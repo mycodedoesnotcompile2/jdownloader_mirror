@@ -37,7 +37,6 @@ package org.appwork.processes.windows.jna;
 import com.sun.jna.Native;
 import com.sun.jna.platform.win32.WinNT;
 import com.sun.jna.win32.StdCallLibrary;
-import com.sun.jna.win32.W32APIOptions;
 
 /**
  * Minimal Kernel32 interface for {@link JNANonWMIWindowsProcessHandler} only. Exposes only the functions used by that
@@ -49,7 +48,7 @@ import com.sun.jna.win32.W32APIOptions;
  */
 public interface Kernel32ForJNANonWMIWindowsProcessHandler extends StdCallLibrary {
 
-    Kernel32ForJNANonWMIWindowsProcessHandler INSTANCE = Native.load("kernel32", Kernel32ForJNANonWMIWindowsProcessHandler.class, W32APIOptions.DEFAULT_OPTIONS);
+    Kernel32ForJNANonWMIWindowsProcessHandler INSTANCE = Native.load("kernel32", Kernel32ForJNANonWMIWindowsProcessHandler.class, org.appwork.jna.windows.JNAOptions.SYSTEM_DLLS_ONLY);
 
     /**
      * Opens an existing process object. Uses int for access mask (e.g. PROCESS_QUERY_INFORMATION | PROCESS_TERMINATE).

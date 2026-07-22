@@ -45,13 +45,13 @@ import com.sun.jna.platform.win32.Guid;
 import com.sun.jna.platform.win32.WinDef.HWND;
 import com.sun.jna.platform.win32.WinNT.HANDLE;
 import com.sun.jna.win32.StdCallLibrary;
-import com.sun.jna.win32.W32APIOptions;
+import org.appwork.jna.windows.JNAOptions;
 
 /**
  * Minimal WinTrust API mapping for WinVerifyTrust.
  */
 public interface WinTrust extends StdCallLibrary {
-    final static WinTrust  INSTANCE                          = Native.load("wintrust", WinTrust.class, W32APIOptions.UNICODE_OPTIONS);
+    final static WinTrust  INSTANCE                          = Native.load("wintrust", WinTrust.class, JNAOptions.UNICODE_SYSTEM_DLLS_ONLY);
     final static Guid.GUID WINTRUST_ACTION_GENERIC_VERIFY_V2 = new Guid.GUID("{00AAC56B-CD44-11d0-8CC2-00C04FC295EE}");
 
     int WinVerifyTrust(HWND hwnd, Guid.GUID pgActionID, WINTRUST_DATA pWinTrustData);

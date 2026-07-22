@@ -44,6 +44,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.appwork.utils.Exceptions;
 import org.appwork.utils.Hash;
 import org.appwork.utils.StringUtils;
 import org.objectweb.asm.AnnotationVisitor;
@@ -64,10 +65,10 @@ import org.objectweb.asm.signature.SignatureVisitor;
  * @date Jan 18, 2026
  */
 public class ClassCollector2 {
-    private static final String DEBUG_DEPENDENCY_PROPERTY      = "build.debug.dependency";
-    private static final String DEBUG_DEPENDENCY_PROPERTY_ALT  = "build.debug.dependency.target";
-    private static final String DEBUG_DEPENDENCY_DEFAULTS      = "org.appwork.updateproviderng.exchange.api2.clientInterfaces.storables.ActiveSessionEntry";
-    private final boolean skipThirdPartyLibraries;
+    private static final String DEBUG_DEPENDENCY_PROPERTY     = "build.debug.dependency";
+    private static final String DEBUG_DEPENDENCY_PROPERTY_ALT = "build.debug.dependency.target";
+    private static final String DEBUG_DEPENDENCY_DEFAULTS     = "org.appwork.updateproviderng.exchange.api2.clientInterfaces.storables.ActiveSessionEntry";
+    private final boolean       skipThirdPartyLibraries;
 
     /**
      * Cached class data containing hash and references
@@ -86,7 +87,6 @@ public class ClassCollector2 {
      * Global cache: className -> ClassData (hash + references) Thread-safe for concurrent access
      */
     private static final Map<String, ClassData> classCache  = new ConcurrentHashMap<String, ClassData>();
-
     /**
      * Cache statistics for monitoring performance
      */
@@ -167,28 +167,24 @@ public class ClassCollector2 {
         final Set<String> toProcess = new HashSet<String>();
         final Set<String> processed = new HashSet<String>();
         long steps = 0;
-
         // Start with initial class
         toProcess.add(className);
         while (!toProcess.isEmpty()) {
             // Get next class to process
             final String clazz = toProcess.iterator().next();
             toProcess.remove(clazz);
-
             // Skip if already processed or should be skipped
             if (processed.contains(clazz) || skip(clazz)) {
                 continue;
             }
             processed.add(clazz);
             steps++;
-
             // Try to get from cache first
             ClassData cachedData = classCache.get(clazz);
             if (cachedData != null) {
                 // Cache hit - use cached data
                 cacheHits.incrementAndGet();
                 result.put(clazz, cachedData.hash);
-
                 // Add references to processing queue if collecting all
                 if (collectAll) {
                     for (String ref : cachedData.references) {
@@ -204,7 +200,6 @@ public class ClassCollector2 {
                     ClassReader reader = new ClassReader(clazz);
                     String hash = Hash.getBytesHash(reader.b, Hash.HASH_TYPE_SHA256);
                     result.put(clazz, hash);
-
                     if (collectAll) {
                         // Collect references
                         CachedClassReferenceCollector collector = new CachedClassReferenceCollector();
@@ -215,11 +210,9 @@ public class ClassCollector2 {
                         if (debugHit != null) {
                             org.appwork.loggingv3.LogV3.info("ClassCollector2: DEBUG scan owner=" + clazz + " hit=" + debugHit + ", refs=" + references.size());
                         }
-
                         // Store in cache
                         classCache.put(clazz, new ClassData(hash, new HashSet<String>(references)));
                         logDebugReferences("collectAll", clazz, references);
-
                         // Add references to processing queue
                         for (String ref : references) {
                             if (!processed.contains(ref) && !skip(ref)) {
@@ -238,7 +231,6 @@ public class ClassCollector2 {
                 }
             }
         }
-
         return result;
     }
 
@@ -261,19 +253,23 @@ public class ClassCollector2 {
             return cachedData.references;
         }
         cacheMisses.incrementAndGet();
-        final ClassReader reader = new ClassReader(className);
-        final String hash = Hash.getBytesHash(reader.b, Hash.HASH_TYPE_SHA256);
-        final CachedClassReferenceCollector collector = new CachedClassReferenceCollector();
-        reader.accept(collector, ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
-        final Set<String> references = collector.getReferencedClasses();
-        logDebugReferences("direct", className, references);
-        final String debugHit = findMatchingTarget(references, getDebugDependencyTargets());
-        if (debugHit != null) {
-            org.appwork.loggingv3.LogV3.info("ClassCollector2: DEBUG direct owner=" + className + " hit=" + debugHit + ", refs=" + references.size());
+        try {
+            final ClassReader reader = new ClassReader(className);
+            final String hash = Hash.getBytesHash(reader.b, Hash.HASH_TYPE_SHA256);
+            final CachedClassReferenceCollector collector = new CachedClassReferenceCollector();
+            reader.accept(collector, ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+            final Set<String> references = collector.getReferencedClasses();
+            logDebugReferences("direct", className, references);
+            final String debugHit = findMatchingTarget(references, getDebugDependencyTargets());
+            if (debugHit != null) {
+                org.appwork.loggingv3.LogV3.info("ClassCollector2: DEBUG direct owner=" + className + " hit=" + debugHit + ", refs=" + references.size());
+            }
+            final ClassData data = new ClassData(hash, new HashSet<String>(references));
+            classCache.put(className, data);
+            return data.references;
+        } catch (IOException e) {
+            throw Exceptions.addSuppressed(e, new Exception("Related Class: " + className));
         }
-        final ClassData data = new ClassData(hash, new HashSet<String>(references));
-        classCache.put(className, data);
-        return data.references;
     }
 
     /**
@@ -351,7 +347,7 @@ public class ClassCollector2 {
         public Set<String> getReferencedClasses() {
             return referenced;
         }
-       
+
         private void addType(Type type) {
             if (type.getSort() == Type.OBJECT) {
                 referenced.add(type.getClassName());
@@ -600,7 +596,7 @@ public class ClassCollector2 {
 
         private static boolean isDebugTargetClass(final String className) {
             return false;
-    }
+        }
 
         private AnnotationVisitor createAnnotationVisitor() {
             return new AnnotationVisitor(Opcodes.ASM9) {

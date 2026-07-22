@@ -59,6 +59,8 @@ import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
+import jd.parser.html.InputField;
+import jd.parser.html.InputField.ElementType;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
@@ -73,7 +75,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53018 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53024 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -1053,6 +1055,9 @@ public class RapidGatorNet extends PluginForHost {
         account.setType(type);
     }
 
+    private final String two_fa_login_field_key = "LoginForm%5BtwoStepAuthCode%5D";
+    private final String captcha_field_key      = "LoginForm%5BverifyCode%5D";
+
     /**
      * @param validateCookies
      *            true = Check whether stored cookies are still valid, if not, perform full login <br/>
@@ -1091,29 +1096,31 @@ public class RapidGatorNet extends PluginForHost {
             }
             clearAccountSession(account, br);
             accessMainpage(br);
-            boolean loginSuccess = false;
-            boolean accountRequires2FALoginCode = false;
             br.getPage("/auth/login");
+            correctBR();
             Form loginform = findLoginform(br);
             if (loginform == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+            boolean loginSuccess = false;
+            /* First round = 2FA cannot be required! */
+            boolean accountRequires2FALoginCode = false;
             String captcha_url = findLoginCaptchaURL(br);
             boolean requiresLoginCaptchaCloudflareTurnstile = this.requiresLoginCaptchaCloudflareTurnstile(loginform);
-            final String two_fa_login_field_key = "LoginForm%5BtwoStepAuthCode%5D";
-            for (int i = 1; i <= 3; i++) {
-                logger.info("Website login attempt " + i + " of 3");
+            final int maxAttempts = 3;
+            for (int i = 1; i <= maxAttempts; i++) {
+                logger.info("Website login attempt " + i + " of " + maxAttempts);
                 loginform.put("LoginForm%5Bemail%5D", Encoding.urlEncode(account.getUser()));
                 loginform.put("LoginForm%5Bpassword%5D", Encoding.urlEncode(account.getPass()));
                 if (captcha_url != null) {
-                    /* Login-captcha */
+                    /* Old image based login-captcha */
                     final DownloadLink dummyLink = new DownloadLink(this, "Account", this.getHost(), "https://" + this.getHost(), true);
                     final String code = getCaptchaCode(captcha_url, dummyLink);
-                    loginform.put("LoginForm%5BverifyCode%5D", Encoding.urlEncode(code));
+                    loginform.put(captcha_field_key, Encoding.urlEncode(code));
                 } else if (requiresLoginCaptchaCloudflareTurnstile) {
-                    /* 2026-07: New */
+                    /* 2026-07: New interactive login captcha */
                     final String cfTurnstileResponse = new CaptchaHelperHostPluginCloudflareTurnstile(this, br).getToken();
-                    loginform.put("LoginForm%5BverifyCode%5D", Encoding.urlEncode(cfTurnstileResponse));
+                    loginform.put(captcha_field_key, Encoding.urlEncode(cfTurnstileResponse));
                     loginform.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
                 }
                 if (accountRequires2FALoginCode) {
@@ -1122,6 +1129,7 @@ public class RapidGatorNet extends PluginForHost {
                     loginform.put(two_fa_login_field_key, twoFACode);
                 }
                 br.submitForm(loginform);
+                correctBR();
                 if (isLoggedINWebsite(br)) {
                     logger.info("Login success");
                     loginSuccess = true;
@@ -1140,12 +1148,11 @@ public class RapidGatorNet extends PluginForHost {
                 captcha_url = findLoginCaptchaURL(br);
                 if (accountRequires2FALoginCode && br.containsHTML(">\\s*Invalid auth code")) {
                     /**
-                     * 2FA code required or previously entered code is invalid. This also means that the users' login credentials are valid.
-                     * </br>
-                     * Ask user for 2FA login code in next round.
+                     * Previously entered 2FA code is invalid. This also means that the users' login credentials are valid. </br>
+                     * Ask user for another 2FA login code in next round.
                      */
                     logger.info("2FA login: User entered invalid 2FA code");
-                } else if (loginform.hasInputFieldByName(two_fa_login_field_key)) {
+                } else if (this.requiresTwoFALogin(loginform)) {
                     logger.info("2FA login: 2FA login required");
                     accountRequires2FALoginCode = true;
                 }
@@ -1175,6 +1182,22 @@ public class RapidGatorNet extends PluginForHost {
         }
     }
 
+    /**
+     * Removes things from html code we don't need. <br>
+     * Important for login handling.
+     */
+    private void correctBR() {
+        final String[] htmls = br.getRegex("<li[^>]*style=\"display: none;?\">.*?</li>").getColumn(-1);
+        if (htmls == null || htmls.length == 0) {
+            return;
+        }
+        String newhtml = br.getRequest().getHtmlCode();
+        for (final String html : htmls) {
+            newhtml = newhtml.replace(html, "");
+        }
+        br.getRequest().setHtmlCode(newhtml);
+    }
+
     private Form findLoginform(final Browser br) {
         Form loginform = br.getFormbyProperty("id", "login");
         if (loginform == null) {
@@ -1188,7 +1211,30 @@ public class RapidGatorNet extends PluginForHost {
         return br.getRegex("\"(/auth/captcha/v/[a-z0-9]+)\"").getMatch(0);
     }
 
+    private boolean requiresTwoFALogin(final Form form) {
+        final InputField twoFAField = form.getInputFieldByName(two_fa_login_field_key);
+        if (twoFAField == null) {
+            return false;
+        }
+        final ElementType et = twoFAField.getElementType();
+        if (et != null && StringUtils.equalsIgnoreCase(et.type(), "HIDDEN")) {
+            /* hidden 2FA field -> No 2FA required */
+            return false;
+        }
+        return true;
+    }
+
     private boolean requiresLoginCaptchaCloudflareTurnstile(final Form form) {
+        final InputField captchaField = form.getInputFieldByName(captcha_field_key);
+        if (captchaField == null) {
+            return false;
+        }
+        /* Check for hidden is wrong here: Field is purposely hidden as captcha usually auto-solves itself */
+        // final ElementType et = captchaField.getElementType();
+        // if (et != null && StringUtils.equalsIgnoreCase(et.type(), "HIDDEN")) {
+        // /* hidden captcha field -> No captcha required */
+        // return false;
+        // }
         return form.containsHTML("class=\"cf-turnstile\"");
     }
 

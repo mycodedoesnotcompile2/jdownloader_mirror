@@ -12,7 +12,6 @@ import com.sun.jna.Memory;
 import com.sun.jna.Native;
 import com.sun.jna.platform.win32.IPHlpAPI;
 import com.sun.jna.ptr.IntByReference;
-import com.sun.jna.win32.W32APIOptions;
 
 /**
  * JNA interface to Windows IP Helper API (IPHlpAPI.dll). Used by {@link WindowsJNAProcessUtils} for GetTcpTable2 / GetTcp6Table2
@@ -21,7 +20,7 @@ import com.sun.jna.win32.W32APIOptions;
 public interface WindowsIphlpapi extends IPHlpAPI {
     int AF_INET = 2;
 
-    WindowsIphlpapi INSTANCE = Native.load("IPHlpAPI", WindowsIphlpapi.class, W32APIOptions.DEFAULT_OPTIONS);
+    WindowsIphlpapi INSTANCE = Native.load("IPHlpAPI", WindowsIphlpapi.class, org.appwork.jna.windows.JNAOptions.SYSTEM_DLLS_ONLY);
 
     int GetExtendedTcpTable(Memory pTcpTable, IntByReference pdwSize, boolean bOrder, int ulAf, int table, int reserved);
 

@@ -70,7 +70,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SyncSaveTvToolbarAction;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 52997 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53021 $", interfaceVersion = 3, names = {}, urls = {})
 public class SaveTv extends PluginForHost {
     /* Static information */
     /* API functions developed for API version 3.0.0.1631 */
@@ -1473,7 +1473,7 @@ public class SaveTv extends PluginForHost {
      * Parameters inside the user-added URL can override his basic plugin settings. This function respects that.
      */
     public static boolean getPreferAdsFree(final DownloadLink link) {
-        final Boolean preferAdsFreeStored = link.getBooleanProperty(PROPERTY_download_ads_free);
+        final Boolean preferAdsFreeStored = (Boolean) link.getProperty(PROPERTY_download_ads_free);
         if (preferAdsFreeStored != null) {
             /*
              * A download using this ads-free setting has already been started before --> Keep using it so a resumed filestream never
@@ -1481,7 +1481,7 @@ public class SaveTv extends PluginForHost {
              */
             return preferAdsFreeStored.booleanValue();
         }
-        final String preferAdsFreeUrl = new Regex(link.getDownloadURL(), "adsfree=(true|false)").getMatch(0);
+        final String preferAdsFreeUrl = new Regex(link.getPluginPatternMatcher(), "adsfree=(true|false)").getMatch(0);
         final boolean preferAdsFree;
         if (preferAdsFreeUrl != null) {
             /* Parameters in urls can override plugin settings! */
@@ -2118,7 +2118,7 @@ public class SaveTv extends PluginForHost {
             /* Fallback - upper functions should now use formatID which user has selected in plugin settings. */
             return -1;
         }
-        final String format_from_url = new Regex(link.getDownloadURL(), "(?i)preferformat=(\\d+)").getMatch(0);
+        final String format_from_url = new Regex(link.getPluginPatternMatcher(), "(?i)preferformat=(\\d+)").getMatch(0);
         if (format_from_url == null) {
             /* Fallback - upper functions should now use formatID which user has selected in plugin settings. */
             return -1;
@@ -2333,7 +2333,7 @@ public class SaveTv extends PluginForHost {
     @SuppressWarnings("deprecation")
     private static String getTelecastId(final DownloadLink link) {
         final String telecastID;
-        final String url = link.getDownloadURL();
+        final String url = link.getPluginPatternMatcher();
         if (new Regex(url, Pattern.compile(LINKTYPE_DIRECT)).matches()) {
             /* Convert directurls --> 'Normal' Stv 'telecastID'-URLs */
             telecastID = new Regex(url, Pattern.compile("https?://[A-Za-z0-9\\-]+\\.save\\.tv/\\d+_(\\d+)", Pattern.CASE_INSENSITIVE)).getMatch(0);
@@ -2676,19 +2676,19 @@ public class SaveTv extends PluginForHost {
     }
 
     public static boolean isTypeTelecastIDOverview(final DownloadLink link) {
-        return new Regex(link.getDownloadURL(), Pattern.compile(LINKTYPE_TELECAST_ID_RECORD_OVERVIEW, Pattern.CASE_INSENSITIVE)).matches();
+        return new Regex(link.getPluginPatternMatcher(), Pattern.compile(LINKTYPE_TELECAST_ID_RECORD_OVERVIEW, Pattern.CASE_INSENSITIVE)).matches();
     }
 
     public static boolean isTypeTelecastID(final DownloadLink link) {
-        return new Regex(link.getDownloadURL(), Pattern.compile(LINKTYPE_TELECAST_ID, Pattern.CASE_INSENSITIVE)).matches();
+        return new Regex(link.getPluginPatternMatcher(), Pattern.compile(LINKTYPE_TELECAST_ID, Pattern.CASE_INSENSITIVE)).matches();
     }
 
     public static boolean isTypeTelecastIDVideoArchiveStreaming(final DownloadLink link) {
-        return new Regex(link.getDownloadURL(), Pattern.compile(LINKTYPE_TELECAST_ID_VIDEO_ARCHIVE_STREAMING, Pattern.CASE_INSENSITIVE)).matches();
+        return new Regex(link.getPluginPatternMatcher(), Pattern.compile(LINKTYPE_TELECAST_ID_VIDEO_ARCHIVE_STREAMING, Pattern.CASE_INSENSITIVE)).matches();
     }
 
     public static boolean isTypeDirect(final DownloadLink link) {
-        return new Regex(link.getDownloadURL(), Pattern.compile(LINKTYPE_DIRECT, Pattern.CASE_INSENSITIVE)).matches();
+        return new Regex(link.getPluginPatternMatcher(), Pattern.compile(LINKTYPE_DIRECT, Pattern.CASE_INSENSITIVE)).matches();
     }
 
     @Override

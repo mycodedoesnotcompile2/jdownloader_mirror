@@ -271,6 +271,9 @@ public class Dialog {
     }
 
     public DialogHandler getHandler() {
+        if (handler != defaultHandler) {
+            LogV3.info("Use custom dialog handler: " + handler);
+        }
         return handler;
     }
 
@@ -311,6 +314,9 @@ public class Dialog {
     public void setHandler(DialogHandler handler) {
         if (handler == null) {
             handler = defaultHandler;
+            LogV3.info("Set Dialog Handler: " + "Default Handler" + "\r\n" + Exceptions.getStackTrace(new Exception()));
+        } else {
+            LogV3.info("Set Dialog Handler: " + handler + "\r\n" + Exceptions.getStackTrace(new Exception()));
         }
         this.handler = handler;
     }
@@ -501,8 +507,8 @@ public class Dialog {
      */
     @NoLogSource
     public <T> T showDialog(final AbstractDialog<T> dialog) throws DialogClosedException, DialogCanceledException {
-        LogV3.info("[Dialog] at " + Exceptions.stacktraceElementToThrownAtString(new Exception().getStackTrace()[1], true));
-        final DialogHandler lhandler = handler;
+        LogV3.info("[Dialog] " + dialog);
+        final DialogHandler lhandler = getHandler();
         if (lhandler != null) {
             //
             return lhandler.showDialog(dialog);

@@ -15,7 +15,7 @@ import com.sun.jna.WString;
 import com.sun.jna.platform.win32.WinNT.HANDLE;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.PointerByReference;
-import com.sun.jna.win32.W32APIOptions;
+import org.appwork.jna.windows.JNAOptions;
 
 /**
  * Minimal JNA binding to Windows Crypt32 API (crypt32.dll) for use by {@link WindowsCertUtils} only. Exposes only the certificate
@@ -33,7 +33,7 @@ import com.sun.jna.win32.W32APIOptions;
  * </p>
  */
 public interface WindowsCertUtilsCrypt extends Library {
-    WindowsCertUtilsCrypt INSTANCE = Native.load("crypt32", WindowsCertUtilsCrypt.class, W32APIOptions.UNICODE_OPTIONS);
+    WindowsCertUtilsCrypt INSTANCE = Native.load("crypt32", WindowsCertUtilsCrypt.class, JNAOptions.UNICODE_SYSTEM_DLLS_ONLY);
 
     // -------------------------------------------------------------------------
     // CertOpenStore: store provider type (first argument)

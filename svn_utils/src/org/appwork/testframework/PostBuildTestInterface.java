@@ -53,4 +53,22 @@ public interface PostBuildTestInterface {
      * @return true to allow skip on unchanged deps, false to always run
      */
     boolean isSkipOnUnchangedDependencies();
+
+    /**
+     * Reports a successful sub-test case for the HTML test report (optional; no-op when reporting is disabled).
+     *
+     * @param testCaseName
+     *            short label
+     */
+    void testSucceeded(String testCaseName);
+
+    /**
+     * Reports a skipped sub-test case for the HTML test report (optional).
+     *
+     * @param testCaseName
+     *            short label
+     * @param reason
+     *            skip reason
+     */
+    void testSkipped(String testCaseName, String reason);
 }

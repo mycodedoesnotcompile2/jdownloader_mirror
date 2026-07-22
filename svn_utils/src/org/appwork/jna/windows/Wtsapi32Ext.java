@@ -11,12 +11,11 @@ import com.sun.jna.platform.win32.WinNT.HANDLE;
 import com.sun.jna.platform.win32.Wtsapi32;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.PointerByReference;
-import com.sun.jna.win32.W32APIOptions;
 
 public interface Wtsapi32Ext extends Wtsapi32 {
     // Method declarations, constant and structure definitions go here
     /** The INSTANCE. */
-    public final Wtsapi32Ext INSTANCE = Native.loadLibrary("wtsapi32", Wtsapi32Ext.class, W32APIOptions.DEFAULT_OPTIONS);
+    public final Wtsapi32Ext INSTANCE = Native.load("Wtsapi32", Wtsapi32Ext.class, JNAOptions.SYSTEM_DLLS_ONLY);
 
     public boolean WTSQueryUserToken(int sessionID, PointerByReference phToken);
     /*

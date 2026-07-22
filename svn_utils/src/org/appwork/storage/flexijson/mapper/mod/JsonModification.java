@@ -40,13 +40,11 @@ import java.util.Set;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.moncompare.Condition;
-import org.appwork.storage.BuildsInfo;
 import org.appwork.storage.FailLevel;
 import org.appwork.storage.MapperType;
 import org.appwork.storage.Storable;
 import org.appwork.storage.StorableDoc;
 import org.appwork.storage.StorableSupportedMappers;
-import org.appwork.storage.StorableValidateNotNull;
 import org.appwork.storage.StorableValidator;
 import org.appwork.storage.StorableValidator.ValidatorException;
 import org.appwork.storage.StorableValidator.ValidatorValueIsNullException;
@@ -136,18 +134,6 @@ public class JsonModification<TargetType, MatcherType> implements Storable {
         public String getDocsDescription(String parameter, Object anno) {
             return null;
         }
-    }
-
-    private BuildsInfo targetBuilds;
-
-    @StorableDoc("Information about the target Clients this configuration should be used with. This information is used to create warnings or to avoid that unsupported or deprecated features are used.")
-    @StorableValidateNotNull(description = "It is recommended to set up a proper targetClients property.", level = FailLevel.WARNING)
-    public BuildsInfo getTargetBuilds() {
-        return this.targetBuilds;
-    }
-
-    public void setTargetBuilds(final BuildsInfo clientInfo) {
-        this.targetBuilds = clientInfo;
     }
 
     private Condition<MatcherType>[] conditions;

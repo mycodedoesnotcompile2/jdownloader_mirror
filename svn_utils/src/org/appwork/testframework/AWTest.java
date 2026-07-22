@@ -131,6 +131,16 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
         return true;
     }
 
+    @Override
+    public void testSucceeded(final String testCaseName) {
+        TestCaseReporter.testSucceeded(testCaseName);
+    }
+
+    @Override
+    public void testSkipped(final String testCaseName, final String reason) {
+        TestCaseReporter.testSkipped(testCaseName, reason);
+    }
+
     public static class LogCache extends AbstractSink {
         private final CopyOnWriteArrayList<LogRecord2> buffer = new CopyOnWriteArrayList<LogRecord2>();
 
@@ -225,6 +235,8 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
         if (isSkipDueToMaintenance(this)) {
             AWTest.logInfoAnyway("[** MAINTENANCE **]" + getClass().getName());
             return;
+        } else if (this.isMaintenance()) {
+            AWTest.logInfoAnyway("[** MAINTENANCE(Bypassed!) **]" + getClass().getName());
         }
         this.runTest();
     }

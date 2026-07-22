@@ -14,6 +14,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.NotSerializableException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.RandomAccessFile;
@@ -42,9 +43,11 @@ import org.appwork.utils.Application;
 import org.appwork.utils.IO;
 import org.appwork.utils.LogCallback;
 import org.appwork.utils.UniqueAlltimeID;
+import org.appwork.utils.encoding.Base64;
 import org.appwork.utils.formatter.HexFormatter;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.JNAProcessInfo;
+import org.appwork.utils.duration.TimeSpan;
 import org.appwork.utils.os.NotSupportedException;
 import org.appwork.utils.os.WindowsUtils;
 import org.appwork.utils.processes.ProcessBuilderFactory;
@@ -57,10 +60,18 @@ import org.appwork.utils.singleapp.SingleAppInstance.ErrorReadingResponseExcepti
 import org.appwork.utils.singleapp.SingleAppInstance.InvalidResponseID;
 import org.appwork.utils.singleapp.SingleAppInstance.NoPortFileException;
 
+import com.sun.jna.platform.win32.Win32Exception;
+
 /**
  * Executes code with elevated privileges (Windows UAC) via a separate helper process. Uses SingleAppInstance for communication: the helper
  * accepts connections only from the parent PID. Use {@link #runAsAdmin(ElevatedTestTask, TypeRef)} or
- * {@link #runAsAdmin(File, String[], ProcessOptions)}.
+ * {@link #runAsAdmin(File, String[], ProcessOptions)}. For running a serialized task as another Windows user in the helper's session, use
+ * {@link #runAsUser(String, String, String, ElevatedTestTask, TypeRef)}.
+ * <p>
+ * When {@link RunSerializedTaskMain} was started for {@code RUN_AS_USER_TASK} (see {@link RunSerializedTaskMain#isLaunchedFromRunAsUserIpcTask()}),
+ * {@link #runAsAdmin(ElevatedTestTask, TypeRef, ProcessOptions)} does <strong>not</strong> use the shared helper (different Windows user); it
+ * starts {@link RunSerializedTaskMain} via {@link WindowsUtils#startElevatedProcess} so the <strong>current</strong> task identity is elevated (UAC
+ * {@code runas} for that user).
  */
 public final class AdminExecuter {
     private static final Charset    UTF8                          = Charset.forName("UTF-8");
@@ -279,6 +290,12 @@ public final class AdminExecuter {
             }
             return (T) raw;
         }
+        if (RunSerializedTaskMain.isLaunchedFromRunAsUserIpcTask()) {
+            if (isVerbose()) {
+                LogV3.info("AdminExecuter [verbose]: RUN_AS_USER task JVM: runAsAdmin via WindowsUtils.startElevatedProcess (not helper)");
+            }
+            return runAsAdminForRunAsUserChildViaShellExecute(task, resultType, opts);
+        }
         ensureHelperRunning();
         byte[] taskBytes = serializeTask(task);
         String hexTask = HexFormatter.byteArrayToHex(taskBytes);
@@ -390,7 +407,7 @@ public final class AdminExecuter {
 
     /**
      * Runs the given task as NT AUTHORITY\SYSTEM (LocalSystem). Ensures an elevated helper is running, then runs the task in a scheduled
-     * task as SYSTEM (via {@link RunTaskAsSystemMain}). Stdout/stderr from the task are forwarded to the calling process.
+     * task as SYSTEM (via {@link RunSerializedTaskMain}). Stdout/stderr from the task are forwarded to the calling process.
      *
      * @param task
      *            serializable task to run as Local System
@@ -498,8 +515,170 @@ public final class AdminExecuter {
     }
 
     /**
+     * Runs the task in the elevated helper, which starts a JVM subprocess as {@code DOMAIN\\user} in the same WTS session as the helper
+     * (similar to Shift+Run as different user). The helper uses {@code LogonUser} and may fall back to {@code CreateProcessWithLogonW}.
+     * The password is sent Base64-encoded to the helper over IPC; use only in trusted environments.
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T runAsUser(String domain, String user, String password, ElevatedTestTask task, TypeRef<T> resultType) throws Exception {
+        return runAsUser(domain, user, password, task, resultType, ProcessOptions.DEFAULT);
+    }
+
+    /**
+     * Same as {@link #runAsUser(String, String, String, ElevatedTestTask, TypeRef)} with {@link ProcessOptions} (e.g. {@link LogCallback}).
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T runAsUser(String domain, String user, String password, ElevatedTestTask task, TypeRef<T> resultType, ProcessOptions options) throws Exception {
+        if (!CrossSystem.isWindows()) {
+            throw new UnsupportedOperationException("runAsUser is only supported on Windows");
+        }
+        if (user == null || user.trim().length() == 0) {
+            throw new IllegalArgumentException("user is required");
+        }
+        if (password == null) {
+            throw new IllegalArgumentException("password is required");
+        }
+        if (task == null) {
+            throw new IllegalArgumentException("task cannot be null");
+        }
+        if (isVerbose()) {
+            LogV3.info("AdminExecuter [verbose]: runAsUser entered user=" + user);
+        }
+        ProcessOptions opts = options != null ? options : ProcessOptions.DEFAULT;
+        if (RunSerializedTaskMain.isLaunchedFromElevatedHelperTask()) {
+            if (!opts.isWaitFor()) {
+                throw new UnsupportedOperationException("runAsUser from elevated helper RUN_TASK JVM: waitFor=false is not supported");
+            }
+            if (opts.isKeepRunning()) {
+                throw new UnsupportedOperationException("runAsUser from elevated helper RUN_TASK JVM: keepRunning=true is not supported");
+            }
+            if (!org.appwork.JNAHelper.isJNAAvailable()) {
+                throw new UnsupportedOperationException("runAsUser requires JNA");
+            }
+            if (isVerbose()) {
+                LogV3.info("AdminExecuter [verbose]: runAsUser from RUN_TASK child JVM -> RunTaskAsUserLauncher (no second UAC helper)");
+            }
+            byte[] taskBytes = serializeTask(task);
+            String domainRaw = domain != null ? domain : "";
+            String hex = AdminHelperProcess.runSerializedTaskAsUser(domainRaw, user.trim(), password, taskBytes, getAbsoluteClassPathForLocalSystem(), null);
+            Object raw = deserializeTaskResult(hex != null ? hex : "", opts.getLogCallback());
+            if (raw == null) {
+                return null;
+            }
+            if (resultType != null && resultType.getRawClass() != null) {
+                return (T) resultType.getRawClass().cast(raw);
+            }
+            return (T) raw;
+        }
+        ensureHelperRunning();
+        byte[] taskBytes = serializeTask(task);
+        String hexTask = HexFormatter.byteArrayToHex(taskBytes);
+        String classpath = getAbsoluteClassPathForLocalSystem();
+        String domainStr = domain != null ? domain : "";
+        String pwdB64 = Base64.encode(password);
+        opts.setRequestId(String.valueOf(UniqueAlltimeID.next()));
+        String optionsJson = opts.toHelperPayloadJson();
+        final AtomicReference<SingleAppInstance> clientRef = new AtomicReference<SingleAppInstance>(null);
+        final CountDownLatch latch = new CountDownLatch(1);
+        final AtomicReference<Object> resultRef = new AtomicReference<Object>(null);
+        final AtomicReference<Exception> errorRef = new AtomicReference<Exception>(null);
+        final ProcessOptions optsRef = opts;
+        ResponseListener listener = new ResponseListener() {
+            @Override
+            public void onConnected(SingleAppInstance single, java.net.SocketAddress remoteSocket, String[] message) {
+            }
+
+            @Override
+            public void onReceivedResponse(SingleAppInstance single, Response response) {
+                if (AdminHelperProcess.PROCESS_STARTED.equals(response.getType())) {
+                    String pidStr = response.getMessage();
+                    if (pidStr != null && pidStr.trim().length() > 0 && optsRef != null) {
+                        try {
+                            int pid = Integer.parseInt(pidStr.trim(), 10);
+                            optsRef.setTaskPID(Integer.valueOf(pid));
+                            final String reqId = optsRef.getRequestId();
+                            if (reqId != null) {
+                                final AtomicReference<SingleAppInstance> ref = clientRef;
+                                optsRef.setTerminateAction(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        try {
+                                            SingleAppInstance c = ref.get();
+                                            if (c != null) {
+                                                c.sendToRunningInstance(null, AdminHelperProcess.TERMINATE_REQUEST_ID, reqId);
+                                            }
+                                        } catch (Throwable t) {
+                                            LogV3.log(t);
+                                        }
+                                    }
+                                });
+                            }
+                        } catch (NumberFormatException e) {
+                            LogV3.warning("AdminExecuter: runAsUser PROCESS_STARTED invalid pid: " + pidStr);
+                        }
+                    }
+                    return;
+                }
+                if (AdminHelperProcess.TASK_RESULT.equals(response.getType())) {
+                    try {
+                        String hexResult = response.getMessage();
+                        resultRef.set(deserializeTaskResult(hexResult != null ? hexResult : "", optsRef != null ? optsRef.getLogCallback() : null));
+                    } catch (Throwable t) {
+                        errorRef.set(t instanceof Exception ? (Exception) t : new Exception(t));
+                    }
+                    latch.countDown();
+                } else if (SingleAppInstance.EXCEPTION.equals(response.getType())) {
+                    errorRef.set(new Exception("Helper reported: " + response.getMessage()));
+                    latch.countDown();
+                }
+            }
+        };
+        for (int attempt = 0; attempt < 2; attempt++) {
+            if (attempt > 0) {
+                LogV3.warning("AdminExecuter: connection refused (runAsUser), retrying after ensureHelperRunning");
+                ensureHelperRunning();
+            }
+            SingleAppInstance client = createHelperClient();
+            clientRef.set(client);
+            try {
+                client.sendToRunningInstance(wrapResponseListener(listener), AdminHelperProcess.RUN_AS_USER_TASK, hexTask, classpath, domainStr, user, pwdB64, optionsJson);
+                break;
+            } catch (ConnectException e) {
+                if (attempt == 0) {
+                    continue;
+                }
+                throw new Exception("Helper not reachable after retry: " + e.getMessage(), e);
+            } catch (ExceptionInRunningInstance e) {
+                throw new Exception("Helper reported exception: " + e.getMessage(), e);
+            } catch (InvalidResponseID e) {
+                throw new Exception("Invalid response from helper: " + e.getMessage(), e);
+            } catch (NoPortFileException e) {
+                throw new Exception("Helper not ready (no port file): " + e.getMessage(), e);
+            } catch (ErrorReadingResponseException e) {
+                throw new Exception("Error reading helper response: " + e.getMessage(), e);
+            }
+        }
+        startHelperLivenessWatcher(getHelperLockFile(), latch, errorRef);
+        if (!latch.await(300000, TimeUnit.MILLISECONDS)) {
+            throw new Exception("Timeout waiting for TASK_RESULT from helper (runAsUser)");
+        }
+        Exception ex = errorRef.get();
+        if (ex != null) {
+            throw ex;
+        }
+        Object raw = resultRef.get();
+        if (raw == null) {
+            return null;
+        }
+        if (resultType != null && resultType.getRawClass() != null) {
+            return (T) resultType.getRawClass().cast(raw);
+        }
+        return (T) raw;
+    }
+
+    /**
      * Returns the current JVM classpath with all entries converted to absolute paths. Used when sending the classpath to the helper for
-     * RUN_AS_LOCAL_SYSTEM_TASK so that the subprocess (running with CWD = temp dir) can find RunTaskAsSystemMain and dependencies
+     * RUN_AS_LOCAL_SYSTEM_TASK so that the subprocess (running with CWD = temp dir) can find RunSerializedTaskMain and dependencies
      * regardless of working directory.
      */
     private static String getAbsoluteClassPathForLocalSystem() {
@@ -520,7 +699,109 @@ public final class AdminExecuter {
             }
             sb.append(new File(e).getAbsolutePath());
         }
-        return sb.toString();
+        final String resolved = sb.toString();
+        return resolved;
+    }
+
+    /**
+     * Runs {@link RunSerializedTaskMain} in a new JVM started with {@link WindowsUtils#startElevatedProcess} (ShellExecuteEx {@code runas})
+     * under the <strong>current</strong> user, so UAC elevates the same account as the {@code RUN_AS_USER_TASK} child (not the helper host).
+     */
+    @SuppressWarnings("unchecked")
+    private static <T> T runAsAdminForRunAsUserChildViaShellExecute(final ElevatedTestTask task, final TypeRef<T> resultType, final ProcessOptions opts) throws Exception {
+        if (opts.isKeepRunning()) {
+            throw new UnsupportedOperationException("runAsAdmin from RUN_AS_USER subprocess: keepRunning=true is not supported for ShellExecuteEx elevation");
+        }
+        if (!opts.isWaitFor()) {
+            throw new UnsupportedOperationException("runAsAdmin from RUN_AS_USER subprocess: waitFor=false is not supported for ShellExecuteEx elevation");
+        }
+        opts.setRequestId(String.valueOf(UniqueAlltimeID.next()));
+        final byte[] taskBytes = serializeTask(task);
+        final File tempDir = AdminHelperProcess.newShellExecuteElevatedTransportDir();
+        try {
+            IO.writeToFile(new File(tempDir, "task.bin"), taskBytes);
+            final String taskId = tempDir.getName().startsWith("AppWorkRunElevatedLocal_") ? tempDir.getName().substring("AppWorkRunElevatedLocal_".length()) : tempDir.getName();
+            final String javaBin = CrossSystem.getJavaBinary();
+            final String cp = System.getProperty("java.class.path") != null ? System.getProperty("java.class.path") : "";
+            final String[] argv = new String[] { javaBin, "-Dfile.encoding=UTF-8", "-cp", cp, RunSerializedTaskMain.class.getName(), tempDir.getAbsolutePath(), taskId };
+            JNAProcessInfo proc;
+            try {
+                proc = WindowsUtils.startElevatedProcess(argv, tempDir.getAbsolutePath(), false);
+            } catch (Win32Exception e) {
+                throw new Exception("WindowsUtils.startElevatedProcess failed: " + e.getMessage(), e);
+            }
+            final int pid = proc.getPid();
+            opts.setTaskPID(Integer.valueOf(pid));
+            opts.setTerminateAction(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        ProcessHandlerFactory.getProcessHandler().terminateForced(new ProcessInfo(pid), 1);
+                    } catch (Throwable t) {
+                        LogV3.log(t);
+                    }
+                }
+            });
+            final List<ProcessInfo> remaining;
+            try {
+                remaining = ProcessHandlerFactory.getProcessHandler().waitForExit(TimeSpan.parse("120s"), proc);
+            } catch (NotSupportedException e) {
+                throw new Exception("waitForExit not supported: " + e.getMessage(), e);
+            }
+            if (remaining != null && remaining.size() > 0) {
+                try {
+                    ProcessHandlerFactory.getProcessHandler().terminateForced(new ProcessInfo(pid), 1);
+                } catch (Throwable t) {
+                    LogV3.log(t);
+                }
+                throw new Exception("Timeout waiting for ShellExecuteEx-elevated task (pid=" + pid + ")");
+            }
+            final Integer exitCode = proc.getExitCode();
+            final File resultHexFile = new File(tempDir, "result.hex");
+            if (!resultHexFile.isFile()) {
+                throw new Exception("ShellExecuteEx-elevated task did not produce result.hex (exitCode=" + exitCode + ", pid=" + pid + ")");
+            }
+            final String hex = IO.readFileToString(resultHexFile).trim();
+            if (hex.length() == 0) {
+                throw new Exception("ShellExecuteEx-elevated task produced empty result.hex (exitCode=" + exitCode + ")");
+            }
+            final Object raw = deserializeTaskResult(hex, opts.getLogCallback());
+            if (raw == null) {
+                return null;
+            }
+            if (resultType != null && resultType.getRawClass() != null) {
+                return (T) resultType.getRawClass().cast(raw);
+            }
+            return (T) raw;
+        } finally {
+            deleteRunElevatedLocalTempQuiet(tempDir);
+        }
+    }
+
+    private static void deleteRunElevatedLocalTempQuiet(final File tempDir) {
+        if (tempDir == null) {
+            return;
+        }
+        try {
+            new File(tempDir, "task.bin").delete();
+        } catch (Throwable ignore) {
+        }
+        try {
+            new File(tempDir, "result.hex").delete();
+        } catch (Throwable ignore) {
+        }
+        try {
+            new File(tempDir, "pid.txt").delete();
+        } catch (Throwable ignore) {
+        }
+        try {
+            new File(tempDir, "keep_running").delete();
+        } catch (Throwable ignore) {
+        }
+        try {
+            tempDir.delete();
+        } catch (Throwable ignore) {
+        }
     }
 
     private static byte[] serializeTask(ElevatedTestTask task) throws IOException {
@@ -531,6 +812,13 @@ public final class AdminExecuter {
             oos.writeObject(task);
             oos.flush();
             return baos.toByteArray();
+        } catch (NotSerializableException e) {
+            String taskClass = task != null ? task.getClass().getName() : "null";
+            String detail = e.getMessage() != null ? e.getMessage() : e.getClass().getName();
+            String msg = "Cannot serialize ElevatedTestTask for the helper process (task class: " + taskClass + "). " + "The whole object graph must implement Serializable. Common cause: a non-static anonymous or inner task class that " + "captures the enclosing instance (for example org.appwork.testframework.AWTest), which is not serializable — use a " + "static nested class and only Serializable fields (String, primitives, Serializable data). JVM reported: " + detail;
+            NotSerializableException wrapped = new NotSerializableException(msg);
+            wrapped.initCause(e);
+            throw wrapped;
         } finally {
             if (oos != null) {
                 try {
@@ -571,6 +859,12 @@ public final class AdminExecuter {
             Object obj = ois.readObject();
             if (obj instanceof AdminTaskResultWrapper) {
                 AdminTaskResultWrapper wrapper = (AdminTaskResultWrapper) obj;
+                if (isVerbose()) {
+                    final int outLen = wrapper.getStdout() != null ? wrapper.getStdout().length() : 0;
+                    final int errLen = wrapper.getStderr() != null ? wrapper.getStderr().length() : 0;
+                    final boolean failed = wrapper.hasTaskFailure();
+                    LogV3.info("AdminExecuter [verbose]: deserializeTaskResult wrapper received: stdoutLen=" + outLen + ", stderrLen=" + errLen + ", hasTaskFailure=" + failed);
+                }
                 if (logCallback != null) {
                     streamRemoteOutputToLogV3("runAsAdmin", wrapper.getStdout(), wrapper.getStderr(), logCallback);
                 } else {
@@ -1450,7 +1744,9 @@ public final class AdminExecuter {
             helperCmd = addHelperArg(helperCmd, "-debugLogDir");
             helperCmd = addHelperArg(helperCmd, helperDebugLogDir.getAbsolutePath());
         }
+        logVerbose("helper cmd: generate Keys");
         helperKeyPair = HelperChannelCrypto.generateKeyPair();
+        logVerbose("helper cmd: generate Keys - Done");
         String publicKeyBase64 = HelperChannelCrypto.encodePublicKeyToBase64(helperKeyPair.getPublic());
         helperCmd = addHelperArg(addHelperArg(helperCmd, "-publicKeyBase64"), publicKeyBase64);
         logVerbose("helper cmd: javaBin=" + javaBin + " classpathLen=" + (classpath != null ? classpath.length() : 0) + " appRoot=" + appRootAbs + " lockDir=" + lockDirAbs + " debugLogs=" + debugLogs + " showDebugWindow=" + showDebugWindow + " verbose=" + verbose);

@@ -5,10 +5,10 @@ import com.sun.jna.Pointer;
 import com.sun.jna.platform.win32.WinNT;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.win32.StdCallLibrary;
-import com.sun.jna.win32.W32APIOptions;
+import org.appwork.jna.windows.JNAOptions;
 
 public interface NtDllExt extends StdCallLibrary, WinNT {
-    public final static NtDllExt INSTANCE = Native.load("ntdll", NtDllExt.class, W32APIOptions.UNICODE_OPTIONS);
+    public final static NtDllExt INSTANCE = Native.load("ntdll", NtDllExt.class, JNAOptions.UNICODE_SYSTEM_DLLS_ONLY);
 
     public BOOL RtlSetCurrentTransaction(HANDLE transaction);
 

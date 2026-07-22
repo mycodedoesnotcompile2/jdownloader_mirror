@@ -24,6 +24,20 @@ import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
+
+import org.appwork.exceptions.WTFException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.config.NitroflareConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -48,22 +62,8 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.exceptions.WTFException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.ReflectionUtils;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.config.NitroflareConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53021 $", interfaceVersion = 3, names = {}, urls = {})
 public class NitroFlareCom extends PluginForHost {
-    private final String         staticBaseURL             = "https://nitroflare.com";
     /* Documentation | docs: https://nitroflare.com/member?s=api */
     /* Don't touch the following! */
     private static AtomicInteger maxFree                   = new AtomicInteger(1);
@@ -73,7 +73,7 @@ public class NitroFlareCom extends PluginForHost {
     @Override
     public void init() {
         final String[] siteSupportedNames = siteSupportedNames();
-        for (String siteSupportedName : siteSupportedNames) {
+        for (final String siteSupportedName : siteSupportedNames) {
             try {
                 Browser.setRequestIntervalLimitGlobal(siteSupportedName, 500);
             } catch (final Throwable t) {
@@ -97,7 +97,7 @@ public class NitroFlareCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return staticBaseURL + "/tos";
+        return "https://" + getHost() + "/tos";
     }
 
     public static List<String[]> getPluginDomains() {
@@ -120,10 +120,12 @@ public class NitroFlareCom extends PluginForHost {
         return buildAnnotationUrls(getPluginDomains());
     }
 
+    private static final Pattern PATTERN_FILE = Pattern.compile("/(?:view|watch)/([A-Z0-9]+)");
+
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:view|watch)/([A-Z0-9]+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_FILE.pattern());
         }
         return ret.toArray(new String[0]);
     }
@@ -147,7 +149,8 @@ public class NitroFlareCom extends PluginForHost {
     /**
      * Use website or API: https://nitroflare.com/member?s=api </br>
      *
-     * @return true: Use API for account login and downloading </br> false: Use website for everything (except linkcheck)
+     * @return true: Use API for account login and downloading </br>
+     *         false: Use website for everything (except linkcheck)
      */
     private boolean useAPIMode(final Account account, final DownloadLink downloadLink) {
         if (API_AUTO_DISABLED.get()) {
@@ -166,7 +169,8 @@ public class NitroFlareCom extends PluginForHost {
     private static AtomicReference<String> BASE_DOMAIN = new AtomicReference<String>(null);
 
     /**
-     * Finds valid base domain. </br> In some countries some nitroflare domains may be blocked by some ISPs.
+     * Finds valid base domain. </br>
+     * In some countries some nitroflare domains may be blocked by some ISPs.
      */
     public static String getBaseDomain(final Plugin plugin, final Browser br) throws PluginException {
         synchronized (BASE_DOMAIN) {
@@ -232,7 +236,7 @@ public class NitroFlareCom extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        return new Regex(link.getPluginPatternMatcher(), PATTERN_FILE).getMatch(0);
     }
 
     @Override
@@ -684,7 +688,8 @@ public class NitroFlareCom extends PluginForHost {
         if (postCaptcha) {
             if (br.containsHTML("You don't have an entry ticket\\. Please refresh the page to get a new one")) {
                 /**
-                 * This should be a rare error. </br> 2024-02-21: This may still happen sometimes for unknown reasons
+                 * This should be a rare error. </br>
+                 * 2024-02-21: This may still happen sometimes for unknown reasons
                  */
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "You don't have an entry ticket. Please refresh the page to get a new one.", 2 * 60 * 1000l);
             } else if (br.containsHTML("File doesn't exist")) {
@@ -703,12 +708,7 @@ public class NitroFlareCom extends PluginForHost {
             final String waitminutesStr = br.getRegex("You have to wait (\\d+) minutes to download").getMatch(0);
             if (waitminutesStr != null) {
                 final int waitminutes = Integer.parseInt(waitminutesStr);
-                /* Sometimes they got3 hour waittime but it will be over sooner --> Wait max 60 minutes. */
-                if (waitminutes >= 60) {
-                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, 60 * 60 * 1001l);
-                } else {
-                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, waitminutes * 60 * 1001l);
-                }
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, waitminutes * 60 * 1001l);
             } else if (PluginJsonConfig.get(NitroflareConfig.class).isAllowMultipleFreeDownloads()) {
                 /* Wait shorter amount of time if user allows multiple free downloads according to plugin config. */
                 throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, 20 * 60 * 1000l);
@@ -790,7 +790,7 @@ public class NitroFlareCom extends PluginForHost {
             final String host = getBaseDomain(this, br);
             br.setCookiesExclusive(true);
             final Cookies cookies = account.loadCookies("");
-            boolean fullLogin;
+            final boolean fullLogin;
             if (cookies != null) {
                 logger.info("Attempting cookie login");
                 br.setCookies(cookies);
@@ -920,7 +920,7 @@ public class NitroFlareCom extends PluginForHost {
                 if (!StringUtils.isEmpty(tmpsec)) {
                     seconds = Integer.parseInt(tmpsec);
                 }
-                long waittime = ((years * 86400000 * 365) + (days * 86400000) + (hours * 3600000) + (minutes * 60000) + (seconds * 1000));
+                final long waittime = ((years * 86400000 * 365) + (days * 86400000) + (hours * 3600000) + (minutes * 60000) + (seconds * 1000));
                 ai.setValidUntil(System.currentTimeMillis() + waittime);
             }
             account.setAccountInfo(ai);
@@ -1216,10 +1216,6 @@ public class NitroFlareCom extends PluginForHost {
     }
 
     @Override
-    public void reset() {
-    }
-
-    @Override
     public int getMaxSimultanFreeDownloadNum() {
         return maxFree.get();
     }
@@ -1234,6 +1230,7 @@ public class NitroFlareCom extends PluginForHost {
         link.removeProperty(PROPERTY_PREMIUM_REQUIRED);
     }
 
+    @Override
     public boolean hasCaptcha(final DownloadLink downloadLink, final jd.plugins.Account acc) {
         if (acc == null || acc.getType() == AccountType.FREE) {
             /* no account and free account, yes we can expect captcha */

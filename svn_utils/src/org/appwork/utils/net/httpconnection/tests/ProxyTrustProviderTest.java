@@ -34,6 +34,7 @@ package org.appwork.utils.net.httpconnection.tests;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.net.httpclient.HttpClient;
 import org.appwork.utils.net.httpclient.HttpClient.RequestContext;
 import org.appwork.utils.net.httpclient.HttpClientException;
@@ -90,7 +91,7 @@ public class ProxyTrustProviderTest extends ProxyConnectionTestBase {
             // Test with TrustAllProvider
             LogV3.info("Via " + proxy);
             {
-                RequestContext context = new HttpClient().proxy(proxy).trust(AllTrustProvider.getInstance()).get("https://appwork.org/");
+                RequestContext context = createClientz().proxy(proxy).trust(AllTrustProvider.getInstance()).get("https://appwork.org/");
                 assertTrue(context.getCode() == 200 || context.getCode() == 301 || context.getCode() == 302, "Request should succeed via SOCKS proxy");
                 assertTrue(context.getTrustResult() != null, "TrustResult should not be null");
                 assertTrue(context.getTrustResult().isTrusted(), "Certificate should be trusted");
@@ -98,28 +99,28 @@ public class ProxyTrustProviderTest extends ProxyConnectionTestBase {
             }
             // Test with TrustCurrentJREProvider
             {
-                RequestContext context = new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()).get("https://appwork.org/");
+                RequestContext context = createClientz().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()).get("https://appwork.org/");
                 assertTrue(context.getCode() == 200 || context.getCode() == 301 || context.getCode() == 302, "Request should succeed via SOCKS proxy");
                 assertTrue(context.getTrustResult() != null, "TrustResult should not be null");
                 assertTrue(context.getTrustResult().isTrusted(), "Certificate should be trusted");
                 assertTrue(context.getTrustResult().getTrustProvider() instanceof CurrentJRETrustProvider);
             }
             {
-                RequestContext context = new HttpClient().proxy(proxy).trust(new CCADBTrustProvider()).get("https://appwork.org/");
+                RequestContext context = createClientz().proxy(proxy).trust(new CCADBTrustProvider()).get("https://appwork.org/");
                 assertTrue(context.getCode() == 200 || context.getCode() == 301 || context.getCode() == 302, "Request should succeed via SOCKS proxy");
                 assertTrue(context.getTrustResult() != null, "TrustResult should not be null");
                 assertTrue(context.getTrustResult().isTrusted(), "Certificate should be trusted");
                 assertTrue(context.getTrustResult().getTrustProvider() instanceof CCADBTrustProvider);
             }
             {
-                RequestContext context = new HttpClient().proxy(proxy).trust(AllTrustProvider.getInstance()).get("https://sha384.badssl.com/");
+                RequestContext context = createClientz().proxy(proxy).trust(AllTrustProvider.getInstance()).get("https://sha384.badssl.com/");
                 assertTrue(context.getCode() == 200 || context.getCode() == 301 || context.getCode() == 302, "Request should succeed via SOCKS proxy");
                 assertTrue(context.getTrustResult() != null, "TrustResult should not be null");
                 assertTrue(context.getTrustResult().isTrusted(), "Certificate should be trusted");
                 assertTrue(context.getTrustResult().getTrustProvider() instanceof AllTrustProvider);
             }
             {
-                RequestContext context = new HttpClient().proxy(proxy).get("https://sha384.badssl.com/");
+                RequestContext context = createClientz().proxy(proxy).get("https://sha384.badssl.com/");
                 assertTrue(context.getCode() == 200 || context.getCode() == 301 || context.getCode() == 302, "Request should succeed via SOCKS proxy");
                 assertTrue(context.getTrustResult() != null, "TrustResult should not be null");
                 assertTrue(context.getTrustResult().getTrustProvider() == TrustUtils.getDefaultProvider());
@@ -127,14 +128,14 @@ public class ProxyTrustProviderTest extends ProxyConnectionTestBase {
                 assertTrue(succeededTrustResult.getTrustProvider() instanceof AllTrustProvider);
             }
             {
-                RequestContext context = new HttpClient().proxy(proxy).get("https://appwork.org/");
+                RequestContext context = createClientz().proxy(proxy).get("https://appwork.org/");
                 assertTrue(context.getTrustResult() != null, "TrustResult should not be null");
                 assertTrue(context.getTrustResult().getTrustProvider() == TrustUtils.getDefaultProvider());
                 TrustResult succeededTrustResult = ((CompositeTrustResult) context.getTrustResult()).getSuccess();
                 assertFalse(succeededTrustResult.getTrustProvider() instanceof AllTrustProvider);
             }
             try {
-                new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()).get("https://sha384.badssl.com/");
+                createClientz().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()).get("https://sha384.badssl.com/");
                 throw new WTFException("Chrome says: net::ERR_CERT_DATE_INVALID");
             } catch (HttpClientException e) {
                 assertTrue(e.getContext().getTrustResult() != null);
@@ -142,7 +143,7 @@ public class ProxyTrustProviderTest extends ProxyConnectionTestBase {
                 assertTrue(e.getContext().getTrustResult().getTrustProvider() instanceof CurrentJRETrustProvider);
             }
             try {
-                new HttpClient().proxy(proxy).trust(new CCADBTrustProvider()).get("https://sha384.badssl.com/");
+                createClientz().proxy(proxy).trust(new CCADBTrustProvider()).get("https://sha384.badssl.com/");
                 throw new WTFException("Chrome says: net::ERR_CERT_DATE_INVALID");
             } catch (HttpClientException e) {
                 assertTrue(e.getContext().getTrustResult() != null);
@@ -150,17 +151,19 @@ public class ProxyTrustProviderTest extends ProxyConnectionTestBase {
                 assertTrue(e.getContext().getTrustResult().getTrustProvider() instanceof CCADBTrustProvider);
             }
             try {
-                new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()).get("https://sha512.badssl.com/");
+                createClientz().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()).get("https://sha512.badssl.com/");
                 throw new WTFException("Chrome says: net::ERR_CERT_DATE_INVALID");
             } catch (HttpClientException e) {
+                DebugMode.breakIf(e.getContext().getTrustResult() == null);
                 assertTrue(e.getContext().getTrustResult() != null);
                 assertFalse(e.getContext().getTrustResult().isTrusted());
                 assertTrue(e.getContext().getTrustResult().getTrustProvider() instanceof CurrentJRETrustProvider);
             }
             try {
-                new HttpClient().proxy(proxy).trust(new CCADBTrustProvider()).get("https://sha512.badssl.com/");
+                createClientz().proxy(proxy).trust(new CCADBTrustProvider()).get("https://sha512.badssl.com/");
                 throw new WTFException("Chrome says: net::ERR_CERT_DATE_INVALID");
             } catch (HttpClientException e) {
+                DebugMode.breakIf(e.getContext().getTrustResult() == null);
                 assertTrue(e.getContext().getTrustResult() != null);
                 assertFalse(e.getContext().getTrustResult().isTrusted());
                 assertTrue(e.getContext().getTrustResult().getTrustProvider() instanceof CCADBTrustProvider);
@@ -168,7 +171,7 @@ public class ProxyTrustProviderTest extends ProxyConnectionTestBase {
             // Test with CompositeTrustProvider
             {
                 CompositeTrustProvider composite = new CompositeTrustProvider(CurrentJRETrustProvider.getInstance());
-                RequestContext context = new HttpClient().proxy(proxy).trust(composite).get("https://appwork.org");
+                RequestContext context = createClientz().proxy(proxy).trust(composite).get("https://appwork.org");
                 assertTrue(context.getCode() == 200 || context.getCode() == 301 || context.getCode() == 302, "Request should succeed via SOCKS proxy");
                 assertTrue(context.getTrustResult() != null, "TrustResult should not be null");
                 assertTrue(context.getTrustResult().isTrusted());
@@ -179,7 +182,7 @@ public class ProxyTrustProviderTest extends ProxyConnectionTestBase {
             }
             {
                 CompositeTrustProvider composite = new CompositeTrustProvider(NeverTrustProvider.getInstance(), CurrentJRETrustProvider.getInstance());
-                RequestContext context = new HttpClient().proxy(proxy).trust(composite).get("https://appwork.org");
+                RequestContext context = createClientz().proxy(proxy).trust(composite).get("https://appwork.org");
                 assertTrue(context.getCode() == 200 || context.getCode() == 301 || context.getCode() == 302, "Request should succeed via SOCKS proxy");
                 assertTrue(context.getTrustResult() != null, "TrustResult should not be null");
                 assertTrue(context.getTrustResult().isTrusted());
@@ -191,7 +194,7 @@ public class ProxyTrustProviderTest extends ProxyConnectionTestBase {
             }
             {
                 CompositeTrustProvider composite = new CompositeTrustProvider(new CCADBTrustProvider());
-                RequestContext context = new HttpClient().proxy(proxy).trust(composite).get("https://appwork.org");
+                RequestContext context = createClientz().proxy(proxy).trust(composite).get("https://appwork.org");
                 assertTrue(context.getCode() == 200 || context.getCode() == 301 || context.getCode() == 302, "Request should succeed via SOCKS proxy");
                 assertTrue(context.getTrustResult() != null, "TrustResult should not be null");
                 assertTrue(context.getTrustResult().isTrusted());
@@ -202,7 +205,7 @@ public class ProxyTrustProviderTest extends ProxyConnectionTestBase {
             }
             {
                 CompositeTrustProvider composite = new CompositeTrustProvider(NeverTrustProvider.getInstance(), new CCADBTrustProvider());
-                RequestContext context = new HttpClient().proxy(proxy).trust(composite).get("https://appwork.org");
+                RequestContext context = createClientz().proxy(proxy).trust(composite).get("https://appwork.org");
                 assertTrue(context.getCode() == 200 || context.getCode() == 301 || context.getCode() == 302, "Request should succeed via SOCKS proxy");
                 assertTrue(context.getTrustResult() != null, "TrustResult should not be null");
                 assertTrue(context.getTrustResult().isTrusted());
@@ -214,5 +217,14 @@ public class ProxyTrustProviderTest extends ProxyConnectionTestBase {
             }
         }
         LogV3.info("TrustProvider via SOCKS proxy tests completed successfully");
+    }
+
+    /**
+     * @return
+     */
+    protected HttpClient createClientz() {
+        HttpClient ret = new HttpClient();
+        ret.setConnectTimeout(120000);
+        return ret;
     }
 }

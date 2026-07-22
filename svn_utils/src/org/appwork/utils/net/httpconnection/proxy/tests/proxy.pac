@@ -6,10 +6,10 @@ function FindProxyForURL(url, host) {
 
     // use SOCKS for specific domains
     if (shExpMatch(host, "*.avlditest.lan"))
-        return "SOCKS localhost:9999";
+        return "SOCKS localhost:9876";
     if (shExpMatch(host, "*.wackerneusongroup-services.com"))
         return "SOCKS localhost:9999";
 
     // by default use SOCKS
-    return "SOCKS localhost:9999";
+    return "DIRECT";
 }

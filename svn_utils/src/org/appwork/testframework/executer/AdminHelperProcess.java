@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 import javax.swing.JFrame;
 import javax.swing.JScrollPane;
@@ -66,6 +67,9 @@ import org.appwork.utils.singleapp.ResponseSender;
 import org.appwork.utils.singleapp.SingleAppInstance;
 import org.appwork.utils.swing.dialog.Dialog;
 
+import com.sun.jna.platform.win32.Kernel32;
+import com.sun.jna.platform.win32.WinNT;
+
 /**
  * Helper process started elevated (UAC). Accepts connections only from processes in its parent chain (direct parent and ancestors) via
  * SingleAppInstance; runs commands and responds with CMD_RESULT. Exits when the direct parent process is no longer alive. Used by
@@ -76,7 +80,8 @@ import org.appwork.utils.swing.dialog.Dialog;
  * client's RSA public key used for key exchange).
  * <p>
  * Protocol (SingleAppInstance): client sends RUN_CMD, JSON array of command strings, workDir path, options JSON (waitFor, keepRunning);
- * server responds PROCESS_STARTED(pid) then CMD_RESULT. message = exitCode + "\n" + hex(stdout) + "\n" + hex(stderr).
+ * server responds PROCESS_STARTED(pid) then CMD_RESULT. message = exitCode + "\n" + hex(stdout) + "\n" + hex(stderr). RUN_AS_USER_TASK runs
+ * a serialized task as another Windows user (see {@link #RUN_AS_USER_TASK}).
  */
 public final class AdminHelperProcess {
     public static final String                           APP_ID                         = "AWTestAdminHelper";
@@ -100,6 +105,12 @@ public final class AdminHelperProcess {
     public static final String                           RUN_AS_LOCAL_SYSTEM_CMD        = "RUN_AS_LOCAL_SYSTEM_CMD";
     /** Run an ElevatedTestTask as NT AUTHORITY\SYSTEM via schtasks; helper owns temp dir and logs, responds with TASK_RESULT. */
     public static final String                           RUN_AS_LOCAL_SYSTEM_TASK       = "RUN_AS_LOCAL_SYSTEM_TASK";
+    /**
+     * Run an {@link ElevatedTestTask} as another Windows user in the helper's WTS session ({@link RunTaskAsUserLauncher}). message[1]=hex
+     * task, message[2]=classpath, message[3]=domain (may be empty), message[4]=user, message[5]=Base64 UTF-8 password, optional message[6]=
+     * options JSON (waitFor must be true).
+     */
+    public static final String                           RUN_AS_USER_TASK               = "RUN_AS_USER_TASK";
     /** Response type for encrypted payload (message = Base64 of symmetric AES cipher; key exchange via RSA). */
     public static final String                           ENCRYPTED                      = "ENCRYPTED";
     private static final Charset                         UTF8                           = Charset.forName("UTF-8");
@@ -293,7 +304,7 @@ public final class AdminHelperProcess {
                     System.out.flush();
                 }
                 if (message == null || message.length < 1) {
-                    callbackToUse.sendResponse(new Response(SingleAppInstance.EXCEPTION, "Expected RUN_CMD or RUN_TASK"));
+                    callbackToUse.sendResponse(new Response(SingleAppInstance.EXCEPTION, "Expected RUN_CMD, RUN_TASK, RUN_AS_LOCAL_SYSTEM_*, or RUN_AS_USER_TASK"));
                     return;
                 }
                 if (RUN_TASK.equals(message[0])) {
@@ -308,6 +319,10 @@ public final class AdminHelperProcess {
                     handleRunAsLocalSystemTask(callbackToUse, message, verboseLog);
                     return;
                 }
+                if (RUN_AS_USER_TASK.equals(message[0]) && message.length >= 6) {
+                    handleRunAsUserTask(callbackToUse, message, verboseLog);
+                    return;
+                }
                 if (RUN_CMD.equals(message[0]) && message.length >= 2) {
                     handleRunCmd(callbackToUse, message, verboseLog);
                     return;
@@ -320,7 +335,7 @@ public final class AdminHelperProcess {
                     handleTerminateRequestId(callbackToUse, message);
                     return;
                 }
-                callbackToUse.sendResponse(new Response(SingleAppInstance.EXCEPTION, "Expected RUN_CMD and command JSON or RUN_TASK and serialized task"));
+                callbackToUse.sendResponse(new Response(SingleAppInstance.EXCEPTION, "Expected RUN_CMD, RUN_TASK, RUN_AS_LOCAL_SYSTEM_*, or RUN_AS_USER_TASK"));
             }
         };
         AdminHelperSingleAppInstance single = new AdminHelperSingleAppInstance(APP_ID, directory, listener, idRoot);
@@ -394,7 +409,7 @@ public final class AdminHelperProcess {
      * PROCESS_STARTED(pid) when the subprocess is started. waitFor true: wait for process to end, then send TASK_RESULT with real return
      * value and exit code. waitFor false: send empty TASK_RESULT immediately and return (caller does not wait). keepRunning: process is
      * left running after task completes (e.g. server); return value is still returned when waitFor is true. No effect when waitFor is
-     * false. Uses {@link RunTaskAsSystemMain} with a temp dir.
+     * false. Uses {@link RunSerializedTaskMain} with a temp dir.
      */
     private static void handleRunTask(ResponseSender callback, String[] message, final boolean verboseLog) throws Exception {
         if (message.length < 2 || message[1] == null) {
@@ -429,9 +444,9 @@ public final class AdminHelperProcess {
             String taskId = tempDir.getName().startsWith("AppWorkRunTask_") ? tempDir.getName().substring("AppWorkRunTask_".length()) : tempDir.getName();
             String javaBin = CrossSystem.getJavaBinary();
             String classpath = System.getProperty("java.class.path");
-            String[] cmd = new String[] { javaBin, "-Dfile.encoding=UTF-8", "-cp", classpath, RunTaskAsSystemMain.class.getName(), tempDir.getAbsolutePath(), taskId };
+            String[] cmd = new String[] { javaBin, "-Dfile.encoding=UTF-8", "-D" + RunSerializedTaskMain.SYSPROP_RUN_SERIALIZED_ORIGIN + "=" + RunSerializedTaskMain.RUN_SERIALIZED_ORIGIN_RUN_TASK, "-cp", classpath, RunSerializedTaskMain.class.getName(), tempDir.getAbsolutePath(), taskId };
             if (verboseLog) {
-                System.out.println("[AdminHelper verbose] RUN_TASK: starting subprocess java ... RunTaskAsSystemMain " + tempDir.getAbsolutePath() + " waitFor=" + waitFor + " keepRunning=" + keepRunning);
+                System.out.println("[AdminHelper verbose] RUN_TASK: starting subprocess java ... RunSerializedTaskMain " + tempDir.getAbsolutePath() + " waitFor=" + waitFor + " keepRunning=" + keepRunning);
                 System.out.flush();
             }
             java.lang.ProcessBuilder pb = ProcessBuilderFactory.create(cmd);
@@ -549,6 +564,282 @@ public final class AdminHelperProcess {
         }
     }
 
+    private static void handleRunAsUserTask(final ResponseSender callback, final String[] message, final boolean verboseLog) throws Exception {
+        if (!org.appwork.JNAHelper.isJNAAvailable()) {
+            callback.sendResponse(new Response(SingleAppInstance.EXCEPTION, "RUN_AS_USER_TASK requires JNA"));
+            return;
+        }
+        if (message.length < 6 || message[1] == null || message[2] == null || message[4] == null || message[5] == null) {
+            callback.sendResponse(new Response(SingleAppInstance.EXCEPTION, "RUN_AS_USER_TASK requires message[1]=hex task, message[2]=classpath, message[3]=domain (may be empty), message[4]=user, message[5]=Base64 UTF-8 password, optional message[6]=options JSON"));
+            return;
+        }
+        String hexTask = message[1];
+        String classpath = message[2];
+        String domainRaw = message[3] != null ? message[3] : "";
+        String user = message[4];
+        String password;
+        try {
+            password = Base64.decodeToString(message[5]);
+        } catch (Throwable t) {
+            callback.sendResponse(new Response(SingleAppInstance.EXCEPTION, "Invalid Base64 password in RUN_AS_USER_TASK: " + t.getMessage()));
+            return;
+        }
+        boolean waitFor = true;
+        boolean keepRunning = false;
+        String requestId = null;
+        if (message.length >= 7 && message[6] != null && message[6].trim().length() > 0) {
+            waitFor = parseHelperOptionsWaitFor(message[6]);
+            keepRunning = parseHelperOptionsKeepRunning(message[6]);
+            requestId = parseHelperOptionsRequestId(message[6]);
+        }
+        final String requestIdFinal = requestId;
+        LogV3.info("[AdminHelper] RUN_AS_USER_TASK received user=" + user + " waitFor=" + waitFor + " keepRunning=" + keepRunning);
+        if (!waitFor) {
+            callback.sendResponse(new Response(SingleAppInstance.EXCEPTION, "RUN_AS_USER_TASK currently requires waitFor=true"));
+            return;
+        }
+        if (keepRunning) {
+            callback.sendResponse(new Response(SingleAppInstance.EXCEPTION, "RUN_AS_USER_TASK does not support keepRunning yet"));
+            return;
+        }
+        byte[] taskBytes;
+        try {
+            taskBytes = HexFormatter.hexToByteArray(hexTask);
+        } catch (Throwable t) {
+            callback.sendResponse(new Response(SingleAppInstance.EXCEPTION, "Invalid hex in RUN_AS_USER_TASK: " + t.getMessage()));
+            return;
+        }
+        try {
+            if (verboseLog) {
+                System.out.println("[AdminHelper verbose] RUN_AS_USER_TASK: start user=" + user);
+                System.out.flush();
+            }
+            final String hexMerged = runSerializedTaskAsUser(domainRaw, user, password, taskBytes, classpath, new RunAsUserProcessStartedHandler() {
+                @Override
+                public void onProcessStarted(final int pid) {
+                    try {
+                        callback.sendResponse(new Response(PROCESS_STARTED, String.valueOf(pid)));
+                        registerRequestIdPid(requestIdFinal, pid);
+                        LogV3.info("[AdminHelper] RUN_AS_USER_TASK sent PROCESS_STARTED pid=" + pid);
+                    } catch (Throwable sendEx) {
+                        LogV3.log(sendEx);
+                    }
+                }
+            });
+            callback.sendResponse(new Response(TASK_RESULT, hexMerged));
+        } catch (Throwable t) {
+            if (verboseLog) {
+                System.out.println("[AdminHelper verbose] RUN_AS_USER_TASK exception: " + t.getClass().getName() + " " + t.getMessage());
+                System.out.flush();
+            }
+            callback.sendResponse(new Response(SingleAppInstance.EXCEPTION, Exceptions.getStackTrace(t)));
+        }
+    }
+
+    /** Optional {@code PROCESS_STARTED} notification for IPC {@code RUN_AS_USER_TASK}. */
+    interface RunAsUserProcessStartedHandler {
+        void onProcessStarted(int pid);
+    }
+
+    /**
+     * Same launch path as {@code RUN_AS_USER_TASK} IPC: {@link RunTaskAsUserLauncher} + {@link RunSerializedTaskMain}. Used by the helper
+     * and by {@link AdminExecuter#runAsUser} when called from a {@code RUN_TASK} child JVM (no second UAC helper).
+     *
+     * @param startedHandler
+     *            optional; invoked after the subprocess is created (before wait)
+     * @return hex-encoded {@link AdminTaskResultWrapper} (TASK_RESULT payload)
+     */
+    static String runSerializedTaskAsUser(final String domainRaw, final String user, final String password, final byte[] taskBytes, final String classpath, final RunAsUserProcessStartedHandler startedHandler) throws Exception {
+        if (!org.appwork.JNAHelper.isJNAAvailable()) {
+            throw new IOException("runSerializedTaskAsUser requires JNA");
+        }
+        if (user == null || user.trim().length() == 0) {
+            throw new IllegalArgumentException("user is required");
+        }
+        if (password == null) {
+            throw new IllegalArgumentException("password is required");
+        }
+        if (taskBytes == null) {
+            throw new IllegalArgumentException("taskBytes is required");
+        }
+        final String cp = classpath != null && classpath.trim().length() > 0 ? classpath : System.getProperty("java.class.path");
+        File tempDir = getRunAsUserTempDir();
+        tempDir.mkdirs();
+        if (!tempDir.isDirectory()) {
+            throw new IOException("RUN_AS_USER temp dir could not be created: " + tempDir.getAbsolutePath());
+        }
+        allowRunAsUserTempDirForAllUsers(tempDir);
+        File taskFile = new File(tempDir, "task.bin");
+        try {
+            IO.writeToFile(taskFile, taskBytes);
+            String taskId = tempDir.getName().startsWith("AppWorkRunAsUser_") ? tempDir.getName().substring("AppWorkRunAsUser_".length()) : tempDir.getName();
+            String javaBin = CrossSystem.getJavaBinary();
+            String classpathForUser = buildRunAsUserClasspathSnapshot(tempDir, cp);
+            String[] cmd = new String[] { javaBin, "-Dfile.encoding=UTF-8", "-D" + RunSerializedTaskMain.SYSPROP_RUN_SERIALIZED_ORIGIN + "=" + RunSerializedTaskMain.RUN_SERIALIZED_ORIGIN_RUN_AS_USER, "-cp", classpathForUser, RunSerializedTaskMain.class.getName(), tempDir.getAbsolutePath(), taskId };
+            String domainArg = domainRaw != null && domainRaw.trim().length() > 0 ? domainRaw.trim() : null;
+            WinNT.HANDLE hProcess = RunTaskAsUserLauncher.createProcessWithLogon(tempDir, cmd, domainArg, user.trim(), password);
+            if (startedHandler != null) {
+                startedHandler.onProcessStarted(Kernel32.INSTANCE.GetProcessId(hProcess));
+            }
+            int exitCode = RunTaskAsUserLauncher.waitForExitAndClose(hProcess);
+            LogV3.info("[AdminHelper] runSerializedTaskAsUser subprocess exited exitCode=" + exitCode + " user=" + user);
+            File resultHexFile = new File(tempDir, "result.hex");
+            if (!resultHexFile.isFile()) {
+                String launchInfo = " user=" + user + ", workDir=" + tempDir.getAbsolutePath() + ", javaBin=" + javaBin + ", main=" + RunSerializedTaskMain.class.getName() + ", classpathLen=" + classpathForUser.length();
+                String hint = " Hint: this often means the target user cannot read one or more classpath entries.";
+                throw new IOException("runSerializedTaskAsUser subprocess did not produce result.hex (exitCode=" + exitCode + ")." + launchInfo + hint);
+            }
+            String hexResult = IO.readFileToString(resultHexFile).trim();
+            if (hexResult.length() == 0) {
+                throw new IOException("runSerializedTaskAsUser subprocess produced empty result.hex");
+            }
+            if (exitCode != 0) {
+                LogV3.warning("[AdminHelper] runSerializedTaskAsUser exited with code " + exitCode + " but result.hex exists; forwarding task result wrapper to caller");
+            }
+            return mergeTaskResultHexWithProcessStreams(hexResult, "", "");
+        } finally {
+            try {
+                taskFile.delete();
+            } catch (Throwable t) {
+            }
+            try {
+                new File(tempDir, "result.hex").delete();
+            } catch (Throwable t) {
+            }
+            try {
+                tempDir.delete();
+            } catch (Throwable t) {
+            }
+        }
+    }
+
+    /**
+     * Transport dir for {@link AdminExecuter} ShellExecuteEx elevation from a {@code RUN_AS_USER_TASK} child: must be readable by the
+     * filtered caller JVM and writable by the UAC-elevated same-account child (not {@code %TEMP%} with high-integrity-only ACLs).
+     */
+    static File newShellExecuteElevatedTransportDir() throws Exception {
+        String commonRoot = System.getenv("ProgramData");
+        if (commonRoot == null || commonRoot.trim().length() == 0) {
+            commonRoot = System.getenv("ALLUSERSPROFILE");
+        }
+        if (commonRoot == null || commonRoot.trim().length() == 0) {
+            final String systemRoot = System.getenv("SystemRoot");
+            commonRoot = systemRoot != null && systemRoot.trim().length() > 0 ? new File(systemRoot.trim(), "Temp").getAbsolutePath() : System.getProperty("java.io.tmpdir");
+        }
+        final File root = new File(new File(commonRoot.trim(), "AppWork"), "RunElevatedLocal");
+        if (!root.isDirectory() && !root.mkdirs()) {
+            throw new IOException("Could not create ShellExecute elevated transport root: " + root.getAbsolutePath());
+        }
+        final File tempDir = new File(root, "AppWorkRunElevatedLocal_" + UniqueAlltimeID.next());
+        if (!tempDir.mkdirs() && !tempDir.isDirectory()) {
+            throw new IOException("Could not create ShellExecute elevated transport dir: " + tempDir.getAbsolutePath());
+        }
+        allowRunAsUserTempDirForAllUsers(tempDir);
+        return tempDir;
+    }
+
+    /**
+     * The child runs as another Windows user, so the transport directory must not live below the caller's profile temp directory.
+     */
+    private static File getRunAsUserTempDir() {
+        String commonRoot = System.getenv("ProgramData");
+        if (commonRoot == null || commonRoot.trim().length() == 0) {
+            commonRoot = System.getenv("ALLUSERSPROFILE");
+        }
+        if (commonRoot == null || commonRoot.trim().length() == 0) {
+            final String systemRoot = System.getenv("SystemRoot");
+            commonRoot = systemRoot != null && systemRoot.trim().length() > 0 ? new File(systemRoot.trim(), "Temp").getAbsolutePath() : System.getProperty("java.io.tmpdir");
+        }
+        final File root = new File(new File(commonRoot.trim(), "AppWork"), "RunAsUser");
+        root.mkdirs();
+        return new File(root, "AppWorkRunAsUser_" + UniqueAlltimeID.next());
+    }
+
+    /**
+     * Copies classpath entries into a shared temp subdirectory so CreateProcessWithLogonW target users can read them even when the original
+     * workspace lives below a private profile path (e.g. C:\Users\...\workspace). Falls back to absolute original entries when copy is not
+     * possible.
+     */
+    private static String buildRunAsUserClasspathSnapshot(final File tempDir, final String classpath) throws Exception {
+        if (classpath == null || classpath.trim().length() == 0) {
+            throw new IllegalArgumentException("RUN_AS_USER_TASK classpath is empty");
+        }
+        final File cpRoot = new File(tempDir, "classpath");
+        cpRoot.mkdirs();
+        allowRunAsUserTempDirForAllUsers(cpRoot);
+        final String[] entries = classpath.split(Pattern.quote(File.pathSeparator));
+        final StringBuilder result = new StringBuilder();
+        for (int i = 0; i < entries.length; i++) {
+            final String raw = entries[i] != null ? entries[i].trim() : "";
+            if (raw.length() == 0) {
+                continue;
+            }
+            final File src = new File(raw).getAbsoluteFile();
+            String outEntry = null;
+            if (src.exists()) {
+                final String safeBaseName = sanitizeForFileName(src.getName().length() > 0 ? src.getName() : ("entry" + i));
+                final File dst = new File(cpRoot, String.format("%04d_%s", Integer.valueOf(i), safeBaseName));
+                try {
+                    if (src.isDirectory()) {
+                        IO.copyFolderRecursive(src, dst, true);
+                    } else {
+                        final File parent = dst.getParentFile();
+                        if (parent != null) {
+                            parent.mkdirs();
+                        }
+                        IO.copyFile(src, dst);
+                    }
+                    outEntry = dst.getAbsolutePath();
+                } catch (Throwable t) {
+                    LogV3.warning("RUN_AS_USER_TASK classpath snapshot failed for '" + src + "': " + t.getMessage() + " (fallback to original absolute entry)");
+                }
+            }
+            if (outEntry == null) {
+                outEntry = src.getAbsolutePath();
+            }
+            if (result.length() > 0) {
+                result.append(File.pathSeparator);
+            }
+            result.append(outEntry);
+        }
+        if (result.length() == 0) {
+            throw new IllegalStateException("RUN_AS_USER_TASK produced empty classpath snapshot (entries=" + entries.length + ")");
+        }
+        return result.toString();
+    }
+
+    private static String sanitizeForFileName(final String in) {
+        if (in == null || in.length() == 0) {
+            return "entry";
+        }
+        final StringBuilder sb = new StringBuilder(in.length());
+        for (int i = 0; i < in.length(); i++) {
+            final char c = in.charAt(i);
+            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '_') {
+                sb.append(c);
+            } else {
+                sb.append('_');
+            }
+        }
+        return sb.length() > 0 ? sb.toString() : "entry";
+    }
+
+    /**
+     * The target user must be able to use the directory as {@code lpCurrentDirectory} and read/write task.bin/result.hex.
+     */
+    private static void allowRunAsUserTempDirForAllUsers(final File tempDir) throws Exception {
+        try {
+            WindowsUtils.applyPermissions(tempDir, false, true, AccessPermissionEntry.allow(SID.SID_LOCAL_SYSTEM.sid, WindowsUtils.PERMISSIONSET_FULL).containerInherit(true).objectInherit(true), AccessPermissionEntry.allow(SID.SID_BUILTIN_ADMINISTRATORS.sid, WindowsUtils.PERMISSIONSET_FULL).containerInherit(true).objectInherit(true), AccessPermissionEntry.allow(SID.SID_EVERYONE.sid, WindowsUtils.PERMISSIONSET_FULL).containerInherit(true).objectInherit(true));
+        } catch (RuntimeException e) {
+            LogV3.info("allowRunAsUserTempDirForAllUsers: WindowsUtils.applyPermissions failed, trying icacls fallback: " + e.getMessage());
+            String icacls = new File(System.getenv("SystemRoot") != null ? System.getenv("SystemRoot") : "C:\\Windows", "system32\\icacls.exe").getAbsolutePath();
+            ProcessOutput out = ProcessBuilderFactory.runCommand(icacls, tempDir.getAbsolutePath(), "/inheritance:r", "/grant:r", "*S-1-5-18:(OI)(CI)F", "/grant:r", "*S-1-5-32-544:(OI)(CI)F", "/grant:r", "*S-1-1-0:(OI)(CI)F");
+            if (out.getExitCode() != 0) {
+                throw new Exception("Failed to allow run-as-user temp dir for all users (JNA and icacls): " + out.getErrOutString());
+            }
+        }
+    }
+
     private static AdminTaskResultWrapper deserializeResultWrapper(byte[] bytes) throws IOException, ClassNotFoundException {
         ObjectInputStream ois = null;
         try {
@@ -602,8 +893,8 @@ public final class AdminHelperProcess {
 
     /**
      * Merges JVM process stdout/stderr (e.g. from redirected stdout.txt/stderr.txt under LocalSystem) into the hex-encoded
-     * {@link AdminTaskResultWrapper} read from result.hex. Same semantics as RUN_TASK subprocess pipe merge: wrapper streams are replaced
-     * with process capture so {@link AdminExecuter#deserializeTaskResult} can forward them to the caller.
+     * {@link AdminTaskResultWrapper} read from result.hex. Wrapper streams are preserved and process capture is appended so task-produced
+     * LogV3 output remains visible even when process-level stream capture is empty (for example in RUN_AS_USER_TASK).
      */
     static String mergeTaskResultHexWithProcessStreams(String hexEncodedWrapper, String processStdout, String processStderr) {
         if (hexEncodedWrapper == null || hexEncodedWrapper.trim().length() == 0) {
@@ -615,8 +906,8 @@ public final class AdminHelperProcess {
                 return hexEncodedWrapper;
             }
             AdminTaskResultWrapper wrapper = deserializeResultWrapper(resultBytes);
-            final String out = processStdout != null ? processStdout : "";
-            final String err = processStderr != null ? processStderr : "";
+            final String out = appendOutput(wrapper.getStdout(), processStdout);
+            final String err = appendOutput(wrapper.getStderr(), processStderr);
             AdminTaskResultWrapper merged;
             if (wrapper.hasTaskFailure()) {
                 merged = new AdminTaskResultWrapper(wrapper.getReturnValue(), out, err, wrapper.getExceptionStackTrace());
@@ -629,6 +920,21 @@ public final class AdminHelperProcess {
             LogV3.warning("mergeTaskResultHexWithProcessStreams failed: " + t.getMessage());
             return hexEncodedWrapper;
         }
+    }
+
+    private static String appendOutput(String first, String second) {
+        final String a = first != null ? first : "";
+        final String b = second != null ? second : "";
+        if (a.length() == 0) {
+            return b;
+        }
+        if (b.length() == 0) {
+            return a;
+        }
+        if (a.endsWith("\n")) {
+            return a + b;
+        }
+        return a + "\n" + b;
     }
 
     /**
@@ -904,7 +1210,7 @@ public final class AdminHelperProcess {
     }
 
     /**
-     * RUN_AS_LOCAL_SYSTEM_TASK: message[1]=hex serialized task, message[2]=classpath. Writes task.bin, runs RunTaskAsSystemMain, responds
+     * RUN_AS_LOCAL_SYSTEM_TASK: message[1]=hex serialized task, message[2]=classpath. Writes task.bin, runs RunSerializedTaskMain, responds
      * with TASK_RESULT. Uses JNA or schtasks according to {@link #USE_JNA_FOR_LOCAL_SYSTEM_TASKS}.
      */
     private static void handleRunAsLocalSystemTask(ResponseSender callback, String[] message, final boolean verboseLog) throws Exception {
@@ -929,7 +1235,7 @@ public final class AdminHelperProcess {
             IO.writeToFile(taskFile, taskBytes);
             String taskId = tempDir.getName().startsWith("AppWorkRunAsLocalSystem_") ? tempDir.getName().substring("AppWorkRunAsLocalSystem_".length()) : tempDir.getName();
             String javaBin = CrossSystem.getJavaBinary();
-            String[] cmd = new String[] { javaBin, "-Dfile.encoding=UTF-8", "-cp", classpath, RunTaskAsSystemMain.class.getName(), tempDir.getAbsolutePath(), taskId };
+            String[] cmd = new String[] { javaBin, "-Dfile.encoding=UTF-8", "-cp", classpath, RunSerializedTaskMain.class.getName(), tempDir.getAbsolutePath(), taskId };
             if (USE_JNA_FOR_LOCAL_SYSTEM_TASKS && org.appwork.JNAHelper.isJNAAvailable()) {
                 try {
                     RunAsLocalSystemJNA.runAsLocalSystemViaJna(callback, tempDir, cmd, true, false, null, tempDir, taskFile, verboseLog, activeLocalSystemTasks, activeLocalSystemPids);

@@ -11,7 +11,9 @@ package org.appwork.testframework.executer;
 
 /**
  * Use {@link AdminExecuter#runAsAdmin(ElevatedTestTask, org.appwork.storage.TypeRef)}. The task is serialized and executed in the elevated helper process (or as
- * LocalSystem via {@link AdminExecuter#runAsLocalSystem(ElevatedTestTask, org.appwork.storage.TypeRef)}). The task already runs with elevated privileges; use
+ * LocalSystem via {@link AdminExecuter#runAsLocalSystem(ElevatedTestTask, org.appwork.storage.TypeRef)}). Implementations must be fully serializable: avoid
+ * non-static inner or anonymous classes that capture a non-serializable enclosing instance (typical mistake in tests subclassing {@code AWTest}). Prefer a
+ * {@code private static final class ... implements ElevatedTestTask} with only serializable fields. The task already runs with elevated privileges; use
  * {@link org.appwork.utils.processes.ProcessBuilderFactory#runCommand} (or similar) directly if you need to run subprocess commands.
  * The task may return a {@link Serializable} result that is sent back to the client.
  */

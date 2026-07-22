@@ -113,7 +113,6 @@ public class SimpleLoggerFactory implements LogV3Factory, SinkProvider {
                     LoggerToSink ret = this.logger.get(id);
                     if (ret == null) {
                         this.logger.put(id, ret = this.createLogger(context));
-                        ret.info("Created Logger " + this.logger.size() + ": " + context);
                     }
                     return ret;
                 }

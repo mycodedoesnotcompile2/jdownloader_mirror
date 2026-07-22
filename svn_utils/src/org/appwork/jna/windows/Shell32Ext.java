@@ -35,7 +35,6 @@
 package org.appwork.jna.windows;
 
 import com.sun.jna.Native;
-import com.sun.jna.win32.W32APIOptions;
 
 import org.appwork.jna.windows.structs.NOTIFYICONDATA;
 import org.appwork.jna.windows.structs.NOTIFYICONIDENTIFIER;
@@ -55,7 +54,7 @@ public interface Shell32Ext extends com.sun.jna.platform.win32.Shell32 {
     public static final int NIM_MODIFY = 0x1;
     public static final int NIM_DELETE = 0x2;
 
-    final static Shell32Ext INSTANCE = Native.load("shell32", Shell32Ext.class, W32APIOptions.DEFAULT_OPTIONS);
+    final static Shell32Ext INSTANCE = Native.load("shell32", Shell32Ext.class, org.appwork.jna.windows.JNAOptions.SYSTEM_DLLS_ONLY);
 
     /**
      * Shell_NotifyIcon with custom NOTIFYICONDATA structure (for System Tray).

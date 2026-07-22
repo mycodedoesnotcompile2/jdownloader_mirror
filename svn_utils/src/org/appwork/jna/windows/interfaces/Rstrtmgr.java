@@ -39,7 +39,7 @@ import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.WString;
 import com.sun.jna.ptr.IntByReference;
-import com.sun.jna.win32.W32APIOptions;
+import org.appwork.jna.windows.JNAOptions;
 
 /**
  * @author thomas
@@ -47,7 +47,7 @@ import com.sun.jna.win32.W32APIOptions;
  *
  */
 public interface Rstrtmgr extends Library {
-    public final static Rstrtmgr INSTANCE = Native.load("Rstrtmgr", Rstrtmgr.class, W32APIOptions.UNICODE_OPTIONS);
+    public final static Rstrtmgr INSTANCE = Native.load("Rstrtmgr", Rstrtmgr.class, JNAOptions.UNICODE_SYSTEM_DLLS_ONLY);
 
     int RmStartSession(IntByReference pSessionHandle, int dwFlags, char[] strSessionKey);
 

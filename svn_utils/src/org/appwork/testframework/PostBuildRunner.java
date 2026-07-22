@@ -178,6 +178,14 @@ public class PostBuildRunner {
         return new File(System.getProperty("user.home", ""), POSTBUILD_STATUS_CACHE_SUBDIR + File.separator + cacheKey);
     }
 
+    /** HTML test report written by {@link TestCaseReporter} for the given cache key (sanitized build id or base hash). */
+    public static File getReportHtmlFile(final String cacheKey) {
+        if (cacheKey == null) {
+            return null;
+        }
+        return new File(new File(getStatusCacheDir(sanitizeBuildId(cacheKey)), "reports"), "test-report.html");
+    }
+
     /** Sanitize buildId for use as directory name (replace path and invalid chars). */
     protected static String sanitizeBuildId(String buildId) {
         if (buildId == null) {
@@ -227,6 +235,7 @@ public class PostBuildRunner {
             return new PostBuildTestStatus();
         }
         try {
+            LogV3.info(header("cache") + "load status: " + statusFile.getAbsolutePath());
             String json = IO.readFileToString(statusFile);
             PostBuildTestStatus s = FlexiUtils.jsonToObject(json, new SimpleTypeRef<PostBuildTestStatus>(PostBuildTestStatus.class));
             return s != null ? s : new PostBuildTestStatus();
@@ -245,6 +254,7 @@ public class PostBuildRunner {
                 parent.mkdirs();
             }
             String json = FlexiUtils.serializeToPrettyJson(status);
+            LogV3.info(header("cache") + "save status: " + statusFile.getAbsolutePath());
             IO.secureWrite(statusFile, json, SYNC.META_AND_DATA);
         } catch (Throwable e) {
             LogV3.warning("Could not save post-build test status to " + statusFile + ": " + e.getMessage());
@@ -279,40 +289,29 @@ public class PostBuildRunner {
     private static final int MAX_CHANGED_CLASSES_TO_LOG = 10;
 
     /**
-     * Logs to console why the test is being executed and up to {@link #MAX_CHANGED_CLASSES_TO_LOG} changed classes.
+     * Logs to console why the test is being executed and up to {@link #MAX_CHANGED_CLASSES_TO_LOG} changed classes. When
+     * {@code sourceRoots} is non-empty, each line includes a {@code .java} delta vs {@link PostBuildTestStatus#getJavaSourceHashes()} (same
+     * file is not re-read repeatedly thanks to {@link DependencyJavaSourceFingerprint} run cache).
      */
-    protected static void logRunReason(String testClassName, PostBuildTestStatus status, Map<String, String> currentRefs, String currentResourceHash) {
-        String reason;
+    protected static void logRunReason(String testClassName, PostBuildTestStatus status, ArrayList<String> changes, List<File> sourceRoots) {
         if (isLastRunFailure(status)) {
-            reason = "last run failed";
-            LogV3.info("  >>" + header("run") + testClassName + " - Running because: " + reason);
+            LogV3.info("  >>" + header("run") + testClassName + " - Running because: last run failed");
             return;
         }
         if (status.getResourceHash() == null || status.getResourceHashes() == null || status.getResourceHashes().isEmpty()) {
-            reason = "first run (no cached dependencies)";
-            LogV3.info("  >>" + header("run") + testClassName + " - Running because: " + reason);
+            LogV3.info("  >>" + header("run") + testClassName + " - Running because: first run (no cached dependencies)");
             return;
         }
-        Map<String, String> prev = status.getResourceHashes();
-        ArrayList<String> changes = new ArrayList<String>();
-        for (Entry<String, String> e : currentRefs.entrySet()) {
-            String c = e.getKey();
-            if (!prev.containsKey(c)) {
-                changes.add(c + " (new)");
-            } else if (!e.getValue().equals(prev.get(c))) {
-                changes.add(c + " (changed)");
-            }
-        }
-        for (String c : prev.keySet()) {
-            if (!currentRefs.containsKey(c)) {
-                changes.add(c + " (removed)");
-            }
-        }
-        reason = "dependencies changed";
-        LogV3.info("  >>" + header("run") + testClassName + " - Running because: " + reason);
+        LogV3.info("  >>" + header("run") + testClassName + " - Running because: dependencies changed");
         int max = Math.min(MAX_CHANGED_CLASSES_TO_LOG, changes.size());
         for (int i = 0; i < max; i++) {
-            LogV3.info("       " + (i + 1) + ". " + changes.get(i));
+            String line = changes.get(i);
+            String suffix = "";
+            if (sourceRoots != null && !sourceRoots.isEmpty()) {
+                String d = DependencyJavaSourceFingerprint.describeJavaDeltaForChangeLine(line, status.getJavaSourceHashes(), sourceRoots);
+                suffix = " [.java: " + d + "]";
+            }
+            LogV3.info("       " + (i + 1) + ". " + line + suffix);
         }
         if (changes.size() > MAX_CHANGED_CLASSES_TO_LOG) {
             LogV3.info("       ... and " + (changes.size() - MAX_CHANGED_CLASSES_TO_LOG) + " more");
@@ -406,10 +405,13 @@ public class PostBuildRunner {
                         LogV3.info("Try Test " + classname);
                         Class<?> cls = Class.forName(classname, false, Thread.currentThread().getContextClassLoader());
                         if (Modifier.isAbstract(cls.getModifiers())) {
+                            LogV3.info("is ABtract  " + classname);
                             continue main;
                         }
                         if (PostBuildTestInterface.class.isAssignableFrom(cls) && PostBuildTestInterface.class != cls) {
                             testClasses.add(cls);
+                        } else {
+                            LogV3.info("No postBuild " + classname);
                         }
                     } catch (NoClassDefFoundError e) {
                         LogV3.info("Skipped Test (Classloader Error):" + relative);
@@ -435,6 +437,7 @@ public class PostBuildRunner {
         }
         String cacheKey = (buildId != null && buildId.length() > 0) ? sanitizeBuildId(buildId) : baseHash;
         File statusCacheDir = getStatusCacheDir(cacheKey);
+        TestCaseReporter.beginRun("PostBuild", new File(statusCacheDir, "reports"), buildId, projectInfo);
         writeCacheInfo(statusCacheDir, cacheKey, buildId, BASE, projectInfo);
         final HashMap<String, PostBuildTestStatus> statusMap = new HashMap<String, PostBuildTestStatus>();
         for (Class<?> cls : testClasses) {
@@ -460,6 +463,7 @@ public class PostBuildRunner {
         });
         final HashMap<String, String> testResourceHashes = new HashMap<String, String>();
         final HashMap<String, Map<String, String>> testResourceRefs = new HashMap<String, Map<String, String>>();
+        LogV3.info("  >>" + testClasses.size() + " Tests");
         for (Class<?> cls : testClasses) {
             try {
                 Map<String, String> refs = new ClassCollector2().getClasses(cls.getName(), true);
@@ -496,9 +500,15 @@ public class PostBuildRunner {
                 LogV3.warning("Could not start AdminExecuter helper for post-build tests: " + t.getMessage());
             }
         }
+        DependencyJavaSourceFingerprint.clearRunFileHashCache();
+        final List<File> postBuildSourceRoots = DependencyJavaSourceFingerprint.resolveSourceRootsFromClasspathAndExtra(sourceFolder);
+        LogV3.info("  >>" + testClasses.size() + " Tests after filter");
         for (Class<?> cls : testClasses) {
             PostBuildTestStatus status = statusMap.get(cls.getName());
             String currentResourceHash = testResourceHashes.get(cls.getName());
+            Map<String, String> refsForSave = testResourceRefs.get(cls.getName());
+            Map<String, String> safeRefs = refsForSave != null ? refsForSave : new HashMap<String, String>();
+            ArrayList<String> changes = DependencyJavaSourceFingerprint.computeChangeDescriptions(status.getResourceHashes(), safeRefs);
             boolean skip = currentResourceHash != null && currentResourceHash.equals(status.getResourceHash()) && !isLastRunFailure(status);
             if (skip) {
                 try {
@@ -514,11 +524,25 @@ public class PostBuildRunner {
             if (skip) {
                 TESTS_OK.add(cls.getName());
                 LogV3.info("  >>" + header("skipped") + cls.getName() + " (deps unchanged, last passed)");
+                TestCaseReporter.recordClassSkippedWithoutRun(cls.getName(), "dependencies unchanged, last passed");
                 continue;
             }
-            Map<String, String> refsForSave = testResourceRefs.get(cls.getName());
-            logRunReason(cls.getName(), status, refsForSave != null ? refsForSave : new HashMap<String, String>(), currentResourceHash);
-            runTestClass(cls, sourceFolder, args, getStatusFile(statusCacheDir, cls.getName()), currentResourceHash, refsForSave);
+            if (!isLastRunFailure(status) && !postBuildSourceRoots.isEmpty() && DependencyJavaSourceFingerprint.shouldSkipBecauseJavaSourcesUnchanged(changes, status.getJavaSourceHashes(), postBuildSourceRoots, MAX_CHANGED_CLASSES_TO_LOG)) {
+                TESTS_OK.add(cls.getName());
+                PostBuildTestStatus stCatchUp = statusMap.get(cls.getName());
+                if (currentResourceHash != null) {
+                    stCatchUp.setResourceHash(currentResourceHash);
+                }
+                if (refsForSave != null && !refsForSave.isEmpty()) {
+                    stCatchUp.setResourceHashes(new HashMap<String, String>(refsForSave));
+                }
+                saveStatus(getStatusFile(statusCacheDir, cls.getName()), stCatchUp);
+                LogV3.info("  >>" + header("skipped") + cls.getName() + " (classfile deps drift; .java unchanged for changed set, state updated)");
+                TestCaseReporter.recordClassSkippedWithoutRun(cls.getName(), "classfile deps drift; .java unchanged");
+                continue;
+            }
+            logRunReason(cls.getName(), status, changes, postBuildSourceRoots);
+            runTestClass(cls, sourceFolder, args, getStatusFile(statusCacheDir, cls.getName()), currentResourceHash, refsForSave, changes, sourceFolder);
         }
         for (Entry<String, String> es : TESTS_FAILED.entrySet()) {
             LogV3.info(header("FAILED") + es.getKey() + ": " + es.getValue());
@@ -537,6 +561,7 @@ public class PostBuildRunner {
             throw new Exception("Could not find tests for at least 1 -force pattern");
         }
         LogV3.info(header("SUCCESS") + "Finished Post Build Tests");
+        TestCaseReporter.finishRunAndWriteReports();
         LogV3.info(header("FINISHED") + "PostBuildRunnerFinished");
     }
 
@@ -813,7 +838,7 @@ public class PostBuildRunner {
      * @return
      * @throws Exception
      */
-    private static void runTest(String clz, String base, String[] args) throws Exception {
+    private static void runTest(String clz, String base, String[] args) throws Throwable {
         System.setProperty(POSTBUILDTEST, clz);
         PostBuildTestInterface instance;
         instance = (PostBuildTestInterface) Class.forName(clz).getConstructor(new Class[] {}).newInstance(new Object[] {});
@@ -826,10 +851,20 @@ public class PostBuildRunner {
                 CONFIG = JSonStorage.restoreFromString(IO.readFileToString(testConfigFile), TypeRef.HASHMAP);
             }
         }
-        instance.runPostBuildTest(paras, new File(base, "application"));
+        final File applicationRoot = new File(base, "application");
+        final File exportFile = new File(applicationRoot, "cfg/awtest-class-report.json");
+        System.setProperty(TestCaseReporter.REPORT_EXPORT_FILE_PROPERTY, exportFile.getAbsolutePath());
+        TestCaseReporter.beginTestClass(clz);
+        try {
+            instance.runPostBuildTest(paras, applicationRoot);
+            TestCaseReporter.endTestClassSuccess();
+        } catch (Throwable e) {
+            TestCaseReporter.endTestClassFailed(e);
+            throw e;
+        }
     }
 
-    protected static void runTestClass(Class<?> cls, String sourceFolder, String[] args, File statusFile, String resourceHashAfterRun, Map<String, String> resourceHashesForSave) throws Exception {
+    protected static void runTestClass(Class<?> cls, String sourceFolder, String[] args, File statusFile, String resourceHashAfterRun, Map<String, String> resourceHashesForSave, ArrayList<String> dependencyChangeDescriptions, String sourceFolderForJavaRoots) throws Exception {
         final boolean[] successHolder = new boolean[] { false };
         final int[] exitCodeHolder = new int[] { -1 };
         final String[] errorMessageHolder = new String[] { null };
@@ -845,6 +880,19 @@ public class PostBuildRunner {
             }
             if (resourceHashesForSave != null && !resourceHashesForSave.isEmpty()) {
                 status.setResourceHashes(new HashMap<String, String>(resourceHashesForSave));
+            }
+            if (successHolder[0] && dependencyChangeDescriptions != null && !dependencyChangeDescriptions.isEmpty()) {
+                final List<File> roots = DependencyJavaSourceFingerprint.resolveSourceRootsFromClasspathAndExtra(sourceFolderForJavaRoots);
+                if (!roots.isEmpty()) {
+                    Map<String, String> jh = status.getJavaSourceHashes();
+                    if (jh == null) {
+                        jh = new HashMap<String, String>();
+                    } else {
+                        jh = new HashMap<String, String>(jh);
+                    }
+                    DependencyJavaSourceFingerprint.mergeJavaHashesForTopChanges(jh, dependencyChangeDescriptions, roots, MAX_CHANGED_CLASSES_TO_LOG);
+                    status.setJavaSourceHashes(jh);
+                }
             }
             if (successHolder[0]) {
                 status.setLastSuccessTimestamp(Long.valueOf(now));
@@ -970,6 +1018,16 @@ public class PostBuildRunner {
                 LogV3.info(result.getErrOutString());
             }
             int exit = result.getExitCode();
+            final File classReportExport = new File(workingcopy, "application/cfg/awtest-class-report.json");
+            if (classReportExport.isFile()) {
+                TestCaseReporter.mergeExportedClassReport(classReportExport);
+            } else if (exit == EXIT_SUCCESS) {
+                TestCaseReporter.beginTestClass(cls.getName());
+                TestCaseReporter.endTestClassSuccess();
+            } else {
+                TestCaseReporter.beginTestClass(cls.getName());
+                TestCaseReporter.endTestClassFailed(new Exception("Exit code " + exit));
+            }
             AWTest.setLoggerSilent(false, false);
             if (exit == EXIT_ERROR_BUT_NO_BREAK_JUST_LOG) {
                 // error, but do not stop tests - just log

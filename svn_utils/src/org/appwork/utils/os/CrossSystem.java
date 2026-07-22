@@ -221,7 +221,7 @@ public class CrossSystem {
         KALILINUX_2025_4(OSFamily.LINUX, "2025\\.4"),
         /*
          * https://www.debian.org/releases/
-         * 
+         *
          * Debian: List must be sorted by release Date!!
          */
         @StorableDoc("Debian Linux distribution")
@@ -250,7 +250,7 @@ public class CrossSystem {
         DEBIAN_SID(OSFamily.LINUX, "sid"), // unstable
         /*
          * RASPBIAN
-         * 
+         *
          * RASPBIAN: List must be sorted by release Date!!
          */
         @StorableDoc("Raspbian Linux distribution (Raspberry Pi OS)")
@@ -271,9 +271,9 @@ public class CrossSystem {
         RASPBIAN_TRIXIE(OSFamily.LINUX, "trixie"),
         /*
          * https://en.wikipedia.org/wiki/Ubuntu_version_history
-         * 
+         *
          * https://wiki.ubuntu.com/Releases
-         * 
+         *
          * Ubuntu: List must be sorted by release Date!!
          */
         @StorableDoc("Ubuntu Linux distribution")
@@ -461,6 +461,7 @@ public class CrossSystem {
         WINDOWS_11_26H1(OSFamily.WINDOWS),
         @StorableDoc("Windows 11 version 26H2 (2026 Update)")
         WINDOWS_11_26H2(OSFamily.WINDOWS);
+
         private final OSFamily family;
         private final Pattern  releasePattern;
 
@@ -534,6 +535,7 @@ public class CrossSystem {
         OTHERS,
         @StorableDoc("Windows family of operating systems (Windows 7, 10, 11, Server editions, etc.)")
         WINDOWS;
+
         public static OSFamily get(final OperatingSystem os) {
             return os != null ? os.getFamily() : null;
         }
@@ -738,7 +740,7 @@ public class CrossSystem {
         }
         /*
          * remove ending dots, not allowed under windows and others os maybe too
-         * 
+         *
          * Do not end a file or directory name with a space or a period.
          */
         pathPart = pathPart.replaceFirst("\\.+$", "");
@@ -922,7 +924,7 @@ public class CrossSystem {
         synchronized (DESKTOP_SUPPORT) {
             ret = CrossSystem.DESKTOP_SUPPORT.get();
             if (ret == null) {
-                ret = setDesktopSupportInstance(DesktopSupportProvider.getDesktopSupport(getOSFamily()));
+                ret = setDesktopSupportInstance(DesktopSupportProvider.getDesktopSupport(getOS()));
             }
         }
         return ret;
@@ -976,7 +978,7 @@ public class CrossSystem {
                     final boolean isServer = osName != null && osName.toLowerCase(Locale.ENGLISH).contains("server");
                     if (isServer) {
                         // https://learn.microsoft.com/en-us/windows/release-health/windows-server-release-info
-                        if (buildNumber >= 26040 /* Preview */|| buildNumber >= 26100 /* GA */) {
+                        if (buildNumber >= 26040 /* Preview */ || buildNumber >= 26100 /* GA */) {
                             this.set(OperatingSystem.WINDOWS_SERVER_2025);
                         } else if (buildNumber >= 20348) {
                             this.set(OperatingSystem.WINDOWS_SERVER_2022);

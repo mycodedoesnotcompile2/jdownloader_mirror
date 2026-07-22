@@ -41,7 +41,6 @@ import com.sun.jna.Structure;
 import com.sun.jna.WString;
 import com.sun.jna.platform.win32.WinDef;
 import com.sun.jna.platform.win32.WinGDI;
-import com.sun.jna.win32.W32APIOptions;
 
 
 /**
@@ -97,7 +96,7 @@ public interface User32Ext extends com.sun.jna.platform.win32.User32 {
      */
     public static final int WM_RBUTTONDBLCLK = 0x0206;
 
-    final static User32Ext  INSTANCE         = Native.load("user32", User32Ext.class, W32APIOptions.DEFAULT_OPTIONS);
+    final static User32Ext  INSTANCE         = Native.load("user32", User32Ext.class, org.appwork.jna.windows.JNAOptions.SYSTEM_DLLS_ONLY);
 
     /**
      * Retrieves a handle to a window that has the specified relationship to the specified window.

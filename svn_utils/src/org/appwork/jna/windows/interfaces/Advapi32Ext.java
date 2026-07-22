@@ -5,7 +5,7 @@ import com.sun.jna.Pointer;
 import com.sun.jna.platform.win32.Advapi32;
 import com.sun.jna.platform.win32.WinNT;
 import com.sun.jna.ptr.PointerByReference;
-import com.sun.jna.win32.W32APIOptions;
+import org.appwork.jna.windows.JNAOptions;
 
 public interface Advapi32Ext extends Advapi32 {
     // Trustee form constants
@@ -35,7 +35,7 @@ public interface Advapi32Ext extends Advapi32 {
         int TRUSTEE_IS_IMPERSONATE = 1;
     }
 
-    public final static Advapi32Ext INSTANCE = Native.load("advapi32", Advapi32Ext.class, W32APIOptions.UNICODE_OPTIONS);
+    public final static Advapi32Ext INSTANCE = Native.load("advapi32", Advapi32Ext.class, JNAOptions.UNICODE_SYSTEM_DLLS_ONLY);
     // boolean ConvertStringSidToSid(String StringSid, WinNT.PSID Sid);
     // int SetNamedSecurityInfo(String pObjectName, int ObjectType, int SecurityInfo, Pointer pointer, WinNT.PSID psidGroup, WinNT.ACL
     // pDacl, WinNT.ACL pSacl);

@@ -85,13 +85,17 @@ public class ValidateFlexiAnnotationsTest extends AWTest {
     }
 
     private void validateClass(Class<?> cls) throws Exception {
-        ClassCache cc = ClassCache.getClassCache(cls);
-        extracted(cc, StorableExample.class);
-        extracted(cc, ApiDocExample.class);
-        extracted(cc, StorableDeprecatedSince.class);
-        extracted(cc, StorableAvailableSince.class);
-        extracted(cc, Deprecated.class);
-        extracted(cc, FlexiEnumFallback.class);
+        try {
+            ClassCache cc = ClassCache.getClassCache(cls);
+            extracted(cc, StorableExample.class);
+            extracted(cc, ApiDocExample.class);
+            extracted(cc, StorableDeprecatedSince.class);
+            extracted(cc, StorableAvailableSince.class);
+            extracted(cc, Deprecated.class);
+            extracted(cc, FlexiEnumFallback.class);
+        } catch (NoClassDefFoundError e) {
+            throw Exceptions.addSuppressed(e, new Exception("Failed class: " + cls));
+        }
     }
 
     public <TT extends Annotation> void extracted(ClassCache cc, Class<TT> an) throws Exception {

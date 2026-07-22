@@ -57,7 +57,6 @@ import org.appwork.moncompare.Condition;
 import org.appwork.moncompare.Condition.PathHandler;
 import org.appwork.moncompare.Scope;
 import org.appwork.moncompare.fromjson.FlexiCondition;
-import org.appwork.storage.BuildsInfo.TargetBuildIssue;
 import org.appwork.storage.flexijson.CannotResolvePathException;
 import org.appwork.storage.flexijson.FlexiComment;
 import org.appwork.storage.flexijson.FlexiJSonArray;
@@ -148,24 +147,6 @@ public class StorableValidator<T> {
                 return getMessage();
             }
             return "Property deprecated since " + DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.MEDIUM, Locale.ROOT).format(new Date(deprecatedSinceTimestamp));
-        }
-
-        /**
-         * @param codebaseVersion
-         * @return
-         */
-        public TargetBuildIssue handle(BuildsInfo buildsInfo) {
-            final Date minimum = buildsInfo.getMinimumBuildDate();
-            if (minimum != null && minimum.getTime() < deprecatedSinceTimestamp) {
-                return TargetBuildIssue.ALL_TARGET_BUILDS_AFFECTED;
-            }
-            final Date maximum = buildsInfo.getMaximumBuildDate();
-            if (maximum != null) {
-                if (deprecatedSinceTimestamp < maximum.getTime()) {
-                    return TargetBuildIssue.SOME_TARGET_BUILDS_AFFECTED;
-                }
-            }
-            return TargetBuildIssue.NO_TARGET_BUILDS_AFFECTED;
         }
     }
 
@@ -680,24 +661,6 @@ public class StorableValidator<T> {
             }
             return "Property available since " + DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.MEDIUM, Locale.ROOT).format(new Date(availableSinceTimestamp)) + "(" + availableSinceTimestamp + ")";
         }
-
-        /**
-         * @param buildsInfo
-         * @return
-         */
-        public TargetBuildIssue handle(BuildsInfo buildsInfo) {
-            final Date maximum = buildsInfo.getMaximumBuildDate();
-            if (maximum != null) {
-                if (availableSinceTimestamp >= maximum.getTime()) {
-                    return TargetBuildIssue.ALL_TARGET_BUILDS_AFFECTED;
-                }
-            }
-            final Date minimum = buildsInfo.getMinimumBuildDate();
-            if (minimum != null && minimum.getTime() < availableSinceTimestamp) {
-                return TargetBuildIssue.SOME_TARGET_BUILDS_AFFECTED;
-            }
-            return TargetBuildIssue.NO_TARGET_BUILDS_AFFECTED;
-        }
     }
 
     public static class InvalidTimestampException extends ValidatorException {
@@ -816,24 +779,6 @@ public class StorableValidator<T> {
             }
             return "Property deprecated since " + DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.MEDIUM, Locale.ROOT).format(new Date(deprecatedSinceTimestamp));
         }
-
-        /**
-         * @param codebaseVersion
-         * @return
-         */
-        public TargetBuildIssue handle(BuildsInfo buildsInfo) {
-            final Date minimum = buildsInfo.getMinimumBuildDate();
-            if (minimum != null && minimum.getTime() < deprecatedSinceTimestamp) {
-                return TargetBuildIssue.ALL_TARGET_BUILDS_AFFECTED;
-            }
-            final Date maximum = buildsInfo.getMaximumBuildDate();
-            if (maximum != null) {
-                if (deprecatedSinceTimestamp < maximum.getTime()) {
-                    return TargetBuildIssue.SOME_TARGET_BUILDS_AFFECTED;
-                }
-            }
-            return TargetBuildIssue.NO_TARGET_BUILDS_AFFECTED;
-        }
     }
 
     public static class NullException extends ValidatorException {
@@ -910,7 +855,6 @@ public class StorableValidator<T> {
     private T                                              result;
     private ArrayList<StorableValidator<T>.ValidatetoDoss> toDos;
     private ArrayList<ValidatorException>                  exceptions;
-    private String                                         targetBuildsProperty = "targetBuilds";
     private Object                                         context;
 
     public Object getContext() {
@@ -919,14 +863,6 @@ public class StorableValidator<T> {
 
     public void setContext(Object context) {
         this.context = context;
-    }
-
-    public String getTargetBuildsProperty() {
-        return targetBuildsProperty;
-    }
-
-    public void setTargetBuildsProperty(String targetBuildsProperty) {
-        this.targetBuildsProperty = targetBuildsProperty;
     }
 
     public StorableValidator(FlexiJSonNode node, TypeRef<T> type) {
@@ -1373,16 +1309,12 @@ public class StorableValidator<T> {
                     }
                     String desc = condition.message();
                     long ts = ((Date) new DateMapper().json2Obj(null, new FlexiJSonValue(condition.value()), CompiledType.create(Date.class), null)).getTime();
-                    BuildsInfo buildInfo = getTargetBuildsinfo(toDo.node);
                     if (StringUtils.isEmpty(desc)) {
                         desc = "[Deprecated since " + DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.MEDIUM, Locale.ROOT).format(ts) + "]";
                     } else {
                         desc = "[Deprecated since " + DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.MEDIUM, Locale.ROOT).format(ts) + "] " + desc;
                     }
                     DeprecatedException ex = new DeprecatedException(StorableValidator.this, ts, toDo.path, toDo.node, toDo.type, desc, condition.level());
-                    if (buildInfo != null && ex.handle(buildInfo) == TargetBuildIssue.NO_TARGET_BUILDS_AFFECTED) {
-                        continue;
-                    }
                     add(ex);
                 }
                 if (c instanceof StorableAvailableSince && toDo.node != null) {
@@ -1401,11 +1333,7 @@ public class StorableValidator<T> {
                     } else {
                         desc = "[Available since " + DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.MEDIUM, Locale.ROOT).format(new Date(ts)) + "] " + desc;
                     }
-                    BuildsInfo buildInfo = getTargetBuildsinfo(toDo.node);
                     AvailableSinceException ex = new AvailableSinceException(StorableValidator.this, ts, toDo.path, toDo.node, toDo.type, desc, condition.level());
-                    if (buildInfo != null && ex.handle(buildInfo) == TargetBuildIssue.NO_TARGET_BUILDS_AFFECTED) {
-                        continue;
-                    }
                     add(ex);
                 }
                 if (c instanceof StorableValidateTimestampRelative) {
@@ -1580,32 +1508,6 @@ public class StorableValidator<T> {
      */
     protected boolean isIgnore(StorableValidator<T>.ValidatetoDoss toDo, Annotation c) {
         return false;
-    }
-
-    private FlexiJSonObject getTargetBuildsNode(FlexiJSonNode node) {
-        while (node != null) {
-            if (node instanceof FlexiJSonObject) {
-                final FlexiJSonNode targetBuilds = ((FlexiJSonObject) node).getNode(getTargetBuildsProperty());
-                if (targetBuilds != null && targetBuilds instanceof FlexiJSonObject) {
-                    return (FlexiJSonObject) targetBuilds;
-                }
-            }
-            node = node.getParent();
-        }
-        return null;
-    }
-
-    /**
-     * @param node
-     * @return
-     * @throws FlexiMapperException
-     */
-    private BuildsInfo getTargetBuildsinfo(FlexiJSonNode node) throws FlexiMapperException {
-        FlexiJSonObject ret = getTargetBuildsNode(node);
-        if (ret != null) {
-            return createMapper().jsonToObject(ret, BuildsInfo.TYPE);
-        }
-        return null;
     }
 
     /**

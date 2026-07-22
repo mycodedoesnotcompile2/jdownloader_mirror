@@ -37,6 +37,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.UnsupportedEncodingException;
 
 import org.appwork.exceptions.WTFException;
+import org.appwork.processes.ProcessInfo;
 import org.appwork.utils.Exceptions;
 
 /**
@@ -71,16 +72,36 @@ public class ProcessOutput {
      * so the process can be closed later.
      */
     private Runnable destroyCallback;
+    /**
+     * Optional started process (e.g. {@link org.appwork.utils.os.JNAProcessInfo} from UAC ShellExecuteEx when {@code waitFor=false}). Caller
+     * should {@link ProcessInfo#close()} or use ProcessHandler when done.
+     */
+    private final ProcessInfo processInfo;
 
     /**
      * Constructor with optional remote PID and destroy callback for processes started with waitFor=false.
      */
     public ProcessOutput(int exitCode, ByteArrayOutputStream stdOut, ByteArrayOutputStream errOut, String codePage, Integer remotePid, Runnable destroyCallback) {
+        this(exitCode, stdOut, errOut, codePage, remotePid, destroyCallback, null);
+    }
+
+    /**
+     * Full constructor including optional {@link ProcessInfo} for async launches (e.g. {@link org.appwork.utils.os.windows.execute.RunAsHelper#runUACElevated} with
+     * {@code waitFor=false}).
+     */
+    public ProcessOutput(int exitCode, ByteArrayOutputStream stdOut, ByteArrayOutputStream errOut, String codePage, Integer remotePid, Runnable destroyCallback, ProcessInfo processInfo) {
         this.exitCode = exitCode;
         this.stdOutData = stdOut;
         this.errOutData = errOut;
         this.codePage = codePage;
-        this.remotePid = remotePid;
+        this.processInfo = processInfo;
+        if (remotePid != null) {
+            this.remotePid = remotePid;
+        } else if (processInfo != null) {
+            this.remotePid = Integer.valueOf(processInfo.getPid());
+        } else {
+            this.remotePid = null;
+        }
         this.destroyCallback = destroyCallback;
     }
 
@@ -134,6 +155,13 @@ public class ProcessOutput {
      */
     public Integer getRemotePid() {
         return remotePid;
+    }
+
+    /**
+     * @return started process when the launcher provides one (e.g. UAC elevation with open handle); {@code null} otherwise
+     */
+    public ProcessInfo getProcessInfo() {
+        return processInfo;
     }
 
     /**

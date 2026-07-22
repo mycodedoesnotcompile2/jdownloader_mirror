@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2025, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         Germany
@@ -42,6 +42,7 @@ import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
+import java.security.Key;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -51,6 +52,7 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Signature;
+import java.security.interfaces.RSAKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
@@ -169,6 +171,18 @@ public class AWSign {
         }
     }
 
+    /**
+     * RSA ciphertext block size in bytes for the given key (2048-bit → 256, 4096-bit → 512).
+     *
+     * @throws InvalidKeyException
+     */
+    private static int getRSABlockSize(final Key key) throws InvalidKeyException {
+        if (key instanceof RSAKey) {
+            return (((RSAKey) key).getModulus().bitLength() + 7) / 8;
+        }
+        throw new InvalidKeyException("No RSA Key!");
+    }
+
     public static void decryptRSA_AES(final File srcFile, final File dstFile, final PublicKey pk) throws IOException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
         FileInputStream fis = null;
         FileOutputStream fos = null;
@@ -176,16 +190,17 @@ public class AWSign {
         try {
             fis = new FileInputStream(srcFile);
             fos = new FileOutputStream(dstFile);
-            final byte[] wrappedKey = new byte[256];
-            final byte[] wrappedIV = new byte[256];
+            final int rsaBlock = AWSign.getRSABlockSize(pk);
+            final byte[] wrappedKey = new byte[rsaBlock];
+            final byte[] wrappedIV = new byte[rsaBlock];
             final byte[] readDigest = new byte[32];
             int done = 0;
             int read = 0;
-            while (done < 256 && (read = fis.read()) != -1) {
+            while (done < rsaBlock && (read = fis.read()) != -1) {
                 wrappedKey[done++] = (byte) read;
             }
             done = 0;
-            while (done < 256 && (read = fis.read()) != -1) {
+            while (done < rsaBlock && (read = fis.read()) != -1) {
                 wrappedIV[done++] = (byte) read;
             }
             done = 0;
@@ -237,6 +252,7 @@ public class AWSign {
         try {
             fis = new FileInputStream(srcFile);
             fos = new FileOutputStream(dstFile);
+            final int rsaBlock = AWSign.getRSABlockSize(pk);
             final KeyGenerator keygen = KeyGenerator.getInstance("AES");
             if (AWSign.sr != null) {
                 keygen.init(AWSign.sr);
@@ -291,7 +307,7 @@ public class AWSign {
             }
             cos.close();
             // only works because FileOutputStream is NOT in append mode
-            fos.getChannel().position(2 * 256);
+            fos.getChannel().position(2L * rsaBlock);
             fos.write(md.digest());
             deleteDst = false;
         } finally {

@@ -40,7 +40,8 @@ import com.sun.jna.platform.win32.Kernel32;
 import com.sun.jna.platform.win32.WinNT.HANDLE;
 
 /**
- * ProcessInfo for a process started with a JNA handle (e.g. from {@link WindowsUtils#startElevatedProcess}). Holds the OS handle for stable
+ * ProcessInfo for a process started with a JNA handle (e.g. from {@link org.appwork.utils.os.windows.execute.RunAsHelper#runUACElevated} via
+ * {@link org.appwork.utils.processes.ProcessOutput#getProcessInfo()} or {@link WindowsUtils#startElevatedProcess}). Holds the OS handle for stable
  * reference; use {@link #close()} when done or let ProcessHandler close it via terminateForced / waitForExit.
  *
  * @author thomas

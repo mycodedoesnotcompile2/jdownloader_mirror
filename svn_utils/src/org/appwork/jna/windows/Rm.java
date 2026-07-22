@@ -6,10 +6,10 @@ import com.sun.jna.Pointer;
 import com.sun.jna.StringArray;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.LongByReference;
-import com.sun.jna.win32.W32APIOptions;
+import org.appwork.jna.windows.JNAOptions;
 
 public interface Rm extends Library {
-    final static Rm INSTANCE = Native.load("rstrtmgr", Rm.class, W32APIOptions.UNICODE_OPTIONS);
+    final static Rm INSTANCE = Native.load("rstrtmgr", Rm.class, JNAOptions.UNICODE_SYSTEM_DLLS_ONLY);
 
     int RmGetList(int dwSessionHandle, IntByReference pnProcInfoNeeded, IntByReference pnProcInfo, RmProcessInfo[] rgAffectedApps, LongByReference lpdwRebootReasons);
 

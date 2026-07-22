@@ -19,7 +19,7 @@ import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.platform.win32.WinDef.DWORD;
 import com.sun.jna.ptr.PointerByReference;
-import com.sun.jna.win32.W32APIOptions;
+import org.appwork.jna.windows.JNAOptions;
 
 /**
  * JNA interface to Windows WinHTTP API (winhttp.dll) for URL-based system proxy lookup via
@@ -29,7 +29,7 @@ import com.sun.jna.win32.W32APIOptions;
  * @see <a href="https://learn.microsoft.com/en-us/windows/win32/api/winhttp/nf-winhttp-winhttpgetproxyforurl">WinHttpGetProxyForUrl</a>
  */
 public interface WinHttp extends Library {
-    WinHttp INSTANCE = Native.load("winhttp", WinHttp.class, W32APIOptions.UNICODE_OPTIONS);
+    WinHttp INSTANCE = Native.load("winhttp", WinHttp.class, JNAOptions.UNICODE_SYSTEM_DLLS_ONLY);
 
     /** Use default proxy (registry / system). */
     int WINHTTP_ACCESS_TYPE_DEFAULT_PROXY = 0;

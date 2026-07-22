@@ -47,6 +47,7 @@ import java.util.zip.ZipInputStream;
 import org.appwork.exceptions.WTFException;
 import org.appwork.testframework.AWTest;
 import org.appwork.testframework.PostBuildTestInterface;
+import org.appwork.testframework.TestCaseReporter;
 import org.appwork.utils.ClassPathScanner;
 import org.appwork.utils.Files;
 import org.appwork.utils.ZipContentHasher;
@@ -61,6 +62,16 @@ public class AssertNoTestsInJars implements PostBuildTestInterface {
     @Override
     public boolean isSkipOnUnchangedDependencies() {
         return true;
+    }
+
+    @Override
+    public void testSucceeded(final String testCaseName) {
+        TestCaseReporter.testSucceeded(testCaseName);
+    }
+
+    @Override
+    public void testSkipped(final String testCaseName, final String reason) {
+        TestCaseReporter.testSkipped(testCaseName, reason);
     }
 
     private void validateZipOrJar(final File folder) throws Exception {

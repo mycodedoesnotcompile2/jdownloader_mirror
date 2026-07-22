@@ -43,6 +43,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.appwork.app.launcher.parameterparser.CommandSwitch;
 import org.appwork.app.launcher.parameterparser.ParameterParser;
 import org.appwork.testframework.PostBuildTestInterface;
+import org.appwork.testframework.TestCaseReporter;
 import org.appwork.testframework.TestDependency;
 import org.appwork.utils.Files;
 import org.appwork.utils.Files.Handler;
@@ -61,6 +62,16 @@ public class SourceParserPostBuildTest implements PostBuildTestInterface {
     @Override
     public boolean isSkipOnUnchangedDependencies() {
         return false;
+    }
+
+    @Override
+    public void testSucceeded(final String testCaseName) {
+        TestCaseReporter.testSucceeded(testCaseName);
+    }
+
+    @Override
+    public void testSkipped(final String testCaseName, final String reason) {
+        TestCaseReporter.testSkipped(testCaseName, reason);
     }
 
     @Override

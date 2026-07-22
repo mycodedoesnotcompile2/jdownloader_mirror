@@ -13,7 +13,7 @@ import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.platform.win32.WinCrypt.HCRYPTMSG;
 import com.sun.jna.ptr.IntByReference;
-import com.sun.jna.win32.W32APIOptions;
+import org.appwork.jna.windows.JNAOptions;
 
 /**
  * JNA interface for the subset of Windows Crypt32 API (crypt32.dll) used by {@link WindowsSignature} for reading Authenticode signatures:
@@ -35,7 +35,7 @@ import com.sun.jna.win32.W32APIOptions;
  */
 public interface WindowsSignatureCrypt32Api extends Library {
     /** Singleton instance loading crypt32.dll. */
-    WindowsSignatureCrypt32Api INSTANCE = Native.load("crypt32", WindowsSignatureCrypt32Api.class, W32APIOptions.UNICODE_OPTIONS);
+    WindowsSignatureCrypt32Api INSTANCE = Native.load("crypt32", WindowsSignatureCrypt32Api.class, JNAOptions.UNICODE_SYSTEM_DLLS_ONLY);
 
     /**
      * Retrieves a specified type of data from a cryptographic message. Used by {@link WindowsSignature} to get signer info

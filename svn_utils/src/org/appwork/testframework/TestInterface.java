@@ -57,4 +57,22 @@ public interface TestInterface {
      * @return
      */
     boolean isMaintenance();
+
+    /**
+     * Reports a successful sub-test case for the HTML test report (optional; no-op when reporting is disabled).
+     *
+     * @param testCaseName
+     *            short label, e.g. {@code LocalSystem->Owner}
+     */
+    void testSucceeded(String testCaseName);
+
+    /**
+     * Reports a skipped sub-test case for the HTML test report (optional).
+     *
+     * @param testCaseName
+     *            short label
+     * @param reason
+     *            why the case was skipped, e.g. {@code Requires Linux}
+     */
+    void testSkipped(String testCaseName, String reason);
 }

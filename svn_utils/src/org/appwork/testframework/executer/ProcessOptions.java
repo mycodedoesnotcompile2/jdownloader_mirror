@@ -41,7 +41,7 @@ import org.appwork.utils.LogCallback;
  * The options relevant for the helper (waitFor, keepRunning, requestId) are sent as a serialized object (JSON).
  */
 public final class ProcessOptions {
-    /** Default: wait for process to finish, no extra env, no log callback, no cancel callback, keepRunning false. */
+    /** Default: wait for process to finish, no extra env, no log callback, keepRunning false. */
     public static final ProcessOptions DEFAULT = new ProcessOptions(true, null, null, false);
     private final boolean              waitFor;
     private final Map<String, String>  env;
@@ -179,10 +179,10 @@ public final class ProcessOptions {
     }
 
     public static final class Builder {
-        private boolean             waitFor     = true;
+        private boolean             waitFor              = true;
         private Map<String, String> env;
         private LogCallback         logCallback;
-        private boolean             keepRunning = false;
+        private boolean             keepRunning          = false;
 
         /**
          * Task/method: wait for process to end and then return value/exit code. CMD: true = wait for process end; false = start only,

@@ -49,4 +49,6 @@ public class DeserConstants {
     protected static final String CLASS_SIMPLE         = "org.appwork.storage.SimpleSerializer";
     @AWTestValidateClassReference
     protected static final String CLASS_FLEXI          = "org.appwork.storage.flexijson.FlexiSerializer";
+    @AWTestValidateClassReference
+    public static final String    DESER                = "org.appwork.serializer.Deser";
 }

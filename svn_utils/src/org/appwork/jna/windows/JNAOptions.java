@@ -7,10 +7,11 @@
  *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
+ *         e-mail@appwork.org
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
- *     The intent is that the AppWork GmbH is able to provide their utilities library for free to non-commercial projects whereas commercial usage is only permitted after obtaining a commercial license.
+ *     The intent is that the AppWork GmbH is able to provide  their utilities library for free to non-commercial projects whereas commercial usage is only permitted after obtaining a commercial license.
  *     These terms apply to all files that have the [The Product] License header (IN the file), a <filename>.license or <filename>.info (like mylib.jar.info) file that contains a reference to this license.
  *
  * === 3rd Party Licences ===
@@ -19,11 +20,11 @@
  *
  * === Definition: Commercial Usage ===
  *     If anybody or any organization is generating income (directly or indirectly) by using [The Product] or if there's any commercial interest or aspect in what you are doing, we consider this as a commercial usage.
- *     If your use-case is neither strictly private nor strictly educational, it is commercial. If you are unsure whether your use-case is commercial or not, consider it as commercial or contact us.
+ *     If your use-case is neither strictly private nor strictly educational, it is commercial. If you are unsure whether your use-case is commercial or not, consider it as commercial or contact as.
  * === Dual Licensing ===
  * === Commercial Usage ===
  *     If you want to use [The Product] in a commercial way (see definition above), you have to obtain a paid license from AppWork GmbH.
- *     Contact AppWork for further details: <e-mail@appwork.org>
+ *     Contact AppWork for further details: e-mail@appwork.org
  * === Non-Commercial Usage ===
  *     If there is no commercial usage (see definition above), you may use [The Product] under the terms of the
  *     "GNU Affero General Public License" (http://www.gnu.org/licenses/agpl-3.0.en.html).
@@ -31,37 +32,30 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.utils.os;
+package org.appwork.jna.windows;
 
-import org.appwork.JNAHelper;
-import org.appwork.builddecision.BuildDecisions;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.os.CrossSystem.OperatingSystem;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
+import com.sun.jna.win32.W32APIOptions;
 
 /**
- * @author daniel
- *
+ * Standard {@link com.sun.jna.Native#load} option maps for Windows DLL bindings in AppWork projects.
+ * Always pass one of these constants as the third argument — never {@link W32APIOptions#UNICODE_OPTIONS} or
+ * {@link W32APIOptions#DEFAULT_OPTIONS} directly.
  */
-public class DesktopSupportProvider {
-    public static DesktopSupport getDesktopSupport(OperatingSystem os) {
-        switch (os.getFamily()) {
-        case WINDOWS:
-            try {
-                if (JNAHelper.isJNAAvailable() && !BuildDecisions.contains(DesktopSupportWindowsViaJNA.DESKTOP_SUPPORT_WINDOWS_VIA_JNA_NO)) {
-                    return new org.appwork.utils.os.DesktopSupportWindowsViaJNA();
-                } else {
-                    return new DesktopSupportWindows();
-                }
-            } catch (final Exception e) {
-                DebugMode.debugger(e);
-                return new DesktopSupportWindows();
-            }
-        case LINUX:
-            return new DesktopSupportLinux();
-        case MAC:
-            return new DesktopSupportMac();
-        default:
-            return new DesktopSupportJavaDesktop();
-        }
-    }
+public class JNAOptions {
+    /** {@link W32APIOptions#DEFAULT_OPTIONS} plus {@code LOAD_LIBRARY_SEARCH_SYSTEM32}. */
+    public static final Map SYSTEM_DLLS_ONLY         = Collections.unmodifiableMap(new HashMap<String, Object>(W32APIOptions.DEFAULT_OPTIONS) {
+                                                                                       {
+                                                                                           put(com.sun.jna.Library.OPTION_OPEN_FLAGS, 0x00000800);
+                                                                                       }
+                                                                                   });
+    /** {@link W32APIOptions#UNICODE_OPTIONS} plus {@code LOAD_LIBRARY_SEARCH_SYSTEM32} (Win32 {@code *W} APIs). */
+    public static final Map UNICODE_SYSTEM_DLLS_ONLY = Collections.unmodifiableMap(new HashMap<String, Object>(W32APIOptions.UNICODE_OPTIONS) {
+                                                                                       {
+                                                                                           put(com.sun.jna.Library.OPTION_OPEN_FLAGS, 0x00000800);
+                                                                                       }
+                                                                                   });
 }

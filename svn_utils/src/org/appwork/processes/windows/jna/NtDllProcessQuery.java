@@ -39,7 +39,7 @@ import com.sun.jna.Pointer;
 import com.sun.jna.platform.win32.WinNT;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.win32.StdCallLibrary;
-import com.sun.jna.win32.W32APIOptions;
+import org.appwork.jna.windows.JNAOptions;
 
 /**
  * Minimal NTDLL interface for process-handler use only. Exposes {@link #NtQueryInformationProcess} for querying
@@ -51,7 +51,7 @@ import com.sun.jna.win32.W32APIOptions;
  */
 public interface NtDllProcessQuery extends StdCallLibrary {
 
-    NtDllProcessQuery INSTANCE = Native.load("ntdll", NtDllProcessQuery.class, W32APIOptions.UNICODE_OPTIONS);
+    NtDllProcessQuery INSTANCE = Native.load("ntdll", NtDllProcessQuery.class, JNAOptions.UNICODE_SYSTEM_DLLS_ONLY);
 
     /**
      * NtQueryInformationProcess. Returns NTSTATUS (0 = success). Used with ProcessCommandLineInformation (60) to

@@ -45,7 +45,7 @@ import org.appwork.storage.StorableExample;
  * Stored as JSON under user.home/.appworktest/postbuild/{baseHash}/.
  */
 @StorableDoc("Status object for one post-build test class. Persisted per test and per BASE-hash.")
-@StorableExample("{\"lastFailureTimestamp\":1700000000000,\"lastRunTimestamp\":1700000001000,\"lastSuccessTimestamp\":null,\"runCount\":5,\"failureCount\":1}")
+@StorableExample("{\"lastFailureTimestamp\":1700000000000,\"lastRunTimestamp\":1700000001000,\"lastSuccessTimestamp\":null,\"runCount\":5,\"failureCount\":1,\"javaSourceHashes\":{\"org.example.Outer\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"}}")
 public class PostBuildTestStatus implements Storable {
     /**
      * Default constructor for Storable deserialization.
@@ -76,6 +76,12 @@ public class PostBuildTestStatus implements Storable {
      * Full map of dependency class name to hash from last run. Used to log which classes changed when test is re-run.
      */
     private Map<String, String> resourceHashes;
+    /**
+     * SHA256 of the on-disk {@code .java} for the outer class (key = outer FQCN), for dependencies that were fingerprinted. Used with
+     * {@link org.appwork.testframework.DependencyJavaSourceFingerprint} to avoid re-running when only classfile metadata drifted but sources did not.
+     */
+    @StorableDoc("Optional map outerClassName -> SHA256 of .java file content from last successful fingerprint merge.")
+    private Map<String, String> javaSourceHashes;
 
     public long getLastRunTimestamp() {
         return lastRunTimestamp;
@@ -147,5 +153,13 @@ public class PostBuildTestStatus implements Storable {
 
     public void setResourceHashes(Map<String, String> resourceHashes) {
         this.resourceHashes = resourceHashes == null ? null : new HashMap<String, String>(resourceHashes);
+    }
+
+    public Map<String, String> getJavaSourceHashes() {
+        return javaSourceHashes == null ? null : new HashMap<String, String>(javaSourceHashes);
+    }
+
+    public void setJavaSourceHashes(Map<String, String> javaSourceHashes) {
+        this.javaSourceHashes = javaSourceHashes == null ? null : new HashMap<String, String>(javaSourceHashes);
     }
 }

@@ -56,6 +56,7 @@ import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder;
 import org.appwork.utils.AutoCloseInputStream;
 import org.appwork.utils.CompareUtils;
 import org.appwork.utils.DebugMode;
+import org.appwork.utils.Exceptions;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.reflection.Clazz;
@@ -188,7 +189,8 @@ public class FlexiSerializer extends AbstractSerializer implements SerializerInt
             final FlexiJSonNode node = createParser(json, context).parse();
             return getMapper(context).jsonToObject(node, type);
         } catch (Exception e) {
-            LogV3.info("Error Parsing Json from String: " + StringUtils.abr(json, 300, "[" + (json.length() - 300) + "]"));
+            // LogV3.log(e);
+            LogV3.info("Error Parsing Json from String: " + StringUtils.abr(json, 900, "[" + (json.length() - 900) + "] << " + Exceptions.toCauseChainClassString(e, true)));
             throw SerializerException.wrap(e);
         }
     }
@@ -291,9 +293,6 @@ public class FlexiSerializer extends AbstractSerializer implements SerializerInt
      *
      */
     public static void setAsDefault() {
-        if (Deser.get() instanceof FlexiSerializer) {
-            return;
-        }
         System.setProperty("AWU_SERIALIZER_CLASS", FlexiSerializer.class.getName());
         Deser.set(new FlexiSerializer());
     }

@@ -53,7 +53,7 @@ public final class AdminTaskResultWrapper implements Serializable {
         return exceptionStackTrace != null ? exceptionStackTrace : "";
     }
 
-    /** True when the task threw an exception (wrapper was written by RunTaskAsSystemMain in catch block). */
+    /** True when the task threw an exception (wrapper was written by RunSerializedTaskMain in catch block). */
     public boolean hasTaskFailure() {
         return exceptionStackTrace != null && exceptionStackTrace.length() > 0;
     }

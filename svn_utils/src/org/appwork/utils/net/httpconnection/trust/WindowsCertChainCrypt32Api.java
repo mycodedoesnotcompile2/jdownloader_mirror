@@ -14,7 +14,7 @@ import com.sun.jna.Pointer;
 import com.sun.jna.platform.win32.WinCrypt.CERT_CONTEXT;
 import com.sun.jna.platform.win32.WinCrypt.HCERTSTORE;
 import com.sun.jna.ptr.PointerByReference;
-import com.sun.jna.win32.W32APIOptions;
+import org.appwork.jna.windows.JNAOptions;
 
 /**
  * JNA interface for the subset of Windows Crypt32 API (crypt32.dll) used by {@link JNAWindowsTrustProvider} for certificate chain
@@ -39,7 +39,7 @@ import com.sun.jna.win32.W32APIOptions;
  */
 public interface WindowsCertChainCrypt32Api extends Library {
     /** Singleton instance loading crypt32.dll. */
-    WindowsCertChainCrypt32Api INSTANCE = Native.load("crypt32", WindowsCertChainCrypt32Api.class, W32APIOptions.UNICODE_OPTIONS);
+    WindowsCertChainCrypt32Api INSTANCE = Native.load("crypt32", WindowsCertChainCrypt32Api.class, JNAOptions.UNICODE_SYSTEM_DLLS_ONLY);
 
     /**
      * Creates a certificate context from an encoded certificate. The context is not persisted to a store and must be freed by the caller

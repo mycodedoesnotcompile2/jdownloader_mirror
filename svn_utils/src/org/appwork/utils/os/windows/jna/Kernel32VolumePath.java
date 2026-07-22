@@ -6,7 +6,6 @@ package org.appwork.utils.os.windows.jna;
 import com.sun.jna.Native;
 import com.sun.jna.platform.win32.Kernel32;
 import com.sun.jna.ptr.IntByReference;
-import com.sun.jna.win32.W32APIOptions;
 
 /**
  * GetVolumePathNamesForVolumeNameW: retrieves drive letters and mount paths for a volume GUID.
@@ -14,7 +13,7 @@ import com.sun.jna.win32.W32APIOptions;
  * Output: multi-string (null-terminated strings, double-null at end), e.g. "C:\"
  */
 public interface Kernel32VolumePath extends Kernel32 {
-    Kernel32VolumePath INSTANCE = Native.load("kernel32", Kernel32VolumePath.class, W32APIOptions.DEFAULT_OPTIONS);
+    Kernel32VolumePath INSTANCE = Native.load("kernel32", Kernel32VolumePath.class, org.appwork.jna.windows.JNAOptions.SYSTEM_DLLS_ONLY);
 
     /**
      * @param lpszVolumeName volume GUID path, e.g. "\\?\Volume{guid}\" (null-terminated wide string)

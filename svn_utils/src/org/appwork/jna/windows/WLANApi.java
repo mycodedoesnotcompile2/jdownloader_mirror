@@ -5,10 +5,9 @@ import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.platform.win32.Guid;
 import com.sun.jna.ptr.PointerByReference;
-import com.sun.jna.win32.W32APIOptions;
 
 public interface WLANApi extends Library {
-    public final static WLANApi INSTANCE = Native.load("wlanapi", WLANApi.class, W32APIOptions.DEFAULT_OPTIONS);
+    public final static WLANApi INSTANCE = Native.load("wlanapi", WLANApi.class, org.appwork.jna.windows.JNAOptions.SYSTEM_DLLS_ONLY);
 
     int WlanOpenHandle(int dwClientVersion, Pointer pReserved, PointerByReference pHandle);
 

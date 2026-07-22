@@ -63,6 +63,7 @@ import org.appwork.swing.exttable.ExtTable;
 import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.swing.exttable.columns.ExtCheckColumn;
 import org.appwork.swing.exttable.columns.ExtTextColumn;
+import org.appwork.testframework.TestCaseReporter;
 import org.appwork.testframework.TestInterface;
 import org.appwork.utils.Application;
 import org.appwork.utils.BinaryLogic;
@@ -106,6 +107,16 @@ public class JavaFileLineEndingAWTest implements TestInterface {
     @Override
     public boolean isSkipOnUnchangedDependencies() {
         return false;
+    }
+
+    @Override
+    public void testSucceeded(final String testCaseName) {
+        TestCaseReporter.testSucceeded(testCaseName);
+    }
+
+    @Override
+    public void testSkipped(final String testCaseName, final String reason) {
+        TestCaseReporter.testSkipped(testCaseName, reason);
     }
 
     @Override

@@ -20,12 +20,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.formatter.TimeFormatter;
 
 import jd.PluginWrapper;
+import jd.controlling.AccountController;
+import jd.controlling.AccountControllerEvent;
+import jd.controlling.AccountControllerListener;
 import jd.http.Browser;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -42,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
 /** API docs: https://a.hatfile.com/JD2/doc.html */
-@HostPlugin(revision = "$Revision: 53020 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53023 $", interfaceVersion = 3, names = {}, urls = {})
 public class HatfileCom extends PluginForHost {
     public static final String  API_BASE                      = "https://a.hatfile.com/JD2/api.php";
     private static final String PROPERTY_SESSION              = "session";
@@ -52,10 +56,16 @@ public class HatfileCom extends PluginForHost {
     private static final String PROPERTY_PREMIUM_REQUIRED     = "premium_required";
     private static final String PROPERTY_RESUMABLE            = "resumable";
     private static final String PROPERTY_MAXCHUNKS            = "maxchunks";
+    /**
+     * Guards {@link #registerLogoutListener()} so the AccountControllerListener only gets added once per account. Must only be checked/set
+     * on the stable plugin instance cached in {@link Account#getPlugin()}, not on the short-lived instances created for a single account
+     * check/download.
+     */
+    private final AtomicBoolean LOGOUT_LISTENER_REGISTERED    = new AtomicBoolean(false);
 
     public HatfileCom(final PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://" + getHost() + "/");
+        this.enablePremium("https://" + getHost() + "/premium");
     }
 
     @Override
@@ -88,14 +98,14 @@ public class HatfileCom extends PluginForHost {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([A-Za-z0-9\\-]+)(/([^/]*))?");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([A-F0-9]{6}-[A-F0-9]{6})(/([^/]*))?");
         }
         return ret.toArray(new String[0]);
     }
 
     @Override
     public String getAGBLink() {
-        return "https://" + getHost() + "/";
+        return "https://" + getHost() + "/pages/rules";
     }
 
     private String getFID(final DownloadLink link) {
@@ -161,7 +171,7 @@ public class HatfileCom extends PluginForHost {
             /* File offline */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, msg);
         case 103:
-            /* Storage unavailable */
+            /* Storage unavailable (I guess this should never happen during downloading) */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, 5 * 60 * 1000l);
         case 104:
             /* Not enough Premium traffic */
@@ -214,8 +224,57 @@ public class HatfileCom extends PluginForHost {
         }
     }
 
+    /** Invalidates the account's session server-side. Called via the AccountController listener once the account gets removed. */
+    private void logout(final Account account) {
+        final String session = account.getStringProperty(PROPERTY_SESSION, null);
+        if (session == null) {
+            /* No stored session -> We cannot logout */
+            return;
+        }
+        try {
+            if (br == null) {
+                /* This plugin instance may already have gone through clean() (e.g. after its last account check/download). */
+                setBrowser(createNewBrowserInstance());
+            }
+            final Map<String, Object> postData = new HashMap<String, Object>();
+            postData.put("action", "logout");
+            postData.put("session", session);
+            postAPI(postData);
+            logger.info("Logout successful");
+            account.removeProperty(PROPERTY_SESSION);
+            account.removeProperty(PROPERTY_SESSION_EXPIRES_AT);
+        } catch (final Exception e) {
+            logger.log(e);
+        }
+    }
+
+    /** Registers the logout listener exactly once per account, anchored on the stable plugin instance from {@link Account#getPlugin()}. */
+    private void registerLogoutListener(final Account account) {
+        final PluginForHost accPlugin = account.getPlugin();
+        if (accPlugin instanceof HatfileCom) {
+            ((HatfileCom) accPlugin).doRegisterLogoutListener();
+        }
+    }
+
+    private void doRegisterLogoutListener() {
+        if (LOGOUT_LISTENER_REGISTERED.compareAndSet(false, true)) {
+            AccountController.getInstance().getEventSender().addListener(new AccountControllerListener() {
+                @Override
+                public void onAccountControllerEvent(final AccountControllerEvent event) {
+                    if (AccountControllerEvent.Types.REMOVED.equals(event.getType())) {
+                        final Account removedAccount = event.getAccount();
+                        if (removedAccount != null && getHost().equalsIgnoreCase(removedAccount.getHoster())) {
+                            logout(removedAccount);
+                        }
+                    }
+                }
+            });
+        }
+    }
+
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
+        // registerLogoutListener(account);
         final String session = getSession(account, false);
         final Map<String, Object> data = accountCheck(session);
         final AccountInfo ai = new AccountInfo();
@@ -248,7 +307,11 @@ public class HatfileCom extends PluginForHost {
         link.setFinalFileName((String) data.get("filename"));
         link.setVerifiedFileSize(((Number) data.get("filesize")).longValue());
         link.setMD5Hash((String) data.get("md5"));
-        link.setProperty(PROPERTY_PREMIUM_REQUIRED, data.get("premium_required"));
+        if (Boolean.TRUE.equals(data.get("premium_required"))) {
+            link.setProperty(PROPERTY_PREMIUM_REQUIRED, true);
+        } else {
+            link.removeProperty(PROPERTY_PREMIUM_REQUIRED);
+        }
         link.setProperty(PROPERTY_RESUMABLE, data.get("resumable"));
         link.setProperty(PROPERTY_MAXCHUNKS, ((Number) data.get("maxchunks")).intValue());
         return AvailableStatus.TRUE;
@@ -256,14 +319,14 @@ public class HatfileCom extends PluginForHost {
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
-        /* HatFile downloads require an active Premium account. */
+        /* All HatFile downloads require an active Premium account. */
         throw new AccountRequiredException();
     }
 
     @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
         requestFileInformation(link);
-        if (Boolean.TRUE.equals(link.getBooleanProperty(PROPERTY_PREMIUM_REQUIRED, false)) && !AccountType.PREMIUM.equals(account.getType())) {
+        if (link.hasProperty(PROPERTY_PREMIUM_REQUIRED) && !AccountType.PREMIUM.equals(account.getType())) {
             throw new AccountRequiredException();
         }
         String directurl = link.getStringProperty(PROPERTY_DIRECTURL, null);
@@ -273,14 +336,19 @@ public class HatfileCom extends PluginForHost {
             link.removeProperty(PROPERTY_DIRECTURL);
             link.removeProperty(PROPERTY_DIRECTURL_EXPIRES_AT);
         }
+        boolean isFreshDirecturl = false;
         if (directurl == null) {
             directurl = requestDirectURL(account, link, false);
+            isFreshDirecturl = true;
         }
         dl = new jd.plugins.BrowserAdapter().openDownload(br, link, directurl, isResumeable(link, account), getMaxChunks(link, account));
         if (!looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
             link.removeProperty(PROPERTY_DIRECTURL);
             link.removeProperty(PROPERTY_DIRECTURL_EXPIRES_AT);
+            if (isFreshDirecturl) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Final downloadurl did not lead to downloadable content");
+            }
             /* Stored directurl was stale -> request a fresh one and retry once. */
             directurl = requestDirectURL(account, link, true);
             dl = new jd.plugins.BrowserAdapter().openDownload(br, link, directurl, isResumeable(link, account), getMaxChunks(link, account));
@@ -308,6 +376,26 @@ public class HatfileCom extends PluginForHost {
         }
         final String directurl = (String) data.get("direct_url");
         link.setProperty(PROPERTY_DIRECTURL_EXPIRES_AT, ((Number) data.get("expires_at")).longValue());
+        updateTraffic: {
+            if (Boolean.FALSE.equals(data.get("charged"))) {
+                logger.info("User was not charged any traffic for this download");
+                break updateTraffic;
+            }
+            final Map<String, Object> trafficinfo = (Map<String, Object>) data.get("account");
+            if (trafficinfo == null) {
+                break updateTraffic;
+            }
+            if (Boolean.TRUE.equals(trafficinfo.get("traffic_unlimited"))) {
+                /* User has unlimited traffic -> No need to update traffic info */
+                break updateTraffic;
+            }
+            final AccountInfo ai = account.getAccountInfo();
+            if (ai == null) {
+                break updateTraffic;
+            }
+            ai.setTrafficLeft(((Number) trafficinfo.get("trafficleft")).longValue());
+            ai.setTrafficMax(((Number) trafficinfo.get("trafficmax_daily")).longValue());
+        }
         return directurl;
     }
 
@@ -341,5 +429,10 @@ public class HatfileCom extends PluginForHost {
     @Override
     public boolean hasAutoCaptcha() {
         return false;
+    }
+
+    @Override
+    public void update(final DownloadLink downloadLink, final Account account, final long bytesTransfered) {
+        /* Do nothing since traffic is updated right away after each download attempt. */
     }
 }

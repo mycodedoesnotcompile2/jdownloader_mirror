@@ -901,6 +901,13 @@ public abstract class PluginForHost extends Plugin {
         return ai;
     }
 
+    /**
+     * Called by {@link jd.controlling.AccountController} right before the given account gets permanently removed. Override to notify
+     * the hoster (e.g. invalidate a server-side session/API token) since this is the plugin's only chance to react to the deletion.
+     */
+    public void onAccountRemove(final Account account) {
+    }
+
     public abstract String getAGBLink();
 
     protected void enablePremium() {

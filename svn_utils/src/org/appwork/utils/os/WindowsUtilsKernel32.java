@@ -39,7 +39,6 @@ import org.appwork.jna.windows.Kernel32Ext;
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.ptr.IntByReference;
-import com.sun.jna.win32.W32APIOptions;
 
 import com.sun.jna.platform.win32.WinBase;
 import com.sun.jna.platform.win32.WinDef.DWORD;
@@ -50,7 +49,7 @@ import com.sun.jna.platform.win32.WinDef.DWORD;
  *
  */
 public interface WindowsUtilsKernel32 extends Kernel32Ext {
-    final static WindowsUtilsKernel32 INSTANCE         = Native.load("kernel32", WindowsUtilsKernel32.class, W32APIOptions.DEFAULT_OPTIONS);
+    final static WindowsUtilsKernel32 INSTANCE         = Native.load("kernel32", WindowsUtilsKernel32.class, org.appwork.jna.windows.JNAOptions.SYSTEM_DLLS_ONLY);
     /** GetFinalPathNameByHandle: return path with drive letter (e.g. \\?\C:\path). Use this to get C:\ style paths. */
     int                               VOLUME_NAME_DOS  = 0x0;
     /** GetFinalPathNameByHandle: return path with volume GUID (e.g. \\?\Volume{...}). */

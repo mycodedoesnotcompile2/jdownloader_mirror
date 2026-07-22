@@ -10,10 +10,10 @@ import com.sun.jna.Pointer;
 import com.sun.jna.platform.win32.WinNT;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.win32.StdCallLibrary;
-import com.sun.jna.win32.W32APIOptions;
+import org.appwork.jna.windows.JNAOptions;
 
 public interface NtDllForHandleScan extends StdCallLibrary, WinNT {
-    NtDllForHandleScan INSTANCE = Native.load("ntdll", NtDllForHandleScan.class, W32APIOptions.UNICODE_OPTIONS);
+    NtDllForHandleScan INSTANCE = Native.load("ntdll", NtDllForHandleScan.class, JNAOptions.UNICODE_SYSTEM_DLLS_ONLY);
 
     /** SystemHandleInformation; buffer: ULONG HandleCount then entries. HandleValue is 16-bit in entries. */
     int SystemHandleInformation = 16;

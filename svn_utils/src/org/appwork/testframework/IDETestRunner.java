@@ -266,39 +266,56 @@ public class IDETestRunner {
             }
         }
         AWTest.logInfoAnyway("Found  " + testClassesFound + " - Skipped Tests: " + skippedTestClasses);
+        TestCaseReporter.beginRun("IDE", TestCaseReporter.getReportDirectory(Application.getResource("reports")));
+        DependencyJavaSourceFingerprint.clearRunFileHashCache();
+        final List<File> ideSourceRoots = DependencyJavaSourceFingerprint.resolveSourceRootsFromClasspathAndExtra(null);
         int count = 0;
         nextTest: for (final String testClass : testClasses) {
             count++;
             AWTest.logInfoAnyway("Next  " + " - " + count + "/" + testClassesFound + " : " + testClass);
             Map<String, String> references = new ClassCollector().getClasses(testClass, true);
             File file = Application.getResource("cfg/testcache_" + testClass + ".cache");
+            File javaHashCacheFile = Application.getResource("cfg/testcache_" + testClass + "_java.cache");
             HashMap<String, String> known = new HashMap<String, String>();
+            HashMap<String, String> javaKnown = new HashMap<String, String>();
+            AWTest.logInfoAnyway(testClass + " cache refs file: " + file.getAbsolutePath());
+            if (javaHashCacheFile != null) {
+                AWTest.logInfoAnyway(testClass + " cache java file: " + javaHashCacheFile.getAbsolutePath());
+            }
             if (file.isFile()) {
+                AWTest.logInfoAnyway(testClass + " loading refs cache from " + file.getAbsolutePath());
                 known = Deser.fromByteArray(IO.readFile(file), TypeRef.HASHMAP_STRING);
             } else {
                 AWTest.logInfoAnyway(testClass + " new TEST!");
             }
-            boolean skip = true;
-            if (references.size() > known.size()) {
-                skip = false;
-            } else {
-                for (Entry<String, String> es : references.entrySet()) {
-                    if (IDETestRunner.class.getName().equals(es.getKey())) {
-                        // Maybe rmeove later....
-                        continue;
+            if (javaHashCacheFile != null && javaHashCacheFile.isFile()) {
+                AWTest.logInfoAnyway(testClass + " loading java cache from " + javaHashCacheFile.getAbsolutePath());
+                javaKnown = Deser.fromByteArray(IO.readFile(javaHashCacheFile), TypeRef.HASHMAP_STRING);
+            }
+            final ArrayList<String> rawChanges = DependencyJavaSourceFingerprint.computeChangeDescriptions(known, references);
+            final String skipFrameworkPrefix = IDETestRunner.class.getName().replaceAll("[^\\.]+$", "");
+            final List<String> changedClasses = new ArrayList<String>();
+            for (final String line : rawChanges) {
+                final String fqcn = DependencyJavaSourceFingerprint.parseFqcnFromChangeDescription(line);
+                if (fqcn.startsWith(skipFrameworkPrefix)) {
+                    continue;
+                }
+                changedClasses.add(line);
+            }
+            boolean skip = changedClasses.isEmpty();
+            if (!changedClasses.isEmpty()) {
+                AWTest.logInfoAnyway(testClass + " dependency diff (References: last known:" + known.size() + "/new:" + references.size() + "):");
+                int displayCount = Math.min(10, changedClasses.size());
+                for (int i = 0; i < displayCount; i++) {
+                    String line = changedClasses.get(i);
+                    String suffix = "";
+                    if (!ideSourceRoots.isEmpty()) {
+                        suffix = " [.java: " + DependencyJavaSourceFingerprint.describeJavaDeltaForChangeLine(line, javaKnown, ideSourceRoots) + "]";
                     }
-                    String cls = es.getKey();
-                    String knownHash = known.get(cls);
-                    if (knownHash == null) {
-                        AWTest.logInfoAnyway(testClass + " New File: " + cls + "(References: last known:" + known.size() + "/new:" + references.size() + ")");
-                        skip = false;
-                        break;
-                    }
-                    if (!StringUtils.equalsIgnoreCase(knownHash, es.getValue())) {
-                        AWTest.logInfoAnyway(testClass + " Changed File: " + cls + "(References: last known:" + known.size() + "/new:" + references.size() + ")");
-                        skip = false;
-                        break;
-                    }
+                    AWTest.logInfoAnyway("  - " + line + suffix);
+                }
+                if (changedClasses.size() > 10) {
+                    AWTest.logInfoAnyway("  [+ " + (changedClasses.size() - 10) + " more]");
                 }
             }
             if (skip) {
@@ -315,19 +332,36 @@ public class IDETestRunner {
                     // keep skip as true
                 }
             }
+            if (!skip && javaHashCacheFile != null && !ideSourceRoots.isEmpty() && DependencyJavaSourceFingerprint.shouldSkipBecauseJavaSourcesUnchanged(changedClasses, javaKnown, ideSourceRoots, DependencyJavaSourceFingerprint.DEFAULT_MAX_CLASSES)) {
+                skippedTestClasses++;
+                AWTest.logInfoAnyway(testClass + " saving refs cache to " + file.getAbsolutePath());
+                IO.secureWrite(file, Deser.toByteArray(references, SC.READABLE));
+                AWTest.logInfoAnyway(testClass + " SKIPPED (classfile drift; .java unchanged for changed set, bytecode cache updated)! Total: " + skippedTestClasses + " of " + testClassesFound);
+                TestCaseReporter.recordClassSkippedWithoutRun(testClass, "classfile drift; .java unchanged");
+                continue;
+            }
             if (skip) {
                 skippedTestClasses++;
                 AWTest.logInfoAnyway(testClass + " SKIPPED! Total: " + skippedTestClasses + " of " + testClassesFound);
+                TestCaseReporter.recordClassSkippedWithoutRun(testClass, "dependencies unchanged");
                 continue;
             }
             final Class<?> cls = Class.forName(testClass, false, Thread.currentThread().getContextClassLoader());
             runTestInternal(cls);
+            AWTest.logInfoAnyway(testClass + " saving refs cache to " + file.getAbsolutePath());
             IO.secureWrite(file, Deser.toByteArray(references, SC.READABLE));
+            if (javaHashCacheFile != null && !changedClasses.isEmpty() && !ideSourceRoots.isEmpty()) {
+                javaKnown = new HashMap<String, String>(javaKnown);
+                DependencyJavaSourceFingerprint.mergeJavaHashesForTopChanges(javaKnown, changedClasses, ideSourceRoots, DependencyJavaSourceFingerprint.DEFAULT_MAX_CLASSES);
+                AWTest.logInfoAnyway(testClass + " saving java cache to " + javaHashCacheFile.getAbsolutePath());
+                IO.secureWrite(javaHashCacheFile, Deser.toByteArray(javaKnown, SC.READABLE));
+            }
             // final Map<String, String> refClasses = new ClassCollector().getClasses(testClass, true);
             knownClasses.putAll(references);
             writeKnownClassesCache();
         }
         AWTest.logInfoAnyway("Finished IDE Build Tests");
+        TestCaseReporter.finishRunAndWriteReports();
         lastExecutedTestsFile.delete();
     }
 
@@ -352,6 +386,7 @@ public class IDETestRunner {
                 fos.close();
             }
             AWTest.logInfoAnyway("[** START **]" + cls.getName());
+            TestCaseReporter.beginTestClass(cls.getName());
             Thread.currentThread().setName("Run Test: " + cls.getName() + " Since " + DateMapper.formatJsonDefault(new Date()));
             System.setProperty("AWTEST.CLASS", cls.getName());
             LogV3Factory factory = LogV3.getFactory();
@@ -359,6 +394,7 @@ public class IDETestRunner {
                 TestInterface instance = ((TestInterface) ClassCache.getClassCache(cls).getInstance());
                 if (AWTest.isSkipDueToMaintenance(instance)) {
                     AWTest.logInfoAnyway("[** MAINTENANCE **]" + cls.getName());
+                    TestCaseReporter.endTestClassMaintenance();
                     return;
                 }
                 instance.runTest();
@@ -374,8 +410,10 @@ public class IDETestRunner {
             } else {
                 AWTest.clearLoggerCache();
                 AWTest.logInfoAnyway("    >> SUCCESS");
+                TestCaseReporter.endTestClassSuccess();
             }
         } catch (Throwable e) {
+            TestCaseReporter.endTestClassFailed(e);
             AWTest.setLoggerSilent(false, true);
             // Force to cached error log.
             LogV3.info("FAILED " + cls.getName());

@@ -61,6 +61,7 @@ import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 
+import org.appwork.build.RequiresResource;
 import org.appwork.serializer.Deser;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.commonInterface.SerializerException;
@@ -73,6 +74,7 @@ import org.appwork.utils.encoding.Base64;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.net.NullOutputStream;
 
+@RequiresResource(types = { ZipIOWriter.class })
 public class ZipIOReader {
     private File       zipFile               = null;
     private ZipFile    zip                   = null;

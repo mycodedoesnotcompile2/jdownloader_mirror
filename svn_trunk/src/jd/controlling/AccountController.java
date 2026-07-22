@@ -808,8 +808,52 @@ public class AccountController implements AccountControllerListener, AccountProp
                 ACCOUNTS.remove(host);
             }
         }
+        notifyPluginAccountRemove(account);
         this.broadcaster.fireEvent(new AccountControllerEvent(this, AccountControllerEvent.Types.REMOVED, account));
         return true;
+    }
+
+    /** Gives the account's plugin a chance to react to the removal (e.g. log out a session/API token) in a background thread. */
+    private void notifyPluginAccountRemove(final Account account) {
+        final PluginForHost accountPlugin = account.getPlugin();
+        if (accountPlugin == null) {
+            return;
+        }
+        final Thread thread = new Thread("AccountRemove: " + account.getHoster()) {
+            @Override
+            public void run() {
+                PluginForHost plugin = null;
+                try {
+                    final PluginClassLoaderChild cl = PluginClassLoader.getSharedChild(accountPlugin);
+                    PluginClassLoader.setThreadPluginClassLoaderChild(cl, null);
+                    plugin = accountPlugin.getLazyP().newInstance(cl);
+                    final LogSource logger = LogController.getFastPluginLogger("accountRemove:" + plugin.getHost() + "_" + plugin.getLazyP().getClassName());
+                    plugin.setLogger(logger);
+                    try {
+                        final Browser br = plugin.createNewBrowserInstance();
+                        br.setLogger(logger);
+                        plugin.setBrowser(br);
+                        plugin.init();
+                        plugin.onAccountRemove(account);
+                    } finally {
+                        logger.close();
+                    }
+                } catch (final Throwable e) {
+                    LogController.CL().log(e);
+                } finally {
+                    if (plugin != null) {
+                        try {
+                            plugin.clean();
+                        } catch (final Throwable e) {
+                            LogController.CL().log(e);
+                        }
+                    }
+                    PluginClassLoader.setThreadPluginClassLoaderChild(null, null);
+                }
+            }
+        };
+        thread.setDaemon(true);
+        thread.start();
     }
 
     public void onAccountControllerEvent(final AccountControllerEvent event) {
@@ -878,7 +922,7 @@ public class AccountController implements AccountControllerListener, AccountProp
         synchronized (AccountController.this) {
             for (final List<Account> accounts : ACCOUNTS.values()) {
                 if (accounts == null) {
-                    return;
+                    continue;
                 }
                 for (final Account acc : accounts) {
                     if (acc.getPlugin() != null && acc.isEnabled() && acc.isValid() && acc.refreshTimeoutReached()) {

@@ -38,7 +38,6 @@ import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.platform.win32.WinDef;
 import com.sun.jna.win32.StdCallLibrary;
-import com.sun.jna.win32.W32APIOptions;
 
 /**
  * Minimal User32 interface for {@link JNANonWMIWindowsProcessHandler} only. Exposes only the functions used by that
@@ -50,7 +49,7 @@ import com.sun.jna.win32.W32APIOptions;
  */
 public interface User32ForJNANonWMIWindowsProcessHandler extends StdCallLibrary {
 
-    User32ForJNANonWMIWindowsProcessHandler INSTANCE = Native.load("user32", User32ForJNANonWMIWindowsProcessHandler.class, W32APIOptions.DEFAULT_OPTIONS);
+    User32ForJNANonWMIWindowsProcessHandler INSTANCE = Native.load("user32", User32ForJNANonWMIWindowsProcessHandler.class, org.appwork.jna.windows.JNAOptions.SYSTEM_DLLS_ONLY);
 
     /**
      * Enables the process to set the foreground window using SetForegroundWindow.
