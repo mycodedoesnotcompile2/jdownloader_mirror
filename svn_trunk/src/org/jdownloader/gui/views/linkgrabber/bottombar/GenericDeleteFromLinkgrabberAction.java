@@ -8,14 +8,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.swing.KeyStroke;
 
-import jd.controlling.TaskQueue;
-import jd.controlling.downloadcontroller.DownloadController;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.linkcrawler.CrawledPackage.TYPE;
-import jd.plugins.DownloadLink.AvailableStatus;
-
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.swing.exttable.ExtTableEvent;
 import org.appwork.swing.exttable.ExtTableListener;
@@ -37,6 +29,14 @@ import org.jdownloader.gui.views.downloads.action.ByPassDialogSetup;
 import org.jdownloader.gui.views.downloads.action.Modifier;
 import org.jdownloader.gui.views.linkgrabber.LinkGrabberTable;
 import org.jdownloader.translate._JDT;
+
+import jd.controlling.TaskQueue;
+import jd.controlling.downloadcontroller.DownloadController;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.linkcrawler.CrawledPackage.TYPE;
+import jd.plugins.DownloadLink.AvailableStatus;
 
 public class GenericDeleteFromLinkgrabberAction extends CustomizableAppAction implements ExtTableListener, ActionContext, ExtTableModelListener {
     public static final String    CLEAR_FILTERED_LINKS    = "clearFilteredLinks";
@@ -174,7 +174,6 @@ public class GenericDeleteFromLinkgrabberAction extends CustomizableAppAction im
         final SelectionType selectionType = includedSelection.getSelectionType();
         final LinkGrabberTable table = LinkGrabberTable.getInstance();
         table.getSelectionInfo(new QueueSelectionInfoCallback<CrawledPackage, CrawledLink>() {
-
             @Override
             public void onSelectionInfo(final SelectionInfo<CrawledPackage, CrawledLink> selectionInfo) {
                 final List<CrawledLink> nodesToDelete = new ArrayList<CrawledLink>();
@@ -372,11 +371,6 @@ public class GenericDeleteFromLinkgrabberAction extends CustomizableAppAction im
     @Customizer(link = "#getTranslationForDeleteOffline")
     public boolean isDeleteOffline() {
         return deleteOffline;
-    }
-
-    @Override
-    public boolean isEnabled() {
-        return super.isEnabled();
     }
 
     public static String getTranslationForIgnoreFiltered() {

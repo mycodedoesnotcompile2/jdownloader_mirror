@@ -31,34 +31,36 @@ public class JDFileUtils extends Files {
         return supported;
     }
 
-    public static void moveToTrash(File... files) throws IOException {
+    public static boolean moveToTrash(File... files) throws IOException {
+        if (!isTrashSupported()) {
+            return false;
+        }
         try {
-            if (isTrashSupported()) {
-                final List<File> existing = new ArrayList<File>();
-                FileNotFoundException exception = null;
-                for (final File file : files) {
-                    if (!file.exists()) {
-                        if (exception == null) {
-                            exception = new FileNotFoundException(file.getAbsolutePath());
-                        }
-                    } else {
-                        existing.add(file);
+            final List<File> existing = new ArrayList<File>();
+            FileNotFoundException exception = null;
+            for (final File file : files) {
+                if (!file.exists()) {
+                    if (exception == null) {
+                        exception = new FileNotFoundException(file.getAbsolutePath());
                     }
+                } else {
+                    existing.add(file);
                 }
-                if (existing.size() > 0) {
-                    if (CrossSystem.isWindows()) {
-                        com.sun.jna.platform.win32.W32FileUtils.getInstance().moveToTrash(existing.toArray(new File[0]));
-                    } else if (CrossSystem.isMac()) {
-                        com.sun.jna.platform.mac.MacFileUtils.getInstance().moveToTrash(existing.toArray(new File[0]));
-                    }
+            }
+            if (existing.size() > 0) {
+                if (CrossSystem.isWindows()) {
+                    com.sun.jna.platform.win32.W32FileUtils.getInstance().moveToTrash(existing.toArray(new File[0]));
+                } else if (CrossSystem.isMac()) {
+                    com.sun.jna.platform.mac.MacFileUtils.getInstance().moveToTrash(existing.toArray(new File[0]));
                 }
-                if (exception != null) {
-                    throw exception;
-                }
+            }
+            if (exception != null) {
+                throw exception;
             }
         } catch (final UnsatisfiedLinkError e) {
             // may cause java.lang.UnsatisfiedLinkError
             throw new IOException(e);
         }
+        return true;
     }
 }

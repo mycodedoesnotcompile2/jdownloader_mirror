@@ -33,6 +33,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -55,7 +56,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.RuTubeVariant;
 import jd.plugins.hoster.RuTubeRu;
 
-@DecrypterPlugin(revision = "$Revision: 50824 $", interfaceVersion = 3, names = { "rutube.ru" }, urls = { "https?://((?:www\\.)?rutube\\.ru/(tracks/\\d+\\.html|(play/|video/)?embed/\\w+(.*?p=[A-Za-z0-9\\-_]+)?|video/[a-f0-9]{32})|video\\.rutube.ru/([a-f0-9]{32}|\\d+))" })
+@DecrypterPlugin(revision = "$Revision: 53027 $", interfaceVersion = 3, names = { "rutube.ru" }, urls = { "https?://((?:www\\.)?rutube\\.ru/(tracks/\\d+\\.html|(play/|video/)?embed/\\w+(.*?p=[A-Za-z0-9\\-_]+)?|video/[a-f0-9]{32})|video\\.rutube.ru/([a-f0-9]{32}|\\d+))" })
 public class RuTubeRuDecrypter extends PluginForDecrypt {
     public RuTubeRuDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -134,16 +135,18 @@ public class RuTubeRuDecrypter extends PluginForDecrypt {
     }
 
     protected DownloadLink crawlSingleVideo(final CryptedLink param) throws PluginException, Exception {
-        String videoHash = new Regex(param.getCryptedUrl(), "/([a-f0-9]{32})").getMatch(0);
-        String videoID = new Regex(param.getCryptedUrl(), "rutube\\.ru/(?:play/|video/)?embed/(\\d{3,})").getMatch(0);
+        final String contenturl = param.getCryptedUrl();
+        String videoHash = new Regex(contenturl, "/([a-f0-9]{32})").getMatch(0);
+        String videoID = new Regex(contenturl, "rutube\\.ru/(?:play/|video/)?embed/(\\d{3,})").getMatch(0);
         if (videoID == null) {
-            videoID = new Regex(param.getCryptedUrl(), "video\\.rutube\\.ru/(\\d{3,})").getMatch(0);
+            videoID = new Regex(contenturl, "video\\.rutube\\.ru/(\\d{3,})").getMatch(0);
         }
         if (videoID == null) {
-            videoID = new Regex(param.getCryptedUrl(), "/tracks/(\\d+)").getMatch(0);
+            videoID = new Regex(contenturl, "/tracks/(\\d+)").getMatch(0);
         }
-        privatevalue = new Regex(param.getCryptedUrl(), "p=([A-Za-z0-9\\-_]+)").getMatch(0);
-        if (videoID == null) {
+        privatevalue = new Regex(contenturl, "p=([A-Za-z0-9\\-_]+)").getMatch(0);
+        final boolean useVideoHash = true;
+        if (videoID == null && !useVideoHash) {
             if (videoHash == null) {
                 /* Developer mistake */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -153,26 +156,42 @@ public class RuTubeRuDecrypter extends PluginForDecrypt {
             // since we know the embed url for player/embed link types no need todo this step
             getPage(br, "http://" + this.getHost() + "/api/video/" + videoHash);
             /* 2020-02-11: This may return HTTP/1.1 401 UNAUTHORIZED for normal offline content too. */
-            if (br.getHttpConnection().getResponseCode() == 401 || br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("<root><detail>Not found</detail></root>")) {
+            if (br.getHttpConnection().getResponseCode() == 401 || br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (br.containsHTML("<root><detail>\\s*Not found\\s*</detail></root>")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             videoID = entries.get("track_id").toString();
         }
         final Browser ajax = getAjaxBR(br.cloneBrowser());
-        getPage(ajax, "http://" + this.getHost() + "/api/play/options/" + videoID + "/?format=json&no_404=true&sqr4374_compat=1&referer=" + Encoding.urlEncode(param.getCryptedUrl()) + "&_t=" + System.currentTimeMillis());
+        /**
+         * 2026-07-22: Request with numeric videoID only provides quality up to 1080p while request with videoHash provides higher qualities
+         * e.g. 4k. <br>
+         * Example 4k: /video/2d5e1e2f0e87880be9eb224c127d0cdf/
+         */
+        if (useVideoHash && videoHash != null) {
+            getPage(ajax, "http://" + this.getHost() + "/api/play/options/" + videoHash + "/?no_404=true&referer=" + Encoding.urlEncode(contenturl) + "&pver=v2&client=wdp&mq=all&av1=1&ac_client=web&ver=2.117.0&ad_ver=v2&cvid=&ac_request_id=");
+        } else {
+            getPage(ajax, "http://" + this.getHost() + "/api/play/options/" + videoID + "/?format=json&no_404=true&sqr4374_compat=1&referer=" + Encoding.urlEncode(contenturl) + "&_t=" + System.currentTimeMillis());
+        }
         final Map<String, Object> entries = restoreFromString(ajax.getRequest().getHtmlCode(), TypeRef.MAP);
-        final Map<String, Object> detailmap = (Map<String, Object>) entries.get("detail");
+        final Map<String, Object> detail = (Map<String, Object>) entries.get("detail");
         videoHash = (String) entries.get("effective_video");
         if (Boolean.FALSE.equals(entries.get("has_video"))) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (ajax.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (StringUtils.isEmpty(videoHash)) {
-            if (detailmap != null) {
+            if (detail != null) {
                 /* E.g. UGC_copyright_abuse or default_does_not_exists_video */
-                final String name = detailmap.get("name").toString();
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Video offline because: " + name);
+                // final String name = detail.get("name").toString();
+                final String type = detail.get("type").toString();
+                final String title = (String) JavaScriptEngineFactory.walkJson(detail, "languages/{0}/title");
+                if (type.equalsIgnoreCase("blocking_rule")) {
+                    throw new PluginException(LinkStatus.ERROR_FATAL, "GEO-blocked: " + title);
+                }
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Video offline because: " + title);
             }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
@@ -194,7 +213,7 @@ public class RuTubeRuDecrypter extends PluginForDecrypt {
         final String streamHLSMaster = (String) videoBalancer.get("m3u8");
         final String expireTimestampStr;
         /* 2021-09-17: Prefer HLS over HDS */
-        ArrayList<RuTubeVariant> variantsVideo = new ArrayList<RuTubeVariant>();
+        final ArrayList<RuTubeVariant> variantsVideo = new ArrayList<RuTubeVariant>();
         RuTubeVariant bestVariant = null;
         if (!StringUtils.isEmpty(streamHLSMaster)) {
             /* HLS */
@@ -230,22 +249,22 @@ public class RuTubeRuDecrypter extends PluginForDecrypt {
             final Browser streamBR = getAjaxBR(br.cloneBrowser());
             streamBR.getPage(streamDefault);
             Document d = parser.parse(new ByteArrayInputStream(streamBR.toString().getBytes("UTF-8")));
-            String baseUrl = xPath.evaluate("/manifest/baseURL", d).trim();
-            NodeList f4mUrls = (NodeList) xPath.evaluate("/manifest/media", d, XPathConstants.NODESET);
+            final String baseUrl = xPath.evaluate("/manifest/baseURL", d).trim();
+            final NodeList f4mUrls = (NodeList) xPath.evaluate("/manifest/media", d, XPathConstants.NODESET);
             Node best = f4mUrls.item(f4mUrls.getLength() - 1);
             long bestSizeEstimation = 0;
             for (int i = 0; i < f4mUrls.getLength(); i++) {
                 best = f4mUrls.item(i);
-                String width = getAttByNamedItem(best, "width");
-                String height = getAttByNamedItem(best, "height");
-                String bitrate = getAttByNamedItem(best, "bitrate");
-                String f4murl = getAttByNamedItem(best, "href");
+                final String width = getAttByNamedItem(best, "width");
+                final String height = getAttByNamedItem(best, "height");
+                final String bitrate = getAttByNamedItem(best, "bitrate");
+                final String f4murl = getAttByNamedItem(best, "href");
                 bestSizeEstimation = (durationSeconds * Long.parseLong(bitrate) * 1024l) / 8;
                 streamBR.getPage(baseUrl + f4murl);
                 d = parser.parse(new ByteArrayInputStream(streamBR.toString().getBytes("UTF-8")));
                 // baseUrl = xPath.evaluate("/manifest/baseURL", d).trim();
                 // double duration = Double.parseDouble(xPath.evaluate("/manifest/duration", d));
-                NodeList mediaUrls = (NodeList) xPath.evaluate("/manifest/media", d, XPathConstants.NODESET);
+                final NodeList mediaUrls = (NodeList) xPath.evaluate("/manifest/media", d, XPathConstants.NODESET);
                 Node media;
                 for (int j = 0; j < mediaUrls.getLength(); j++) {
                     media = mediaUrls.item(j);
@@ -307,6 +326,7 @@ public class RuTubeRuDecrypter extends PluginForDecrypt {
         return (t != null ? t.trim() : null);
     }
 
+    @Override
     public boolean hasCaptcha(final CryptedLink link, final jd.plugins.Account acc) {
         return false;
     }

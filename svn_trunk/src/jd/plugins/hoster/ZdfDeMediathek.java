@@ -66,7 +66,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 
-@HostPlugin(revision = "$Revision: 52603 $", interfaceVersion = 3, names = { "zdf.de" }, urls = { "decryptedmediathek://.+" })
+@HostPlugin(revision = "$Revision: 53026 $", interfaceVersion = 3, names = { "zdf.de" }, urls = { "decryptedmediathek://.+" })
 public class ZdfDeMediathek extends PluginForHost {
     public static final String  PROPERTY_hlsBandwidth       = "hlsBandwidth";
     public static final String  PROPERTY_streamingType      = "streamingType";
@@ -110,7 +110,7 @@ public class ZdfDeMediathek extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "http://" + getHost();
+        return "https://" + getHost();
     }
 
     public static Browser prepBR(final Browser br) {
@@ -610,7 +610,7 @@ public class ZdfDeMediathek extends PluginForHost {
         public static final TRANSLATION TRANSLATION = new TRANSLATION();
 
         @AboutConfig
-        @DefaultBooleanValue(false)
+        @DefaultBooleanValue(true)
         @DescriptionForConfigEntry(text_UseVideoResolutionAsQualityModifierForHTTPVideoStreams)
         @Order(8)
         boolean isUseVideoResolutionAsQualityModifierForHTTPVideoStreams();

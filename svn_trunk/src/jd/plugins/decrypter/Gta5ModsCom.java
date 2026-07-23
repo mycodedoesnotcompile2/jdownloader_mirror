@@ -20,6 +20,8 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.formatter.SizeFormatter;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.nutils.encoding.Encoding;
@@ -32,15 +34,15 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52888 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53026 $", interfaceVersion = 3, names = {}, urls = {})
 public class Gta5ModsCom extends PluginForDecrypt {
     public Gta5ModsCom(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     // always in english, also I haven't seen anything but "1 minute" but account for others cause why not
-    private final Pattern WAIT_TIME = Pattern.compile("(?i)^Due to a high number of requests we have temporarily blocked traffic from your ip address for (\\d+) (minute|second|hour)s?\\b");
-    private final Pattern DL_URL    = Pattern.compile("<a class\\s*=\\s*\"btn btn-primary btn-download\"\\s*href\\s*=\\s*\"(https?://files\\.gta5\\-mods\\.com/uploads/[^\"]+)\"");
+    private final Pattern WAIT_TIME = Pattern.compile("(?i)^Due to a high number of requests we have temporarily blocked traffic from your ip address for (\\d+) (minute|second|hour)s?\\b", Pattern.CASE_INSENSITIVE);
+    private final Pattern DL_URL    = Pattern.compile("<a class\\s*=\\s*\"btn btn-primary btn-download\"\\s*href\\s*=\\s*\"(https?://files\\.gta5\\-mods\\.com/uploads/[^\"]+)\"", Pattern.CASE_INSENSITIVE);
 
     private static List<String[]> getPluginDomains() {
         List<String> doms = new ArrayList<String>();
@@ -105,18 +107,26 @@ public class Gta5ModsCom extends PluginForDecrypt {
         } else if (br.containsHTML(">\\s*The page you were looking for doesn't exist")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        final String filesizeStr = br.getRegex("class=\"file-size\"[^>]*>, (\\d+[^<]+)</span>").getMatch(0);
         url = br.getRegex(DL_URL).getMatch(0);
         if (url != null) {
             url = Encoding.htmlOnlyDecode(url);
             final DownloadLink file = createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
             final String[] urlsplit = url.split("/");
             final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-            file.setFinalFileName(urlsplit[urlsplit.length - 1].split("-", 2)[1]);
+            file.setFinalFileName(Encoding.htmlDecode(urlsplit[urlsplit.length - 1].split("-", 2)[1]).trim());
+            if (filesizeStr != null) {
+                file.setDownloadSize(SizeFormatter.getSize(filesizeStr));
+            }
+            file.setAvailable(true);
             ret.add(file);
             return ret;
         }
         final String downloadButton = br.getRegex("<a href=\"([^\"]+)\" class=\"btn btn-primary btn-download\"").getMatch(0);
         if (downloadButton == null) {
+            if (!br.containsHTML("class=\"num-downloads\"")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         getPage(downloadButton, param);
@@ -126,7 +136,11 @@ public class Gta5ModsCom extends PluginForDecrypt {
             final DownloadLink file = createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
             final String[] urlsplit = url.split("/");
             final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-            file.setFinalFileName(urlsplit[urlsplit.length - 1].split("-", 2)[1]);
+            file.setFinalFileName(Encoding.htmlDecode(urlsplit[urlsplit.length - 1].split("-", 2)[1]).trim());
+            if (filesizeStr != null) {
+                file.setDownloadSize(SizeFormatter.getSize(filesizeStr));
+            }
+            file.setAvailable(true);
             ret.add(file);
             return ret;
         }

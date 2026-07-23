@@ -150,7 +150,6 @@ import org.jdownloader.controlling.hosterrule.HosterRuleControllerListener;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.downloads.action.ResetSettings;
-import org.jdownloader.gui.views.downloads.action.ResetSettings.DeleteMode;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.ConditionalSkipReason;
@@ -2137,12 +2136,7 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                 container.invalidate();
             }
         }
-        final DeleteMode dm = settings.getDeleteMode();
-        if (dm == DeleteMode.MOVE_TO_TRASH) {
-            deleteFile(link, DeleteOption.RECYCLE);
-        } else {
-            deleteFile(link, DeleteOption.NULL);
-        }
+        deleteFile(link, settings.getDeleteMode());
         unSkipLink(link, session);
         final List<PluginForHost> plugins = getPluginsFromHistory(link, history);
         link.reset(plugins);

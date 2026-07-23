@@ -16,6 +16,9 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
 
 import org.jdownloader.plugins.controller.LazyPlugin;
 
@@ -32,19 +35,46 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49326 $", interfaceVersion = 2, names = { "vids.myspace.com" }, urls = { "https?://(?:www\\.)?(myspace\\.com/(([a-z0-9\\-_\\.]+/)?video/[a-z0-9\\-_]+/\\d+)|mediaservices\\.myspace\\.com/services/media/embed\\.aspx/m=\\d+)" })
+@HostPlugin(revision = "$Revision: 53026 $", interfaceVersion = 2, names = {}, urls = {})
 public class VidsMySpaceCom extends PluginForHost {
+    public VidsMySpaceCom(PluginWrapper wrapper) {
+        super(wrapper);
+    }
+
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "vids.myspace.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    /** getHost() returns "vids.myspace.com", but actual content is served from "myspace.com". */
+    private static final String  SITE_DOMAIN   = "myspace.com";
+    private static final Pattern PATTERN_VIDEO = Pattern.compile("myspace\\.com/(([a-z0-9\\-_\\.]+/)?video/[a-z0-9\\-_]+/\\d+)");
+    private static final Pattern PATTERN_EMBED = Pattern.compile("mediaservices\\.myspace\\.com/services/media/embed\\.aspx/m=\\d+");
+
+    public static String[] getAnnotationUrls() {
+        final List<String> ret = new ArrayList<String>();
+        ret.add("https?://(?:www\\.)?(" + PATTERN_VIDEO.pattern() + "|" + PATTERN_EMBED.pattern() + ")");
+        return ret.toArray(new String[0]);
+    }
+
     @Override
     public void correctDownloadLink(final DownloadLink link) {
         // correction of old embded link format.
-        String[] movuid = new Regex(link.getDownloadURL(), "(https?).+embed\\.aspx/m=(\\d+)").getRow(0);
+        final String[] movuid = new Regex(link.getDownloadURL(), "(https?).+embed\\.aspx/m=(\\d+)").getRow(0);
         if (movuid != null && movuid.length == 2) {
-            link.setUrlDownload(movuid[0] + "://myspace.com/video/" + movuid[1]);
+            link.setUrlDownload(movuid[0] + "://" + SITE_DOMAIN + "/video/" + movuid[1]);
         }
-    }
-
-    public VidsMySpaceCom(PluginWrapper wrapper) {
-        super(wrapper);
     }
 
     @Override
@@ -54,7 +84,7 @@ public class VidsMySpaceCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "http://www.myspace.com/index.cfm?fuseaction=misc.terms";
+        return "https://www." + SITE_DOMAIN + "/index.cfm?fuseaction=misc.terms";
     }
 
     @Override
@@ -121,17 +151,5 @@ public class VidsMySpaceCom extends PluginForHost {
     @Override
     protected void throwFinalConnectionException(Browser br, URLConnectionAdapter con) throws PluginException, IOException {
         throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
     }
 }

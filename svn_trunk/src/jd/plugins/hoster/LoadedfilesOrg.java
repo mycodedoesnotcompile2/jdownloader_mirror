@@ -27,7 +27,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 53016 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53028 $", interfaceVersion = 2, names = {}, urls = {})
 public class LoadedfilesOrg extends YetiShareCore {
     public LoadedfilesOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -45,7 +45,7 @@ public class LoadedfilesOrg extends YetiShareCore {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "loadedfiles.st", "loadedfiles.org" });
+        ret.add(new String[] { "loadedfiles.net", "loadedfiles.st", "loadedfiles.org" });
         return ret;
     }
 
@@ -59,6 +59,7 @@ public class LoadedfilesOrg extends YetiShareCore {
     @Override
     public String rewriteHost(final String host) {
         /* 2026-07-20: changed main domain from loadedfiles.org to loadedfiles.st */
+        /* 2026-07-22: changed main domain from loadedfiles.st to loadedfiles.net */
         return this.rewriteHost(getPluginDomains(), host);
     }
 

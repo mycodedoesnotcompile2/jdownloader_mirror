@@ -43,13 +43,13 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.ImageFap;
 
-@DecrypterPlugin(revision = "$Revision: 52822 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53026 $", interfaceVersion = 2, names = {}, urls = {})
 public class ImageFapCrawler extends PluginForDecrypt {
     public ImageFapCrawler(PluginWrapper wrapper) {
         super(wrapper);
     }
 
-    private static List<String[]> getPluginDomains() {
+    public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "imagefap.com" });
