@@ -20,23 +20,6 @@ import javax.swing.JPanel;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter.HighlightPainter;
 
-import jd.PluginWrapper;
-import jd.gui.swing.components.linkbutton.JLink;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.http.Request;
-import jd.http.requests.FormData;
-import jd.http.requests.PostFormDataRequest;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-import jd.plugins.DefaultEditAccountPanelAPIKeyLogin;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.swing.MigPanel;
@@ -65,7 +48,24 @@ import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptcha
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigDeathbycaptcha;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 52718 $", interfaceVersion = 3, names = { "deathbycaptcha.com" }, urls = { "" })
+import jd.PluginWrapper;
+import jd.gui.swing.components.linkbutton.JLink;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.http.Request;
+import jd.http.requests.FormData;
+import jd.http.requests.PostFormDataRequest;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.DefaultEditAccountPanelAPIKeyLogin;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import net.miginfocom.swing.MigLayout;
+
+@HostPlugin(revision = "$Revision: 53033 $", interfaceVersion = 3, names = { "deathbycaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -102,11 +102,10 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
         types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
         /**
-         * 2026-01-16: API docs claim that reCaptcha enterprise is supported (as "beta") but when uploading a reCaptcha challenge there is
-         * no place to specify that it's a reCaptcha enterprise so I highly doubt that. <br>
-         * Docs: https://deathbycaptcha.com/api#supported_captchas
+         *
+         * Enterprise supported via https://deathbycaptcha.com/api/newtokenrecaptcha#reCAPTCHAv2Enterprise
          */
-        // types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
         types.add(CAPTCHA_TYPE.CLOUDFLARE_TURNSTILE);
         types.add(CAPTCHA_TYPE.CUTCAPTCHA);
@@ -223,7 +222,26 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
                 token_param.put("googlekey", rc_challenge.getSiteKey());
                 token_param.put("pageurl", rc_challenge.getSiteUrl(this));
                 final Map<String, Object> v3action = rc_challenge.getV3Action();
-                if (v3action != null) {
+                if (rc_challenge.isEnterprise()) {
+                    /* https://deathbycaptcha.com/api/newtokenrecaptcha#reCAPTCHAv2Enterprise */
+                    type = "RecaptchaV2Enterprise";
+                    r.addFormData(new FormData("type", "25"));
+                    final CaptchaSolverPluginConfigDeathbycaptcha cfg = this.get(CaptchaSolverPluginConfigDeathbycaptcha.class);
+                    final String proxy = cfg != null ? cfg.getEnterpriseRecaptchaProxy() : null;
+                    if (StringUtils.isEmpty(proxy)) {
+                        throw new PluginException(LinkStatus.ERROR_CAPTCHA, "deathbycaptcha.com requires a proxy to solve reCAPTCHAv2 Enterprise challenges. Please configure one in the DeathByCaptcha settings.");
+                    }
+                    token_param.put("proxy", proxy);
+                    token_param.put("proxytype", cfg.getEnterpriseRecaptchaProxyType());
+                    if (v3action != null) {
+                        token_param.put("action", v3action.get("action"));
+                    }
+                    final Double minScore = rc_challenge.getMinScore();
+                    if (minScore != null) {
+                        token_param.put("min_score", minScore);
+                    }
+                    r.addFormData(new FormData("token_enterprise_params", JSonStorage.serializeToJson(token_param)));
+                } else if (v3action != null) {
                     type = "RecaptchaV3";
                     r.addFormData(new FormData("type", "5"));
                     token_param.put("action", v3action.get("action"));
@@ -231,6 +249,7 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
                     if (minScore != null) {
                         token_param.put("min_score", minScore);
                     }
+                    r.addFormData(new FormData("token_params", JSonStorage.serializeToJson(token_param)));
                 } else {
                     if (rc_challenge.isV3()) {
                         type = "RecaptchaV3";
@@ -242,8 +261,8 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
                         type = "RecaptchaV2";
                         r.addFormData(new FormData("type", "4"));
                     }
+                    r.addFormData(new FormData("token_params", JSonStorage.serializeToJson(token_param)));
                 }
-                r.addFormData(new FormData("token_params", JSonStorage.serializeToJson(token_param)));
             } else if (challenge instanceof CutCaptchaChallenge) {
                 type = "CutCaptcha";
                 final CutCaptchaChallenge cc = (CutCaptchaChallenge) challenge;

@@ -11,10 +11,6 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import jd.http.Browser;
-import jd.http.requests.FormData;
-import jd.http.requests.PostFormDataRequest;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -44,6 +40,10 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.settings.staticreferences.CFG_DBC;
+
+import jd.http.Browser;
+import jd.http.requests.FormData;
+import jd.http.requests.PostFormDataRequest;
 
 public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
     private DeathByCaptchaSettings            config;
@@ -129,7 +129,25 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
                 token_param.put("googlekey", rc_challenge.getSiteKey());
                 token_param.put("pageurl", rc_challenge.getSiteUrl(this));
                 final Map<String, Object> v3action = rc_challenge.getV3Action();
-                if (v3action != null) {
+                if (rc_challenge.isEnterprise()) {
+                    /* https://deathbycaptcha.com/api/newtokenrecaptcha#reCAPTCHAv2Enterprise */
+                    type = "RecaptchaV2Enterprise";
+                    r.addFormData(new FormData("type", "25"));
+                    final String proxy = config.getEnterpriseRecaptchaProxy();
+                    if (StringUtils.isEmpty(proxy)) {
+                        throw new SolverException("deathbycaptcha.com requires a proxy to solve reCAPTCHAv2 Enterprise challenges. Please configure one in the DeathByCaptcha settings.");
+                    }
+                    token_param.put("proxy", proxy);
+                    token_param.put("proxytype", config.getEnterpriseRecaptchaProxyType());
+                    if (v3action != null) {
+                        token_param.put("action", v3action.get("action"));
+                    }
+                    final Double minScore = rc_challenge.getMinScore();
+                    if (minScore != null) {
+                        token_param.put("min_score", minScore);
+                    }
+                    r.addFormData(new FormData("token_enterprise_params", JSonStorage.serializeToJson(token_param)));
+                } else if (v3action != null) {
                     // recaptchav3
                     type = "RecaptchaV3";
                     r.addFormData(new FormData("type", "5"));
@@ -139,11 +157,17 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
                     if (minScore != null) {
                         token_param.put("min_score", minScore);
                     }
+                    r.addFormData(new FormData("token_params", JSonStorage.serializeToJson(token_param)));
+                } else if (rc_challenge.isV3()) {
+                    type = "RecaptchaV3";
+                    r.addFormData(new FormData("type", "5"));
+                    final Double minScore = rc_challenge.getMinScore();
+                    if (minScore != null) {
+                        token_param.put("min_score", minScore);
+                    }
+                    r.addFormData(new FormData("token_params", JSonStorage.serializeToJson(token_param)));
                 } else {
-                    if (rc_challenge.isV3()) {
-                        type = "RecaptchaV3";
-                        r.addFormData(new FormData("type", "5"));
-                    } else if (rc_challenge.isInvisible()) {
+                    if (rc_challenge.isInvisible()) {
                         type = "RecaptchaV2 invisible";
                         r.addFormData(new FormData("type", "4"));
                     } else {
@@ -152,9 +176,9 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
                     }
                     // required parameters
                     // token_param.put("google_stoken", rv2c.getSecureToken());
+                    // TODO invisible captcha oder falsche domain /pageurl hier
+                    r.addFormData(new FormData("token_params", JSonStorage.serializeToJson(token_param)));
                 }
-                // TODO invisible captcha oder falsche domain /pageurl hier
-                r.addFormData(new FormData("token_params", JSonStorage.serializeToJson(token_param)));
             } else if (challenge instanceof CutCaptchaChallenge) {
                 /* See: https://deathbycaptcha.com/api/cutcaptcha */
                 type = "CutCaptcha";

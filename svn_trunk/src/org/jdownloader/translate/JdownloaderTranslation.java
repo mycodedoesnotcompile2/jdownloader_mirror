@@ -975,7 +975,7 @@ public interface JdownloaderTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Force Downloads" })
     String ConfirmLinksContextAction_getTranslationForForceDownloads();
 
-    @Default(lngs = { "en" }, values = { "Enabled Prioritychange" })
+    @Default(lngs = { "en" }, values = { "Set priority" })
     String ConfirmLinksContextAction_getTranslationForAssignPriorityEnabled();
 
     @Default(lngs = { "en" }, values = { "Download Priority:" })
@@ -989,6 +989,21 @@ public interface JdownloaderTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Clear Linkgrabber after adding links" })
     String ConfirmLinksContextAction_getTranslationForClearListAfterConfirm();
+
+    @Default(lngs = { "en" }, values = { "Auto switch to download tab:" })
+    String ConfirmLinksContextAction_getTranslationForSwitchToDownloadlistBehavior();
+
+    @Default(lngs = { "en" }, values = { "Use global default" })
+    String ConfirmLinksSettings_SwitchToDownloadlistBehavior_GLOBAL_DEFAULT();
+
+    @Default(lngs = { "en" }, values = { "When links are moved to downloadlist" })
+    String ConfirmLinksSettings_SwitchToDownloadlistBehavior_ALWAYS();
+
+    @Default(lngs = { "en" }, values = { "When links are moved to downloadlist and no links are left in linkgrabber" })
+    String ConfirmLinksSettings_SwitchToDownloadlistBehavior_ONLY_IF_LINKGRABBER_EMPTY();
+
+    @Default(lngs = { "en" }, values = { "Never" })
+    String ConfirmLinksSettings_SwitchToDownloadlistBehavior_NEVER();
 
     @Default(lngs = { "en" }, values = { "Autostart Downloads afterwards" })
     String ConfirmLinksContextAction_getTranslationForAutoStart();

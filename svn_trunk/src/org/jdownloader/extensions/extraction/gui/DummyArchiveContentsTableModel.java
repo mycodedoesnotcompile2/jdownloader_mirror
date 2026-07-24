@@ -1,12 +1,11 @@
 package org.jdownloader.extensions.extraction.gui;
 
-import javax.swing.Icon;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.List;
 
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.FilePackage;
+import javax.swing.Icon;
 
 import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.swing.exttable.columns.ExtTextColumn;
@@ -20,55 +19,72 @@ import org.jdownloader.extensions.extraction.translate.T;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.images.AbstractIcon;
 
-public class DummyArchiveContentsTableModel extends ExtTableModel<DummyArchiveFile> {
-    private ExtTextColumn<DummyArchiveFile> packageName;
-    private ExtTextColumn<DummyArchiveFile> local;
-    private ExtTextColumn<DummyArchiveFile> linkStatus;
-    private ExtTextColumn<DummyArchiveFile> name;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.FilePackage;
 
+public class DummyArchiveContentsTableModel extends ExtTableModel<DummyArchiveFile> {
+    private ExtTextColumn<DummyArchiveFile>                 packageName;
+    private ExtTextColumn<DummyArchiveFile>                 local;
+    private ExtTextColumn<DummyArchiveFile>                 linkStatus;
+    private ExtTextColumn<DummyArchiveFile>                 name;
     /**
-     * All parts of a DummyArchive belong to the same linkgrabber package. We resolve the package name once at construction time from the
-     * first CrawledLinkArchiveFile found in the list, so that missing/placeholder entries (which carry no CrawledLink) can display the same
-     * name.
+     * All parts of a single DummyArchive belong to the same linkgrabber package. We resolve the package name once per archive from the
+     * first CrawledLinkArchiveFile/DownloadLinkArchiveFile found in that archive's list, so that missing/placeholder entries (which carry
+     * no link) can still display the correct name. Since this model can show the combined contents of several incomplete archives (e.g.
+     * several packages confirmed at once), we keep the resolved name per DummyArchiveFile rather than a single model-wide name.
      */
-    private final String                    resolvedPackageName;
+    private final IdentityHashMap<DummyArchiveFile, String> packageNameByFile;
 
     public ExtTextColumn<DummyArchiveFile> getLocal() {
         return local;
     }
 
     public DummyArchiveContentsTableModel(DummyArchive da) {
+        this(Collections.singletonList(da));
+    }
+
+    public DummyArchiveContentsTableModel(List<DummyArchive> archives) {
         super("DummyArchiveContentsTableModel");
-        String pkgName = "";
-        for (final DummyArchiveFile daf : da.getList()) {
-            final ArchiveFile archiveFile = daf.getArchiveFile();
-            if (archiveFile instanceof CrawledLinkArchiveFile) {
-                final CrawledLink link = ((CrawledLinkArchiveFile) archiveFile).getLinks().get(0);
-                final CrawledPackage pkg = link.getParentNode();
-                if (pkg != null) {
-                    pkgName = pkg.getName();
-                    break;
-                }
-            } else if (archiveFile instanceof DownloadLinkArchiveFile) {
-                final DownloadLink link = ((DownloadLinkArchiveFile) archiveFile).getDownloadLinks().get(0);
-                final FilePackage pkg = link.getParentNode();
-                if (pkg != null) {
-                    pkgName = pkg.getName();
-                    break;
+        this.packageNameByFile = new IdentityHashMap<DummyArchiveFile, String>();
+        final ArrayList<DummyArchiveFile> combined = new ArrayList<DummyArchiveFile>();
+        for (final DummyArchive da : archives) {
+            String pkgName = "";
+            for (final DummyArchiveFile daf : da.getList()) {
+                final ArchiveFile archiveFile = daf.getArchiveFile();
+                if (archiveFile instanceof CrawledLinkArchiveFile) {
+                    final CrawledLink link = ((CrawledLinkArchiveFile) archiveFile).getLinks().get(0);
+                    final CrawledPackage pkg = link.getParentNode();
+                    if (pkg != null) {
+                        pkgName = pkg.getName();
+                        break;
+                    }
+                } else if (archiveFile instanceof DownloadLinkArchiveFile) {
+                    final DownloadLink link = ((DownloadLinkArchiveFile) archiveFile).getDownloadLinks().get(0);
+                    final FilePackage pkg = link.getParentNode();
+                    if (pkg != null) {
+                        pkgName = pkg.getName();
+                        break;
+                    }
                 }
             }
+            for (final DummyArchiveFile daf : da.getList()) {
+                packageNameByFile.put(daf, pkgName);
+            }
+            combined.addAll(da.getList());
         }
-        this.resolvedPackageName = pkgName;
-        _fireTableStructureChanged(da.getList(), true);
+        _fireTableStructureChanged(combined, true);
     }
 
     @Override
     protected void initColumns() {
         addColumn(packageName = new ExtTextColumn<DummyArchiveFile>(T.T.packagename()) {
+            // TODO: Maybe implement double-click = highlight package in linkgrabber and/or copy package name
             @Override
             public String getStringValue(DummyArchiveFile value) {
-                /* All parts of the same archive share the same package name, resolved once at model construction. */
-                return resolvedPackageName;
+                return packageNameByFile.get(value);
             }
         });
         addColumn(name = new ExtTextColumn<DummyArchiveFile>(T.T.filename()) {

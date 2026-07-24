@@ -1915,8 +1915,11 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Archive Incomplete: %s1" })
     String ConfirmAction_run_incomplete_archive_title_(String name);
 
-    @Default(lngs = { "en" }, values = { "You added an Archive that has several parts. \r\nYou need at least one Link for each part. Some Links are missing." })
-    String ConfirmAction_run_incomplete_archive_msg();
+    @Default(lngs = { "en" }, values = { "Archive Incomplete: %s1 affected packages" })
+    String ConfirmAction_run_incomplete_archive_title_multi_(int packageCount);
+
+    @Default(lngs = { "en" }, values = { "You added an archive that has several parts. \r\nYou need at least one Link for each part. Some archive parts are missing.\r\n\r\nAffected packages: %s1" })
+    String ConfirmAction_run_incomplete_archive_msg_(int packageCount);
 
     @Default(lngs = { "en" }, values = { "Show details" })
     String ConfirmAction_run_incomplete_archive_details();

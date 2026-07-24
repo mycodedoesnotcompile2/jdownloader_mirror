@@ -34,3 +34,5 @@ private final AtomicLong              CACHED_LOID_TIMESTAMP = new AtomicLong(-1)
 ```
 
 Never use `static` for such fields — `final` + atomic wrapper is the correct JDownloader convention.
+
+Do not include a Co-Authored-By line or "Generated with Claude Code" footer in any commit message.

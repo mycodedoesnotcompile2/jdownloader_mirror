@@ -18,6 +18,8 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -37,9 +39,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.PixhostTo;
 
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 52971 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53042 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PixhostTo.class })
 public class PixhostToGallery extends PluginForDecrypt {
     public PixhostToGallery(PluginWrapper wrapper) {
@@ -86,7 +86,7 @@ public class PixhostToGallery extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String galleryID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
-        br.getPage(param.getCryptedUrl());
+        br.getPage("https://" + getHost() + "/gallery/" + galleryID);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML(">\\s*Gallery doesn't exist")) {

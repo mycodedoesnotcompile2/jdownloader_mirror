@@ -150,6 +150,9 @@ public interface ExtractionTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Archive %s1" })
     String dummyarchivedialog_title(String name);
 
+    @Default(lngs = { "en" }, values = { "%s1 incomplete archives" })
+    String dummyarchivedialog_title_multi(int packageCount);
+
     @Default(lngs = { "en" }, values = { "Close" })
     String close();
 

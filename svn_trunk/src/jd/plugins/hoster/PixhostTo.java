@@ -20,6 +20,9 @@ import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -32,10 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PixhostToGallery;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 52972 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53042 $", interfaceVersion = 3, names = {}, urls = {})
 public class PixhostTo extends PluginForHost {
     public PixhostTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -52,7 +52,6 @@ public class PixhostTo extends PluginForHost {
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.IMAGE_HOST, LazyPlugin.FEATURE.IMAGE_GALLERY };
     }
-
     /* DEV NOTES */
     // Tags: pichost
     // protocol: no https
@@ -68,8 +67,20 @@ public class PixhostTo extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "pixhost.to", "pixhost.cc" });
+        ret.add(new String[] { "pixhost.cc", "pixhost.to" });
         return ret;
+    }
+
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("pixhost.to");
+        return deadDomains;
+    }
+
+    @Override
+    public String rewriteHost(final String host) {
+        /* 2026-07-24: Main domain changed from pixhost.to to pixhost.cc as .to went down */
+        return this.rewriteHost(getPluginDomains(), host);
     }
 
     public static String[] getAnnotationNames() {
@@ -119,7 +130,11 @@ public class PixhostTo extends PluginForHost {
         final String url = link.getPluginPatternMatcher();
         final Regex urlinfo = new Regex(url, this.getSupportedLinks());
         /* Important: Use domain without subdomain! */
-        final String host = Browser.getHost(url, false);
+        String host = Browser.getHost(url, false);
+        final List<String> deadDomains = this.getDeadDomains();
+        if (deadDomains.contains(host)) {
+            host = this.getHost();
+        }
         return "https://" + host + "/show/" + urlinfo.getMatch(1) + "/" + urlinfo.getMatch(2) + "_" + urlinfo.getMatch(3);
     }
 

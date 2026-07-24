@@ -37,7 +37,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 53016 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53031 $", interfaceVersion = 3, names = {}, urls = {})
 public class MoguwpCom extends PluginForHost {
     public MoguwpCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -115,6 +115,9 @@ public class MoguwpCom extends PluginForHost {
         br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("<title>PHPDisk 403</title>")) {
+            /* Error 403 with http response 200 e.g. fileID MDAwMDAwMDAwMK61uJSFrrGx6 */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("document\\.location\\.href = '\\./'")) {
             /* js redirect to main page */

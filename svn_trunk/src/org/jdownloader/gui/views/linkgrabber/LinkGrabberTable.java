@@ -30,20 +30,6 @@ import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.TransferHandler;
 
-import jd.controlling.TaskQueue;
-import jd.controlling.downloadcontroller.DownloadController;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings;
-import jd.controlling.linkcollector.LinkCollector.MoveLinksMode;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.linkcrawler.CrawledPackage.TYPE;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.WarnLevel;
-import jd.plugins.DownloadLink.AvailableStatus;
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.circlebar.CircledProgressBar;
 import org.appwork.swing.components.circlebar.ImagePainter;
@@ -82,6 +68,21 @@ import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.translate._JDT;
 import org.jdownloader.updatev2.gui.LAFOptions;
+
+import jd.controlling.TaskQueue;
+import jd.controlling.downloadcontroller.DownloadController;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings;
+import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings.SwitchToDownloadlistBehavior;
+import jd.controlling.linkcollector.LinkCollector.MoveLinksMode;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.linkcrawler.CrawledPackage.TYPE;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.WarnLevel;
+import jd.plugins.DownloadLink.AvailableStatus;
+import net.miginfocom.swing.MigLayout;
 
 public class LinkGrabberTable extends PackageControllerTable<CrawledPackage, CrawledLink> {
     private static final long          serialVersionUID   = 8843600834248098174L;
@@ -175,7 +176,7 @@ public class LinkGrabberTable extends PackageControllerTable<CrawledPackage, Cra
                     if ((e.getModifiers() & InputEvent.SHIFT_MASK) == 0) {
                         final ConfirmLinksSettings cls = new ConfirmLinksSettings(MoveLinksMode.MANUAL);
                         cls.setClearLinkgrabberlistOnConfirm(false);
-                        cls.setSwitchToDownloadlistOnConfirm(false);
+                        cls.setSwitchToDownloadlistBehavior(SwitchToDownloadlistBehavior.NEVER);
                         cls.setForceDownloads(Boolean.FALSE);
                         final int row = rowAtPoint(e.getPoint());
                         final AbstractNode obj = this.getModel().getObjectbyRow(row);
@@ -286,7 +287,6 @@ public class LinkGrabberTable extends PackageControllerTable<CrawledPackage, Cra
     @Override
     protected boolean onShortcutDelete(final java.util.List<AbstractNode> selectedObjects, final KeyEvent evt, final boolean direct) {
         getSelectionInfo(new QueueSelectionInfoCallback<CrawledPackage, CrawledLink>() {
-
             @Override
             public void onSelectionInfo(final SelectionInfo<CrawledPackage, CrawledLink> selectionInfo) {
                 final List<CrawledLink> nodesToDelete = new ArrayList<CrawledLink>();
@@ -364,7 +364,6 @@ public class LinkGrabberTable extends PackageControllerTable<CrawledPackage, Cra
         return new HashSet<AWTKeyStroke>();
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     protected boolean processKeyBinding(KeyStroke stroke, KeyEvent evt, int condition, boolean pressed) {
         boolean actionNotified = false;

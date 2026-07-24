@@ -29,37 +29,6 @@ import java.util.regex.Pattern;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
-import jd.PluginWrapper;
-import jd.config.SubConfiguration;
-import jd.controlling.AccountController;
-import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.parser.html.Form.MethodType;
-import jd.parser.html.HTMLParser;
-import jd.parser.html.InputField;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadConnectionVerifier;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.PluginJSonUtils;
-import jd.plugins.components.SiteType.SiteTemplate;
-
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
@@ -93,7 +62,38 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-@HostPlugin(revision = "$Revision: 53012 $", interfaceVersion = 2, names = {}, urls = {})
+import jd.PluginWrapper;
+import jd.config.SubConfiguration;
+import jd.controlling.AccountController;
+import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.parser.html.Form.MethodType;
+import jd.parser.html.HTMLParser;
+import jd.parser.html.InputField;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadConnectionVerifier;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.PluginJSonUtils;
+import jd.plugins.components.SiteType.SiteTemplate;
+
+@HostPlugin(revision = "$Revision: 53035 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -489,7 +489,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * don't display the filesize anywhere! <br>
      * CAUTION: Only set this to true if a filehost: <br>
      * 1. Allows users to embed videos via '/embed-<fuid>.html'. <br>
-     * 2. Does not display a filesize anywhere inside html code or other calls where we do not have to do an http request on a directurl. <br>
+     * 2. Does not display a filesize anywhere inside html code or other calls where we do not have to do an http request on a directurl.
+     * <br>
      * 3. Allows a lot of simultaneous connections. <br>
      * 4. Is FAST - if it is not fast, this will noticably slow down the linkchecking procedure! <br>
      * 5. Allows using a generated direct-URL at least two times.
@@ -2231,7 +2232,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * Wrapper for requestFileInformationWebsiteMassLinkcheckerSingle which contains a bit of extra log output <br>
      * Often used as fallback if e.g. only logged-in users can see filesize or filesize is not given in html code for whatever reason.<br>
      * Often needed for <b><u>IMAGEHOSTER</u>S</b>.<br>
-     * Important: Only call this if <b><u>supports_availablecheck_alt</u></b> is <b>true</b> (meaning omly try this if website supports it)!<br>
+     * Important: Only call this if <b><u>supports_availablecheck_alt</u></b> is <b>true</b> (meaning omly try this if website supports
+     * it)!<br>
      * Some older XFS versions AND videohosts have versions of this linkchecker which only return online/offline and NO FILESIZE!<br>
      * In case there is no filesize given, offline status will still be recognized! <br>
      *
@@ -2874,7 +2876,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * Admins may sometimes setup waittimes that are higher than the interactive captcha timeout so lets say they set up 180 seconds of
      * pre-download-waittime --> User solves captcha immediately --> Captcha-solution times out after 120 seconds --> User has to re-enter
      * it in browser (and it would fail in JD)! <br>
-     * If admins set it up in a way that users can solve the captcha via the waittime counts down, this failure may even happen via browser! <br>
+     * If admins set it up in a way that users can solve the captcha via the waittime counts down, this failure may even happen via browser!
+     * <br>
      * This is basically a workaround which avoids running into said timeout: Make sure that we wait less than 120 seconds after the user
      * has solved the captcha by waiting some of this time in beforehand.
      */
@@ -4790,7 +4793,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     /**
-     * Tries to find apikey on website which, if given, usually camn be found on /?op=my_account Example host which has 'API mod' installed:<br>
+     * Tries to find apikey on website which, if given, usually camn be found on /?op=my_account Example host which has 'API mod'
+     * installed:<br>
      * This will also try to get- and save the API host with protocol in case it differs from the plugins' main host (examples:
      * ddownload.co, vup.to). clicknupload.org <br>
      * apikey will usually be located here: "/?op=my_account" <br>
@@ -4996,8 +5000,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 /**
                  * kenfiles.com
                  *
-                 * >Traffic available today</span><span><a href="https://kenfiles.com/contact" title="671Mb/50000Mb"
-                 * data-toggle="tooltip">49329 Mb</a></span>
+                 * >Traffic available
+                 * today</span><span><a href="https://kenfiles.com/contact" title="671Mb/50000Mb" data-toggle="tooltip">49329 Mb</a></span>
                  */
                 final long used = parseSize(Size.TRAFFIC, trafficDetails[0]);
                 final long max = parseSize(Size.TRAFFIC, trafficDetails[1]);
@@ -5008,8 +5012,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             /**
              * filejoker.net
              *
-             * >Traffic Available:</label> <div class="col-12 col-md-8 col-lg"> <div class="progress"> <div
-             * class="progress-bar progress-bar-striped bg-success" role="progressbar" style="width:47.95%" aria-valuenow="47.95"
+             * >Traffic Available:</label> <div class="col-12 col-md-8 col-lg"> <div class="progress">
+             * <div class="progress-bar progress-bar-striped bg-success" role="progressbar" style="width:47.95%" aria-valuenow="47.95"
              * aria-valuemin="0" aria-valuemax="100" title="47951 MB available">47.95%</div>
              */
             availabletraffic = new Regex(formGroup, "title\\s*=\\s*\"\\s*([\\-\\s*]*[0-9\\.]+\\s*[TGMB]+\\s*)(?:available)?\"").getMatch(0);
@@ -5952,8 +5956,16 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 setAccountLimitsByType(account, AccountType.PREMIUM);
             }
         }
-        final String premium_bandwidthBytesStr = (String) result.get("premium_bandwidth"); // Double as string
-        final String traffic_leftBytesStr = (String) result.get("traffic_left");
+        final Object premium_bandwidthO = result.get("premium_bandwidth");
+        String premium_bandwidthBytesStr = null;
+        if (premium_bandwidthO != null) {
+            premium_bandwidthBytesStr = premium_bandwidthO.toString();
+        }
+        final Object traffic_leftO = result.get("traffic_left");
+        String traffic_leftBytesStr = null;
+        if (traffic_leftO != null) {
+            traffic_leftBytesStr = traffic_leftO.toString();
+        }
         if (premium_bandwidthBytesStr != null) {
             ai.setTrafficLeft(parseSize(Size.TRAFFIC, premium_bandwidthBytesStr));
         } else if (traffic_leftBytesStr != null) {

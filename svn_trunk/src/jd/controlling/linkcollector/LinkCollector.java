@@ -86,6 +86,7 @@ import org.appwork.shutdown.ShutdownVetoException;
 import org.appwork.shutdown.ShutdownVetoListener;
 import org.appwork.storage.SimpleMapper;
 import org.appwork.storage.TypeRef;
+import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
@@ -2750,6 +2751,33 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
      * "clean all remaining items in linkgrabber"
      */
     public final static class ConfirmLinksSettings {
+        public static enum SwitchToDownloadlistBehavior implements LabelInterface {
+            GLOBAL_DEFAULT {
+                @Override
+                public String getLabel() {
+                    return _JDT.T.ConfirmLinksSettings_SwitchToDownloadlistBehavior_GLOBAL_DEFAULT();
+                }
+            },
+            ALWAYS {
+                @Override
+                public String getLabel() {
+                    return _JDT.T.ConfirmLinksSettings_SwitchToDownloadlistBehavior_ALWAYS();
+                }
+            },
+            ONLY_IF_LINKGRABBER_EMPTY {
+                @Override
+                public String getLabel() {
+                    return _JDT.T.ConfirmLinksSettings_SwitchToDownloadlistBehavior_ONLY_IF_LINKGRABBER_EMPTY();
+                }
+            },
+            NEVER {
+                @Override
+                public String getLabel() {
+                    return _JDT.T.ConfirmLinksSettings_SwitchToDownloadlistBehavior_NEVER();
+                }
+            };
+        }
+
         public final MoveLinksMode getMoveLinksMode() {
             return moveLinksMode;
         }
@@ -2822,19 +2850,26 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
             return this;
         }
 
-        public final boolean isSwitchToDownloadlistOnConfirm() {
-            final Boolean ret = switchToDownloadlistOnConfirm;
-            if (ret != null) {
-                return ret.booleanValue();
+        /**
+         * Never returns GLOBAL_DEFAULT - resolves it to whatever {@link #getDefaultSwitchToDownloadlistBehavior()} currently computes
+         * (i.e. the global default config), same as every other getter here resolving unset values to their default.
+         */
+        public final SwitchToDownloadlistBehavior getSwitchToDownloadlistBehavior() {
+            final SwitchToDownloadlistBehavior ret = switchToDownloadlistBehavior;
+            if (ret == null) {
+                return defaultSwitchToDownloadlistBehavior;
+            } else if (ret == SwitchToDownloadlistBehavior.GLOBAL_DEFAULT) {
+                return getDefaultSwitchToDownloadlistBehavior();
+            } else {
+                return ret;
             }
-            return defaultSwitchToDownloadlistOnConfirm;
         }
 
-        public final ConfirmLinksSettings setSwitchToDownloadlistOnConfirm(Boolean switchToDownloadlistOnConfirm) {
-            if (switchToDownloadlistOnConfirm == null || switchToDownloadlistOnConfirm.booleanValue() == defaultSwitchToDownloadlistOnConfirm) {
-                this.switchToDownloadlistOnConfirm = null;
+        public final ConfirmLinksSettings setSwitchToDownloadlistBehavior(SwitchToDownloadlistBehavior switchToDownloadlistBehavior) {
+            if (switchToDownloadlistBehavior == null || switchToDownloadlistBehavior == defaultSwitchToDownloadlistBehavior) {
+                this.switchToDownloadlistBehavior = null;
             } else {
-                this.switchToDownloadlistOnConfirm = switchToDownloadlistOnConfirm;
+                this.switchToDownloadlistBehavior = switchToDownloadlistBehavior;
             }
             return this;
         }
@@ -2958,8 +2993,8 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
         private Boolean                          clearLinkgrabberlistOnConfirm                 = null;
         private final Priority                   defaultPriority                               = getDefaultPriority();
         private Priority                         priority                                      = null;
-        private final boolean                    defaultSwitchToDownloadlistOnConfirm          = getDefaultSwitchToDownloadlistOnConfirm();
-        private Boolean                          switchToDownloadlistOnConfirm                 = null;
+        private final SwitchToDownloadlistBehavior defaultSwitchToDownloadlistBehavior         = getDefaultSwitchToDownloadlistBehavior();
+        private SwitchToDownloadlistBehavior     switchToDownloadlistBehavior                  = null;
         private final OnOfflineLinksAction       defaultHandleOffline                          = getDefaultHandleOffline();
         private OnOfflineLinksAction             handleOffline                                 = null;
         private final OnDupesLinksAction         defaultHandleDupes                            = getDefaultHandleDupes();
@@ -3011,8 +3046,16 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
             return OnOfflineLinksAction.ASK;
         }
 
-        private boolean getDefaultSwitchToDownloadlistOnConfirm() {
-            return JsonConfig.create(LinkgrabberSettings.class).isAutoSwitchToDownloadTableOnConfirmDefaultEnabled();
+        /**
+         * Never returns GLOBAL_DEFAULT - it resolves the global "AutoSwitchToDownloadTableOnConfirmDefaultEnabled" config into a concrete
+         * ALWAYS/NEVER, which is what GLOBAL_DEFAULT (as chosen by the user) falls back to.
+         */
+        private SwitchToDownloadlistBehavior getDefaultSwitchToDownloadlistBehavior() {
+            if (JsonConfig.create(LinkgrabberSettings.class).isAutoSwitchToDownloadTableOnConfirmDefaultEnabled()) {
+                return SwitchToDownloadlistBehavior.ALWAYS;
+            } else {
+                return SwitchToDownloadlistBehavior.NEVER;
+            }
         }
 
         private Priority getDefaultPriority() {

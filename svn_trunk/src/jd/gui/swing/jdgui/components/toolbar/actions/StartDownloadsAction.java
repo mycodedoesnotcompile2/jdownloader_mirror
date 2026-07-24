@@ -17,6 +17,7 @@ import jd.controlling.downloadcontroller.DownloadWatchDogProperty;
 import jd.controlling.downloadcontroller.SingleDownloadController;
 import jd.controlling.downloadcontroller.event.DownloadWatchdogListener;
 import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings;
+import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings.SwitchToDownloadlistBehavior;
 import jd.controlling.linkcollector.LinkCollector.MoveLinksMode;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.CrawledPackage;
@@ -87,7 +88,7 @@ public class StartDownloadsAction extends AbstractToolBarAction implements Downl
                                 final ConfirmLinksSettings cls = new ConfirmLinksSettings(MoveLinksMode.MANUAL);
                                 cls.setAutoStartDownloads(true);
                                 cls.setClearLinkgrabberlistOnConfirm(false);
-                                cls.setSwitchToDownloadlistOnConfirm(true);
+                                cls.setSwitchToDownloadlistBehavior(SwitchToDownloadlistBehavior.ALWAYS);
                                 cls.setForceDownloads(false);
                                 ConfirmLinksContextAction.confirmSelection(selectionInfo, cls);
                             }

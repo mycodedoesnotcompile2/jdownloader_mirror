@@ -5,6 +5,7 @@ import java.awt.Image;
 import java.awt.event.ActionEvent;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
@@ -41,6 +42,7 @@ import org.jdownloader.extensions.extraction.bindings.crawledlink.CrawledLinkArc
 import org.jdownloader.extensions.extraction.contextmenu.downloadlist.ArchiveValidator;
 import org.jdownloader.extensions.extraction.contextmenu.downloadlist.ArchiveValidator.ArchiveValidation;
 import org.jdownloader.extensions.extraction.gui.DummyArchiveDialog;
+import org.jdownloader.extensions.extraction.multi.CheckException;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.KeyObserver;
 import org.jdownloader.gui.event.GUIEventSender;
@@ -60,6 +62,7 @@ import org.jdownloader.translate._JDT;
 import jd.controlling.downloadcontroller.DownloadController;
 import jd.controlling.linkcollector.LinkCollector;
 import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings;
+import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings.SwitchToDownloadlistBehavior;
 import jd.controlling.linkcollector.LinkCollector.MoveLinksMode;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.CrawledPackage;
@@ -305,19 +308,20 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
         this.forceDownloads = forceDownloads;
     }
 
-    private boolean                    ctrlToggle                                            = true;
-    private boolean                    forceDownloads                                        = false;
-    private Priority                   piority                                               = Priority.DEFAULT;
-    private boolean                    assignPriorityEnabled                                 = false;
-    private PackageExpandBehavior      packageExpandBehavior                                 = PackageExpandBehavior.UNCHANGED;
-    private OnOfflineLinksAction       handleOffline                                         = OnOfflineLinksAction.GLOBAL;
-    private OnDupesLinksAction         handleDupes                                           = OnDupesLinksAction.GLOBAL;
-    private AutoStartOptions           autoStart                                             = AutoStartOptions.AUTO;
-    private boolean                    clearListAfterConfirm                                 = false;
-    private boolean                    metaCtrl                                              = false;
-    private ConfirmationDialogBehavior confirmationDialogBehavior                            = ConfirmationDialogBehavior.DISABLED;
-    private int                        minNumberofPackagesForConfirmMoveToDownloadlistDialog = 1;
-    private int                        minNumberofLinksForConfirmMoveToDownloadlistDialog    = 1;
+    private boolean                      ctrlToggle                                            = true;
+    private boolean                      forceDownloads                                        = false;
+    private Priority                     piority                                               = Priority.DEFAULT;
+    private boolean                      assignPriorityEnabled                                 = false;
+    private PackageExpandBehavior        packageExpandBehavior                                 = PackageExpandBehavior.UNCHANGED;
+    private OnOfflineLinksAction         handleOffline                                         = OnOfflineLinksAction.GLOBAL;
+    private OnDupesLinksAction           handleDupes                                           = OnDupesLinksAction.GLOBAL;
+    private AutoStartOptions             autoStart                                             = AutoStartOptions.AUTO;
+    private boolean                      clearListAfterConfirm                                 = false;
+    private SwitchToDownloadlistBehavior switchToDownloadlistBehavior                          = SwitchToDownloadlistBehavior.GLOBAL_DEFAULT;
+    private boolean                      metaCtrl                                              = false;
+    private ConfirmationDialogBehavior   confirmationDialogBehavior                            = ConfirmationDialogBehavior.DISABLED;
+    private int                          minNumberofPackagesForConfirmMoveToDownloadlistDialog = 1;
+    private int                          minNumberofLinksForConfirmMoveToDownloadlistDialog    = 1;
 
     public static String getTranslationForAssignPriorityEnabled() {
         return _JDT.T.ConfirmLinksContextAction_getTranslationForAssignPriorityEnabled();
@@ -412,140 +416,146 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
      */
     private static final long  serialVersionUID = -3937346180905569896L;
 
+    /**
+     * Collects all incomplete archives of the selection and, if needed, asks the user once (for all of them together, not once per archive)
+     * how to handle them. Archives whose completeness can't be determined (CheckException) are skipped and treated as complete. Returns
+     * false if the whole confirm should be aborted (user did not answer the dialog), true if processing should continue.
+     */
+    private static boolean resolveIncompleteArchives(final SelectionInfo<CrawledPackage, CrawledLink> selection, final HashSet<CrawledLink> toDelete, final HashSet<CrawledLink> toKeepInLinkgrabber, final AtomicBoolean alreadyDisplayedOtherDialogToUser) {
+        final ExtractionExtension extractionExtension = ExtractionExtension.getInstance();
+        final ConfirmIncompleteArchiveAction doAction = CFG_GUI.CFG.getConfirmIncompleteArchiveAction();
+        incompleteArchiveCheck: if (extractionExtension != null && !ConfirmIncompleteArchiveAction.MOVE_TO_DOWNLOADLIST.equals(doAction)) {
+            /* Collect incomplete archives */
+            // this validation step also copies the passwords from the Crawledlinks in the archive settings
+            final ArchiveValidation result = ArchiveValidator.validate(selection, false);
+            final ArrayList<Archive> incompleteArchives = new ArrayList<Archive>();
+            final ArrayList<DummyArchive> incompleteDummyArchives = new ArrayList<DummyArchive>();
+            for (final Archive a : result.getArchives()) {
+                DummyArchive da;
+                try {
+                    da = extractionExtension.createDummyArchive(a);
+                } catch (CheckException e) {
+                    /* Could not reliably determine archive completeness -> Silent ignore as if archive was complete. */
+                    e.printStackTrace();
+                    continue;
+                }
+                if (da.isComplete()) {
+                    continue;
+                }
+                incompleteArchives.add(a);
+                incompleteDummyArchives.add(da);
+            }
+            if (incompleteArchives.size() == 0) {
+                /* Nothing incomplete -> Nothing to ask/handle here. */
+                break incompleteArchiveCheck;
+            }
+            ConfirmIncompleteArchiveAction doActionForTheseArchives = doAction;
+            if (doAction == ConfirmIncompleteArchiveAction.ASK) {
+                final ConfirmIncompleteArchiveAction[] options = new ConfirmIncompleteArchiveAction[] { ConfirmIncompleteArchiveAction.DELETE, ConfirmIncompleteArchiveAction.KEEP_IN_LINKGRABBER, ConfirmIncompleteArchiveAction.MOVE_TO_DOWNLOADLIST };
+                int defaultSelection = 0;
+                final ConfirmIncompleteArchiveAction s = CFG_LINKGRABBER.CFG.getHandleIncompleteArchiveOnConfirmLatestSelection();
+                for (int i = 0; i < options.length; i++) {
+                    if (s == options[i]) {
+                        defaultSelection = i;
+                        break;
+                    }
+                }
+                final String title;
+                if (incompleteArchives.size() == 1) {
+                    title = _GUI.T.ConfirmAction_run_incomplete_archive_title_(incompleteArchives.get(0).getName());
+                } else {
+                    title = _GUI.T.ConfirmAction_run_incomplete_archive_title_multi_(incompleteArchives.size());
+                }
+                final ComboBoxDialog guiDialog = new ComboBoxDialog(0, title, _GUI.T.ConfirmAction_run_incomplete_archive_msg_(incompleteArchives.size()), options, defaultSelection, new AbstractIcon(IconKey.ICON_STOP, 32), _GUI.T.lit_continue(), null, null) {
+                    protected MigPanel createBottomPanel() {
+                        return new MigPanel("ins 0", "[]20[grow,fill][]", "[]");
+                    }
+
+                    @Override
+                    protected DefaultButtonPanel createBottomButtonPanel() {
+                        DefaultButtonPanel ret = new DefaultButtonPanel("ins 0", "[][][]", "0[]0");
+                        ret.add(new JButton(new AppAction() {
+                            {
+                                setName(_GUI.T.ConfirmAction_run_incomplete_archive_details());
+                            }
+
+                            @Override
+                            public void actionPerformed(ActionEvent e) {
+                                try {
+                                    Dialog.getInstance().showDialog(new DummyArchiveDialog(incompleteDummyArchives));
+                                } catch (DialogClosedException e1) {
+                                    e1.printStackTrace();
+                                } catch (DialogCanceledException e1) {
+                                    e1.printStackTrace();
+                                }
+                            }
+                        }), "");
+                        return ret;
+                    }
+
+                    protected ListCellRenderer getRenderer(final ListCellRenderer orgRenderer) {
+                        return new ListCellRenderer() {
+                            @Override
+                            public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                                if (value == null) {
+                                    return orgRenderer.getListCellRendererComponent(list, _GUI.T.AddActionAction_getListCellRendererComponent_no_action_(), index, isSelected, cellHasFocus);
+                                }
+                                JLabel ret = (JLabel) orgRenderer.getListCellRendererComponent(list, ((ConfirmIncompleteArchiveAction) value).getLabel(), index, isSelected, cellHasFocus);
+                                return ret;
+                            }
+                        };
+                    }
+                };
+                final ComboBoxDialogInterface response;
+                try {
+                    response = UIOManager.I().show(ComboBoxDialogInterface.class, guiDialog);
+                    response.throwCloseExceptions();
+                } catch (final DialogNoAnswerException e) {
+                    /* User did not react -> Abort confirming entirely. */
+                    return false;
+                }
+                doActionForTheseArchives = options[response.getSelectedIndex()];
+                CFG_LINKGRABBER.CFG.setHandleIncompleteArchiveOnConfirmLatestSelection(doActionForTheseArchives);
+                alreadyDisplayedOtherDialogToUser.set(true);
+            }
+            /* Apply the chosen action to every incomplete archive, not just the first one found. */
+            for (final Archive a : incompleteArchives) {
+                switch (doActionForTheseArchives) {
+                case DELETE:
+                    for (ArchiveFile af : a.getArchiveFiles()) {
+                        if (af instanceof CrawledLinkArchiveFile) {
+                            toDelete.addAll(((CrawledLinkArchiveFile) af).getLinks());
+                        }
+                    }
+                    break;
+                case KEEP_IN_LINKGRABBER:
+                    for (ArchiveFile af : a.getArchiveFiles()) {
+                        if (af instanceof CrawledLinkArchiveFile) {
+                            toKeepInLinkgrabber.addAll(((CrawledLinkArchiveFile) af).getLinks());
+                        }
+                    }
+                    break;
+                case MOVE_TO_DOWNLOADLIST:
+                    // do nothing
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+        return true;
+    }
+
     public static void confirmSelection(final SelectionInfo<CrawledPackage, CrawledLink> selection, final ConfirmLinksSettings settings) {
         final Thread thread = new Thread() {
             public void run() {
                 OnOfflineLinksAction handleOfflineLoc = settings.getHandleOffline();
                 OnDupesLinksAction handleDupesLoc = settings.getHandleDupes();
-                boolean alreadyDisplayedOtherDialogToUser = false;
+                final AtomicBoolean alreadyDisplayedOtherDialogToUser = new AtomicBoolean(false);
                 final HashSet<CrawledLink> toDelete = new HashSet<CrawledLink>();
                 final HashSet<CrawledLink> toKeepInLinkgrabber = new HashSet<CrawledLink>();
-                final ExtractionExtension extractionExtension = ExtractionExtension.getInstance();
-                ConfirmIncompleteArchiveAction doAction = CFG_GUI.CFG.getConfirmIncompleteArchiveAction();
-                if (extractionExtension != null && !ConfirmIncompleteArchiveAction.MOVE_TO_DOWNLOADLIST.equals(doAction)) {
-                    /* Collect incomplete archives */
-                    try {
-                        // this validation step also copies the passwords from the Crawledlinks in the archive settings
-                        final ArchiveValidation result = ArchiveValidator.validate(selection, false);
-                        for (final Archive a : result.getArchives()) {
-                            ConfirmIncompleteArchiveAction doActionForTheCurrentArchive = doAction;
-                            final DummyArchive da = extractionExtension.createDummyArchive(a);
-                            if (da.isComplete()) {
-                                continue;
-                            }
-                            if (doAction == ConfirmIncompleteArchiveAction.ASK) {
-                                final ConfirmIncompleteArchiveAction[] options = new ConfirmIncompleteArchiveAction[] { ConfirmIncompleteArchiveAction.DELETE, ConfirmIncompleteArchiveAction.KEEP_IN_LINKGRABBER, ConfirmIncompleteArchiveAction.MOVE_TO_DOWNLOADLIST };
-                                int def = 0;
-                                final ConfirmIncompleteArchiveAction s = CFG_LINKGRABBER.CFG.getHandleIncompleteArchiveOnConfirmLatestSelection();
-                                for (int i = 0; i < options.length; i++) {
-                                    if (s == options[i]) {
-                                        def = i;
-                                        break;
-                                    }
-                                }
-                                final ComboBoxDialog guiDialog = new ComboBoxDialog(Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, _GUI.T.ConfirmAction_run_incomplete_archive_title_(a.getName()), _GUI.T.ConfirmAction_run_incomplete_archive_msg(), options, def, new AbstractIcon(IconKey.ICON_STOP, 32), _GUI.T.lit_continue(), null, null) {
-                                    public String getDontShowAgainKey() {
-                                        return null;
-                                    };
-
-                                    protected MigPanel createBottomPanel() {
-                                        return new MigPanel("ins 0", "[]20[grow,fill][]", "[]");
-                                    }
-
-                                    @Override
-                                    protected DefaultButtonPanel createBottomButtonPanel() {
-                                        DefaultButtonPanel ret = new DefaultButtonPanel("ins 0", "[][][]", "0[]0");
-                                        ret.add(new JButton(new AppAction() {
-                                            {
-                                                setName(_GUI.T.ConfirmAction_run_incomplete_archive_details());
-                                            }
-
-                                            @Override
-                                            public void actionPerformed(ActionEvent e) {
-                                                try {
-                                                    Dialog.getInstance().showDialog(new DummyArchiveDialog(da));
-                                                } catch (DialogClosedException e1) {
-                                                    e1.printStackTrace();
-                                                } catch (DialogCanceledException e1) {
-                                                    e1.printStackTrace();
-                                                }
-                                            }
-                                        }), "");
-                                        return ret;
-                                    }
-
-                                    @Override
-                                    protected String getDontShowAgainLabelText() {
-                                        return _GUI.T.ConfirmLinksContextAction_getDontShowAgainLabelText_object_();
-                                    }
-
-                                    protected ListCellRenderer getRenderer(final ListCellRenderer orgRenderer) {
-                                        return new ListCellRenderer() {
-                                            @Override
-                                            public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
-                                                if (value == null) {
-                                                    return orgRenderer.getListCellRendererComponent(list, _GUI.T.AddActionAction_getListCellRendererComponent_no_action_(), index, isSelected, cellHasFocus);
-                                                }
-                                                switch (((ConfirmIncompleteArchiveAction) value)) {
-                                                // case EXCLUDE_OFFLINE:
-                                                // return orgRenderer.getListCellRendererComponent(list,
-                                                // _GUI.T.ConfirmLinksContextAction_getListCellRendererComponent_EXCLUDE_OFFLINE(),
-                                                // index, isSelected, cellHasFocus);
-                                                //
-                                                // case EXCLUDE_OFFLINE_AND_REMOVE:
-                                                // return orgRenderer.getListCellRendererComponent(list,
-                                                // _GUI.T.ConfirmLinksContextAction_getListCellRendererComponent_EXCLUDE_OFFLINE_AND_REMOVE(),
-                                                // index, isSelected, cellHasFocus);
-                                                //
-                                                // case INCLUDE_OFFLINE:
-                                                // return orgRenderer.getListCellRendererComponent(list,
-                                                // _GUI.T.ConfirmLinksContextAction_getListCellRendererComponent_INCLUDE_OFFLINE(),
-                                                // index, isSelected, cellHasFocus);
-                                                }
-                                                JLabel ret = (JLabel) orgRenderer.getListCellRendererComponent(list, ((ConfirmIncompleteArchiveAction) value).getLabel(), index, isSelected, cellHasFocus);
-                                                return ret;
-                                            }
-                                        };
-                                    }
-                                };
-                                final ComboBoxDialogInterface response = UIOManager.I().show(ComboBoxDialogInterface.class, guiDialog);
-                                response.throwCloseExceptions();
-                                doActionForTheCurrentArchive = options[response.getSelectedIndex()];
-                                CFG_LINKGRABBER.CFG.setHandleIncompleteArchiveOnConfirmLatestSelection(doActionForTheCurrentArchive);
-                                if (response.isDontShowAgainSelected()) {
-                                    /* Do not display dialog for subsequent items in current loop. */
-                                    doAction = doActionForTheCurrentArchive;
-                                }
-                                alreadyDisplayedOtherDialogToUser = true;
-                            }
-                            switch (doActionForTheCurrentArchive) {
-                            case DELETE:
-                                for (ArchiveFile af : a.getArchiveFiles()) {
-                                    if (af instanceof CrawledLinkArchiveFile) {
-                                        toDelete.addAll(((CrawledLinkArchiveFile) af).getLinks());
-                                    }
-                                }
-                                break;
-                            case KEEP_IN_LINKGRABBER:
-                                for (ArchiveFile af : a.getArchiveFiles()) {
-                                    if (af instanceof CrawledLinkArchiveFile) {
-                                        toKeepInLinkgrabber.addAll(((CrawledLinkArchiveFile) af).getLinks());
-                                    }
-                                }
-                                break;
-                            case MOVE_TO_DOWNLOADLIST:
-                                // do nothing
-                                break;
-                            default:
-                                break;
-                            }
-                        }
-                    } catch (final DialogNoAnswerException e) {
-                        /* User did not react -> Do nothing */
-                        return;
-                    } catch (final Throwable ignore) {
-                        org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(ignore);
-                    }
+                if (!resolveIncompleteArchives(selection, toDelete, toKeepInLinkgrabber, alreadyDisplayedOtherDialogToUser)) {
+                    return;
                 }
                 if (handleOfflineLoc != OnOfflineLinksAction.INCLUDE_OFFLINE) {
                     /* Collect- and handle offline items */
@@ -598,13 +608,13 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
                             final ComboBoxDialogInterface result = UIOManager.I().show(ComboBoxDialogInterface.class, combo);
                             try {
                                 result.throwCloseExceptions();
-                            } catch (final Exception e) {
+                            } catch (final DialogNoAnswerException e) {
                                 return;
                             }
                             handleOfflineLoc = options[result.getSelectedIndex()];
                             /* Store last user selected option. */
                             CFG_LINKGRABBER.CFG.setHandleOfflineOnConfirmLatestSelection(handleOfflineLoc);
-                            alreadyDisplayedOtherDialogToUser = true;
+                            alreadyDisplayedOtherDialogToUser.set(true);
                         }
                         switch (handleOfflineLoc) {
                         case EXCLUDE_OFFLINE:
@@ -668,12 +678,12 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
                             final ComboBoxDialogInterface result = UIOManager.I().show(ComboBoxDialogInterface.class, combo);
                             try {
                                 result.throwCloseExceptions();
-                            } catch (Exception e) {
+                            } catch (final DialogNoAnswerException e) {
                                 return;
                             }
                             handleDupesLoc = options[result.getSelectedIndex()];
                             CFG_LINKGRABBER.CFG.setHandleDupesOnConfirmLatestSelection(handleDupesLoc);
-                            alreadyDisplayedOtherDialogToUser = true;
+                            alreadyDisplayedOtherDialogToUser.set(true);
                         }
                         /* Evaluate user preferred action */
                         switch (handleDupesLoc) {
@@ -687,13 +697,17 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
                     }
                 }
                 final ArrayList<CrawledLink> toMove = new ArrayList<CrawledLink>();
-                boolean createNewSelectionInfo = false;
+                /*
+                 * Only true if no links were excluded (deleted/kept) above, i.e. toMove equals selection.getChildren() - only then can the
+                 * original selection be reused as-is; otherwise a narrower SelectionInfo has to be built from toMove.
+                 */
+                boolean selectionIsFinal = true;
                 for (final CrawledLink cl : selection.getChildren()) {
                     if (toDelete.contains(cl)) {
-                        createNewSelectionInfo = true;
+                        selectionIsFinal = false;
                         continue;
                     } else if (toKeepInLinkgrabber.contains(cl)) {
-                        createNewSelectionInfo = true;
+                        selectionIsFinal = false;
                         continue;
                     } else {
                         toMove.add(cl);
@@ -708,23 +722,25 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
                     return;
                 }
                 final SelectionInfo<CrawledPackage, CrawledLink> finalSelection;
-                if (createNewSelectionInfo) {
-                    finalSelection = new SelectionInfo<CrawledPackage, CrawledLink>(null, toMove);
-                } else {
+                if (selectionIsFinal) {
                     finalSelection = selection;
+                } else {
+                    finalSelection = new SelectionInfo<CrawledPackage, CrawledLink>(null, toMove);
                 }
                 final int numberofPackages = selection.getPackageViews().size();
                 final int numberofLinks = selection.getChildren().size();
                 final ConfirmationDialogBehavior confirmationDialogBehavior = settings.getConfirmationDialogBehavior();
-                if (((confirmationDialogBehavior == ConfirmationDialogBehavior.ENABLED_THRESHOLD_AUTO && !alreadyDisplayedOtherDialogToUser) || confirmationDialogBehavior == ConfirmationDialogBehavior.ENABLED_THRESHOLD_SIMPLE) && numberofPackages >= 1 && numberofLinks >= 1) {
+                final boolean thresholdReached = numberofPackages >= settings.getConfirmationDialogThresholdMinPackages() && numberofLinks >= settings.getConfirmationDialogThresholdMinLinks();
+                if (((confirmationDialogBehavior == ConfirmationDialogBehavior.ENABLED_THRESHOLD_AUTO && !alreadyDisplayedOtherDialogToUser.get()) || confirmationDialogBehavior == ConfirmationDialogBehavior.ENABLED_THRESHOLD_SIMPLE) && thresholdReached) {
                     /* Ask user if he really wants to move items to downloadlist. */
                     if (!UIOManager.I().showConfirmDialog(0, _GUI.T.literall_are_you_sure(), _GUI.T.ConfirmContextmenuAction_confirmation_dialog_text(numberofPackages, numberofLinks), new AbstractIcon(IconKey.ICON_QUESTION, 32), _GUI.T.literally_yes(), _GUI.T.literall_no())) {
                         /* Canceled by user */
                         return;
                     }
                 }
+                final boolean linkgrabberWillBeEmpty = LinkCollector.getInstance().size() - finalSelection.getChildren().size() <= 0 ? true : false;
                 LinkCollector.getInstance().moveLinksToDownloadList(finalSelection, settings);
-                if (Boolean.TRUE.equals(settings.isSwitchToDownloadlistOnConfirm())) {
+                if (shouldSwitchToDownloadlist(settings, linkgrabberWillBeEmpty)) {
                     switchToDownloadTab();
                 }
                 if (Boolean.TRUE.equals(settings.isClearLinkgrabberlistOnConfirm())) {
@@ -736,6 +752,29 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
         thread.setPriority(Thread.MIN_PRIORITY);
         thread.setName(ConfirmLinksContextAction.class.getName());
         thread.start();
+    }
+
+    /**
+     * Resolves whether the download tab should be switched to after this confirm, taking both
+     * {@link ConfirmLinksSettings#getSwitchToDownloadlistBehavior()} and {@link ConfirmLinksSettings#isClearLinkgrabberlistOnConfirm()}
+     * into account: ONLY_IF_LINKGRABBER_EMPTY also counts as "empty" if the linkgrabber is about to be cleared anyway.
+     *
+     * @param linkgrabberIsEmptyAfterConfirm
+     *            whether the linkgrabber (globally, not just this selection) has no items left after the links were moved.
+     */
+    private static boolean shouldSwitchToDownloadlist(final ConfirmLinksSettings settings, final boolean linkgrabberIsEmptyAfterConfirm) {
+        switch (settings.getSwitchToDownloadlistBehavior()) {
+        case NEVER:
+            return false;
+        case ALWAYS:
+            return true;
+        case ONLY_IF_LINKGRABBER_EMPTY:
+            return linkgrabberIsEmptyAfterConfirm || settings.isClearLinkgrabberlistOnConfirm();
+        case GLOBAL_DEFAULT:
+        default:
+            /* ConfirmLinksSettings.getSwitchToDownloadlistBehavior() never itself returns GLOBAL_DEFAULT. */
+            return false;
+        }
     }
 
     protected static void switchToDownloadTab() {
@@ -819,6 +858,7 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
         final ConfirmLinksSettings cls = new ConfirmLinksSettings(MoveLinksMode.MANUAL);
         cls.setAutoStartDownloads(doAutostart());
         cls.setClearLinkgrabberlistOnConfirm(isClearListAfterConfirm());
+        cls.setSwitchToDownloadlistBehavior(getSwitchToDownloadlistBehavior());
         if (isAssignPriorityEnabled()) {
             cls.setPriority(getPriority());
         }
@@ -869,6 +909,23 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
     @Order(200)
     public boolean isClearListAfterConfirm() {
         return clearListAfterConfirm;
+    }
+
+    public static String getTranslationForSwitchToDownloadlistBehavior() {
+        return _JDT.T.ConfirmLinksContextAction_getTranslationForSwitchToDownloadlistBehavior();
+    }
+
+    @Customizer(link = "#getTranslationForSwitchToDownloadlistBehavior")
+    @Order(201)
+    public SwitchToDownloadlistBehavior getSwitchToDownloadlistBehavior() {
+        return switchToDownloadlistBehavior;
+    }
+
+    public void setSwitchToDownloadlistBehavior(SwitchToDownloadlistBehavior switchToDownloadlistBehavior) {
+        if (switchToDownloadlistBehavior == null) {
+            switchToDownloadlistBehavior = SwitchToDownloadlistBehavior.GLOBAL_DEFAULT;
+        }
+        this.switchToDownloadlistBehavior = switchToDownloadlistBehavior;
     }
 
     @Override

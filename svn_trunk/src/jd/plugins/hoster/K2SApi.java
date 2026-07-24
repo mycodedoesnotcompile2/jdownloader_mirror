@@ -19,6 +19,22 @@ import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.RFC2047;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.blacklist.BlockDownloadCaptchasByHost;
+import org.jdownloader.captcha.blacklist.CaptchaBlackList;
+import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.config.Keep2shareConfig;
+import org.jdownloader.plugins.components.config.Keep2shareConfig.CaptchaTimeoutBehavior;
+import org.jdownloader.plugins.components.config.Keep2shareConfig.LinkcheckMode;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.captcha.SkipRequest;
@@ -48,22 +64,6 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.Keep2ShareCcDecrypter;
 import jd.plugins.download.DownloadInterface;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.RFC2047;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.logging2.LogInterface;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.blacklist.BlockDownloadCaptchasByHost;
-import org.jdownloader.captcha.blacklist.CaptchaBlackList;
-import org.jdownloader.captcha.v2.Challenge;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.config.Keep2shareConfig;
-import org.jdownloader.plugins.components.config.Keep2shareConfig.CaptchaTimeoutBehavior;
-import org.jdownloader.plugins.components.config.Keep2shareConfig.LinkcheckMode;
-
 /**
  * Abstract class supporting tezfiles.com/keep2share.cc (k2s.cc)/fileboom(fboom.me)/publish2.me <br>
  * <a href="https://github.com/keep2share/api/">Github documentation</a>
@@ -71,7 +71,7 @@ import org.jdownloader.plugins.components.config.Keep2shareConfig.LinkcheckMode;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 52724 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53031 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class K2SApi extends PluginForHost {
     private final String        lng                                                    = getLanguage();
     private final String        PROPERTY_ACCOUNT_AUTHTOKEN                             = "auth_token";
@@ -148,16 +148,22 @@ public abstract class K2SApi extends PluginForHost {
         return 0;
     }
 
+    /**
+     * Returns true if traffic for this url has already deducted. <br>
+     * If a user downloads the same link within a specific time window, traffic for it is only deducted once.
+     */
     protected boolean isTrafficCredited(final DownloadLink link, final Account account) {
-        if (account != null) {
-            final long link_quota_reset_at_ts = link.getLongProperty(getDirectLinkProperty(account) + "_" + QUOTA_RESET_AT_TIMESTAMP, -1l);
-            if (link_quota_reset_at_ts != -1) {
-                final long account_quota_reset_at_ts = account.getLongProperty(QUOTA_RESET_AT_TIMESTAMP, -1);
-                if (link_quota_reset_at_ts == account_quota_reset_at_ts && System.currentTimeMillis() < account_quota_reset_at_ts) {
-                    /* download url generation is credited only once per day/account */
-                    return true;
-                }
-            }
+        if (account == null) {
+            return false;
+        }
+        final long link_quota_reset_at_ts = link.getLongProperty(getDirectLinkProperty(account) + "_" + QUOTA_RESET_AT_TIMESTAMP, -1l);
+        if (link_quota_reset_at_ts == -1) {
+            return false;
+        }
+        final long account_quota_reset_at_ts = account.getLongProperty(QUOTA_RESET_AT_TIMESTAMP, -1);
+        if (link_quota_reset_at_ts == account_quota_reset_at_ts && System.currentTimeMillis() < account_quota_reset_at_ts) {
+            /* download url generation is credited only once per day/account */
+            return true;
         }
         return false;
     }
@@ -165,11 +171,15 @@ public abstract class K2SApi extends PluginForHost {
     @Override
     public boolean enoughTrafficFor(final DownloadLink link, Account account) throws Exception {
         if (isTrafficCredited(link, account)) {
+            /*
+             * Traffic for this link has already been deducted in specific timeframe so now we can download that link again without traffic
+             * deduction.
+             */
             return true;
         }
         final String dllink = getStoredDirecturl(link, account);
         if (StringUtils.isNotEmpty(dllink)) {
-            /* Previously generated direct-URL is available -> Even if the account is out f traffic, that link should be downloadable. */
+            /* Previously generated direct-URL is available -> Even if the account is out of traffic, that link should be downloadable. */
             return true;
         } else {
             return super.enoughTrafficFor(link, account);
@@ -197,14 +207,6 @@ public abstract class K2SApi extends PluginForHost {
         } catch (final Exception ignore) {
         }
         return url_referer;
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
-    }
-
-    @Override
-    public void reset() {
     }
 
     /**
@@ -283,7 +285,7 @@ public abstract class K2SApi extends PluginForHost {
      * @author Jiaz
      */
     protected long getAPIRevision() {
-        return Math.max(0, Formatter.getRevision("$Revision: 52724 $"));
+        return Math.max(0, Formatter.getRevision("$Revision: 53031 $"));
     }
 
     /**
@@ -354,8 +356,8 @@ public abstract class K2SApi extends PluginForHost {
     }
 
     /**
-     * There are special long fileIDs most likely used for tracking. </br> There can be multiple of those IDs available for the same file so
-     * those special IDs can't be reliably used for duplicate-checking.
+     * There are special long fileIDs most likely used for tracking. </br>
+     * There can be multiple of those IDs available for the same file so those special IDs can't be reliably used for duplicate-checking.
      */
     public static boolean isSpecialFileID(final String fuid) {
         if (fuid != null && (fuid.contains("-") || fuid.contains("_"))) {
@@ -429,8 +431,8 @@ public abstract class K2SApi extends PluginForHost {
     public boolean internal_supportsMassLinkcheck() {
         /**
          * The need to have a setting for the mass-linkcheck behavior is mainly due to a serverside API bug in mass-linkcheck which leads to
-         * files being displayed as online while they actually don't exist anymore (abused/deleted). </br> More detailed description:
-         * https://board.jdownloader.org/showthread.php?t=95537
+         * files being displayed as online while they actually don't exist anymore (abused/deleted). </br>
+         * More detailed description: https://board.jdownloader.org/showthread.php?t=95537
          */
         final Keep2shareConfig cfg = get(this.getConfigInterface());
         final LinkcheckMode mode = cfg.getFileLinkcheckMode();
@@ -512,8 +514,8 @@ public abstract class K2SApi extends PluginForHost {
                                 final Boolean isFolder = (Boolean) fileInfo.get("is_folder");
                                 if (Boolean.TRUE.equals(isFolder)) {
                                     /**
-                                     * Check if somehow a fileID has managed to go into the hoster plugin handling. </br> This should never
-                                     * happen.
+                                     * Check if somehow a fileID has managed to go into the hoster plugin handling. </br>
+                                     * This should never happen.
                                      */
                                     link.setAvailable(false);
                                     if (link.getComment() == null) {
@@ -528,8 +530,8 @@ public abstract class K2SApi extends PluginForHost {
                             if (StringUtils.equals((String) root.get("message"), "Invalid request params")) {
                                 /**
                                  * 2022-02-25: Workaround for when checking only one <b>invalid</b> fileID e.g.
-                                 * "2ahUKEwiUlaOqlZv2AhWLyIUKHXOjAmgQuZ0HegQIARBG". </br> This may also happen when there are multiple
-                                 * fileIDs to check and all of them are invalid.
+                                 * "2ahUKEwiUlaOqlZv2AhWLyIUKHXOjAmgQuZ0HegQIARBG". </br>
+                                 * This may also happen when there are multiple fileIDs to check and all of them are invalid.
                                  */
                                 for (final DownloadLink dl : links) {
                                     dl.setAvailable(false);
@@ -862,7 +864,8 @@ public abstract class K2SApi extends PluginForHost {
             final String free_download_key = (String) geturlResponse.get("free_download_key");
             if (!StringUtils.isEmpty(free_download_key)) {
                 /**
-                 * Free and free-account download </br> In some rare cases, the API wants us to wait again even though we've already waited.
+                 * Free and free-account download </br>
+                 * In some rare cases, the API wants us to wait again even though we've already waited.
                  */
                 /*
                  * {"status":"success","code":200,"message":"Captcha accepted, please wait","free_download_key":"homeHash","time_wait":30}
@@ -997,9 +1000,10 @@ public abstract class K2SApi extends PluginForHost {
         if (StringUtils.startsWithCaseInsensitive(captchaAddress, "http://")) {
             /**
              * 2020-02-03: Possible workaround for this issues reported here: board.jdownloader.org/showthread.php?t=82989 and 2020-04-23:
-             * board.jdownloader.org/showthread.php?t=83927 </br> and board.jdownloader.org/showthread.php?t=83781 </br> Explanation: This
-             * filehost will block the users' IP if too many un-answered captcha requests are taking place. </br> This method is here to try
-             * to avoid this.
+             * board.jdownloader.org/showthread.php?t=83927 </br>
+             * and board.jdownloader.org/showthread.php?t=83781 </br>
+             * Explanation: This filehost will block the users' IP if too many un-answered captcha requests are taking place. </br>
+             * This method is here to try to avoid this.
              */
             logger.info("login-captcha_url is not https --> Changing it to https");
             captchaAddress = captchaAddress.replaceFirst("(?i)http://", "https://");
@@ -1118,7 +1122,7 @@ public abstract class K2SApi extends PluginForHost {
     }
 
     public Map<String, Object> postPageRaw(final Browser ibr, String url, final Map<String, Object> postdata, final Account account, final DownloadLink link) throws Exception {
-        return postPageRaw(ibr, url, postdata, account, null, 0);
+        return postPageRaw(ibr, url, postdata, account, link, 0);
     }
 
     /**
@@ -1903,9 +1907,9 @@ public abstract class K2SApi extends PluginForHost {
     }
 
     /**
-     * Check single file via single linkcheck using another API call. </br> Can be used as a workaround for this problem:
-     * https://board.jdownloader.org/showthread.php?t=95537 </br> API call used here:
-     * https://keep2share.github.io/api/#resources:/getFileStatus:post
+     * Check single file via single linkcheck using another API call. </br>
+     * Can be used as a workaround for this problem: https://board.jdownloader.org/showthread.php?t=95537 </br>
+     * API call used here: https://keep2share.github.io/api/#resources:/getFileStatus:post
      */
     private AvailableStatus requestFileInformationViaSingleLinkcheck_GetfilestatusAPICall(final DownloadLink link) throws Exception {
         final HashMap<String, Object> postdataGetfilestatus = new HashMap<String, Object>();
@@ -2231,7 +2235,6 @@ public abstract class K2SApi extends PluginForHost {
             return true;
         }
     }
-
     // @Override
     // public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
     // final boolean isAvailableForFree = link.getBooleanProperty(PROPERTY_isAvailableForFree, true);

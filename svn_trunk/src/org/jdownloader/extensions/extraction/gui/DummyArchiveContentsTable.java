@@ -1,6 +1,8 @@
 package org.jdownloader.extensions.extraction.gui;
 
 import java.awt.Color;
+import java.util.Collections;
+import java.util.List;
 
 import jd.gui.swing.jdgui.BasicJDTable;
 
@@ -14,12 +16,18 @@ import org.jdownloader.extensions.extraction.bindings.crawledlink.CrawledLinkArc
 public class DummyArchiveContentsTable extends BasicJDTable<DummyArchiveFile> {
 
     public DummyArchiveContentsTable(DummyArchive da) {
-        super(new DummyArchiveContentsTableModel(da));
+        this(Collections.singletonList(da));
+    }
+
+    public DummyArchiveContentsTable(List<DummyArchive> archives) {
+        super(new DummyArchiveContentsTableModel(archives));
         boolean linkgrabber = false;
-        for (DummyArchiveFile daf : da.getList()) {
-            if (daf.getArchiveFile() != null && daf.getArchiveFile() instanceof CrawledLinkArchiveFile) {
-                linkgrabber = true;
-                break;
+        outer: for (DummyArchive da : archives) {
+            for (DummyArchiveFile daf : da.getList()) {
+                if (daf.getArchiveFile() != null && daf.getArchiveFile() instanceof CrawledLinkArchiveFile) {
+                    linkgrabber = true;
+                    break outer;
+                }
             }
         }
 
