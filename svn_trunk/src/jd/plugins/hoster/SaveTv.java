@@ -70,7 +70,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SyncSaveTvToolbarAction;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 53021 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53055 $", interfaceVersion = 3, names = {}, urls = {})
 public class SaveTv extends PluginForHost {
     /* Static information */
     /* API functions developed for API version 3.0.0.1631 */
@@ -1727,7 +1727,6 @@ public class SaveTv extends PluginForHost {
     }
 
     /* Always compare to the decrypter */
-    @SuppressWarnings("deprecation")
     private void getPageSafe(final String url, final Account account) throws Exception {
         this.br.getPage(url);
         handleErrorsWebsite(br, account);

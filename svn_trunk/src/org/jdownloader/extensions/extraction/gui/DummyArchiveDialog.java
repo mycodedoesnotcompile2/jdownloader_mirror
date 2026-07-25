@@ -51,12 +51,12 @@ public class DummyArchiveDialog extends AbstractDialog<Object> {
     @Override
     public JComponent layoutDialogContent() {
         MigPanel d = new MigPanel("ins 5,wrap 1", "[]", "[grow,fill]");
-        boolean allComplete = true;
+        int incompleteCount = 0;
         int totalSize = 0;
         final LinkedHashSet<String> types = new LinkedHashSet<String>();
         for (final DummyArchive archive : archives) {
             if (!archive.isComplete()) {
-                allComplete = false;
+                incompleteCount++;
             }
             totalSize += archive.getSize();
             if (archive.getType() != null) {
@@ -64,11 +64,15 @@ public class DummyArchiveDialog extends AbstractDialog<Object> {
             }
         }
         final String typeInfo = types.toString().replaceAll("^\\[|\\]$", "");
-        if (allComplete) {
+        if (incompleteCount == 0) {
             JLabel lbl = new JLabel();
             d.add(lbl, "pushx,growx");
             lbl.setIcon(new AbstractIcon(IconKey.ICON_OK, 32));
-            lbl.setText(T.T.ValidateArchiveAction_actionPerformed_(totalSize));
+            if (archives.size() == 1) {
+                lbl.setText(T.T.ValidateArchiveAction_actionPerformed_(totalSize));
+            } else {
+                lbl.setText(T.T.ValidateArchiveAction_actionPerformed_multi(archives.size(), totalSize));
+            }
             lbl = new JLabel();
             d.add(lbl, "pushx,growx");
             lbl.setIcon(new AbstractIcon(IconKey.ICON_INFO, 32));
@@ -77,7 +81,11 @@ public class DummyArchiveDialog extends AbstractDialog<Object> {
             JLabel lbl = new JLabel();
             d.add(lbl, "pushx,growx");
             lbl.setIcon(new AbstractIcon(IconKey.ICON_STOP, 32));
-            lbl.setText(T.T.ValidateArchiveAction_actionPerformed_bad(totalSize));
+            if (archives.size() == 1) {
+                lbl.setText(T.T.ValidateArchiveAction_actionPerformed_bad(totalSize));
+            } else {
+                lbl.setText(T.T.ValidateArchiveAction_actionPerformed_bad_multi(incompleteCount, totalSize));
+            }
             lbl = new JLabel();
             d.add(lbl, "pushx,growx");
             lbl.setIcon(new AbstractIcon(IconKey.ICON_INFO, 32));

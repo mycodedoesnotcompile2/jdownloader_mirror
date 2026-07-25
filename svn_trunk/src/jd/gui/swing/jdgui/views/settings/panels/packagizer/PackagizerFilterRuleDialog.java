@@ -830,6 +830,7 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
                 rule.setTestUrl(getTxtTestUrl());
                 rule.setOnlineStatusFilter(getOnlineStatusFilter());
                 rule.setPluginStatusFilter(getPluginStatusFilter());
+                rule.setPackageEnabledFilter(getPackageEnabledFilter());
                 rule.setStopAfterThisRule(cbStopAfterThisRule.isSelected());
             }
         }.waitForEDT();
@@ -867,6 +868,7 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
         setFiletypeFilter(rule.getFiletypeFilter());
         setOnlineStatusFilter(rule.getOnlineStatusFilter());
         setPluginStatusFilter(rule.getPluginStatusFilter());
+        setPackageEnabledFilter(rule.getPackageEnabledFilter());
         setOriginFilter(rule.getOriginFilter());
         setConditionFilter(rule.getConditionFilter());
         txtPackagename.setText(rule.getPackageName());

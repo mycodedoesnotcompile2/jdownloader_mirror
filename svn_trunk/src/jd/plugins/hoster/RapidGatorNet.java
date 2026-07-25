@@ -21,6 +21,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -30,6 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
@@ -44,6 +46,8 @@ import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudfla
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.plugins.components.config.RapidGatorConfig;
 import org.jdownloader.plugins.components.config.RapidGatorConfig.PremiumDownloadBehaviorForSubscriberOnlyFiles;
 import org.jdownloader.plugins.config.PluginJsonConfig;
@@ -72,10 +76,11 @@ import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
+import jd.plugins.PluginConfigPanelNG;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53024 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53055 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -146,6 +151,7 @@ public class RapidGatorNet extends PluginForHost {
     private final String             PROPERTY_timestamp_session_create_api       = "session_create";
     private final String             PROPERTY_timestamp_session_create_website   = "session_create_website";
     private final String             PROPERTY_HOTLINK                            = "HOTLINK";
+    private static final String      PROPERTY_SOLO_SUBSCRIPTIONS                 = "solo_subscriptions_json";
     /* 2019-12-12: Lowered from 2 to 1 hour */
     private final long               FREE_RECONNECTWAIT_GENERAL_MILLIS           = 1 * 60 * 60 * 1001L;
     private final long               FREE_RECONNECTWAIT_DAILYLIMIT_MILLIS        = 3 * 60 * 60 * 1000L;
@@ -1014,25 +1020,85 @@ public class RapidGatorNet extends PluginForHost {
                 }
             }
         }
-        {
+        find_solo_subscriptions: {
+            /* Clear possibly stale subscription information first. It gets set again below if we still find valid subscriptions. */
+            account.removeProperty(PROPERTY_SOLO_SUBSCRIPTIONS);
             final Browser brc = br.cloneBrowser();
             brc.getPage("/subscription/list");
-            final String[][] activeSubscriptions = brc.getRegex("<td[^>]*>\\s*(\\d+-\\d+-\\d+ \\d+:\\d+:\\d+)\\s*</td>\\s*<td[^>]*>\\s*<a href=\"/subscription/links/id/lef\">\\s*(.*?)\\s*</a>\\s*</td>\\s*<td[^>]*>\\s*(.*?)\\s*</td>\\s*<td[^>]*>\\s*(\\d+-\\d+-\\d+ \\d+:\\d+:\\d+)\\s*</td>\\s*<td[^>]*>\\s*(active)\\s*</td>\\s*<td[^>]*>\\s*(.*?)\\s*</td>").getMatches();
+            final String[][] subscriptions = brc.getRegex("<td[^>]*>\\s*(\\d+-\\d+-\\d+ \\d+:\\d+:\\d+)\\s*</td>\\s*<td[^>]*>\\s*<a href=\"/subscription/links/id/[^\"]+\">\\s*(.*?)\\s*</a>\\s*</td>\\s*<td[^>]*>\\s*(.*?)\\s*</td>\\s*<td[^>]*>\\s*(\\d+-\\d+-\\d+ \\d+:\\d+:\\d+)\\s*</td>\\s*<td[^>]*>\\s*(.*?)\\s*</td>\\s*<td[^>]*>\\s*(.*?)\\s*</td>").getMatches();
+            if (subscriptions == null || subscriptions.length == 0) {
+                logger.info("User has zero solo subscriptions");
+                break find_solo_subscriptions;
+            }
             final StringBuilder sb = new StringBuilder();
-            for (String activeSubscription[] : activeSubscriptions) {
-                String subscriptionStart = activeSubscription[0];
-                String subscriptionSite = activeSubscription[1];
-                String subscriptionBandwidth = activeSubscription[2];
-                String subscriptionEnd = activeSubscription[3];
-                String subscriptionStatus = activeSubscription[4];
-                String subscriptionAutoRenew = activeSubscription[4];
+            /* Collect the information of all valid solo subscriptions so we can display them later via extendAccountSettingsPanel. */
+            final Map<String, Object> subscriptionInfoMap = new LinkedHashMap<String, Object>();
+            int numberofValidSubscriptions = 0;
+            long highestExpireTimestamp = -1;
+            long trafficOfLastValidSubscription = -1;
+            String siteOfLastValidSubscription = null;
+            for (final String[] subscription : subscriptions) {
+                final String subscriptionStart = subscription[0];
+                final String subscriptionSite = subscription[1];
+                final String subscriptionBandwidth = subscription[2];
+                final String subscriptionEnd = subscription[3];
+                final String subscriptionStatus = subscription[4];
+                final String subscriptionAutoRenew = subscription[5] != null && subscription[5].contains("/subscription/cancel/") ? "Yes" : "No";
+                /* Skip inactive solo subscriptions. */
+                if (!"active".equalsIgnoreCase(subscriptionStatus)) {
+                    logger.info("Skipping inactive solo subscription: " + subscriptionSite);
+                    continue;
+                }
+                /* Skip solo subscriptions with zero or negative traffic. */
+                final long subscriptionTraffic = SizeFormatter.getSize(subscriptionBandwidth);
+                if (subscriptionTraffic <= 0) {
+                    logger.info("Skipping solo subscription without traffic: " + subscriptionSite);
+                    continue;
+                }
+                numberofValidSubscriptions++;
                 if (sb.length() > 0) {
-                    sb.append(",");
+                    sb.append(", ");
                 }
                 sb.append(subscriptionSite);
+                /* Collect the highest expire date of all solo subscriptions. */
+                final long thisExpireTimestamp = TimeFormatter.getMilliSeconds(subscriptionEnd, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
+                if (thisExpireTimestamp > highestExpireTimestamp) {
+                    highestExpireTimestamp = thisExpireTimestamp;
+                }
+                trafficOfLastValidSubscription = subscriptionTraffic;
+                siteOfLastValidSubscription = subscriptionSite;
+                final Map<String, Object> singleSubscriptionInfo = new LinkedHashMap<String, Object>();
+                singleSubscriptionInfo.put("site", subscriptionSite);
+                singleSubscriptionInfo.put("bandwidth", subscriptionBandwidth);
+                singleSubscriptionInfo.put("start", subscriptionStart);
+                singleSubscriptionInfo.put("expire", subscriptionEnd);
+                singleSubscriptionInfo.put("autorenew", subscriptionAutoRenew);
+                subscriptionInfoMap.put(Integer.toString(numberofValidSubscriptions), singleSubscriptionInfo);
             }
-            if (sb.length() > 0) {
-                ai.setStatus(account.getType() + "|active subscriptions on=" + sb.toString());
+            if (numberofValidSubscriptions == 0) {
+                logger.info("User has zero active solo subscriptions with traffic");
+                break find_solo_subscriptions;
+            }
+            /* Store collected subscription information as json string property so we can display it via extendAccountSettingsPanel. */
+            account.setProperty(PROPERTY_SOLO_SUBSCRIPTIONS, JSonStorage.serializeToJson(subscriptionInfoMap));
+            if (!isPremiumAccount(account) && numberofValidSubscriptions == 1) {
+                /* Free account with exactly one active solo subscription: treat it like the premium expire/traffic handling. */
+                if (highestExpireTimestamp > 0) {
+                    ai.setValidUntil(highestExpireTimestamp, br);
+                }
+                if (trafficOfLastValidSubscription > 0) {
+                    /*
+                     * Display the subscription traffic but flag it as special so it does not count against the account. This way the user
+                     * can still download other files with this account.
+                     */
+                    ai.setTrafficLeft(trafficOfLastValidSubscription);
+                    ai.setSpecialTraffic(true);
+                }
+                ai.setStatus("Free account with active solo subscription: " + siteOfLastValidSubscription);
+            } else if (numberofValidSubscriptions == 1) {
+                ai.setStatus(account.getType().getLabel() + " | Active solo subscription: " + sb.toString());
+            } else {
+                ai.setStatus(account.getType().getLabel() + " | Active solo subscriptions: " + sb.toString());
             }
         }
         return ai;
@@ -1902,6 +1968,42 @@ public class RapidGatorNet extends PluginForHost {
     @Override
     public Class<RapidGatorConfig> getConfigInterface() {
         return RapidGatorConfig.class;
+    }
+
+    @Override
+    public void extendAccountSettingsPanel(final Account account, final PluginConfigPanelNG panel) {
+        super.extendAccountSettingsPanel(account, panel);
+        final String subscriptionsJson = account.getStringProperty(PROPERTY_SOLO_SUBSCRIPTIONS);
+        if (subscriptionsJson == null) {
+            /* User has no (valid) solo subscriptions -> Do not display any extra information. */
+            return;
+        }
+        final Map<String, Object> subscriptionInfoMap;
+        try {
+            subscriptionInfoMap = JSonStorage.restoreFromString(subscriptionsJson, TypeRef.MAP);
+        } catch (final Throwable e) {
+            logger.log(e);
+            return;
+        }
+        if (subscriptionInfoMap == null || subscriptionInfoMap.isEmpty()) {
+            return;
+        }
+        panel.addHeader("Active Solo Subscriptions (" + subscriptionInfoMap.size() + ")", new AbstractIcon(IconKey.ICON_PREMIUM, 18));
+        int index = 0;
+        for (final Object value : subscriptionInfoMap.values()) {
+            if (!(value instanceof Map)) {
+                continue;
+            }
+            index++;
+            @SuppressWarnings("unchecked")
+            final Map<String, Object> singleSubscriptionInfo = (Map<String, Object>) value;
+            final String site = (String) singleSubscriptionInfo.get("site");
+            panel.addStringPair("Solo-Subscription " + index + " | Publisher:", site);
+            panel.addStringPair("    Traffic:", singleSubscriptionInfo.get("bandwidth"));
+            panel.addStringPair("    Subscribed since:", singleSubscriptionInfo.get("start"));
+            panel.addStringPair("    Expire date:", singleSubscriptionInfo.get("expire"));
+            panel.addStringPair("    Auto renew:", singleSubscriptionInfo.get("autorenew"));
+        }
     }
 
     @Override

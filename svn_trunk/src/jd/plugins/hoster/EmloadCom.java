@@ -19,6 +19,17 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
+
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.config.Property;
@@ -42,17 +53,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 52174 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53051 $", interfaceVersion = 3, names = {}, urls = {})
 public class EmloadCom extends PluginForHost {
     public EmloadCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -61,6 +62,10 @@ public class EmloadCom extends PluginForHost {
 
     private String getWebsiteBase() {
         return "https://www." + getHost() + "/v2";
+    }
+
+    private String getBaseURL() {
+        return "https://www." + getHost();
     }
 
     @Override
@@ -125,10 +130,12 @@ public class EmloadCom extends PluginForHost {
         return buildSupportedNames(getPluginDomains());
     }
 
+    private static final Pattern PATTERN_FILE = Pattern.compile("(?:/v2)?/file/([A-Za-z0-9\\-_]+)(/([^/]+))?", Pattern.CASE_INSENSITIVE);
+
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(?:/v2)?/file/([A-Za-z0-9\\-_]+)(/([^/]+))?");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_FILE.pattern());
         }
         return ret.toArray(new String[0]);
     }
@@ -149,7 +156,7 @@ public class EmloadCom extends PluginForHost {
     }
 
     public String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        return new Regex(link.getPluginPatternMatcher(), PATTERN_FILE).getMatch(0);
     }
 
     @Override
@@ -166,7 +173,7 @@ public class EmloadCom extends PluginForHost {
 
     @Override
     protected String getDefaultFileName(DownloadLink link) {
-        final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
+        final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), PATTERN_FILE);
         final String fid = urlinfo.getMatch(0);
         final String filenameFromURL = urlinfo.getMatch(2);
         if (filenameFromURL != null) {
@@ -187,7 +194,7 @@ public class EmloadCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String filename = br.getRegex("filename wordwrap\"[^>]*>([^<]+)<").getMatch(0);
-        String filesize = br.getRegex("filesize\"[^>]*>([^<]+)<").getMatch(0);
+        final String filesize = br.getRegex("filesize\"[^>]*>([^<]+)<").getMatch(0);
         if (!StringUtils.isEmpty(filename)) {
             filename = Encoding.htmlDecode(filename).trim();
             /* 2024-10-07: Server sends empty content-disposition string -> Set final filename here. */
@@ -345,7 +352,7 @@ public class EmloadCom extends PluginForHost {
                 /* 2018-10-19 */
                 access_token = hardcoded_access_token;
             } else {
-                br.getPage("https://www." + this.getHost() + "/java/mycloud.js");
+                br.getPage(getBaseURL() + "/java/mycloud.js");
                 access_token = br.getRegex("app:\\s*?\\'([^<>\"\\']+)\\'").getMatch(0);
             }
             if (StringUtils.isEmpty(access_token)) {
@@ -370,7 +377,7 @@ public class EmloadCom extends PluginForHost {
             } else {
                 logger.info("Login captcha NOT required");
             }
-            br.getHeaders().put("Origin", "https://www." + this.getHost());
+            br.getHeaders().put("Origin", getBaseURL());
             br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
             final UrlQuery query = new UrlQuery();
             query.appendEncoded("email", account.getUser());
@@ -381,7 +388,7 @@ public class EmloadCom extends PluginForHost {
             }
             query.appendEncoded("useraccess", "");
             query.appendEncoded("access_token", access_token);
-            br.postPage("https://www." + getHost() + "/api/0/signmein", query);
+            br.postPage(getBaseURL() + "/api/0/signmein", query);
             final String result = PluginJSonUtils.getJson(br, "result");
             String userdata = PluginJSonUtils.getJson(br, "doz");
             if (!"ok".equals(result) || StringUtils.isEmpty(userdata)) {
@@ -460,24 +467,32 @@ public class EmloadCom extends PluginForHost {
     }
 
     private void handleWebsiteErrors(final Browser br, final DownloadLink link, final Account account) throws PluginException {
-        if (account == null || !AccountType.PREMIUM.equals(account.getType())) {
-            if (br.containsHTML(">\\s*Max Filesize Limit Reached")) {
-                /* "As a free user you can download files up to X mb" */
-                final String msg_max_filesize_limit_reached = "Max File Size Limit Reached.";
-                String more_detailed_error_msg = br.getRegex(">\\s*(As a Free user you can[^<]+)").getMatch(0);
-                if (more_detailed_error_msg != null) {
-                    more_detailed_error_msg = Encoding.htmlDecode(more_detailed_error_msg).trim();
-                    if (!more_detailed_error_msg.endsWith(".")) {
-                        /* Properly end sentence. */
-                        more_detailed_error_msg += ".";
-                    }
-                    throw new AccountRequiredException(msg_max_filesize_limit_reached + " " + more_detailed_error_msg);
-                } else {
-                    throw new AccountRequiredException(msg_max_filesize_limit_reached);
+        if (br.containsHTML(">\\s*Max Filesize Limit Reached")) {
+            /* "As a free user you can download files up to X mb" */
+            final String msg_max_filesize_limit_reached = "Max File Size Limit Reached.";
+            String more_detailed_error_msg = br.getRegex(">\\s*(As a Free user you can[^<]+)").getMatch(0);
+            if (more_detailed_error_msg != null) {
+                more_detailed_error_msg = Encoding.htmlDecode(more_detailed_error_msg).trim();
+                if (!more_detailed_error_msg.endsWith(".")) {
+                    /* Properly end sentence. */
+                    more_detailed_error_msg += ".";
                 }
-            } else if (br.containsHTML("This link only for premium|>\\s*This link is for premium only user")) {
-                throw new AccountRequiredException();
+                throw new AccountRequiredException(msg_max_filesize_limit_reached + " " + more_detailed_error_msg);
+            } else {
+                throw new AccountRequiredException(msg_max_filesize_limit_reached);
             }
+        } else if (br.containsHTML("This link only for premium|>\\s*This link is for premium only user")) {
+            throw new AccountRequiredException();
+        }
+        String msg = br.getRegex(">[^<]*(You don't have sufficient funds in your account to cover this purchase)").getMatch(0);
+        if (msg != null) {
+            /* 2026-07-24: _Single paid files */
+            msg = Encoding.htmlDecode(msg).trim();
+            final String filePrice = br.getRegex("File Price:\\s*<b>([^<]+)</b>").getMatch(0);
+            if (filePrice != null) {
+                msg += "\r\nFile price: " + Encoding.htmlDecode(filePrice).trim();
+            }
+            throw new AccountRequiredException(msg);
         }
         if (br.containsHTML(">\\s*You have reached your maximum Bandwidth Limit") || br.containsHTML(">\\s*Your bandwidth quota exceeded\\s*<")) {
             throw new AccountUnavailableException("You have reached your maximum Bandwidth Limit", 60 * 60 * 1000l);
@@ -491,39 +506,50 @@ public class EmloadCom extends PluginForHost {
             br.getPage(link.getPluginPatternMatcher());
             logged_in_or_error(br);
             doFree(link, "account_free_directlink");
-        } else {
-            String dllink = this.checkDirectLink(link, "premium_directlink_2");
-            if (dllink == null) {
-                this.login(br, account, false);
-                final boolean followRedirectsBefore = br.isFollowingRedirects();
-                try {
-                    br.setFollowRedirects(false);
-                    br.getPage(link.getPluginPatternMatcher().replaceFirst("http://", "https://"));
-                    /* First check if user has direct download enabled */
-                    dllink = br.getRedirectLocation();
-                    /* Direct download disabled? We have to find the final downloadurl. */
-                    if (StringUtils.isEmpty(dllink)) {
-                        dllink = br.getRegex("\"(https?://[^/]+/v2/dl[^\"]+)\"").getMatch(0);
-                        if (StringUtils.isEmpty(dllink)) {
-                            dllink = br.getRegex("href=\"(https?://[^\"]+)\"[^>]*>\\s*Download Now").getMatch(0);
-                        }
-                    }
-                } finally {
-                    br.setFollowRedirects(followRedirectsBefore);
-                }
-                if (StringUtils.isEmpty(dllink)) {
-                    handleWebsiteErrors(br, link, account);
-                    logged_in_or_error(br);
-                    logger.warning("Final downloadlink (String is \"dllink\") regex didn't match!");
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-            }
-            br.setFollowRedirects(true);
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
-            handleConnectionErrors(br, dl.getConnection());
-            link.setProperty("premium_directlink", dl.getConnection().getURL().toExternalForm());
-            dl.startDownload();
+            return;
         }
+        /* Premium download */
+        final String directlinkproperty = "premium_directlink_2";
+        String dllink = link.getStringProperty(directlinkproperty);
+        if (dllink != null) {
+            logger.info("Trying to download stored directurl");
+            try {
+                dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
+                handleConnectionErrors(br, dl.getConnection());
+                dl.startDownload();
+                return;
+            } catch (final InterruptedException ie) {
+                throw ie;
+            } catch (final Exception e) {
+                logger.info("Downloading stored directurl failed");
+                dllink = null;
+            }
+        }
+        /* No stored directurl */
+        this.login(br, account, false);
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, link.getPluginPatternMatcher(), this.isResumeable(link, account), this.getMaxChunks(link, account));
+        if (this.looksLikeDownloadableContent(dl.getConnection())) {
+            logger.info("Direct download active");
+            link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
+            dl.startDownload();
+            return;
+        }
+        logger.info("Direct download inactive");
+        br.followConnection();
+        dllink = br.getRegex("\"(https?://[^/]+/v2/dl[^\"]+)\"").getMatch(0);
+        if (StringUtils.isEmpty(dllink)) {
+            dllink = br.getRegex("href=\"(https?://[^\"]+)\"[^>]*>\\s*Download Now").getMatch(0);
+        }
+        if (StringUtils.isEmpty(dllink)) {
+            handleWebsiteErrors(br, link, account);
+            logged_in_or_error(br);
+            logger.warning("Final downloadlink (String is \"dllink\") regex didn't match!");
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
+        handleConnectionErrors(br, dl.getConnection());
+        link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
+        dl.startDownload();
     }
 
     private void logged_in_or_error(final Browser br) throws AccountUnavailableException {

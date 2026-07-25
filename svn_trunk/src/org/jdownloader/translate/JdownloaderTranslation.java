@@ -753,13 +753,13 @@ public interface JdownloaderTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "The address to the actual content." })
     String UrlDisplayType_CONTENT_description();
 
-    @Default(lngs = { "en" }, values = { "add them, too" })
+    @Default(lngs = { "en" }, values = { "Add online & offline links to the Downloadlist" })
     String ConfirmLinksContextAction_HandleOfflineLinksOptions_INCLUDE_OFFLINE();
 
-    @Default(lngs = { "en" }, values = { "do NOT add them" })
+    @Default(lngs = { "en" }, values = { "Do not add offline links to the Downloadlist" })
     String ConfirmLinksContextAction_HandleOfflineLinksOptions_EXCLUDE_OFFLINE();
 
-    @Default(lngs = { "en" }, values = { "do NOT add, but remove them from linkgrabber" })
+    @Default(lngs = { "en" }, values = { "Do not add offline links to the Downloadlist but remove the links from the linkgrabber anyway" })
     String ConfirmLinksContextAction_HandleOfflineLinksOptions_EXCLUDE_OFFLINE_AND_REMOVE();
 
     @Default(lngs = { "en" }, values = { "ask me every time" })
@@ -1029,16 +1029,16 @@ public interface JdownloaderTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Delete Duplicates" })
     String GenericDeleteFromLinkgrabberAction_getTranslationForDeleteDupesEnabled();
 
-    @Default(lngs = { "en" }, values = { "add them, too" })
+    @Default(lngs = { "en" }, values = { "Add duplicates links to the Downloadlist anyway" })
     String ConfirmLinksContextAction_HandleDupesLinksOptions_INCLUDE();
 
-    @Default(lngs = { "en" }, values = { "do NOT add them" })
+    @Default(lngs = { "en" }, values = { "Don't add duplicate links to the Downloadlist, add all others" })
     String ConfirmLinksContextAction_HandleDupesLinksOptions_EXCLUDE();
 
-    @Default(lngs = { "en" }, values = { "do NOT add, but remove them from linkgrabber" })
+    @Default(lngs = { "en" }, values = { "Don't add duplicates the Downloadlist and remove them from the linkgrabber" })
     String ConfirmLinksContextAction_HandleDupesLinksOptions_EXCLUDE_AND_REMOVE();
 
-    @Default(lngs = { "en" }, values = { "ask me every time" })
+    @Default(lngs = { "en" }, values = { "Ask me every time" })
     String ConfirmLinksContextAction_HandleDupesLinksOptions_ASK();
 
     @Default(lngs = { "en" }, values = { "use global (adv. config) settings: %s1" })

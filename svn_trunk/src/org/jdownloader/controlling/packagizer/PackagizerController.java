@@ -861,6 +861,9 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
                 if (!lgr.checkPluginStatus(link)) {
                     continue nextRule;
                 }
+                if (!lgr.checkPackageEnabled(link)) {
+                    continue nextRule;
+                }
                 if (!lgr.checkOrigin(link)) {
                     continue nextRule;
                 }
@@ -1280,6 +1283,9 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
                     continue;
                 }
                 if (!lgr.checkPluginStatus(dummyLink)) {
+                    continue;
+                }
+                if (!lgr.checkPackageEnabled(dummyLink)) {
                     continue;
                 }
                 if (!lgr.checkOrigin(dummyLink)) {

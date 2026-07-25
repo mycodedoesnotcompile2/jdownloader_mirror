@@ -327,6 +327,9 @@ public class LinkFilterController implements LinkCrawlerFilter {
         if (!rule.checkPluginStatus(link)) {
             return false;
         }
+        if (!rule.checkPackageEnabled(link)) {
+            return false;
+        }
         if (!isTestInstance()) {
             if (!rule.checkOrigin(link)) {
                 return false;

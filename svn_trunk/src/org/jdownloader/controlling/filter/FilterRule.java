@@ -12,6 +12,7 @@ import jd.controlling.linkcrawler.CrawledLink;
 import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.ConditionFilter;
 import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.OnlineStatusFilter;
 import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.OriginFilter;
+import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.PackageEnabledFilter;
 import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.PluginStatusFilter;
 
 public abstract class FilterRule extends AbstractJsonData implements Storable {
@@ -139,7 +140,7 @@ public abstract class FilterRule extends AbstractJsonData implements Storable {
      * @return
      */
     public boolean _isValid() {
-        return getPackagenameFilter().isEnabled() || getCommentFilter().isEnabled() || getMatchAlwaysFilter().isEnabled() || getFilenameFilter().isEnabled() || getFilesizeFilter().isEnabled() || getFiletypeFilter().isEnabled() || getHosterURLFilter().isEnabled() || getSourceURLFilter().isEnabled() || getOriginFilter().isEnabled() || getConditionFilter().isEnabled() || getOnlineStatusFilter().isEnabled() || getPluginStatusFilter().isEnabled();
+        return getPackagenameFilter().isEnabled() || getCommentFilter().isEnabled() || getMatchAlwaysFilter().isEnabled() || getFilenameFilter().isEnabled() || getFilesizeFilter().isEnabled() || getFiletypeFilter().isEnabled() || getHosterURLFilter().isEnabled() || getSourceURLFilter().isEnabled() || getOriginFilter().isEnabled() || getConditionFilter().isEnabled() || getOnlineStatusFilter().isEnabled() || getPluginStatusFilter().isEnabled() || getPackageEnabledFilter().isEnabled();
     }
 
     public String toString(CrawledLink link) {
@@ -159,6 +160,9 @@ public abstract class FilterRule extends AbstractJsonData implements Storable {
             }
             if (getPluginStatusFilter().isEnabled()) {
                 cond.add(pluginStatusFilter.toString());
+            }
+            if (getPackageEnabledFilter().isEnabled()) {
+                cond.add(packageEnabledFilter.toString());
             }
             if (getFilenameFilter().isEnabled()) {
                 if (link != null && link.getName() != null) {
@@ -278,6 +282,19 @@ public abstract class FilterRule extends AbstractJsonData implements Storable {
             pluginStatusFilter = new PluginStatusFilter();
         }
         return pluginStatusFilter;
+    }
+
+    private PackageEnabledFilter packageEnabledFilter;
+
+    public void setPackageEnabledFilter(PackageEnabledFilter packageEnabledFilter) {
+        this.packageEnabledFilter = packageEnabledFilter;
+    }
+
+    public PackageEnabledFilter getPackageEnabledFilter() {
+        if (packageEnabledFilter == null) {
+            packageEnabledFilter = new PackageEnabledFilter();
+        }
+        return packageEnabledFilter;
     }
 
     public RegexFilter getFilenameFilter() {

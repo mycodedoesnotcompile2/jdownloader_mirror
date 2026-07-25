@@ -25,9 +25,14 @@ public class RuleWrapper<T extends FilterRule> {
     private final CompiledRegexFilter        packageNameRule;
     private final CompiledRegexFilter        commentRule;
     private final CompiledConditionFilter    conditionFilter;
+    private final CompiledPackageEnabledFilter packageEnabledFilter;
 
     public CompiledPluginStatusFilter getPluginStatusFilter() {
         return pluginStatusFilter;
+    }
+
+    public CompiledPackageEnabledFilter getPackageEnabledFilter() {
+        return packageEnabledFilter;
     }
 
     public RuleWrapper(final T rule2) {
@@ -89,6 +94,11 @@ public class RuleWrapper<T extends FilterRule> {
             conditionFilter = new CompiledConditionFilter(rule.getConditionFilter());
         } else {
             conditionFilter = null;
+        }
+        if (rule.getPackageEnabledFilter().isEnabled()) {
+            packageEnabledFilter = new CompiledPackageEnabledFilter(rule.getPackageEnabledFilter());
+        } else {
+            packageEnabledFilter = null;
         }
         if (rule.getMatchAlwaysFilter().isEnabled()) {
             alwaysFilter = rule.getMatchAlwaysFilter();
@@ -532,6 +542,14 @@ public class RuleWrapper<T extends FilterRule> {
             return false;
         }
         return pluginStatusFilter.matches(link);
+    }
+
+    public boolean checkPackageEnabled(final CrawledLink link) {
+        final CompiledPackageEnabledFilter packageEnabledFilter = getPackageEnabledFilter();
+        if (packageEnabledFilter == null) {
+            return true;
+        }
+        return packageEnabledFilter.matches(link);
     }
 
     public String getName() {

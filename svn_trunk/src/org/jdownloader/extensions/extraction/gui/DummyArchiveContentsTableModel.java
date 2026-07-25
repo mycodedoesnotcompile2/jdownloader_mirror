@@ -1,13 +1,16 @@
 package org.jdownloader.extensions.extraction.gui;
 
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 import javax.swing.Icon;
 
 import org.appwork.swing.exttable.ExtTableModel;
+import org.appwork.utils.ClipboardUtils;
 import org.appwork.swing.exttable.columns.ExtTextColumn;
 import org.jdownloader.extensions.extraction.ArchiveFile;
 import org.jdownloader.extensions.extraction.DummyArchive;
@@ -81,10 +84,24 @@ public class DummyArchiveContentsTableModel extends ExtTableModel<DummyArchiveFi
     @Override
     protected void initColumns() {
         addColumn(packageName = new ExtTextColumn<DummyArchiveFile>(T.T.packagename()) {
-            // TODO: Maybe implement double-click = highlight package in linkgrabber and/or copy package name
+            // TODO: Maybe implement double-click = highlight package in linkgrabber
             @Override
             public String getStringValue(DummyArchiveFile value) {
                 return packageNameByFile.get(value);
+            }
+
+            @Override
+            protected String getTooltipText(DummyArchiveFile value) {
+                final String pkgName = packageNameByFile.get(value);
+                if (pkgName == null || pkgName.length() == 0) {
+                    return null;
+                }
+                return T.T.packagename_tooltip_copy(pkgName);
+            }
+
+            @Override
+            public boolean onDoubleClick(MouseEvent e, DummyArchiveFile obj) {
+                return copyPackageNamesToClipboard(Collections.singletonList(obj));
             }
         });
         addColumn(name = new ExtTextColumn<DummyArchiveFile>(T.T.filename()) {
@@ -184,6 +201,37 @@ public class DummyArchiveContentsTableModel extends ExtTableModel<DummyArchiveFi
                 return getStringValue(value);
             }
         });
+    }
+
+    /**
+     * Copies the package name(s) of the given items to the system clipboard, one name per line, duplicates removed. Returns false if there
+     * was nothing to copy.
+     */
+    public boolean copyPackageNamesToClipboard(final List<DummyArchiveFile> files) {
+        final LinkedHashSet<String> names = new LinkedHashSet<String>();
+        for (final DummyArchiveFile file : files) {
+            final String pkgName = packageNameByFile.get(file);
+            if (pkgName != null && pkgName.length() > 0) {
+                names.add(pkgName);
+            }
+        }
+        if (names.size() == 0) {
+            return false;
+        }
+        final StringBuilder sb = new StringBuilder();
+        for (final String pkgName : names) {
+            if (sb.length() > 0) {
+                sb.append("\r\n");
+            }
+            sb.append(pkgName);
+        }
+        try {
+            ClipboardUtils.setTextContent(sb.toString());
+            return true;
+        } catch (final Exception e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 
     public ExtTextColumn<DummyArchiveFile> getPackageName() {

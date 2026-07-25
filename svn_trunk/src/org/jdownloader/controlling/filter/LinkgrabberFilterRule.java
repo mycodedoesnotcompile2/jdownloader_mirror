@@ -38,6 +38,7 @@ public class LinkgrabberFilterRule extends FilterRule implements Storable {
         ret.setOriginFilter(getOriginFilter());
         ret.setConditionFilter(getConditionFilter());
         ret.setPluginStatusFilter(getPluginStatusFilter());
+        ret.setPackageEnabledFilter(getPackageEnabledFilter());
         ret.setHosterURLFilter(getHosterURLFilter());
         ret.setName(_JDT.T.LinkgrabberFilterRule_duplicate(getName()));
         ret.setSourceURLFilter(getSourceURLFilter());

@@ -5,6 +5,7 @@ import java.awt.Image;
 import java.awt.event.ActionEvent;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.swing.ImageIcon;
@@ -68,6 +69,7 @@ import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.CrawledPackage;
 import jd.gui.swing.jdgui.JDGui;
 import jd.gui.swing.jdgui.interfaces.View;
+import jd.plugins.DownloadLink;
 
 public class ConfirmLinksContextAction extends CustomizableTableContextAppAction<CrawledPackage, CrawledLink> implements GUIListener, ActionContext {
     public static final String SELECTION_ONLY = "selectionOnly";
@@ -428,9 +430,14 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
             /* Collect incomplete archives */
             // this validation step also copies the passwords from the Crawledlinks in the archive settings
             final ArchiveValidation result = ArchiveValidator.validate(selection, false);
+            final List<Archive> archives = result.getArchives();
+            if (archives == null) {
+                /* Validation was interrupted or failed -> Treat as if there were no archives at all. */
+                break incompleteArchiveCheck;
+            }
             final ArrayList<Archive> incompleteArchives = new ArrayList<Archive>();
             final ArrayList<DummyArchive> incompleteDummyArchives = new ArrayList<DummyArchive>();
-            for (final Archive a : result.getArchives()) {
+            for (final Archive a : archives) {
                 DummyArchive da;
                 try {
                     da = extractionExtension.createDummyArchive(a);
@@ -439,7 +446,7 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
                     e.printStackTrace();
                     continue;
                 }
-                if (da.isComplete()) {
+                if (da == null || da.isComplete()) {
                     continue;
                 }
                 incompleteArchives.add(a);
@@ -561,13 +568,14 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
                     /* Collect- and handle offline items */
                     final ArrayList<CrawledLink> offline = new ArrayList<CrawledLink>();
                     for (final CrawledLink cl : selection.getChildren()) {
+                        final DownloadLink dl = cl.getDownloadLink();
                         if (toKeepInLinkgrabber.contains(cl)) {
                             /* Item has already been processed. */
                             continue;
                         } else if (toDelete.contains(cl)) {
                             /* Item has already been processed. */
                             continue;
-                        } else if (!cl.getDownloadLink().isAvailabilityStatusChecked() || cl.getDownloadLink().isAvailable()) {
+                        } else if (dl == null || !dl.isAvailabilityStatusChecked() || dl.isAvailable()) {
                             /* Item has not been checked or item is online -> We are only collecting offline items here. */
                             continue;
                         }
@@ -590,14 +598,6 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
                                         public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
                                             if (value == null) {
                                                 return orgRenderer.getListCellRendererComponent(list, _GUI.T.AddActionAction_getListCellRendererComponent_no_action_(), index, isSelected, cellHasFocus);
-                                            }
-                                            switch (((OnOfflineLinksAction) value)) {
-                                            case EXCLUDE_OFFLINE:
-                                                return orgRenderer.getListCellRendererComponent(list, _GUI.T.ConfirmLinksContextAction_getListCellRendererComponent_EXCLUDE_OFFLINE(), index, isSelected, cellHasFocus);
-                                            case EXCLUDE_OFFLINE_AND_REMOVE:
-                                                return orgRenderer.getListCellRendererComponent(list, _GUI.T.ConfirmLinksContextAction_getListCellRendererComponent_EXCLUDE_OFFLINE_AND_REMOVE(), index, isSelected, cellHasFocus);
-                                            case INCLUDE_OFFLINE:
-                                                return orgRenderer.getListCellRendererComponent(list, _GUI.T.ConfirmLinksContextAction_getListCellRendererComponent_INCLUDE_OFFLINE(), index, isSelected, cellHasFocus);
                                             }
                                             JLabel ret = (JLabel) orgRenderer.getListCellRendererComponent(list, ((OnOfflineLinksAction) value).getLabel(), index, isSelected, cellHasFocus);
                                             return ret;
@@ -660,14 +660,6 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
                                         public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
                                             if (value == null) {
                                                 return orgRenderer.getListCellRendererComponent(list, _GUI.T.AddActionAction_getListCellRendererComponent_no_action_(), index, isSelected, cellHasFocus);
-                                            }
-                                            switch (((OnDupesLinksAction) value)) {
-                                            case EXCLUDE:
-                                                return orgRenderer.getListCellRendererComponent(list, _GUI.T.ConfirmLinksContextAction_getListCellRendererComponent_EXCLUDE_DUPES(), index, isSelected, cellHasFocus);
-                                            case EXCLUDE_AND_REMOVE:
-                                                return orgRenderer.getListCellRendererComponent(list, _GUI.T.ConfirmLinksContextAction_getListCellRendererComponent_EXCLUDE_DUPES_AND_REMOVE(), index, isSelected, cellHasFocus);
-                                            case INCLUDE:
-                                                return orgRenderer.getListCellRendererComponent(list, _GUI.T.ConfirmLinksContextAction_getListCellRendererComponent_INCLUDE_DUPES(), index, isSelected, cellHasFocus);
                                             }
                                             JLabel ret = (JLabel) orgRenderer.getListCellRendererComponent(list, ((OnDupesLinksAction) value).getLabel(), index, isSelected, cellHasFocus);
                                             return ret;

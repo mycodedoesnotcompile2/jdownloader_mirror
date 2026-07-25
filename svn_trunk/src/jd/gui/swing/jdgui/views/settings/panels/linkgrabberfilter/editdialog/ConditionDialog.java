@@ -46,14 +46,6 @@ import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter;
 import javax.swing.text.Highlighter.HighlightPainter;
 
-import jd.controlling.linkcollector.LinkOrigin;
-import jd.controlling.linkcollector.VariousCrawledLinkFlags;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.OnlineStatusFilter.OnlineStatus;
-import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.OnlineStatusFilter.OnlineStatusMatchtype;
-import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.PluginStatusFilter.PluginStatus;
-import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.PluginStatusFilter.PluginStatusMatchtype;
-
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.CheckBoxIcon;
 import org.appwork.swing.components.ExtButton;
@@ -80,6 +72,15 @@ import org.jdownloader.gui.views.components.MergedIcon;
 import org.jdownloader.gui.views.components.PseudoMultiCombo;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
+
+import jd.controlling.linkcollector.LinkOrigin;
+import jd.controlling.linkcollector.VariousCrawledLinkFlags;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.BooleanStatusFilter.Matchtype;
+import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.OnlineStatusFilter.OnlineStatus;
+import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.OnlineStatusFilter.OnlineStatusMatchtype;
+import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.PluginStatusFilter.PluginStatus;
+import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.PluginStatusFilter.PluginStatusMatchtype;
 
 public abstract class ConditionDialog<T> extends AbstractDialog<T> {
     protected ExtTextField txtName;
@@ -194,6 +195,14 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         cobPluginOptions.setSelectedIndex(f.getPluginStatus().ordinal());
     }
 
+    public void setPackageEnabledFilter(PackageEnabledFilter f) {
+        if (f == null) {
+            return;
+        }
+        cbPackageEnabled.setSelected(f.isEnabled());
+        cobPackageEnabled.setSelectedIndex(f.getMatchType().ordinal());
+    }
+
     public void setFilesizeFilter(FilesizeFilter f) {
         if (f == null) {
             return;
@@ -288,6 +297,10 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
 
     public PluginStatusFilter getPluginStatusFilter() {
         return new PluginStatusFilter(PluginStatusMatchtype.values()[cobPlugin.getSelectedIndex()], cbPlugin.isSelected(), PluginStatus.values()[cobPluginOptions.getSelectedIndex()]);
+    }
+
+    public PackageEnabledFilter getPackageEnabledFilter() {
+        return new PackageEnabledFilter(Matchtype.values()[cobPackageEnabled.getSelectedIndex()], cbPackageEnabled.isSelected());
     }
 
     protected final Map<ExtTextField, JToggleButton> regexFields = new HashMap<ExtTextField, JToggleButton>();
@@ -391,6 +404,8 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
     private JComboBox                                 cobPlugin;
     private JComboBox                                 cobPluginOptions;
     private ExtCheckBox                               cbPlugin;
+    private JComboBox                                 cobPackageEnabled;
+    private ExtCheckBox                               cbPackageEnabled;
     // private AutoScroller autoScroller;
     protected JComboBox                               cobCrawlerSource;
     protected PseudoMultiCombo<LinkOrigin>            cobCrawlerSourceOptions;
@@ -514,7 +529,6 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
             }
         });
         btnIcon.addMouseListener(new MouseListener() {
-
             @Override
             public void mouseReleased(MouseEvent e) {
                 if (SwingUtilities.isRightMouseButton(e)) {
@@ -562,9 +576,11 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         MouseAdapter ml = new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
-                if (cbFlags.isEnabled()) {
-                    cbFlags.setSelected(true);
+                if (!cbFlags.isEnabled()) {
+                    // field is disabled (e.g. static/predefined rule) -> clicking must not re-enable it
+                    return;
                 }
+                cbFlags.setSelected(true);
             }
         };
         cobFlags.addMouseListener(ml);
@@ -596,6 +612,10 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         ml = new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
+                if (!cbFilename.isEnabled()) {
+                    // field is disabled (e.g. static/predefined rule) -> clicking must not re-enable it
+                    return;
+                }
                 cbFilename.setSelected(true);
             }
         };
@@ -644,6 +664,10 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         ml = new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
+                if (!cbPackage.isEnabled()) {
+                    // field is disabled (e.g. static/predefined rule) -> clicking must not re-enable it
+                    return;
+                }
                 cbPackage.setSelected(true);
             }
         };
@@ -682,6 +706,10 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         ml = new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
+                if (!cbCommentFilter.isEnabled()) {
+                    // field is disabled (e.g. static/predefined rule) -> clicking must not re-enable it
+                    return;
+                }
                 cbCommentFilter.setSelected(true);
             }
         };
@@ -706,6 +734,10 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         ml = new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
+                if (!cbSize.isEnabled()) {
+                    // field is disabled (e.g. static/predefined rule) -> clicking must not re-enable it
+                    return;
+                }
                 cbSize.setSelected(true);
             }
         };
@@ -729,6 +761,10 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         cobType.addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
+                if (!cbType.isEnabled()) {
+                    // field is disabled (e.g. static/predefined rule) -> clicking must not re-enable it
+                    return;
+                }
                 cbType.setSelected(true);
             }
         });
@@ -794,6 +830,10 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         txtCustumMime.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
+                if (!cbType.isEnabled()) {
+                    // field is disabled (e.g. static/predefined rule) -> clicking must not re-enable it
+                    return;
+                }
                 cbTypeSelection.setItemSelected(FileType.CUSTOM, true);
                 txtCustumMime.requestFocusInWindow();
             }
@@ -808,6 +848,10 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         ml = new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
+                if (!cbType.isEnabled()) {
+                    // field is disabled (e.g. static/predefined rule) -> clicking must not re-enable it
+                    return;
+                }
                 cbType.setSelected(true);
             }
         };
@@ -836,6 +880,10 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         ml = new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
+                if (!cbHoster.isEnabled()) {
+                    // field is disabled (e.g. static/predefined rule) -> clicking must not re-enable it
+                    return;
+                }
                 cbHoster.setSelected(true);
             }
         };
@@ -868,9 +916,11 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         ml = new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
-                if (cbSource.isEnabled()) {
-                    cbSource.setSelected(true);
+                if (!cbSource.isEnabled()) {
+                    // field is disabled (e.g. static/predefined rule) -> clicking must not re-enable it
+                    return;
                 }
+                cbSource.setSelected(true);
             }
         };
         txtSource.addMouseListener(ml);
@@ -901,9 +951,11 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         ml = new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
-                if (cbCrawlerSource.isEnabled()) {
-                    cbCrawlerSource.setSelected(true);
+                if (!cbCrawlerSource.isEnabled()) {
+                    // field is disabled (e.g. static/predefined rule) -> clicking must not re-enable it
+                    return;
                 }
+                cbCrawlerSource.setSelected(true);
             }
         };
         cobCrawlerSource.addMouseListener(ml);
@@ -924,9 +976,11 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         ml = new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
-                if (cbOnline.isEnabled()) {
-                    cbOnline.setSelected(true);
+                if (!cbOnline.isEnabled()) {
+                    // field is disabled (e.g. static/predefined rule) -> clicking must not re-enable it
+                    return;
                 }
+                cbOnline.setSelected(true);
             }
         };
         cobOnline.addMouseListener(ml);
@@ -942,13 +996,37 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         ml = new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
-                if (cbPlugin.isEnabled()) {
-                    cbPlugin.setSelected(true);
+                if (!cbPlugin.isEnabled()) {
+                    // field is disabled (e.g. static/predefined rule) -> clicking must not re-enable it
+                    return;
                 }
+                cbPlugin.setSelected(true);
             }
         };
         cobPlugin.addMouseListener(ml);
         cobPluginOptions.addMouseListener(ml);
+        // package enabled status
+        cobPackageEnabled = new JComboBox(new String[] { PackageEnabledFilter.getTrueLabelStatic(), PackageEnabledFilter.getFalseLabelStatic() });
+        cbPackageEnabled = new ExtCheckBox(cobPackageEnabled) {
+            @Override
+            public void updateDependencies() {
+                super.updateDependencies();
+            }
+        };
+        panel.add(cbPackageEnabled);
+        panel.add(new JLabel(_GUI.T.FilterRuleDialog_layoutDialogContent_lbl_packageenabled()));
+        panel.add(cobPackageEnabled, "spanx,pushx,growx");
+        ml = new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                if (!cbPackageEnabled.isEnabled()) {
+                    // field is disabled (e.g. static/predefined rule) -> clicking must not re-enable it
+                    return;
+                }
+                cbPackageEnabled.setSelected(true);
+            }
+        };
+        cobPackageEnabled.addMouseListener(ml);
         return panel;
     }
 

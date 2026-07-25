@@ -15,8 +15,14 @@ public interface ExtractionTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Archive has %s1 part(s) and is complete" })
     String ValidateArchiveAction_actionPerformed_(int size);
 
-    @Default(lngs = { "en" }, values = { "Archive has %s1 part(s) and is incomplete." })
+    @Default(lngs = { "en" }, values = { "All %s1 archives are complete (%s2 parts in total)." })
+    String ValidateArchiveAction_actionPerformed_multi(int archiveCount, int totalParts);
+
+    @Default(lngs = { "en" }, values = { "This archive consists of %s1 part(s) and is incomplete." })
     String ValidateArchiveAction_actionPerformed_bad(int size);
+
+    @Default(lngs = { "en" }, values = { "%s1 archives are incomplete (%s2 parts in total)." })
+    String ValidateArchiveAction_actionPerformed_bad_multi(int incompleteCount, int totalParts);
 
     @Default(lngs = { "en" }, values = { "Archive information: %s1" })
     String ValidateArchiveAction_actionPerformed_information(String string);
@@ -203,6 +209,9 @@ public interface ExtractionTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Packagename" })
     String packagename();
+
+    @Default(lngs = { "en" }, values = { "Double-click or CTRL+C to copy package names of selected items" })
+    String packagename_tooltip_copy(String packagename);
 
     @Default(lngs = { "en" }, values = { "Hoster" })
     String hoster();
