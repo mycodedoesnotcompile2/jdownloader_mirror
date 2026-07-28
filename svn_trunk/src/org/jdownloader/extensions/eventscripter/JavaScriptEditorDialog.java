@@ -4,10 +4,19 @@ import java.awt.Dialog.ModalityType;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.event.ActionEvent;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
 import javax.swing.Box;
 import javax.swing.JComponent;
 import javax.swing.JEditorPane;
@@ -15,14 +24,12 @@ import javax.swing.JLabel;
 import javax.swing.JScrollPane;
 import javax.swing.JToolBar;
 
-import jd.gui.swing.jdgui.views.settings.components.Checkbox;
-import jsyntaxpane.DefaultSyntaxKit;
-import jsyntaxpane.syntaxkits.JavaSyntaxKit;
-
+import org.appwork.exceptions.WTFException;
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtButton;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.IO;
+import org.appwork.utils.JavaVersion;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.swing.EDTHelper;
@@ -36,10 +43,17 @@ import org.jdownloader.extensions.eventscripter.sandboxobjects.ScriptEnvironment
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.scripting.JSRhinoPermissionRestricter;
+import org.jdownloader.scripting.JavaScriptEngineFactory.CustomizedScriptEngineManager;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.Script;
 import org.mozilla.javascript.ScriptableObject;
 import org.mozilla.javascript.tools.shell.Global;
+
+import jd.gui.swing.jdgui.views.settings.components.Checkbox;
+import jsyntaxpane.DefaultSyntaxKit;
+import jsyntaxpane.actions.ScriptAction;
+import jsyntaxpane.actions.ScriptRunnerAction;
+import jsyntaxpane.syntaxkits.JavaSyntaxKit;
 
 public class JavaScriptEditorDialog extends AbstractDialog<Object> {
     private static final String                   CLEANUP                  = "[^\\w\\d\\(\\)\\+\\-\\[\\]\\;\\,/\\\\]";
@@ -115,6 +129,50 @@ public class JavaScriptEditorDialog extends AbstractDialog<Object> {
         p.add(toolbar);
         settingsPanel = entry.getEventTrigger().createSettingsPanel(entry, testEventTriggerSettings, this);
         final JEditorPane defaults = new JEditorPane();
+        if (new ScriptEngineManager().get("js") == null) {
+            // initialize JS engine in ScriptAction and ScriptRunnerAction
+            final ClassLoader threadCl = Thread.currentThread().getContextClassLoader();
+            try {
+                try {
+                    final ClassLoader serviceClassLoader = new ClassLoader(threadCl) {
+                        @Override
+                        public Enumeration<URL> getResources(String name) throws IOException {
+                            if (JavaVersion.getVersion().isMinimum(JavaVersion.JVM_15_0) && "META-INF/services/javax.script.ScriptEngineFactory".equals(name)) {
+                                final Enumeration<URL> resources = super.getResources(name);
+                                final List<URL> ret = new ArrayList<URL>();
+                                while (resources != null && resources.hasMoreElements()) {
+                                    final URL url = resources.nextElement();
+                                    ret.add(url);
+                                }
+                                // Nashorn JS engine no longer available
+                                final URL scriptEngineHack = getResource("org/jdownloader/scripting/ScriptEngineFactoryService.html");
+                                if (scriptEngineHack != null) {
+                                    ret.add(scriptEngineHack);
+                                }
+                                return Collections.enumeration(ret);
+                            } else {
+                                return super.getResources(name);
+                            }
+                        }
+                    };
+                    Thread.currentThread().setContextClassLoader(serviceClassLoader);
+                    final ScriptEngine engine = (ScriptEngine) ReflectionUtils.getField(ScriptAction.class, "engine", null, ScriptEngine.class).get(null);
+                    if (engine == null) {
+                        throw new WTFException();
+                    }
+                    final Field semField = ReflectionUtils.getField(ScriptRunnerAction.class, "sem", null, ScriptEngineManager.class);
+                    final ScriptEngineManager sem;
+                    if ((sem = ((ScriptEngineManager) semField.get(null))) == null || sem.getEngineByName("js") == null) {
+                        semField.set(null, new CustomizedScriptEngineManager());
+                    }
+                } catch (Exception e) {
+                    LogController.CL().log(e);
+                    DebugMode.debugger(e);
+                }
+            } finally {
+                Thread.currentThread().setContextClassLoader(threadCl);
+            }
+        }
         final JavaSyntaxKit javaSyntaxKit = new JavaSyntaxKit();
         try {
             // set UI default font to JavaSyntaxKit
@@ -306,7 +364,6 @@ public class JavaScriptEditorDialog extends AbstractDialog<Object> {
                 JSRhinoPermissionRestricter.evaluateTrustedString(cx, scope, "global=this;", "", 1, null);
                 compiledLibrary.exec(cx, scope);
             }
-
             ScriptableObject.putProperty(scope, "text", script);
             String formated = (String) JSRhinoPermissionRestricter.evaluateTrustedString(cx, scope, "js_beautify(text, {   });", "", 1, null);
             return formated;

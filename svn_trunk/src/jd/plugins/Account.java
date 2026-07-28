@@ -204,26 +204,30 @@ public class Account extends Property {
     /** Returns list of stored cookies WITHOUT additional information such as User-Agent header. */
     public synchronized Cookies loadCookies(final String ID) {
         final String validation = getAccountFootprintString();
-        if (StringUtils.equals(getStringProperty(COOKIE_STORAGE), validation)) {
-            final String COOKIE_STORAGE_ID = COOKIE_STORAGE + ":" + ID;
-            // TODO: add support for UserAgent, eg dropbox/filestore.to
-            final String cookieStorables = getStringProperty(COOKIE_STORAGE_ID);
-            if (StringUtils.isNotEmpty(cookieStorables)) {
-                try {
-                    final List<CookieStorable> cookies = JSonStorage.restoreFromString(cookieStorables, new TypeRef<ArrayList<CookieStorable>>() {
-                    }, null);
-                    final Cookies ret = new Cookies();
-                    for (final CookieStorable storable : cookies) {
-                        final Cookie cookie = storable._restore();
-                        if (!cookie.isExpired()) {
-                            ret.add(cookie);
-                        }
-                    }
-                    return ret;
-                } catch (Throwable e) {
-                    LogController.CL().log(e);
+        if (!StringUtils.equals(getStringProperty(COOKIE_STORAGE), validation)) {
+            clearCookies(ID);
+            return null;
+        }
+        final String COOKIE_STORAGE_ID = COOKIE_STORAGE + ":" + ID;
+        // TODO: add support for UserAgent, eg dropbox/filestore.to
+        final String cookieStorables = getStringProperty(COOKIE_STORAGE_ID);
+        if (StringUtils.isEmpty(cookieStorables)) {
+            clearCookies(ID);
+            return null;
+        }
+        try {
+            final List<CookieStorable> cookies = JSonStorage.restoreFromString(cookieStorables, new TypeRef<ArrayList<CookieStorable>>() {
+            }, null);
+            final Cookies ret = new Cookies();
+            for (final CookieStorable storable : cookies) {
+                final Cookie cookie = storable._restore();
+                if (!cookie.isExpired()) {
+                    ret.add(cookie);
                 }
             }
+            return ret;
+        } catch (Throwable e) {
+            LogController.CL().log(e);
         }
         clearCookies(ID);
         return null;
@@ -791,19 +795,21 @@ public class Account extends Property {
 
     public String toString() {
         final AccountInfo ai = this.accinfo;
-        if (ai != null) {
-            return user + ":" + pass + "@" + hoster + "=" + enabled + " " + super.toString() + " AccInfo: " + ai.toString();
-        } else {
+        if (ai == null) {
             return user + ":" + pass + "@" + hoster + "=" + enabled + " " + super.toString();
         }
+        return user + ":" + pass + "@" + hoster + "=" + enabled + " " + super.toString() + " AccInfo: " + ai.toString();
     }
 
-    public boolean equals(final Account account) {
-        if (account == null) {
-            return false;
-        } else if (account == this) {
+    @Override
+    public boolean equals(final Object o) {
+        if (o == this) {
             return true;
-        } else if (!StringUtils.equals(getHoster(), account.getHoster())) {
+        } else if (!(o instanceof Account)) {
+            return false;
+        }
+        final Account account = (Account) o;
+        if (!StringUtils.equals(getHoster(), account.getHoster())) {
             // different hoster
             return false;
         } else if (!StringUtils.equals(getUser(), account.getUser())) {

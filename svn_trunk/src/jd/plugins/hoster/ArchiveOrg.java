@@ -81,7 +81,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.ArchiveOrgCrawler;
 
-@HostPlugin(revision = "$Revision: 52625 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
+@HostPlugin(revision = "$Revision: 53061 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
 public class ArchiveOrg extends PluginForHost {
     public ArchiveOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -417,7 +417,7 @@ public class ArchiveOrg extends PluginForHost {
                         if (timeUntilNextLoanAllowed != null) {
                             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Wait until this book can be auto re-loaned", timeUntilNextLoanAllowed.longValue());
                         } else {
-                            this.borrowBook(br, account, this.getBookID(link), false);
+                            this.borrowBook(br.cloneBrowser(), account, this.getBookID(link), false);
                             throw new PluginException(LinkStatus.ERROR_RETRY, "Retry after auto re-loan of current download candidate");
                         }
                     }
@@ -724,7 +724,7 @@ public class ArchiveOrg extends PluginForHost {
                         br.setCookies(lendingInfo.getCookies());
                     } else {
                         /* Create new book lending session */
-                        this.borrowBook(br, account, bookID, false);
+                        this.borrowBook(br.cloneBrowser(), account, bookID, false);
                         lendingInfo = this.getLendingInfo(bookID, account);
                         directurl = lendingInfo.getPageURL(this.getBookPageIndexNumber(link));
                         if (StringUtils.isEmpty(directurl)) {
@@ -858,6 +858,41 @@ public class ArchiveOrg extends PluginForHost {
     }
 
     /**
+     * Parses the given http response of a borrow-related request, checks it for a failure (success = false) and, if present, runs through
+     * the same error handling for all borrow-steps. Returns the parsed json entries if no failure occurred.
+     */
+    private Map<String, Object> checkBorrowFailure(final Browser br, final Account account, final String bookID) throws PluginException {
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        if (entries == null || !Boolean.FALSE.equals(entries.get("success"))) {
+            return entries;
+        }
+        final String error = (String) entries.get("error");
+        if (error != null) {
+            if (StringUtils.equalsIgnoreCase(error, "This book is not available to borrow at this time. Please try again later.")) {
+                /**
+                 * Happens if you try to borrow a book that can't be borrowed or if you try to borrow a book while too many (2022-08-31: max
+                 * 10) books per hour have already been borrowed with the current account. </br>
+                 * With setting this timestamp we can ensure not to waste more http requests on trying to borrow books but simply set error
+                 * status on all future links [for the next 60 minutes].
+                 */
+                account.setProperty(PROPERTY_ACCOUNT_TIMESTAMP_BORROW_LIMIT_REACHED, Time.systemIndependentCurrentJVMTimeMillis());
+                /*
+                 * Remove session of book associated with current book page [if present] so that there will be no further download attempts
+                 * and all pages will run into this error directly.
+                 */
+                bookBorrowSessions.remove(getLendingInfoKey(bookID, account));
+                exceptionReachedAccountBorrowLimit();
+                /* This code should never be reached */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_FATAL, "Book borrow failure: " + error);
+            }
+        } else {
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Book borrow failure");
+        }
+    }
+
+    /**
      * Borrows given bookID which gives us a token we can use to download all pages of that book. </br>
      * It is typically valid for one hour.
      */
@@ -881,41 +916,19 @@ public class ArchiveOrg extends PluginForHost {
             Map<String, Object> entries = null;
             final String urlBase = "https://" + this.getHost();
             br.setAllowedResponseCodes(400);
+            br.getHeaders().put("Origin", "https://archive.org");
             if (!skipAllExceptLastStep) {
-                query.add("action", "grant_access");
+                query.addAndReplace("action", "grant_access");
                 br.postPage(urlBase + "/services/loans/loan/searchInside.php", query);
-                entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                entries = checkBorrowFailure(br, account, bookID);
                 query.addAndReplace("action", "browse_book");
                 br.postPage("/services/loans/loan/", query);
-                entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                final String error = (String) entries.get("error");
-                if (error != null) {
-                    if (StringUtils.equalsIgnoreCase(error, "This book is not available to borrow at this time. Please try again later.")) {
-                        /**
-                         * Happens if you try to borrow a book that can't be borrowed or if you try to borrow a book while too many
-                         * (2022-08-31: max 10) books per hour have already been borrowed with the current account. </br>
-                         * With setting this timestamp we can ensure not to waste more http requests on trying to borrow books but simply
-                         * set error status on all future links [for the next 60 minutes].
-                         */
-                        account.setProperty(PROPERTY_ACCOUNT_TIMESTAMP_BORROW_LIMIT_REACHED, Time.systemIndependentCurrentJVMTimeMillis());
-                        /*
-                         * Remove session of book associated with current book page [if present] so that there will be no further download
-                         * attempts and all pages will run into this error directly.
-                         */
-                        bookBorrowSessions.remove(getLendingInfoKey(bookID, account));
-                        exceptionReachedAccountBorrowLimit();
-                        /* This code should never be reached */
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    } else {
-                        // throw new PluginException(LinkStatus.ERROR_FATAL, "Book borrow failure: " + error);
-                        throw new PluginException(LinkStatus.ERROR_FATAL, "Book borrow failure: " + error);
-                    }
-                }
+                entries = checkBorrowFailure(br, account, bookID);
             }
             /* This should set a cookie called "br-load-<bookID>" */
             query.addAndReplace("action", "create_token");
             br.postPage(urlBase + "/services/loans/loan/", query);
-            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            entries = checkBorrowFailure(br, account, bookID);
             final String borrowToken = (String) entries.get("token");
             if (StringUtils.isEmpty(borrowToken)) {
                 throw new PluginException(LinkStatus.ERROR_FATAL, "Book borrow failure #2");

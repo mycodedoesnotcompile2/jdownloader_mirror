@@ -14,6 +14,7 @@ import org.appwork.utils.Application;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.IO;
 import org.appwork.utils.JVMVersion;
+import org.appwork.utils.JavaVersion;
 import org.appwork.utils.Regex;
 
 public class JDClassLoaderLauncher {
@@ -32,7 +33,7 @@ public class JDClassLoaderLauncher {
 
         @Override
         public Enumeration<URL> getResources(String name) throws IOException {
-            if (JVMVersion.isMinimum(JVMVersion.JAVA_15) && "META-INF/services/javax.script.ScriptEngineFactory".equals(name)) {
+            if (JavaVersion.getVersion().isMinimum(JavaVersion.JVM_15_0) && "META-INF/services/javax.script.ScriptEngineFactory".equals(name)) {
                 final Enumeration<URL> resources = super.getResources(name);
                 final List<URL> ret = new ArrayList<URL>();
                 while (resources != null && resources.hasMoreElements()) {

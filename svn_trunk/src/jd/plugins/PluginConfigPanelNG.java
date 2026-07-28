@@ -32,25 +32,6 @@ import javax.swing.JLabel;
 import javax.swing.JSeparator;
 import javax.swing.SwingUtilities;
 
-import jd.controlling.AccountController;
-import jd.controlling.AccountControllerEvent;
-import jd.controlling.AccountControllerListener;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.views.settings.ConfigurationView;
-import jd.gui.swing.jdgui.views.settings.components.Checkbox;
-import jd.gui.swing.jdgui.views.settings.components.ComboBox;
-import jd.gui.swing.jdgui.views.settings.components.Label;
-import jd.gui.swing.jdgui.views.settings.components.MultiComboBox;
-import jd.gui.swing.jdgui.views.settings.components.SettingsComponent;
-import jd.gui.swing.jdgui.views.settings.components.Spinner;
-import jd.gui.swing.jdgui.views.settings.components.TextInput;
-import jd.gui.swing.jdgui.views.settings.components.TextPane;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountEntry;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountManagerSettings;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.PremiumAccountTableModel;
-import jd.nutils.Formatter;
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.storage.config.ConfigInterface;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
@@ -113,7 +94,27 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.premium.BuyAndAddPremiumAccount;
 import org.jdownloader.premium.BuyAndAddPremiumDialogInterface;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.updatev2.gui.LAFOptions;
+
+import jd.controlling.AccountController;
+import jd.controlling.AccountControllerEvent;
+import jd.controlling.AccountControllerListener;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.views.settings.ConfigurationView;
+import jd.gui.swing.jdgui.views.settings.components.Checkbox;
+import jd.gui.swing.jdgui.views.settings.components.ComboBox;
+import jd.gui.swing.jdgui.views.settings.components.Label;
+import jd.gui.swing.jdgui.views.settings.components.MultiComboBox;
+import jd.gui.swing.jdgui.views.settings.components.SettingsComponent;
+import jd.gui.swing.jdgui.views.settings.components.Spinner;
+import jd.gui.swing.jdgui.views.settings.components.TextInput;
+import jd.gui.swing.jdgui.views.settings.components.TextPane;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountEntry;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountManagerSettings;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.PremiumAccountTableModel;
+import net.miginfocom.swing.MigLayout;
 
 public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements AccountControllerListener {
     private List<Group> groups = new ArrayList<Group>();
@@ -208,7 +209,7 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
     }
 
     public JSeparator addSeperator() {
-        if (getComponent(getComponentCount() - 1) instanceof JSeparator) {
+        if (getComponentCount() == 0 || getComponent(getComponentCount() - 1) instanceof JSeparator) {
             return null;
         }
         final JSeparator sep;
@@ -378,13 +379,12 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
             return null;
         } else if (trafficView == null) {
             return "";
-        } else {
-            if (trafficView.isUnlimitedTraffic()) {
-                return _GUI.T.premiumaccounttablemodel_column_trafficleft_unlimited();
-            } else {
-                return _GUI.T.premiumaccounttablemodel_column_trafficleft_left_(Formatter.formatReadable(trafficView.getTrafficLeft()), Formatter.formatReadable(trafficView.getTrafficMax()));
-            }
         }
+        if (trafficView.isUnlimitedTraffic()) {
+            return _GUI.T.premiumaccounttablemodel_column_trafficleft_unlimited();
+        }
+        final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
+        return _GUI.T.premiumaccounttablemodel_column_trafficleft_left_(SIZEUNIT.formatValue(maxSizeUnit, trafficView.getTrafficLeft()), SIZEUNIT.formatValue(maxSizeUnit, trafficView.getTrafficMax()));
     }
 
     protected void initAccountSettings(final Plugin plugin, ArrayList<Account> accounts) {
@@ -489,7 +489,7 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
                                     addPair(_GUI.T.lit_added(), null, new Label(formatDate(new Date(addedTs))));
                                 }
                                 if (ai.getUsedSpace() != -1) {
-                                    addPair(_GUI.T.lit_used_space(), null, new Label(Formatter.formatReadable(ai.getUsedSpace())));
+                                    addPair(_GUI.T.lit_used_space(), null, new Label(SIZEUNIT.formatValue((SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue(), ai.getUsedSpace())));
                                 }
                                 if (ai.getPremiumPoints() != -1) {
                                     addPair(_GUI.T.lit_premium_points(), null, new Label(ai.getPremiumPoints() + ""));
@@ -673,15 +673,15 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
                             final Map<String, Boolean> finalValue = value;
                             final MultiComboBox<String> comp = new MultiComboBox<String>(new ArrayList<String>(value.keySet())) {
                                 private final GenericConfigEventListener<Map<String, Boolean>> listener = new GenericConfigEventListener<Map<String, Boolean>>() {
-                                                                                                            @Override
-                                                                                                            public void onConfigValidatorError(KeyHandler<Map<String, Boolean>> keyHandler, Map<String, Boolean> invalidValue, ValidationException validateException) {
-                                                                                                            }
+                                    @Override
+                                    public void onConfigValidatorError(KeyHandler<Map<String, Boolean>> keyHandler, Map<String, Boolean> invalidValue, ValidationException validateException) {
+                                    }
 
-                                                                                                            @Override
-                                                                                                            public void onConfigValueModified(KeyHandler<Map<String, Boolean>> keyHandler, Map<String, Boolean> newValue) {
-                                                                                                                updateModel(newValue);
-                                                                                                            }
-                                                                                                        };
+                                    @Override
+                                    public void onConfigValueModified(KeyHandler<Map<String, Boolean>> keyHandler, Map<String, Boolean> newValue) {
+                                        updateModel(newValue);
+                                    }
+                                };
                                 {
                                     m.getEventSender().addListener(listener, true);
                                     updateModel(finalValue);
@@ -743,15 +743,15 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
                         try {
                             final MultiComboBox<Object> comp = new MultiComboBox<Object>(((Class) types[0]).getEnumConstants()) {
                                 private final GenericConfigEventListener<Set<Enum>> listener = new GenericConfigEventListener<Set<Enum>>() {
-                                                                                                 @Override
-                                                                                                 public void onConfigValidatorError(KeyHandler<Set<Enum>> keyHandler, Set<Enum> invalidValue, ValidationException validateException) {
-                                                                                                 }
+                                    @Override
+                                    public void onConfigValidatorError(KeyHandler<Set<Enum>> keyHandler, Set<Enum> invalidValue, ValidationException validateException) {
+                                    }
 
-                                                                                                 @Override
-                                                                                                 public void onConfigValueModified(KeyHandler<Set<Enum>> keyHandler, Set<Enum> newValue) {
-                                                                                                     updateModel(newValue);
-                                                                                                 }
-                                                                                             };
+                                    @Override
+                                    public void onConfigValueModified(KeyHandler<Set<Enum>> keyHandler, Set<Enum> newValue) {
+                                        updateModel(newValue);
+                                    }
+                                };
                                 {
                                     Set<Enum> value = (Set<Enum>) m.getValue();
                                     if (value == null) {

@@ -15,7 +15,6 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.nutils;
 
-import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 
 import org.appwork.utils.formatter.StringFormatter;
@@ -83,47 +82,6 @@ public class Formatter {
      */
     public static String formatMilliseconds(long ms) {
         return formatSeconds(ms / 1000) + "." + Formatter.fillInteger(ms % 1000, 3, "0");
-    }
-
-    @Deprecated
-    public static String formatFilesize(double value, int size) {
-        if (value > 1024 && size < 5) {
-            return formatFilesize(value / 1024.0, ++size);
-        } else {
-            final DecimalFormat c = new DecimalFormat();
-            switch (size) {
-            case 0:
-                return c.format(value) + " B";
-            case 1:
-                return c.format(value) + " KiB";
-            case 2:
-                return c.format(value) + " MiB";
-            case 3:
-                return c.format(value) + " GiB";
-            case 4:
-                return c.format(value) + " TiB";
-            }
-        }
-        return null;
-    }
-
-    @Deprecated
-    public static String formatReadable(long fileSize) {
-        if (fileSize < 0) {
-            fileSize = 0;
-        }
-        final DecimalFormat c = new DecimalFormat();
-        if (fileSize >= (1024 * 1024 * 1024 * 1024l)) {
-            return c.format(fileSize / (1024 * 1024 * 1024 * 1024.0)) + " TiB";
-        } else if (fileSize >= (1024 * 1024 * 1024l)) {
-            return c.format(fileSize / (1024 * 1024 * 1024.0)) + " GiB";
-        } else if (fileSize >= (1024 * 1024l)) {
-            return c.format(fileSize / (1024 * 1024.0)) + " MiB";
-        } else if (fileSize >= 1024l) {
-            return c.format(fileSize / 1024.0) + " KiB";
-        } else {
-            return fileSize + " B";
-        }
     }
 
     /**

@@ -39,6 +39,8 @@ import org.jdownloader.gui.notify.gui.AbstractNotifyWindow;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.downloads.table.DownloadsTable;
 import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
 
 import jd.gui.swing.jdgui.JDGui;
 import jd.gui.swing.jdgui.components.JDProgressBar;
@@ -222,7 +224,8 @@ public class InfoDialog extends JWindow implements ActionListener, MouseListener
                         if (isVisible()) {
                             long totalDl = dla.getTotalBytes();
                             long curDl = dla.getBytesLoaded();
-                            lblProgress.setText(Formatter.formatFilesize(curDl, 0) + " / " + Formatter.formatFilesize(totalDl, 0));
+                            final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
+                            lblProgress.setText(SIZEUNIT.formatValue(maxSizeUnit, curDl) + " / " + SIZEUNIT.formatValue(maxSizeUnit, totalDl));
                             lblETA.setText(Formatter.formatSeconds(dla.getEta()));
                             prgTotal.setMaximum(Math.max(1, totalDl));
                             prgTotal.setValue(Math.max(0, curDl));

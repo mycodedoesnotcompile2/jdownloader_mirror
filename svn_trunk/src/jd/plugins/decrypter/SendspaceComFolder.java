@@ -16,7 +16,11 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Pattern;
+
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -37,11 +41,39 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-
-@DecrypterPlugin(revision = "$Revision: 49779 $", interfaceVersion = 2, names = { "sendspace.com" }, urls = { "https?://(?:www\\.)?sendspace\\.com/(?:folder/[0-9a-zA-Z]+|filegroup/([0-9a-zA-Z%]+))" })
+@DecrypterPlugin(revision = "$Revision: 53061 $", interfaceVersion = 2, names = {}, urls = {})
 public class SendspaceComFolder extends PluginForDecrypt {
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        ret.add(new String[] { "sendspace.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    private static final Pattern PATTERN_FOLDER    = Pattern.compile("/folder/([0-9a-zA-Z]+)");
+    private static final Pattern PATTERN_FILEGROUP = Pattern.compile("/filegroup/([0-9a-zA-Z%]+)");
+    private static final Pattern PATTERN_LINK      = Pattern.compile("/(?:" + PATTERN_FOLDER.pattern().substring(1) + "|" + PATTERN_FILEGROUP.pattern().substring(1) + ")");
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_LINK.pattern());
+        }
+        return ret.toArray(new String[0]);
+    }
+
     public SendspaceComFolder(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -65,24 +97,25 @@ public class SendspaceComFolder extends PluginForDecrypt {
         if (StringUtils.containsIgnoreCase(contenturl, "/filegroup/")) {
             // return pro or file links
             final String[] results = br.getRegex("<div class=\"groupedFile\">.*?</div>\\s*</div>").getColumn(-1);
-            if (results != null && results.length > 0) {
-                for (final String result : results) {
-                    final Regex fs = new Regex(result, "<h4><b>(.*?)</b>\\s*(.*?)</h4>");
-                    final String filename = fs.getMatch(0);
-                    final String filesize = fs.getMatch(1);
-                    final String url = new Regex(result, "<a [^>]*href=(\"|'|)(.*?)\\1").getMatch(1);
-                    final DownloadLink dl = createDownloadlink(Request.getLocation(url, br.getRequest()));
-                    dl.setName(Encoding.htmlDecode(filename).trim());
-                    dl.setDownloadSize(SizeFormatter.getSize(filesize.trim().replaceAll(",", ".")));
-                    dl.setAvailable(true);
-                    ret.add(dl);
-                }
-                final String fpName = "Multiple Downloads " + JDHash.getCRC32(Encoding.urlDecode(new Regex(contenturl, this.getSupportedLinks()).getMatch(0), false));
-                if (fpName != null) {
-                    FilePackage fp = FilePackage.getInstance();
-                    fp.setName(fpName.trim());
-                    fp.addLinks(ret);
-                }
+            if (results == null || results.length == 0) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            for (final String result : results) {
+                final Regex fs = new Regex(result, "<h4><b>(.*?)</b>\\s*(.*?)</h4>");
+                final String filename = fs.getMatch(0);
+                final String filesize = fs.getMatch(1);
+                final String url = new Regex(result, "<a [^>]*href=(\"|'|)(.*?)\\1").getMatch(1);
+                final DownloadLink link = createDownloadlink(Request.getLocation(url, br.getRequest()));
+                link.setName(Encoding.htmlDecode(filename).trim());
+                link.setDownloadSize(SizeFormatter.getSize(filesize.trim().replaceAll(",", ".")));
+                link.setAvailable(true);
+                ret.add(link);
+            }
+            final String fpName = "Multiple Downloads " + JDHash.getCRC32(Encoding.urlDecode(new Regex(contenturl, PATTERN_FILEGROUP).getMatch(0), false));
+            if (fpName != null) {
+                FilePackage fp = FilePackage.getInstance();
+                fp.setName(fpName.trim());
+                fp.addLinks(ret);
             }
         } else {
             /* "Normal" folder */
@@ -110,10 +143,24 @@ public class SendspaceComFolder extends PluginForDecrypt {
             final PluginForHost hosterplugin = this.getNewPluginForHostInstance(this.getHost());
             final String[] filesizes = br.getRegex("</td>\\s*<td>\\s*(\\d+[^<]+)</td>").getColumn(0);
             final String[] urls = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
+            final String this_folder_path = br._getURL().getPath();
             int fileindex = 0;
             for (final String url : urls) {
+                if (url.contains(this_folder_path)) {
+                    /* Skip current folder path/url */
+                    continue;
+                } else if (StringUtils.endsWithCaseInsensitive(url, "/folder/Shared")) {
+                    /* Skip invalid item */
+                    continue;
+                } else if (StringUtils.endsWithCaseInsensitive(url, "/folder/Folder")) {
+                    /* Skip invalid item */
+                    continue;
+                } else if (StringUtils.containsIgnoreCase(url, "/folder/Shared%")) {
+                    /* Skip invalid item */
+                    continue;
+                }
                 if (hosterplugin.canHandle(url)) {
-                    final String filename = br.getRegex("title=\"Click to download ([^\"]+)\" target=\"_blank\" href=\"" + Pattern.quote(url)).getMatch(0);
+                    final String filename = br.getRegex("href=\"" + Pattern.quote(url) + "\"[^>]*>([^<]+)<").getMatch(0);
                     final DownloadLink file = this.createDownloadlink(url);
                     if (filename != null) {
                         file.setName(Encoding.htmlDecode(filename).trim());
@@ -129,7 +176,7 @@ public class SendspaceComFolder extends PluginForDecrypt {
                     file._setFilePackage(fp);
                     ret.add(file);
                     fileindex++;
-                } else if (new Regex(url, "^" + this.getSupportedLinks().pattern()).patternFind()) {
+                } else if (new Regex(url, "^https?://(?:www\\.)?" + Pattern.quote(this.getHost()) + PATTERN_LINK.pattern()).patternFind()) {
                     /* Subfolder */
                     final DownloadLink subfolder = this.createDownloadlink(url);
                     if (path != null) {

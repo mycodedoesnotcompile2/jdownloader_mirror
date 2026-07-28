@@ -21,7 +21,6 @@ import javax.swing.JPanel;
 import jd.controlling.downloadcontroller.DownloadWatchDog;
 import jd.gui.swing.components.JWindowTooltip;
 import jd.gui.swing.jdgui.components.JDProgressBar;
-import jd.nutils.Formatter;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import net.miginfocom.swing.MigLayout;
@@ -31,6 +30,8 @@ import org.jdownloader.controlling.AggregatedNumbers;
 import org.jdownloader.gui.jdtrayicon.translate._TRAY;
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.downloads.table.DownloadsTableModel;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
 
 public class TrayIconTooltip extends JWindowTooltip {
     private static final long serialVersionUID = -400023413449818691L;
@@ -71,8 +72,9 @@ public class TrayIconTooltip extends JWindowTooltip {
                         long totalDl = dla.getTotalBytes();
                         long curDl = dla.getLoadedBytes();
                         lblDlRunning.setText(String.valueOf(DownloadWatchDog.getInstance().getRunningDownloadLinks().size()));
-                        lblSpeed.setText(Formatter.formatReadable(DownloadWatchDog.getInstance().getDownloadSpeedManager().getSpeed()) + "/s");
-                        lblProgress.setText(Formatter.formatFilesize(curDl, 0) + " / " + Formatter.formatFilesize(totalDl, 0));
+                        final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
+                        lblSpeed.setText(SIZEUNIT.formatValue(maxSizeUnit, DownloadWatchDog.getInstance().getDownloadSpeedManager().getSpeed()) + "/s");
+                        lblProgress.setText(SIZEUNIT.formatValue(maxSizeUnit, curDl) + " / " + SIZEUNIT.formatValue(maxSizeUnit, totalDl));
                         prgTotal.setMaximum(totalDl);
                         prgTotal.setValue(curDl);
                         lblETA.setText(dla.getEtaString());

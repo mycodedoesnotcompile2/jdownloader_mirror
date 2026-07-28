@@ -4,15 +4,6 @@ import java.util.Date;
 
 import javax.swing.JComponent;
 
-import jd.controlling.accountchecker.AccountChecker;
-import jd.controlling.accountchecker.AccountCheckerEventListener;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.orderpanel.AccountInterface;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.orderpanel.AccountWrapper;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.orderpanel.GroupWrapper;
-import jd.nutils.Formatter;
-import jd.plugins.Account;
-import jd.plugins.AccountTrafficView;
-
 import org.appwork.swing.exttable.columns.ExtDateColumn;
 import org.appwork.swing.exttable.columns.ExtProgressColumn;
 import org.appwork.swing.exttable.columns.ExtTextColumn;
@@ -21,7 +12,16 @@ import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.swing.renderer.RendererMigPanel;
 import org.jdownloader.controlling.hosterrule.FreeAccountReference;
 import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
+
+import jd.controlling.accountchecker.AccountChecker;
+import jd.controlling.accountchecker.AccountCheckerEventListener;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.orderpanel.AccountInterface;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.orderpanel.AccountWrapper;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.orderpanel.GroupWrapper;
+import jd.plugins.Account;
+import jd.plugins.AccountTrafficView;
 
 public class HosterPriorityTableModel extends ExtTreeTableModel<AccountInterface> implements AccountCheckerEventListener {
     public HosterPriorityTableModel() {
@@ -177,24 +177,21 @@ public class HosterPriorityTableModel extends ExtTreeTableModel<AccountInterface
                     final AccountWrapper accountWrapper = (AccountWrapper) value;
                     if (!accountWrapper.isValid()) {
                         return "";
-                    } else {
-                        long timeout = -1;
-                        if (accountWrapper.getAccount().isEnabled() && accountWrapper.isTempDisabled() && ((timeout = accountWrapper.getTmpDisabledTimeout() - System.currentTimeMillis()) > 0)) {
-                            return _GUI.T.premiumaccounttablemodel_column_trafficleft_tempdisabled(TimeFormatter.formatMilliSeconds(timeout, 0));
-                        } else {
-                            final AccountTrafficView accountTrafficView = accountWrapper.getAccount().getAccountTrafficView();
-                            if (accountTrafficView == null) {
-                                return "";
-                            } else {
-                                // COL_PROGRESS = COL_PROGRESS_NORMAL;
-                                if (accountTrafficView.isUnlimitedTraffic()) {
-                                    return _GUI.T.premiumaccounttablemodel_column_trafficleft_unlimited();
-                                } else {
-                                    return Formatter.formatReadable(accountTrafficView.getTrafficLeft()) + "/" + Formatter.formatReadable(accountTrafficView.getTrafficMax());
-                                }
-                            }
-                        }
                     }
+                    long timeout = -1;
+                    if (accountWrapper.getAccount().isEnabled() && accountWrapper.isTempDisabled() && ((timeout = accountWrapper.getTmpDisabledTimeout() - System.currentTimeMillis()) > 0)) {
+                        return _GUI.T.premiumaccounttablemodel_column_trafficleft_tempdisabled(TimeFormatter.formatMilliSeconds(timeout, 0));
+                    }
+                    final AccountTrafficView accountTrafficView = accountWrapper.getAccount().getAccountTrafficView();
+                    if (accountTrafficView == null) {
+                        return "";
+                    }
+                    // COL_PROGRESS = COL_PROGRESS_NORMAL;
+                    if (accountTrafficView.isUnlimitedTraffic()) {
+                        return _GUI.T.premiumaccounttablemodel_column_trafficleft_unlimited();
+                    }
+                    final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
+                    return SIZEUNIT.formatValue(maxSizeUnit, accountTrafficView.getTrafficLeft()) + "/" + SIZEUNIT.formatValue(maxSizeUnit, accountTrafficView.getTrafficMax());
                 }
                 return "";
             }
