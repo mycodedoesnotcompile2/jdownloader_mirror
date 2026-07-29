@@ -24,6 +24,15 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.DeviantArtComConfig;
+import org.jdownloader.plugins.components.config.DeviantArtComConfig.ArtCrawlMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -43,16 +52,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DeviantArtCom;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.DeviantArtComConfig;
-import org.jdownloader.plugins.components.config.DeviantArtComConfig.ArtCrawlMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 52500 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53065 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeviantArtComCrawler extends PluginForDecrypt {
     public DeviantArtComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -287,8 +287,8 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
                 DeviantArtCom.parseDeviationJSON(this, link, deviation);
                 hosterplugin.setFilename(link, account, null);
                 /**
-                 * This file extension may change later when file is downloaded. </br> 2022-11-11: Items of type "literature" (or simply !=
-                 * "image") will not get any file extension at all at this moment.
+                 * This file extension may change later when file is downloaded. </br>
+                 * 2022-11-11: Items of type "literature" (or simply != "image") will not get any file extension at all at this moment.
                  */
                 if (fastcrawl) {
                     link.setAvailable(true);
@@ -344,7 +344,7 @@ public class DeviantArtComCrawler extends PluginForDecrypt {
         int position = 1;
         final String[] propertiesToCopy = new String[] { DeviantArtCom.PROPERTY_USERNAME, DeviantArtCom.PROPERTY_TITLE, DeviantArtCom.PROPERTY_TYPE };
         findAdditionalMedias: try {
-            String json = br.getRegex("window\\.__INITIAL_STATE__ = JSON\\.parse\\(\"(.*?)\"\\);").getMatch(0);
+            String json = DeviantArtCom.findJSString(br);
             json = PluginJSonUtils.unescape(json);
             final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
             final List<Map<String, Object>> additionalMedias = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(entries, "@@entities/deviationExtended/{0}/additionalMedia");

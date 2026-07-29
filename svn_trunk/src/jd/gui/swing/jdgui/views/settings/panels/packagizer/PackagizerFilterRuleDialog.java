@@ -797,7 +797,8 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
                 rule.setFilesizeFilter(getFilersizeFilter());
                 rule.setSourceURLFilter(getSourceFilter());
                 rule.setOriginFilter(getOriginFilter());
-                rule.setConditionFilter(getConditionFilter());
+                rule.setLinkEnabledFilter(getLinkEnabledFilter());
+                rule.setDownloadListDupeFilter(getDownloadListDupeFilter());
                 rule.setFiletypeFilter(getFiletypeFilter());
                 rule.setMatchAlwaysFilter(getMatchAlwaysFilter());
                 if (cbDest.isSelected()) {
@@ -830,7 +831,6 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
                 rule.setTestUrl(getTxtTestUrl());
                 rule.setOnlineStatusFilter(getOnlineStatusFilter());
                 rule.setPluginStatusFilter(getPluginStatusFilter());
-                rule.setPackageEnabledFilter(getPackageEnabledFilter());
                 rule.setStopAfterThisRule(cbStopAfterThisRule.isSelected());
             }
         }.waitForEDT();
@@ -868,9 +868,9 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
         setFiletypeFilter(rule.getFiletypeFilter());
         setOnlineStatusFilter(rule.getOnlineStatusFilter());
         setPluginStatusFilter(rule.getPluginStatusFilter());
-        setPackageEnabledFilter(rule.getPackageEnabledFilter());
         setOriginFilter(rule.getOriginFilter());
-        setConditionFilter(rule.getConditionFilter());
+        setLinkEnabledFilter(rule.getLinkEnabledFilter());
+        setDownloadListDupeFilter(rule.getDownloadListDupeFilter());
         txtPackagename.setText(rule.getPackageName());
         txtPackagekey.setText(rule.getPackageKey());
         txtNewFilename.setText(rule.getFilename());

@@ -7,6 +7,12 @@ import org.appwork.storage.Storable;
 import org.jdownloader.controlling.filter.Filter;
 import org.jdownloader.gui.translate._GUI;
 
+/**
+ * @deprecated Legacy multi-select filter that combined the {@link VariousCrawledLinkFlags}. Superseded by
+ *             {@code LinkEnabledFilter} and {@code DownloadListDupeFilter}. Kept only so old configs can be deserialized and
+ *             migrated (see {@code FilterRule#_migrateLegacyFilters()}).
+ */
+@Deprecated
 public class ConditionFilter extends Filter implements Storable {
     private Matchtype                 matchType = Matchtype.IS_TRUE;
     private VariousCrawledLinkFlags[] conditions   = null;

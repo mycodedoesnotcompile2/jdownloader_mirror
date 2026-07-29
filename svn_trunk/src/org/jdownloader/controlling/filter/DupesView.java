@@ -1,8 +1,7 @@
 package org.jdownloader.controlling.filter;
 
-import jd.controlling.linkcollector.VariousCrawledLinkFlags;
-import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.ConditionFilter;
-import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.ConditionFilter.Matchtype;
+import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.BooleanStatusFilter.Matchtype;
+import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.DownloadListDupeFilter;
 
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.translate._JDT;
@@ -15,7 +14,7 @@ public class DupesView extends LinkgrabberFilterRule {
     }
 
     public LinkgrabberFilterRule init() {
-        setConditionFilter(new ConditionFilter(Matchtype.IS_TRUE, true, new VariousCrawledLinkFlags[] { VariousCrawledLinkFlags.DOWNLOAD_LIST_DUPE }));
+        setDownloadListDupeFilter(new DownloadListDupeFilter(Matchtype.IS_TRUE, true));
         setName(_JDT.T.LinkFilterSettings_DefaultFilterList_dupes());
         setIconKey(IconKey.ICON_COPY);
         setEnabled(true);

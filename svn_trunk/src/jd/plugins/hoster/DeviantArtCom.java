@@ -28,6 +28,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.downloader.text.TextDownloader;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.components.config.DeviantArtComConfig;
+import org.jdownloader.plugins.components.config.DeviantArtComConfig.ImageDownloadMode;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -50,17 +60,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.downloader.text.TextDownloader;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.components.config.DeviantArtComConfig;
-import org.jdownloader.plugins.components.config.DeviantArtComConfig.ImageDownloadMode;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 52500 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53065 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeviantArtCom extends PluginForHost {
     private final String               TYPE_DOWNLOADALLOWED_HTML                   = "class=\"text\">\\s*HTML download\\s*</span>";
     private final String               TYPE_DOWNLOADFORBIDDEN_HTML                 = "<div class=\"grf\\-indent\"";
@@ -87,6 +87,42 @@ public class DeviantArtCom extends PluginForHost {
     /* Don't touch the following! */
     private static final AtomicInteger freeDownloadsRunning                        = new AtomicInteger(0);
     private static final AtomicInteger accountDownloadsRunning                     = new AtomicInteger(0);
+
+    /**
+     * Finds a JS string literal that follows the given marker e.g. "window.__INITIAL_STATE__ = JSON.parse(\"" and returns its still
+     * JS-escaped content. </br>
+     * A simple non-greedy regex such as (.*?)"\\); can be tricked into stopping way too early: The JSON payload itself can contain
+     * embedded/escaped script snippets e.g. document.createElement(\"script\"); which also happen to match the closing "); sequence. </br>
+     * This scans char by char and only treats an unescaped double quote as the end of the string.
+     */
+    public static String findJSString(final Browser br) {
+        final String ret = br.getRegex("window\\.__INITIAL_STATE__ = JSON\\.parse\\(\"(\\{.*?\\})\"\\);\\s*window\\.").getMatch(0);
+        if (ret != null) {
+            return ret;
+        }
+        final String marker = "window.__INITIAL_STATE__ = JSON.parse(\"";
+        final String html = br.getRequest().getHtmlCode();
+        final int startIndex = html.indexOf(marker);
+        if (startIndex == -1) {
+            return null;
+        }
+        final int contentStart = startIndex + marker.length();
+        final int length = html.length();
+        int index = contentStart;
+        while (index < length) {
+            final char c = html.charAt(index);
+            if (c == '\\') {
+                /* Escaped character -> skip it together with the backslash. */
+                index += 2;
+                continue;
+            } else if (c == '"') {
+                return html.substring(contentStart, index);
+            }
+            index++;
+        }
+        /* Reached end of html without finding the closing quote -> string was cut off. */
+        return null;
+    }
 
     @Override
     public String getPluginContentURL(final DownloadLink link) {
@@ -347,7 +383,7 @@ public class DeviantArtCom extends PluginForHost {
             }
         } else {
             /* Art download */
-            String json = br.getRegex("window\\.__INITIAL_STATE__ = JSON\\.parse\\(\"(.*?)\"\\);").getMatch(0);
+            String json = findJSString(br);
             if (json != null) {
                 json = PluginJSonUtils.unescape(json);
                 final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
@@ -476,8 +512,8 @@ public class DeviantArtCom extends PluginForHost {
             dllink = getDirecturl(br, link, account);
         } catch (final PluginException e) {
             /**
-             * This will happen if the item is not downloadable. </br> We're ignoring this during linkcheck as by now we know the file is
-             * online.
+             * This will happen if the item is not downloadable. </br>
+             * We're ignoring this during linkcheck as by now we know the file is online.
              */
             if (isDownload) {
                 throw e;
@@ -650,7 +686,8 @@ public class DeviantArtCom extends PluginForHost {
             dllink = getDirecturl(br, link, account);
         } catch (final PluginException e) {
             /**
-             * This will happen if the item is not downloadable. </br> We're ignoring this here.
+             * This will happen if the item is not downloadable. </br>
+             * We're ignoring this here.
              */
             logger.log(e);
         }
@@ -726,7 +763,8 @@ public class DeviantArtCom extends PluginForHost {
                 }
             } else if (isBlurredImageLink(dllink)) {
                 /**
-                 * Last resort errorhandling for "probably premium-only items". </br> This should usually be catched before.
+                 * Last resort errorhandling for "probably premium-only items". </br>
+                 * This should usually be catched before.
                  */
                 throw new PluginException(LinkStatus.ERROR_FATAL, "Avoiding download of blurred image");
             }
@@ -1035,7 +1073,8 @@ public class DeviantArtCom extends PluginForHost {
         final int imagePosition = getImagePosition(link);
         if (imagePosition > 1) {
             /**
-             * Change resolution from thumbnail to fullsize and remove other unneeded stuff. This will also unblur blurred images (lol). <br>
+             * Change resolution from thumbnail to fullsize and remove other unneeded stuff. This will also unblur blurred images (lol).
+             * <br>
              * Removes everything until "?token=..." <br>
              * Important: This does not work for the first image, only for the images >= 2!
              */

@@ -118,6 +118,7 @@ public class LinkFilterController implements LinkCrawlerFilter {
         boolean directHttpView = false;
         HashSet<String> dupefinder = new HashSet<String>();
         for (LinkgrabberFilterRule rule : filter) {
+            rule._migrateLegacyFilters();
             LinkgrabberFilterRule clone = JSonStorage.restoreFromString(JSonStorage.serializeToJson(rule), new TypeRef<LinkgrabberFilterRule>() {
             });
             clone.setCreated(-1);
@@ -321,42 +322,44 @@ public class LinkFilterController implements LinkCrawlerFilter {
     }
 
     private boolean matches(CrawledLink link, LinkgrabberFilterRuleWrapper rule) {
-        if (!rule.checkHoster(link)) {
+        // Checks are ordered cheapest first (boolean/enum), most expensive (regex) last, so a non-matching rule
+        // fails fast on the cheapest condition. Result is order independent (logical AND of all checks).
+        if (!rule.checkOnlineStatus(link)) {
             return false;
         }
         if (!rule.checkPluginStatus(link)) {
             return false;
         }
-        if (!rule.checkPackageEnabled(link)) {
-            return false;
-        }
         if (!isTestInstance()) {
+            if (!rule.checkLinkEnabled(link)) {
+                return false;
+            }
             if (!rule.checkOrigin(link)) {
                 return false;
             }
-            if (!rule.checkConditions(link)) {
+            if (!rule.checkDownloadListDupe(link)) {
                 return false;
             }
-        }
-        if (!rule.checkSource(link)) {
-            return false;
-        }
-        if (!rule.checkOnlineStatus(link)) {
-            return false;
-        }
-        if (!rule.checkFileName(link)) {
-            return false;
-        }
-        if (!rule.checkPackageName(link)) {
-            return false;
-        }
-        if (!rule.checkComment(link)) {
-            return false;
         }
         if (!rule.checkFileSize(link)) {
             return false;
         }
         if (!rule.checkFileType(link)) {
+            return false;
+        }
+        if (!rule.checkHoster(link)) {
+            return false;
+        }
+        if (!rule.checkSource(link)) {
+            return false;
+        }
+        if (!rule.checkPackageName(link)) {
+            return false;
+        }
+        if (!rule.checkFileName(link)) {
+            return false;
+        }
+        if (!rule.checkComment(link)) {
             return false;
         }
         return true;

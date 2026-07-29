@@ -8,11 +8,14 @@ import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.myjdownloader.client.json.AbstractJsonData;
 
+import jd.controlling.linkcollector.VariousCrawledLinkFlags;
 import jd.controlling.linkcrawler.CrawledLink;
+import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.BooleanStatusFilter;
 import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.ConditionFilter;
+import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.DownloadListDupeFilter;
+import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.LinkEnabledFilter;
 import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.OnlineStatusFilter;
 import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.OriginFilter;
-import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.PackageEnabledFilter;
 import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.PluginStatusFilter;
 
 public abstract class FilterRule extends AbstractJsonData implements Storable {
@@ -21,12 +24,20 @@ public abstract class FilterRule extends AbstractJsonData implements Storable {
     private RegexFilter        sourceURLFilter;
     private OnlineStatusFilter onlineStatusFilter;
     private OriginFilter       originFilter;
+    /**
+     * @deprecated Legacy filter that combined the {@link VariousCrawledLinkFlags} into a single multi-select filter. Kept
+     *             solely so old configs can still be deserialized and migrated to {@link #linkEnabledFilter} /
+     *             {@link #downloadListDupeFilter} via {@link #_migrateLegacyFilters()}. Do not use for new code.
+     */
+    @Deprecated
     private ConditionFilter    conditionFilter;
 
+    /**
+     * @deprecated only used by Storable (JSON key "conditionFilter") and {@link #_migrateLegacyFilters()}. Returns the raw
+     *             (possibly null) stored value on purpose.
+     */
+    @Deprecated
     public ConditionFilter getConditionFilter() {
-        if (conditionFilter == null) {
-            return new ConditionFilter();
-        }
         return conditionFilter;
     }
 
@@ -40,8 +51,76 @@ public abstract class FilterRule extends AbstractJsonData implements Storable {
         this.broken = broken;
     }
 
+    /**
+     * @deprecated only used by Storable and {@link #_migrateLegacyFilters()}.
+     */
+    @Deprecated
     public void setConditionFilter(ConditionFilter conditionFilter) {
         this.conditionFilter = conditionFilter;
+    }
+
+    private LinkEnabledFilter       linkEnabledFilter;
+    private DownloadListDupeFilter  downloadListDupeFilter;
+
+    public LinkEnabledFilter getLinkEnabledFilter() {
+        if (linkEnabledFilter == null) {
+            linkEnabledFilter = new LinkEnabledFilter();
+        }
+        return linkEnabledFilter;
+    }
+
+    public void setLinkEnabledFilter(LinkEnabledFilter linkEnabledFilter) {
+        this.linkEnabledFilter = linkEnabledFilter;
+    }
+
+    public DownloadListDupeFilter getDownloadListDupeFilter() {
+        if (downloadListDupeFilter == null) {
+            downloadListDupeFilter = new DownloadListDupeFilter();
+        }
+        return downloadListDupeFilter;
+    }
+
+    public void setDownloadListDupeFilter(DownloadListDupeFilter downloadListDupeFilter) {
+        this.downloadListDupeFilter = downloadListDupeFilter;
+    }
+
+    /**
+     * Migrates the deprecated {@link #conditionFilter} into the dedicated {@link #linkEnabledFilter} /
+     * {@link #downloadListDupeFilter}. Idempotent: after migration the legacy filter is cleared so subsequent calls (and the
+     * next save) are no-ops.
+     */
+    public void _migrateLegacyFilters() {
+        final ConditionFilter legacy = conditionFilter;
+        if (legacy == null) {
+            return;
+        }
+        conditionFilter = null;
+        if (!legacy.isEnabled() || legacy.getConditions() == null) {
+            return;
+        }
+        final BooleanStatusFilter.Matchtype matchType;
+        switch (legacy.getMatchType()) {
+        case IS_FALSE:
+            matchType = BooleanStatusFilter.Matchtype.IS_FALSE;
+            break;
+        case IS_TRUE:
+        default:
+            matchType = BooleanStatusFilter.Matchtype.IS_TRUE;
+            break;
+        }
+        for (final VariousCrawledLinkFlags condition : legacy.getConditions()) {
+            if (condition == null) {
+                continue;
+            }
+            switch (condition) {
+            case DOWNLOAD_LIST_DUPE:
+                setDownloadListDupeFilter(new DownloadListDupeFilter(matchType, true));
+                break;
+            case IS_ENABLED:
+                setLinkEnabledFilter(new LinkEnabledFilter(matchType, true));
+                break;
+            }
+        }
     }
 
     public OriginFilter getOriginFilter() {
@@ -140,7 +219,7 @@ public abstract class FilterRule extends AbstractJsonData implements Storable {
      * @return
      */
     public boolean _isValid() {
-        return getPackagenameFilter().isEnabled() || getCommentFilter().isEnabled() || getMatchAlwaysFilter().isEnabled() || getFilenameFilter().isEnabled() || getFilesizeFilter().isEnabled() || getFiletypeFilter().isEnabled() || getHosterURLFilter().isEnabled() || getSourceURLFilter().isEnabled() || getOriginFilter().isEnabled() || getConditionFilter().isEnabled() || getOnlineStatusFilter().isEnabled() || getPluginStatusFilter().isEnabled() || getPackageEnabledFilter().isEnabled();
+        return getPackagenameFilter().isEnabled() || getCommentFilter().isEnabled() || getMatchAlwaysFilter().isEnabled() || getFilenameFilter().isEnabled() || getFilesizeFilter().isEnabled() || getFiletypeFilter().isEnabled() || getHosterURLFilter().isEnabled() || getSourceURLFilter().isEnabled() || getOriginFilter().isEnabled() || getLinkEnabledFilter().isEnabled() || getDownloadListDupeFilter().isEnabled() || getOnlineStatusFilter().isEnabled() || getPluginStatusFilter().isEnabled();
     }
 
     public String toString(CrawledLink link) {
@@ -155,14 +234,14 @@ public abstract class FilterRule extends AbstractJsonData implements Storable {
             if (getOriginFilter().isEnabled()) {
                 cond.add(originFilter.toString());
             }
-            if (getConditionFilter().isEnabled()) {
-                cond.add(conditionFilter.toString());
+            if (getLinkEnabledFilter().isEnabled()) {
+                cond.add(linkEnabledFilter.toString());
+            }
+            if (getDownloadListDupeFilter().isEnabled()) {
+                cond.add(downloadListDupeFilter.toString());
             }
             if (getPluginStatusFilter().isEnabled()) {
                 cond.add(pluginStatusFilter.toString());
-            }
-            if (getPackageEnabledFilter().isEnabled()) {
-                cond.add(packageEnabledFilter.toString());
             }
             if (getFilenameFilter().isEnabled()) {
                 if (link != null && link.getName() != null) {
@@ -282,19 +361,6 @@ public abstract class FilterRule extends AbstractJsonData implements Storable {
             pluginStatusFilter = new PluginStatusFilter();
         }
         return pluginStatusFilter;
-    }
-
-    private PackageEnabledFilter packageEnabledFilter;
-
-    public void setPackageEnabledFilter(PackageEnabledFilter packageEnabledFilter) {
-        this.packageEnabledFilter = packageEnabledFilter;
-    }
-
-    public PackageEnabledFilter getPackageEnabledFilter() {
-        if (packageEnabledFilter == null) {
-            packageEnabledFilter = new PackageEnabledFilter();
-        }
-        return packageEnabledFilter;
     }
 
     public RegexFilter getFilenameFilter() {

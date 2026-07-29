@@ -97,11 +97,11 @@ public class ExceptionsRuleDialog extends ConditionDialog<LinkgrabberFilterRule>
         rule.setFilesizeFilter(getFilersizeFilter());
         rule.setSourceURLFilter(getSourceFilter());
         rule.setOriginFilter(getOriginFilter());
-        rule.setConditionFilter(getConditionFilter());
+        rule.setLinkEnabledFilter(getLinkEnabledFilter());
+        rule.setDownloadListDupeFilter(getDownloadListDupeFilter());
         rule.setFiletypeFilter(getFiletypeFilter());
         rule.setOnlineStatusFilter(getOnlineStatusFilter());
         rule.setPluginStatusFilter(getPluginStatusFilter());
-        rule.setPackageEnabledFilter(getPackageEnabledFilter());
         rule.setAccept(true);
         rule.setTestUrl(getTxtTestUrl());
         rule.setIconKey(getIconKey());
@@ -118,10 +118,10 @@ public class ExceptionsRuleDialog extends ConditionDialog<LinkgrabberFilterRule>
         txtTestUrl.setText(rule.getTestUrl());
         setFilesizeFilter(rule.getFilesizeFilter());
         setOriginFilter(rule.getOriginFilter());
-        setConditionFilter(rule.getConditionFilter());
+        setLinkEnabledFilter(rule.getLinkEnabledFilter());
+        setDownloadListDupeFilter(rule.getDownloadListDupeFilter());
         setOnlineStatusFilter(rule.getOnlineStatusFilter());
         setPluginStatusFilter(rule.getPluginStatusFilter());
-        setPackageEnabledFilter(rule.getPackageEnabledFilter());
         setSourceFilter(rule.getSourceURLFilter());
         setFiletypeFilter(rule.getFiletypeFilter());
     }

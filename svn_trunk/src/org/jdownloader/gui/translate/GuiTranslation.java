@@ -6836,12 +6836,21 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "For this feature, 2 advanced options are required:\r\nBrowserCaptchaSolver: Google Com Cookie Value HSID\r\n*BrowserCaptchaSolver: Google Com Cookie Value SID\r\n\r\nPlease enter both." })
     String Recaptcha_cookie_help_msg_both_cookies();
 
-    @Default(lngs = { "en" }, values = { "Package" })
-    String FilterRuleDialog_layoutDialogContent_lbl_packageenabled();
-
     @Default(lngs = { "en" }, values = { "is enabled" })
     String FilterRule_BooleanStatusFilter_generic_enabled();
 
     @Default(lngs = { "en" }, values = { "is disabled" })
     String FilterRule_BooleanStatusFilter_generic_disabled();
+
+    @Default(lngs = { "en" }, values = { "Link" })
+    String FilterRuleDialog_layoutDialogContent_lbl_linkenabled();
+
+    @Default(lngs = { "en" }, values = { "Link" })
+    String FilterRuleDialog_layoutDialogContent_lbl_downloadlistdupe();
+
+    @Default(lngs = { "en" }, values = { "is already in downloadlist" })
+    String FilterRule_DownloadListDupeFilter_true();
+
+    @Default(lngs = { "en" }, values = { "is not in downloadlist" })
+    String FilterRule_DownloadListDupeFilter_false();
 }

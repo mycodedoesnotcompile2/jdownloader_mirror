@@ -24,15 +24,19 @@ public class RuleWrapper<T extends FilterRule> {
     private final CompiledOriginFilter       originFilter;
     private final CompiledRegexFilter        packageNameRule;
     private final CompiledRegexFilter        commentRule;
-    private final CompiledConditionFilter    conditionFilter;
-    private final CompiledPackageEnabledFilter packageEnabledFilter;
+    private final CompiledLinkEnabledFilter      linkEnabledFilter;
+    private final CompiledDownloadListDupeFilter downloadListDupeFilter;
 
     public CompiledPluginStatusFilter getPluginStatusFilter() {
         return pluginStatusFilter;
     }
 
-    public CompiledPackageEnabledFilter getPackageEnabledFilter() {
-        return packageEnabledFilter;
+    public CompiledLinkEnabledFilter getLinkEnabledFilter() {
+        return linkEnabledFilter;
+    }
+
+    public CompiledDownloadListDupeFilter getDownloadListDupeFilter() {
+        return downloadListDupeFilter;
     }
 
     public RuleWrapper(final T rule2) {
@@ -90,15 +94,15 @@ public class RuleWrapper<T extends FilterRule> {
         } else {
             originFilter = null;
         }
-        if (rule.getConditionFilter().isEnabled()) {
-            conditionFilter = new CompiledConditionFilter(rule.getConditionFilter());
+        if (rule.getLinkEnabledFilter().isEnabled()) {
+            linkEnabledFilter = new CompiledLinkEnabledFilter(rule.getLinkEnabledFilter());
         } else {
-            conditionFilter = null;
+            linkEnabledFilter = null;
         }
-        if (rule.getPackageEnabledFilter().isEnabled()) {
-            packageEnabledFilter = new CompiledPackageEnabledFilter(rule.getPackageEnabledFilter());
+        if (rule.getDownloadListDupeFilter().isEnabled()) {
+            downloadListDupeFilter = new CompiledDownloadListDupeFilter(rule.getDownloadListDupeFilter());
         } else {
-            packageEnabledFilter = null;
+            downloadListDupeFilter = null;
         }
         if (rule.getMatchAlwaysFilter().isEnabled()) {
             alwaysFilter = rule.getMatchAlwaysFilter();
@@ -108,10 +112,6 @@ public class RuleWrapper<T extends FilterRule> {
             alwaysFilter = null;
         }
         this.requiresHoster = requiresHoster;
-    }
-
-    public CompiledConditionFilter getConditionFilter() {
-        return conditionFilter;
     }
 
     public CompiledOriginFilter getOriginFilter() {
@@ -513,12 +513,20 @@ public class RuleWrapper<T extends FilterRule> {
         return onlineStatusFilter.matches(linkState);
     }
 
-    public boolean checkConditions(final CrawledLink link) {
-        final CompiledConditionFilter conditionFiler = getConditionFilter();
-        if (conditionFiler == null) {
+    public boolean checkLinkEnabled(final CrawledLink link) {
+        final CompiledLinkEnabledFilter linkEnabledFilter = getLinkEnabledFilter();
+        if (linkEnabledFilter == null) {
             return true;
         }
-        return conditionFiler.matches(link);
+        return linkEnabledFilter.matches(link);
+    }
+
+    public boolean checkDownloadListDupe(final CrawledLink link) {
+        final CompiledDownloadListDupeFilter downloadListDupeFilter = getDownloadListDupeFilter();
+        if (downloadListDupeFilter == null) {
+            return true;
+        }
+        return downloadListDupeFilter.matches(link);
     }
 
     public boolean checkOrigin(final CrawledLink link) {
@@ -542,14 +550,6 @@ public class RuleWrapper<T extends FilterRule> {
             return false;
         }
         return pluginStatusFilter.matches(link);
-    }
-
-    public boolean checkPackageEnabled(final CrawledLink link) {
-        final CompiledPackageEnabledFilter packageEnabledFilter = getPackageEnabledFilter();
-        if (packageEnabledFilter == null) {
-            return true;
-        }
-        return packageEnabledFilter.matches(link);
     }
 
     public String getName() {

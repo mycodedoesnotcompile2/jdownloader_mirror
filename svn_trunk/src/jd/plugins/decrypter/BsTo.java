@@ -44,7 +44,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 52214 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53064 $", interfaceVersion = 2, names = {}, urls = {})
 public class BsTo extends PluginForDecrypt {
     public BsTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -55,7 +55,7 @@ public class BsTo extends PluginForDecrypt {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
         /* Full list of their current domains see: https://burningseries.domains/ */
-        ret.add(new String[] { "bs.to", "burningseries.co", "burningseries.ac", "burningseries.sx", "burningseries.vc", "burningseries.cx", "burningseries.nz", "burningseries.se", "burning-series.io", "burningseries.tw" });
+        ret.add(new String[] { "burningseries.ac", "bs.to", "burningseries.co", "burningseries.sx", "burningseries.vc", "burningseries.cx", "burningseries.nz", "burningseries.se", "burning-series.io", "burningseries.tw", "bs.cine.to" });
         return ret;
     }
 
@@ -68,6 +68,9 @@ public class BsTo extends PluginForDecrypt {
         deadDomains.add("burningseries.nz");
         deadDomains.add("burningseries.se");
         deadDomains.add("burningseries.tw");
+        /* 2027-07-08 */
+        deadDomains.add("burningseries.co");
+        deadDomains.add("bs.to");
         return deadDomains;
     }
 
@@ -164,7 +167,7 @@ public class BsTo extends PluginForDecrypt {
                 }
                 /* 2019-07-26: Sadly we cannot re-use these tokens! */
                 // this.getPluginConfig().setProperty("recaptchaV2Response", recaptchaV2Response);
-            } else if (StringUtils.containsIgnoreCase(finallink, "bs.to/out") || StringUtils.containsIgnoreCase(finallink, "burningseries.co/out")) {
+            } else if (StringUtils.containsIgnoreCase(finallink, br.getHost() + "/out")) {
                 br.setFollowRedirects(false);
                 br.getPage(finallink);
                 if (br.getRedirectLocation() == null || br.containsHTML("g-recaptcha")) {

@@ -32,6 +32,21 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.components.youtube.YoutubeHelper;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -53,22 +68,7 @@ import jd.plugins.hoster.ZdfDeMediathek;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface.SubtitleType;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.components.youtube.YoutubeHelper;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 52295 $", interfaceVersion = 3, names = { "zdf.de", "logo.de", "zdfheute.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?logo\\.de/.+", "https?://(?:www\\.)?zdfheute\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
+@DecrypterPlugin(revision = "$Revision: 53067 $", interfaceVersion = 3, names = { "zdf.de", "logo.de", "zdfheute.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?logo\\.de/.+", "https?://(?:www\\.)?zdfheute\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
 public class ZDFMediathekDecrypter extends PluginForDecrypt {
     private boolean                          fastlinkcheck             = false;
     private final String                     TYPE_ZDF                  = "(?i)https?://(?:www\\.)?(?:zdf\\.de|3sat\\.de)/.+";
@@ -132,7 +132,7 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         QUALITIES_MAP.put("v15", Arrays.asList(new String[][] { new String[] { "1628k_p13", QUALITY.MEDIUM.name() }, new String[] { "2360k_p35", QUALITY.VERYHIGH.name() }, new String[] { "3360k_p36", QUALITY.HD.name() } }));
         /*
          * new String[] { "508k_p9", QUALITY.LOW.name() }
-         * 
+         *
          * new String[] { "808k_p11", QUALITY.HIGH.name() }
          */
         QUALITIES_MAP.put("v17", Arrays.asList(new String[][] { new String[] { "1628k_p13", QUALITY.MEDIUM.name() }, new String[] { "2360k_p35", QUALITY.VERYHIGH.name() }, new String[] { "3360k_p36", QUALITY.HD.name() }, new String[] { "6628k_p61", QUALITY.FHD.name() }, new String[] { "6660k_p37", QUALITY.FHD.name() } }));
@@ -217,11 +217,7 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         return dl;
     }
 
-    /**
-     * Do not delete this code! This can crawl embedded ZDF IDs!
-     *
-     * @throws PluginException
-     */
+    /* Do not delete this code! This can crawl embedded ZDF IDs! */
     // private void crawlEmbeddedUrlsHeute() throws Exception {
     // br.getPage(this.PARAMETER);
     // if (br.containsHTML("Der Beitrag konnte nicht gefunden werden") || this.br.getHttpConnection().getResponseCode() == 404 ||
@@ -237,21 +233,6 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
     // }
     // return;
     // }
-    private ArrayList<DownloadLink> crawlEmbeddedUrlsZdfNew(final CryptedLink param, final String apiToken) throws IOException, PluginException {
-        final ArrayList<DownloadLink> results = new ArrayList<DownloadLink>();
-        final GetRequest request = br.createGetRequest(param.getCryptedUrl());
-        request.getHeaders().put("Api-Auth", "Bearer " + apiToken);
-        br.getPage(request);
-        if (this.br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        final String[] embedded_player_ids = this.br.getRegex("data\\-zdfplayer\\-id=\"([^<>\"]+)\"").getColumn(0);
-        for (final String embedded_player_id : embedded_player_ids) {
-            final String finallink = String.format("https://www.zdf.de/jdl/jdl/%s.html", embedded_player_id);
-            results.add(super.createDownloadlink(finallink));
-        }
-        return results;
-    }
 
     private ArrayList<DownloadLink> crawl3Sat(final CryptedLink param) throws Exception {
         String videoContentID = null;
@@ -415,12 +396,7 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         } else {
             contenturl = param.getCryptedUrl();
         }
-        String sophoraID_from_url = this.getSophoraIDFromURL_safe(contenturl);
-        if (sophoraID_from_url != null) {
-            /* We know that this is a single video so we can skip the steps down below. */
-            logger.info("Found single video_id in user added url");
-            return crawlZdfVideoViaSophoraID(param, sophoraID_from_url);
-        }
+        /* Always load the website first: the "new" zdfmediathek (2026) embeds a ptmd-template which is the preferred way. */
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -428,21 +404,35 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
             /* E.g. https://www.zdf.de/3sat/politik-und-gesellschaft/die-schweizer-alpen-3-100.html */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        sophoraID_from_url = this.getSophoraIDFromURL_safe(br.getURL());
-        if (sophoraID_from_url != null) {
-            /* We know that this is a single video so we can skip the steps down below. */
-            logger.info("Found single video_id in browser url");
-            return crawlZdfVideoViaSophoraID(param, sophoraID_from_url);
-        }
+        final String html_unescaped = PluginJSonUtils.unescape(br.getRequest().getHtmlCode());
+        /*
+         * 1. Check for a series/collection page first: such pages may also contain a hero-video ptmd-template which we must NOT treat as
+         * the (single) content - otherwise only the hero video would be crawled instead of all episodes.
+         */
         final Regex seriesURLRegex = new Regex(br.getURL(), "https://[^/]+/([\\w-]+)/([\\w-]+)[^/]*");
         final String seriesSlug = seriesURLRegex.getMatch(1);
-        final String html_unescaped = PluginJSonUtils.unescape(br.getRequest().getHtmlCode());
-        final String seriesHash = new Regex(html_unescaped, "\"__typename\":\"Season\",\"id\":\"([^\"]+)").getMatch(0);
-        if (seriesSlug != null && seriesHash != null) {
+        final String seasonID = new Regex(html_unescaped, "initialSeasonId\":\"([^\"]+)").getMatch(0);
+        if (seriesSlug != null && seasonID != null) {
             /* Crawl all episodes of a series */
             final String seasonStr = UrlQuery.parse(contenturl).get("staffel");
             final Integer season = seasonStr != null ? Integer.parseInt(seasonStr) : null;
-            return this.crawlZdfSeries(param, seriesSlug, seriesHash, season);
+            return this.crawlZdfSeries(param, seriesSlug, seasonID, season);
+        }
+        /* Always collect metadata from the website - it is used by whichever path is taken below. */
+        final ZdfMetadata websiteMetadata = parseMetadataFromWebsite(html_unescaped);
+        /* 2. Single video via embedded ptmd-template (new zdfmediathek 2026) -> preferred way whenever present. */
+        final String ptmdTemplate = new Regex(html_unescaped, "\"ptmdTemplate\"\\s*:\\s*\"(/tmd/[^\"]+)\"").getMatch(0);
+        if (ptmdTemplate != null) {
+            logger.info("Found ptmdTemplate in website -> Using new way");
+            return this.crawlZdfVideoViaPtmdTemplate(param, ptmdTemplate, websiteMetadata);
+        }
+        /* 3. No ptmd-template found -> fall back to the old ways (content-document, embedded videos, ...). */
+        final String sophoraID_from_url = this.getSophoraIDFromURL_safe(br.getURL());
+        if (sophoraID_from_url != null) {
+            /* We know that this is a single video so we can skip the steps down below. */
+            logger.info("Found single video_id in browser url");
+            /* Content-document may override the website metadata (safer source). */
+            return crawlZdfVideoViaSophoraID(param, sophoraID_from_url, websiteMetadata);
         }
         final String[] sophoraIDs = new Regex(html_unescaped, "\"__typename\":\"Video\",[^\\}]*\"canonical\":\"([\\w-]+)").getColumn(0);
         if (sophoraIDs != null && sophoraIDs.length > 0) {
@@ -466,7 +456,7 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
             /* Return all results */
             int index = 0;
             for (final String sophoraID : uniqueSophoraIDs) {
-                logger.info("Crawling item " + index + 1 + "/" + uniqueSophoraIDs.size());
+                logger.info("Crawling item " + (index + 1) + "/" + uniqueSophoraIDs.size());
                 final ArrayList<DownloadLink> results = crawlZdfVideoViaSophoraID(param, sophoraID);
                 distribute(results);
                 ret.addAll(results);
@@ -532,7 +522,152 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         return null;
     }
 
+    /** Holds all metadata plus stream-/download-urls required to build the final DownloadLinks. */
+    private static class ZdfMetadata {
+        String  streamsJsonURL;
+        String  downloadsJsonURL;
+        String  title;
+        String  show;
+        Integer seasonNumber;
+        Integer episodeNumber;
+        String  dateFormatted;
+        String  tvStation = "ZDF";
+        String  description;
+    }
+
+    /**
+     * Stores the raw title parts into the given metadata object. <br>
+     * The season-/episode information is NOT merged into the title here - this happens later in {@link #buildTitle(ZdfMetadata)} once the
+     * title is actually needed.
+     */
+    private void applyTitleAndShow(final ZdfMetadata md, final String videoTitle, final String show, final Integer seasonNumber, final Integer episodeNumber) {
+        /* Do not keep the show name if it is identical to the video title (e.g. movies where show == title). */
+        final boolean hasSeparateShow = show != null && videoTitle != null && !show.equals(videoTitle);
+        md.title = videoTitle;
+        md.show = hasSeparateShow ? show : null;
+        md.seasonNumber = seasonNumber;
+        md.episodeNumber = episodeNumber;
+    }
+
+    /** Composes the final title, inserting show and season-/episode information if available. */
+    private String buildTitle(final ZdfMetadata md) {
+        final String videoTitle = md.title;
+        final String show = md.show;
+        /* Do not prefix the show if it is missing or identical to the video title (e.g. movies where show == title). */
+        final boolean hasSeparateShow = show != null && videoTitle != null && !show.equals(videoTitle);
+        if (!hasSeparateShow) {
+            return videoTitle;
+        }
+        if (md.seasonNumber != null && md.episodeNumber != null) {
+            final DecimalFormat df = new DecimalFormat("00");
+            return show + " S" + df.format(md.seasonNumber.intValue()) + "E" + df.format(md.episodeNumber.intValue()) + " - " + videoTitle;
+        }
+        return show + " - " + videoTitle;
+    }
+
+    /**
+     * Extracts video metadata from a zdfmediathek website (2026). All values come from the embedded piano-tracking-/og-json. <br>
+     * The ptmd response itself does not contain any metadata which is why we always collect it from the website.
+     */
+    private ZdfMetadata parseMetadataFromWebsite(final String html_unescaped) {
+        final ZdfMetadata md = new ZdfMetadata();
+        String videoTitle = new Regex(html_unescaped, "\"av_title\"\\s*:\\s*\"([^\"]+)\"").getMatch(0);
+        if (videoTitle == null) {
+            videoTitle = new Regex(html_unescaped, "\"page_title\"\\s*:\\s*\"([^\"]+)\"").getMatch(0);
+        }
+        final String show = new Regex(html_unescaped, "\"av_show\"\\s*:\\s*\"([^\"]+)\"").getMatch(0);
+        final String tvStation = new Regex(html_unescaped, "\"av_broadcaster\"\\s*:\\s*\"([^\"]+)\"").getMatch(0);
+        if (tvStation != null) {
+            md.tvStation = tvStation;
+        }
+        md.description = new Regex(html_unescaped, "\"og\"\\s*:\\s*\\{[^\\}]*\"description\"\\s*:\\s*\"([^\"]+)\"").getMatch(0);
+        final String seasonNumberStr = new Regex(html_unescaped, "\"seasonNumber\"\\s*:\\s*(\\d+)").getMatch(0);
+        final String episodeNumberStr = new Regex(html_unescaped, "\"episodeNumber\"\\s*:\\s*(\\d+)").getMatch(0);
+        final Integer seasonNumber = seasonNumberStr != null ? Integer.valueOf(seasonNumberStr) : null;
+        final Integer episodeNumber = episodeNumberStr != null ? Integer.valueOf(episodeNumberStr) : null;
+        String date = new Regex(html_unescaped, "\"av_publication_timestamp\"\\s*:\\s*\"(\\d{4}-\\d{2}-\\d{2})").getMatch(0);
+        if (date == null) {
+            date = new Regex(html_unescaped, "\"publication_timestamp\"\\s*:\\s*\"(\\d{4}-\\d{2}-\\d{2})").getMatch(0);
+        }
+        md.dateFormatted = date;
+        applyTitleAndShow(md, videoTitle, show, seasonNumber, episodeNumber);
+        return md;
+    }
+
+    /**
+     * Builds a metadata baseline from a single episode node of the series/season graphql response. <br>
+     * Title/show/date come from the episode's piano-tracking data, season-/episode number from av_episode_no or the episode's episodeInfo.
+     * <br>
+     * This way series episodes also carry website metadata even before the (safer) content-document is fetched.
+     */
+    private ZdfMetadata parseMetadataFromSeasonEpisode(final Map<String, Object> episode) {
+        final ZdfMetadata md = new ZdfMetadata();
+        final Map<String, Object> pianoVideo = (Map<String, Object>) JavaScriptEngineFactory.walkJson(episode, "tracking/piano/video");
+        final Object videoTitleO = pianoVideo != null ? pianoVideo.get("av_title") : null;
+        final String videoTitle = videoTitleO != null ? videoTitleO.toString() : null;
+        final Object showO = pianoVideo != null ? pianoVideo.get("av_show") : null;
+        final String show = showO != null ? showO.toString() : null;
+        final Object tvStationO = pianoVideo != null ? pianoVideo.get("av_broadcaster") : null;
+        if (tvStationO != null) {
+            md.tvStation = tvStationO.toString();
+        }
+        final Object dateO = pianoVideo != null ? pianoVideo.get("av_publication_timestamp") : null;
+        if (dateO != null) {
+            md.dateFormatted = new Regex(dateO.toString(), "(\\d{4}-\\d{2}-\\d{2})").getMatch(0);
+        }
+        /* Episode number: prefer av_episode_no, fall back to episodeInfo. Season number: from episodeInfo (may be overridden by caller). */
+        Integer seasonNumber = null;
+        Integer episodeNumber = null;
+        final Object avEpisodeNoO = pianoVideo != null ? pianoVideo.get("av_episode_no") : null;
+        if (avEpisodeNoO instanceof Number) {
+            episodeNumber = Integer.valueOf(((Number) avEpisodeNoO).intValue());
+        }
+        final Map<String, Object> episodeInfo = (Map<String, Object>) episode.get("episodeInfo");
+        if (episodeInfo != null) {
+            final Object seasonNumberO = episodeInfo.get("seasonNumber");
+            if (seasonNumberO instanceof Number) {
+                seasonNumber = Integer.valueOf(((Number) seasonNumberO).intValue());
+            }
+            if (episodeNumber == null) {
+                final Object episodeNumberO = episodeInfo.get("episodeNumber");
+                if (episodeNumberO instanceof Number) {
+                    episodeNumber = Integer.valueOf(((Number) episodeNumberO).intValue());
+                }
+            }
+        }
+        applyTitleAndShow(md, videoTitle, show, seasonNumber, episodeNumber);
+        return md;
+    }
+
+    /**
+     * Handles the "new" zdfmediathek (2026) videos which only have a ptmd-template embedded in the website. <br>
+     * The given ptmdTemplate must be a relative path e.g. "/tmd/2/{playerId}/vod/ptmd/mediathek/170325_moerder_kommissare_inf/4". <br>
+     * All metadata is taken from the given (website-)metadata object as the ptmd response itself contains no metadata. <br>
+     * Example: play/dokus/moerdern-auf-der-spur-138/moerdern-auf-der-spur-hartnaeckige-kommissare-102
+     */
+    private ArrayList<DownloadLink> crawlZdfVideoViaPtmdTemplate(final CryptedLink param, final String ptmdTemplate, final ZdfMetadata md) throws Exception {
+        if (StringUtils.isEmpty(ptmdTemplate)) {
+            throw new IllegalArgumentException();
+        } else if (!ptmdTemplate.startsWith("/")) {
+            throw new IllegalArgumentException();
+        }
+        final String apitoken = "ahBaeMeekaiy5ohsai4bee4ki6Oopoi5quailieb"; // 2026-07-28
+        /* ptmd-template is a relative path -> build absolute API urls (browser is currently on the website host, not on api.zdf.de). */
+        md.streamsJsonURL = "https://api.zdf.de" + ptmdTemplate.replace("{playerId}", "android_native_5");
+        md.downloadsJsonURL = "https://api.zdf.de" + ptmdTemplate.replace("{playerId}", "zdf_pd_download_1");
+        return processZdfStreams(param, br, apitoken, md);
+    }
+
     private ArrayList<DownloadLink> crawlZdfVideoViaSophoraID(final CryptedLink param, final String sophoraID) throws Exception {
+        return crawlZdfVideoViaSophoraID(param, sophoraID, null);
+    }
+
+    /**
+     * @param websiteMetadata
+     *            Metadata previously collected from the website. The content-document (if present) is considered the safer source and will
+     *            override these values. May be null.
+     */
+    private ArrayList<DownloadLink> crawlZdfVideoViaSophoraID(final CryptedLink param, final String sophoraID, final ZdfMetadata websiteMetadata) throws Exception {
         if (StringUtils.isEmpty(sophoraID)) {
             throw new IllegalArgumentException();
         }
@@ -544,19 +679,22 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        return handleZdfJson(param, br, apitoken);
+        /* Content-document is the safer source -> let it override the website metadata (if any). */
+        final ZdfMetadata md = websiteMetadata != null ? websiteMetadata : new ZdfMetadata();
+        return handleZdfJson(param, br, apitoken, md);
     }
 
     /**
      * Examples: <br>
      * https://www.zdf.de/filme/collection-index-page-ard-collection-ard-dxjuomfyzdpzag93oji0ytqxodqzy2q5mtlmyjg-762?staffel=2025 <br>
-     * https://www.zdf.de/serien/hacks-104
+     * https://www.zdf.de/serien/hacks-104 <br>
+     * https://www.zdf.de/dokus/xy-geloest-106?staffel=3
      */
-    private ArrayList<DownloadLink> crawlZdfSeries(final CryptedLink param, final String seriesSlug, final String seriesHash, final Integer season) throws Exception {
-        logger.info("Crawling series " + seriesSlug + " | Season: " + season);
+    private ArrayList<DownloadLink> crawlZdfSeries(final CryptedLink param, final String seriesSlug, final String seasonID, final Integer seasonNumber) throws Exception {
+        logger.info("Crawling season from series " + seriesSlug + " | Season: " + seasonNumber + " | SeasonID: " + seasonID);
         if (seriesSlug == null) {
             throw new IllegalArgumentException();
-        } else if (seriesHash == null) {
+        } else if (seasonID == null) {
             throw new IllegalArgumentException();
         }
         br.getHeaders().put("Accept", "*/*");
@@ -565,43 +703,118 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         br.getHeaders().put("Origin", "https://www.zdf.de");
         br.getHeaders().put("Referer", "https://www.zdf.de/");
         br.getHeaders().put("zdf-app-id", "ffw-mt-web-05d9aa4f");
-        br.getPage("https://api.zdf.de/graphql?operationName=seasonByCanonical&variables=%7B%22seasonIndex%22%3A0%2C%22episodesPageSize%22%3A24%2C%22canonical%22%3A%22" + seriesSlug + "%22%2C%22filterBy%22%3A%7B%22idIn%22%3A%5B%22" + seriesHash + "%22%5D%7D%2C%22sortBy%22%3A%5B%7B%22field%22%3A%22EPISODE_NUMBER%22%2C%22direction%22%3A%22ASC%22%7D%5D%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%229412a0f4ac55dc37d46975d461ec64bfd14380d815df843a1492348f77b5c99a%22%7D%7D");
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
+        /* Persisted-query extensions are constant across all pages. */
+        final Map<String, Object> persistedQuery = new HashMap<String, Object>();
+        persistedQuery.put("version", 1);
+        persistedQuery.put("sha256Hash", "9412a0f4ac55dc37d46975d461ec64bfd14380d815df843a1492348f77b5c99a");
+        final Map<String, Object> extensions = new HashMap<String, Object>();
+        extensions.put("persistedQuery", persistedQuery);
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final Map<String, Object> seasons = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "data/smartCollectionByCanonical/seasons");
-        // TODO: Implement pagination
-        final Map<String, Object> seasons_pageInfo = (Map<String, Object>) seasons.get("pageInfo");
-        final List<Map<String, Object>> seasons_nodes = (List<Map<String, Object>>) seasons.get("nodes");
-        for (final Map<String, Object> season_node : seasons_nodes) {
-            final Map<String, Object> episodes = (Map<String, Object>) season_node.get("episodes");
-            final List<Map<String, Object>> episodes_nodes = (List<Map<String, Object>>) episodes.get("nodes");
-            final Map<String, Object> episodes_pageInfo = (Map<String, Object>) episodes.get("pageInfo");
-            int episodes_index = 0;
-            for (final Map<String, Object> episode_node : episodes_nodes) {
-                final Map<String, Object> video = (Map<String, Object>) JavaScriptEngineFactory.walkJson(episode_node, "tracking/piano/video");
-                final String sophoraID = video.get("av_content_id").toString();
-                // final String url = episode_node.get("sharingUrl").toString();
-                logger.info("Crawling episode " + (episodes_index + 1) + "/" + episodes_nodes.size() + " | " + sophoraID);
-                final ArrayList<DownloadLink> episodeResults = this.crawlZdfVideoViaSophoraID(param, sophoraID);
-                ret.addAll(episodeResults);
-                distribute(episodeResults);
-                if (this.isAbort()) {
-                    throw new InterruptedException();
-                }
-                episodes_index++;
+        final HashSet<String> dupes = new HashSet<String>();
+        /* A season can contain more episodes than fit on one page -> loop through all pages via the "episodesAfter" cursor. */
+        String episodesAfter = null;
+        int page = 1;
+        int crawledEpisodes = 0;
+        pagination: do {
+            /* Build the POST json via maps and serialize it. */
+            final Map<String, Object> variables = new HashMap<String, Object>();
+            variables.put("seasonIndex", 0);
+            variables.put("episodesPageSize", 24);
+            variables.put("canonical", seriesSlug);
+            final Map<String, Object> filterBy = new HashMap<String, Object>();
+            filterBy.put("idIn", Arrays.asList(seasonID));
+            variables.put("filterBy", filterBy);
+            final Map<String, Object> sortEntry = new HashMap<String, Object>();
+            sortEntry.put("field", "EPISODE_NUMBER");
+            sortEntry.put("direction", "ASC");
+            variables.put("sortBy", Arrays.asList(sortEntry));
+            if (episodesAfter != null) {
+                variables.put("episodesAfter", episodesAfter);
             }
+            final Map<String, Object> postData = new HashMap<String, Object>();
+            postData.put("operationName", "seasonByCanonical");
+            postData.put("variables", variables);
+            postData.put("extensions", extensions);
+            br.postPageRaw("https://api.zdf.de/graphql", JSonStorage.serializeToJson(postData));
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final Map<String, Object> seasons = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "data/smartCollectionByCanonical/seasons");
+            final List<Map<String, Object>> seasons_nodes = seasons != null ? (List<Map<String, Object>>) seasons.get("nodes") : null;
+            if (seasons_nodes == null || seasons_nodes.isEmpty()) {
+                logger.info("Stopping because: Found no (more) seasons");
+                break;
+            }
+            /* With the idIn filter above exactly one season is returned -> its pageInfo drives the pagination. */
+            String nextEpisodesAfter = null;
+            for (final Map<String, Object> season_node : seasons_nodes) {
+                final Number this_season_number = (Number) season_node.get("number");
+                final Number countEpisodes = (Number) season_node.get("countEpisodes");
+                final Map<String, Object> episodes = (Map<String, Object>) season_node.get("episodes");
+                if (episodes == null) {
+                    continue;
+                }
+                final List<Map<String, Object>> episodes_nodes = (List<Map<String, Object>>) episodes.get("nodes");
+                final Map<String, Object> episodes_pageInfo = (Map<String, Object>) episodes.get("pageInfo");
+                crawledEpisodes += this.crawlEpisodes(param, ret, dupes, episodes_nodes, this_season_number, countEpisodes);
+                if (episodes_pageInfo != null && Boolean.TRUE.equals(episodes_pageInfo.get("hasNextPage"))) {
+                    nextEpisodesAfter = (String) episodes_pageInfo.get("endCursor");
+                }
+            }
+            episodesAfter = nextEpisodesAfter;
+            logger.info("Crawled page " + page + " | Crawled episodes so far: " + crawledEpisodes + " | nextEpisodesAfter = " + nextEpisodesAfter);
+            if (nextEpisodesAfter == null) {
+                logger.info("Stopping because: Reached end?");
+                break pagination;
+            }
+            page++;
+        } while (!this.isAbort());
+        return ret;
+    }
+
+    /**
+     * Crawls all (new) episodes of the given season page and logs the progress after each crawled episode. <br>
+     * Returns the number of newly crawled episodes.
+     */
+    private int crawlEpisodes(final CryptedLink param, final ArrayList<DownloadLink> ret, final HashSet<String> dupes, final List<Map<String, Object>> episodes_nodes, final Number this_season_number, final Number countEpisodes) throws Exception {
+        if (episodes_nodes == null) {
+            return 0;
+        }
+        int crawledEpisodes = 0;
+        for (final Map<String, Object> episode_node : episodes_nodes) {
+            final Map<String, Object> video = (Map<String, Object>) JavaScriptEngineFactory.walkJson(episode_node, "tracking/piano/video");
+            final String sophoraID = video.get("av_content_id").toString();
+            if (!dupes.add(sophoraID)) {
+                /* Skip episodes we already crawled (e.g. overlapping pages). */
+                continue;
+            }
+            /* Metadata baseline from the season data (website); the content-document overrides it later. */
+            final ZdfMetadata episodeMetadata = parseMetadataFromSeasonEpisode(episode_node);
+            if (this_season_number != null) {
+                episodeMetadata.seasonNumber = this_season_number.intValue();
+            }
+            final ArrayList<DownloadLink> episodeResults = this.crawlZdfVideoViaSophoraID(param, sophoraID, episodeMetadata);
+            ret.addAll(episodeResults);
+            distribute(episodeResults);
+            crawledEpisodes++;
+            logger.info("Crawled episode " + dupes.size() + (countEpisodes != null ? "/" + countEpisodes : "") + " | " + sophoraID);
             if (this.isAbort()) {
                 throw new InterruptedException();
             }
         }
-        return ret;
+        return crawledEpisodes;
     }
 
-    /** Handles ZDF json present in given browser after API request has been made before. */
     private ArrayList<DownloadLink> handleZdfJson(final CryptedLink param, final Browser br, final String apiToken) throws Exception {
+        return handleZdfJson(param, br, apiToken, new ZdfMetadata());
+    }
+
+    /**
+     * Parses the ZDF content-document json present in the given browser and writes/overrides the metadata into the given object. <br>
+     * The content-document is considered the safer metadata source and thus overrides values previously collected from the website.
+     */
+    private ArrayList<DownloadLink> handleZdfJson(final CryptedLink param, final Browser br, final String apiToken, final ZdfMetadata md) throws Exception {
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final Map<String, Object> mainVideoContent = (Map<String, Object>) entries.get("mainVideoContent");
         if (mainVideoContent == null) {
@@ -666,17 +879,57 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         if (seriesTitle != null) {
             tv_show = seriesTitle;
         }
-        if (tv_show != null && seriesSeasonNumber != null && seriesEpisodeNumber != null) {
-            final DecimalFormat df = new DecimalFormat("00");
-            final String seasonEpisodeString = "S" + df.format(seriesSeasonNumber.intValue()) + "E" + df.format(seriesEpisodeNumber);
-            title = tv_show + " " + seasonEpisodeString + " - " + title;
-        } else if (tv_show != null) {
-            title = tv_show + " - " + title;
-        }
         final String date_formatted = new Regex(editorialDate, "(\\d{4}\\-\\d{2}\\-\\d{2})").getMatch(0);
-        if (date_formatted == null) {
+        /*
+         * Content-document is the safer source -> set every field it actually provides (non-null) onto the metadata; keep the previously
+         * collected website values where the document has none. The season-/episode info is merged into the title later (see buildTitle).
+         */
+        if (streamsJsonURL != null) {
+            md.streamsJsonURL = streamsJsonURL;
+        }
+        if (downloadsJsonURL != null) {
+            md.downloadsJsonURL = downloadsJsonURL;
+        }
+        if (title != null) {
+            md.title = title;
+        }
+        if (tv_show != null) {
+            md.show = tv_show;
+        }
+        if (seriesSeasonNumber != null) {
+            md.seasonNumber = Integer.valueOf(seriesSeasonNumber.intValue());
+        }
+        if (seriesEpisodeNumber != null) {
+            md.episodeNumber = Integer.valueOf(seriesEpisodeNumber.intValue());
+        }
+        if (description != null) {
+            md.description = description;
+        }
+        if (tv_station != null) {
+            md.tvStation = tv_station;
+        }
+        if (date_formatted != null) {
+            md.dateFormatted = date_formatted;
+        }
+        if (md.dateFormatted == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        return processZdfStreams(param, br, apiToken, md);
+    }
+
+    /**
+     * Fetches the ptmd stream-/download-json (given by streamsJsonURL/downloadsJsonURL) and builds all DownloadLinks. <br>
+     * All metadata (title, show, date, ...) has already been collected by the caller as it is not part of the ptmd response.
+     */
+    private ArrayList<DownloadLink> processZdfStreams(final CryptedLink param, final Browser br, final String apiToken, final ZdfMetadata md) throws Exception {
+        final String streamsJsonURL = md.streamsJsonURL;
+        final String downloadsJsonURL = md.downloadsJsonURL;
+        /* Merge show + season-/episode info into the title now that it is actually needed. */
+        final String title = buildTitle(md);
+        final String tv_show = md.show;
+        final String date_formatted = md.dateFormatted;
+        final String tv_station = md.tvStation;
+        final String description = md.description;
         /** Now collect all user selected qualities. */
         final List<String> allKnownQualities = this.getKnownQualityIdentifiers();
         final ArrayList<DownloadLink> allSelectedDownloadlinks = new ArrayList<DownloadLink>();
@@ -798,7 +1051,8 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         }
         boolean grabHLS = grabHLSAudio || (grabHLSVideo && !grabBest);
         final Map<String, List<Object>> audioVideoMap = new HashMap<String, List<Object>>();
-        final String filename_packagename_base_title = date_formatted + "_" + tv_station + "_" + title;
+        /* date_formatted can be null on the ptmd/website path (no content-document) -> avoid a literal "null_" filename prefix. */
+        final String filename_packagename_base_title = (date_formatted != null ? date_formatted + "_" : "") + tv_station + "_" + title;
         boolean grabDownloadUrlsPossible = false;
         final List<String> hlsDupeArray = new ArrayList<String>();
         boolean atLeastOneSelectedVideoAudioVersionIsAvailable = false;
@@ -1058,8 +1312,8 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
                     final String realQuality = ((String) qualitymap.get("quality")).toLowerCase(Locale.ENGLISH);
                     final ArrayList<Object[]> qualities = new ArrayList<Object[]>();
                     /**
-                     * Sometimes we can modify the final downloadurls and thus get higher quality streams. </br> We want to keep all
-                     * versions though!
+                     * Sometimes we can modify the final downloadurls and thus get higher quality streams. </br>
+                     * We want to keep all versions though!
                      */
                     final List<String[]> betterQualities = getBetterQualities(uri);
                     final HashSet<String> optimizedQualityIdentifiers = new HashSet<String>();
@@ -1102,8 +1356,8 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
                         final DownloadLink dl = this.createDownloadlinkForHosterplugin(finalDownloadURL);
                         dl.setContentUrl(param.getCryptedUrl());
                         /**
-                         * Usually filesize is only given for the official downloads.</br> Only set it here if we haven't touched the
-                         * original downloadurls!
+                         * Usually filesize is only given for the official downloads.</br>
+                         * Only set it here if we haven't touched the original downloadurls!
                          */
                         if (thisFilesize > 0) {
                             dl.setAvailable(true);
@@ -1524,9 +1778,11 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
     }
 
     /**
-     * Searches for videos in zdfmediathek that match the given search term. </br> This is mostly used as a workaround to find stuff that is
-     * hosted on their other website on zdfmediathek instead as zdfmediathek is providing a fairly stable search function while other
-     * websites hosting the same content such as kika.de can be complicated to parse. </br> This does not (yet) support pagination!
+     * Searches for videos in zdfmediathek that match the given search term. </br>
+     * This is mostly used as a workaround to find stuff that is hosted on their other website on zdfmediathek instead as zdfmediathek is
+     * providing a fairly stable search function while other websites hosting the same content such as kika.de can be complicated to parse.
+     * </br>
+     * This does not (yet) support pagination!
      */
     public ArrayList<DownloadLink> crawlZDFMediathekSearchResultsVOD(final String tvChannel, final String searchTerm, final int maxResults, final String externalID) throws Exception {
         if (StringUtils.isEmpty(tvChannel) || StringUtils.isEmpty(searchTerm) || StringUtils.isEmpty(externalID)) {

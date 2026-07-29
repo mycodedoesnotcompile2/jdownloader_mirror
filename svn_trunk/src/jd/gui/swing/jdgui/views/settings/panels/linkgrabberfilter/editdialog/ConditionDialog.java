@@ -74,7 +74,6 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
 
 import jd.controlling.linkcollector.LinkOrigin;
-import jd.controlling.linkcollector.VariousCrawledLinkFlags;
 import jd.gui.swing.jdgui.JDGui;
 import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.BooleanStatusFilter.Matchtype;
 import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.OnlineStatusFilter.OnlineStatus;
@@ -195,14 +194,6 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         cobPluginOptions.setSelectedIndex(f.getPluginStatus().ordinal());
     }
 
-    public void setPackageEnabledFilter(PackageEnabledFilter f) {
-        if (f == null) {
-            return;
-        }
-        cbPackageEnabled.setSelected(f.isEnabled());
-        cobPackageEnabled.setSelectedIndex(f.getMatchType().ordinal());
-    }
-
     public void setFilesizeFilter(FilesizeFilter f) {
         if (f == null) {
             return;
@@ -213,13 +204,20 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         toSize.setValue(f.getTo());
     }
 
-    public void setConditionFilter(ConditionFilter filter) {
-        if (filter == null) {
+    public void setLinkEnabledFilter(LinkEnabledFilter f) {
+        if (f == null) {
             return;
         }
-        cobFlags.setSelectedIndex(filter.getMatchType().ordinal());
-        cbFlags.setSelected(filter.isEnabled());
-        cobFlagsOptions.setSelectedItems(filter.getConditions());
+        cbLinkEnabled.setSelected(f.isEnabled());
+        cobLinkEnabled.setSelectedIndex(f.getMatchType().ordinal());
+    }
+
+    public void setDownloadListDupeFilter(DownloadListDupeFilter f) {
+        if (f == null) {
+            return;
+        }
+        cbDownloadListDupe.setSelected(f.isEnabled());
+        cobDownloadListDupe.setSelectedIndex(f.getMatchType().ordinal());
     }
 
     public void setOriginFilter(OriginFilter originFilter) {
@@ -235,8 +233,12 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         return new OriginFilter(OriginFilter.Matchtype.values()[cobCrawlerSource.getSelectedIndex()], cbCrawlerSource.isSelected(), cobCrawlerSourceOptions.getSelectedItems().toArray(new LinkOrigin[] {}));
     }
 
-    public ConditionFilter getConditionFilter() {
-        return new ConditionFilter(ConditionFilter.Matchtype.values()[cobFlags.getSelectedIndex()], cbFlags.isSelected(), cobFlagsOptions.getSelectedItems().toArray(new VariousCrawledLinkFlags[] {}));
+    public LinkEnabledFilter getLinkEnabledFilter() {
+        return new LinkEnabledFilter(Matchtype.values()[cobLinkEnabled.getSelectedIndex()], cbLinkEnabled.isSelected());
+    }
+
+    public DownloadListDupeFilter getDownloadListDupeFilter() {
+        return new DownloadListDupeFilter(Matchtype.values()[cobDownloadListDupe.getSelectedIndex()], cbDownloadListDupe.isSelected());
     }
 
     public FilesizeFilter getFilersizeFilter() {
@@ -297,10 +299,6 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
 
     public PluginStatusFilter getPluginStatusFilter() {
         return new PluginStatusFilter(PluginStatusMatchtype.values()[cobPlugin.getSelectedIndex()], cbPlugin.isSelected(), PluginStatus.values()[cobPluginOptions.getSelectedIndex()]);
-    }
-
-    public PackageEnabledFilter getPackageEnabledFilter() {
-        return new PackageEnabledFilter(Matchtype.values()[cobPackageEnabled.getSelectedIndex()], cbPackageEnabled.isSelected());
     }
 
     protected final Map<ExtTextField, JToggleButton> regexFields = new HashMap<ExtTextField, JToggleButton>();
@@ -404,8 +402,6 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
     private JComboBox                                 cobPlugin;
     private JComboBox                                 cobPluginOptions;
     private ExtCheckBox                               cbPlugin;
-    private JComboBox                                 cobPackageEnabled;
-    private ExtCheckBox                               cbPackageEnabled;
     // private AutoScroller autoScroller;
     protected JComboBox                               cobCrawlerSource;
     protected PseudoMultiCombo<LinkOrigin>            cobCrawlerSourceOptions;
@@ -421,10 +417,10 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
     private ExtCheckBox                               cbCommentFilter;
     protected JLabel                                  lblSource;
     protected JLabel                                  lblCrawlerSource;
-    private JComboBox                                 cobFlags;
-    private PseudoMultiCombo<VariousCrawledLinkFlags> cobFlagsOptions;
-    private ExtCheckBox                               cbFlags;
-    private JLabel                                    lblFlags;
+    private JComboBox                                 cobLinkEnabled;
+    private ExtCheckBox                               cbLinkEnabled;
+    private JComboBox                                 cobDownloadListDupe;
+    private ExtCheckBox                               cbDownloadListDupe;
 
     public String getIconKey() {
         return iconKey;
@@ -556,35 +552,50 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         panel.add(txtName, "spanx,growx,pushx,height 22!");
         panel.add(createHeader(getIfText()), "gaptop 10,spanx,growx,pushx");
         addConditionGui(panel);
-        // dupe
-        cobFlags = new JComboBox(new String[] { _GUI.T.ConditionDialog_layoutDialogContent_is_true(), _GUI.T.ConditionDialog_layoutDialogContent_online_isnottrue() });
-        cobFlagsOptions = new PseudoMultiCombo<VariousCrawledLinkFlags>(VariousCrawledLinkFlags.values()) {
-            protected String getLabel(VariousCrawledLinkFlags sc) {
-                return sc.getTranslation();
-            }
-        };
-        cbFlags = new ExtCheckBox(cobFlags, cobFlagsOptions) {
+        // link enabled status
+        cobLinkEnabled = new JComboBox(new String[] { LinkEnabledFilter.getTrueLabelStatic(), LinkEnabledFilter.getFalseLabelStatic() });
+        cbLinkEnabled = new ExtCheckBox(cobLinkEnabled) {
             @Override
             public void updateDependencies() {
                 super.updateDependencies();
             }
         };
-        panel.add(cbFlags);
-        panel.add(lblFlags = new JLabel(_GUI.T.FilterRuleDialog_layoutDialogContent_lbl_variousflags()));
-        panel.add(cobFlags);
-        panel.add(cobFlagsOptions, "spanx,pushx,growx");
+        panel.add(cbLinkEnabled);
+        panel.add(new JLabel(_GUI.T.FilterRuleDialog_layoutDialogContent_lbl_linkenabled()));
+        panel.add(cobLinkEnabled, "spanx,pushx,growx");
         MouseAdapter ml = new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
-                if (!cbFlags.isEnabled()) {
+                if (!cbLinkEnabled.isEnabled()) {
                     // field is disabled (e.g. static/predefined rule) -> clicking must not re-enable it
                     return;
                 }
-                cbFlags.setSelected(true);
+                cbLinkEnabled.setSelected(true);
             }
         };
-        cobFlags.addMouseListener(ml);
-        cobFlagsOptions.addMouseListener(ml);
+        cobLinkEnabled.addMouseListener(ml);
+        // download list dupe status
+        cobDownloadListDupe = new JComboBox(new String[] { DownloadListDupeFilter.getTrueLabelStatic(), DownloadListDupeFilter.getFalseLabelStatic() });
+        cbDownloadListDupe = new ExtCheckBox(cobDownloadListDupe) {
+            @Override
+            public void updateDependencies() {
+                super.updateDependencies();
+            }
+        };
+        panel.add(cbDownloadListDupe);
+        panel.add(new JLabel(_GUI.T.FilterRuleDialog_layoutDialogContent_lbl_downloadlistdupe()));
+        panel.add(cobDownloadListDupe, "spanx,pushx,growx");
+        ml = new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                if (!cbDownloadListDupe.isEnabled()) {
+                    // field is disabled (e.g. static/predefined rule) -> clicking must not re-enable it
+                    return;
+                }
+                cbDownloadListDupe.setSelected(true);
+            }
+        };
+        cobDownloadListDupe.addMouseListener(ml);
         cobFilename = new JComboBox(new String[] { _GUI.T.FilterRuleDialog_layoutDialogContent_contains(), _GUI.T.FilterRuleDialog_layoutDialogContent_equals(), _GUI.T.FilterRuleDialog_layoutDialogContent_contains_not(), _GUI.T.FilterRuleDialog_layoutDialogContent_equals_not() });
         txtFilename = new ExtTextField() {
             @Override
@@ -1005,28 +1016,6 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         };
         cobPlugin.addMouseListener(ml);
         cobPluginOptions.addMouseListener(ml);
-        // package enabled status
-        cobPackageEnabled = new JComboBox(new String[] { PackageEnabledFilter.getTrueLabelStatic(), PackageEnabledFilter.getFalseLabelStatic() });
-        cbPackageEnabled = new ExtCheckBox(cobPackageEnabled) {
-            @Override
-            public void updateDependencies() {
-                super.updateDependencies();
-            }
-        };
-        panel.add(cbPackageEnabled);
-        panel.add(new JLabel(_GUI.T.FilterRuleDialog_layoutDialogContent_lbl_packageenabled()));
-        panel.add(cobPackageEnabled, "spanx,pushx,growx");
-        ml = new MouseAdapter() {
-            @Override
-            public void mousePressed(MouseEvent e) {
-                if (!cbPackageEnabled.isEnabled()) {
-                    // field is disabled (e.g. static/predefined rule) -> clicking must not re-enable it
-                    return;
-                }
-                cbPackageEnabled.setSelected(true);
-            }
-        };
-        cobPackageEnabled.addMouseListener(ml);
         return panel;
     }
 

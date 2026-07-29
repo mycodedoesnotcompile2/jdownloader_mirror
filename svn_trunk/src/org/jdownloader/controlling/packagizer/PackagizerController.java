@@ -261,6 +261,7 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
         SubFolderByPluginRule subFolderByPluginRule = null;
         DisableParFilesPackageRule disableParFilesRule = null;
         for (final PackagizerRule rule : list) {
+            rule._migrateLegacyFilters();
             final PackagizerRule clone = JSonStorage.restoreFromString(JSonStorage.serializeToJson(rule), new TypeRef<PackagizerRule>() {
             });
             clone.setCreated(-1);
@@ -855,19 +856,30 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
         nextRule: for (final PackagizerRuleWrapper lgr : rules) {
             final BooleanFilter alwaysFilter = lgr.getAlwaysFilter();
             if (alwaysFilter == null || !alwaysFilter.isEnabled()) {
-                if (!lgr.checkHoster(link)) {
+                // Checks are ordered cheapest first (boolean/enum), most expensive (regex) last, so a non-matching
+                // rule fails fast on the cheapest condition. Result is order independent (logical AND of all checks).
+                if (!lgr.checkOnlineStatus(link)) {
                     continue nextRule;
                 }
                 if (!lgr.checkPluginStatus(link)) {
                     continue nextRule;
                 }
-                if (!lgr.checkPackageEnabled(link)) {
+                if (!lgr.checkLinkEnabled(link)) {
                     continue nextRule;
                 }
                 if (!lgr.checkOrigin(link)) {
                     continue nextRule;
                 }
-                if (!lgr.checkConditions(link)) {
+                if (!lgr.checkDownloadListDupe(link)) {
+                    continue nextRule;
+                }
+                if (!lgr.checkFileSize(link)) {
+                    continue nextRule;
+                }
+                if (!lgr.checkFileType(link)) {
+                    continue nextRule;
+                }
+                if (!lgr.checkHoster(link)) {
                     continue nextRule;
                 }
                 if (!lgr.checkSource(link)) {
@@ -876,19 +888,10 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
                 if (!lgr.checkPackageName(link)) {
                     continue nextRule;
                 }
-                if (!lgr.checkComment(link)) {
-                    continue nextRule;
-                }
-                if (!lgr.checkFileType(link)) {
-                    continue nextRule;
-                }
-                if (!lgr.checkOnlineStatus(link)) {
-                    continue nextRule;
-                }
                 if (!lgr.checkFileName(link)) {
                     continue nextRule;
                 }
-                if (!lgr.checkFileSize(link)) {
+                if (!lgr.checkComment(link)) {
                     continue nextRule;
                 }
             }
@@ -1279,19 +1282,27 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
             }
             final BooleanFilter alwaysFilter = lgr.getAlwaysFilter();
             if (alwaysFilter == null || !alwaysFilter.isEnabled()) {
-                if (!lgr.checkHoster(dummyLink)) {
-                    continue;
-                }
+                // Checks are ordered cheapest first (boolean/enum), most expensive (regex) last, so a non-matching
+                // rule fails fast on the cheapest condition. Result is order independent (logical AND of all checks).
                 if (!lgr.checkPluginStatus(dummyLink)) {
                     continue;
                 }
-                if (!lgr.checkPackageEnabled(dummyLink)) {
+                if (!lgr.checkLinkEnabled(dummyLink)) {
                     continue;
                 }
                 if (!lgr.checkOrigin(dummyLink)) {
                     continue;
                 }
-                if (!lgr.checkConditions(dummyLink)) {
+                if (!lgr.checkDownloadListDupe(dummyLink)) {
+                    continue;
+                }
+                if (!lgr.checkFileSize(dummyLink)) {
+                    continue;
+                }
+                if (!lgr.checkFileType(dummyLink)) {
+                    continue;
+                }
+                if (!lgr.checkHoster(dummyLink)) {
                     continue;
                 }
                 if (!lgr.checkSource(dummyLink)) {
@@ -1300,16 +1311,10 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
                 if (!lgr.checkPackageName(dummyLink)) {
                     continue;
                 }
-                if (!lgr.checkComment(dummyLink)) {
-                    continue;
-                }
-                if (!lgr.checkFileType(dummyLink)) {
-                    continue;
-                }
                 if (!lgr.checkFileName(dummyLink)) {
                     continue;
                 }
-                if (!lgr.checkFileSize(dummyLink)) {
+                if (!lgr.checkComment(dummyLink)) {
                     continue;
                 }
             }
