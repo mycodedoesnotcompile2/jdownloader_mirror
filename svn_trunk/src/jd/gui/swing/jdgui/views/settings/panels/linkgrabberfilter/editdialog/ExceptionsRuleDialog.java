@@ -3,10 +3,13 @@ package jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog;
 import java.awt.Component;
 
 import javax.swing.JComponent;
+import javax.swing.JLabel;
 import javax.swing.JScrollPane;
 import javax.swing.ScrollPaneConstants;
 
 import org.appwork.swing.MigPanel;
+import org.appwork.swing.components.ExtCheckBox;
+import org.appwork.utils.DebugMode;
 import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogCanceledException;
@@ -103,8 +106,25 @@ public class ExceptionsRuleDialog extends ConditionDialog<LinkgrabberFilterRule>
         rule.setOnlineStatusFilter(getOnlineStatusFilter());
         rule.setPluginStatusFilter(getPluginStatusFilter());
         rule.setAccept(true);
+        if (cbNegate != null) {
+            // only overwrite when the checkbox is actually present (IDE/debug); otherwise keep the stored value untouched so a
+            // negated rule created in the IDE is not silently reset to false when saved from a release build.
+            rule.setNegated(isNegated());
+        }
         rule.setTestUrl(getTxtTestUrl());
         rule.setIconKey(getIconKey());
+    }
+
+    @Override
+    protected void addNegateGui(JComponent panel) {
+        // The negate/invert feature is still experimental: only expose the checkbox when running from the IDE. The underlying
+        // "negated" flag stays fully functional in release builds (evaluated in the view path), it just cannot be toggled via GUI.
+        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            return;
+        }
+        cbNegate = new ExtCheckBox();
+        panel.add(cbNegate);
+        panel.add(new JLabel(_GUI.T.ExceptionsRuleDialog_negate_label()), "spanx,growx,pushx");
     }
 
     private void updateGUI() {
@@ -124,6 +144,7 @@ public class ExceptionsRuleDialog extends ConditionDialog<LinkgrabberFilterRule>
         setPluginStatusFilter(rule.getPluginStatusFilter());
         setSourceFilter(rule.getSourceURLFilter());
         setFiletypeFilter(rule.getFiletypeFilter());
+        setNegated(rule.isNegated());
     }
 
     protected String getIfText() {

@@ -1447,6 +1447,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Allow all Links matching these conditions, and ignore the Filter List" })
     String ExceptionsRuleDialog_getIfText_();
 
+    @Default(lngs = { "en" }, values = { "Invert view: when active, show only links matching these conditions (hide all others)" })
+    String ExceptionsRuleDialog_negate_label();
+
     @Default(lngs = { "en" }, values = { "Allow Links if, " })
     String ExceptionsTableModel_initColumns_condition_();
 
@@ -5584,6 +5587,12 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "the this link is already in your downloadlist. That's why it has a red highlight." })
     String LinkGrabberTable_onSingleClick_dupe_msg();
+
+    @Default(lngs = { "en" }, values = { "All %s1 links are hidden via linkgrabber views" })
+    String LinkGrabberTable_allLinksHiddenByViews(String count);
+
+    @Default(lngs = { "en" }, values = { "All %s1 links are hidden by the current search" })
+    String LinkGrabberTable_allLinksHiddenBySearch(String count);
 
     @Default(lngs = { "en" }, values = { "Duplicates" })
     String lit_duplicates_links();

@@ -119,7 +119,7 @@ public class FilterTableModel extends ExtTableModel<Filter> {
                 if (num < 0) {
                     renderer.setText("");
                     renderer.setForeground(defaultColor);
-                } else if (num > 0 && !value.isEnabled()) {
+                } else if (num > 0 && value.isViewActive()) {
                     renderer.setForeground(Color.RED);
                 } else {
                     renderer.setForeground(defaultColor);
@@ -155,7 +155,7 @@ public class FilterTableModel extends ExtTableModel<Filter> {
             @Override
             public void configureRendererComponent(Filter value, boolean isSelected, boolean hasFocus, int row, int column) {
                 super.configureRendererComponent(value, isSelected, hasFocus, row, column);
-                if (value.getCounter() > 0 && !value.isEnabled()) {
+                if (value.getCounter() > 0 && value.isViewActive()) {
                     rendererField.setForeground(Color.RED);
                 } else {
                     rendererField.setForeground(defaultColor);

@@ -39,7 +39,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52902 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53076 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidaraTo extends PluginForHost {
     public VidaraTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -146,7 +146,8 @@ public class VidaraTo extends PluginForHost {
                 filename = brc.getRegex("<title>\\s*(.*?)\\s*<").getMatch(0);
                 filename = StringUtils.firstNotEmpty(filename, fid);
             }
-            link.setFinalFileName(this.correctOrApplyFileNameExtension(filename, ".mp4", null));
+            filename = this.applyFilenameExtension(filename, ".mp4");
+            link.setFinalFileName(filename);
         }
         this.hls_master = entries.get("streaming_url").toString();
         return AvailableStatus.TRUE;

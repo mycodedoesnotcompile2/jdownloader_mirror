@@ -24,6 +24,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -32,7 +33,7 @@ import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50142 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53076 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.decrypter.StileProjectComDecrypter.class })
 public class StileProjectCom extends PluginForHost {
     private String             dllink       = null;
@@ -76,7 +77,7 @@ public class StileProjectCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.stileproject.com/contact";
+        return "https://www." + getHost() + "/contact";
     }
 
     @Override
@@ -104,6 +105,11 @@ public class StileProjectCom extends PluginForHost {
         }
     }
 
+    @Override
+    protected String getDefaultFileName(final DownloadLink link) {
+        return getWeakFilename(link);
+    }
+
     private String getWeakFilename(final DownloadLink link) {
         final String urlTitle = getURLTitleCleaned(link.getPluginPatternMatcher());
         if (urlTitle != null) {
@@ -113,7 +119,7 @@ public class StileProjectCom extends PluginForHost {
         }
     }
 
-    private String getURLTitleCleaned(final String url) {
+    public static String getURLTitleCleaned(final String url) {
         String title = new Regex(url, TYPE_NORMAL).getMatch(0);
         if (title == null) {
             title = new Regex(url, TYPE_NORMAL2).getMatch(1);
@@ -131,9 +137,6 @@ public class StileProjectCom extends PluginForHost {
     }
 
     private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws Exception {
-        if (!link.isNameSet()) {
-            link.setName(getWeakFilename(link));
-        }
         final String extDefault = ".mp4";
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
@@ -156,9 +159,9 @@ public class StileProjectCom extends PluginForHost {
                 link.setPluginPatternMatcher(br.getURL());
             }
         }
-        String titleByURL = getURLTitleCleaned(link.getPluginPatternMatcher());
+        String titleByURL = getURLTitleCleaned(br.getURL());
         if (titleByURL == null) {
-            titleByURL = getURLTitleCleaned(br.getURL());
+            titleByURL = getURLTitleCleaned(link.getPluginPatternMatcher());
         }
         if (titleByURL != null) {
             titleByURL = titleByURL.replace("-", " ").trim();
@@ -185,6 +188,10 @@ public class StileProjectCom extends PluginForHost {
     public void handleFree(final DownloadLink link) throws Exception {
         requestFileInformation(link, true);
         if (StringUtils.isEmpty(dllink)) {
+            if (br.containsHTML("class=\"sponsor\"") && br.containsHTML(">\\s*VISIT OFFICIAL SITE")) {
+                /* 2026-06-10: e.g. fapbox.com, freeviewmovies.com, nakedtube.com */
+                throw new AccountRequiredException("Sponsored content or unavailable video");
+            }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, true, 0);
@@ -197,36 +204,26 @@ public class StileProjectCom extends PluginForHost {
 
     private String getdllink() throws Exception {
         String directurl = br.getRegex("<source src=\"(https?://[^<>\"]+)[^<>]+type='video/mp4'").getMatch(0);
-        if (StringUtils.isEmpty(directurl)) {
-            directurl = br.getRegex("var desktopFile\\s*=\\s*'(https?://[^<>\"\\']+)").getMatch(0);
+        if (!StringUtils.isEmpty(directurl)) {
+            return directurl;
         }
-        if (StringUtils.isEmpty(directurl)) {
-            directurl = br.getRegex("\"contentUrl\"\\s*:\\s*\"(http[^\"]+)").getMatch(0);
+        directurl = br.getRegex("var desktopFile\\s*=\\s*'(https?://[^<>\"\\']+)").getMatch(0);
+        if (!StringUtils.isEmpty(directurl)) {
+            return directurl;
         }
-        if (directurl == null) {
-            final Regex videoMETA = br.getRegex("(VideoFile|VideoMeta)_(\\d+)");
-            final String type = videoMETA.getMatch(0);
-            final String id = videoMETA.getMatch(1);
-            final String cb = br.getRegex("\\?cb=(\\d+)\\'").getMatch(0);
-            if (type == null || id == null || cb == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            final String postData = "cacheBuster=" + System.currentTimeMillis() + "&jsonRequest=%7B%22path%22%3A%22" + type + "%5F" + id + "%22%2C%22cb%22%3A%22" + cb + "%22%2C%22loaderUrl%22%3A%22http%3A%2F%2Fcdn1%2Estatic%2Eatlasfiles%2Ecom%2Fplayer%2Fmemberplayer%2Eswf%3Fcb%3D" + cb + "%22%2C%22returnType%22%3A%22json%22%2C%22file%22%3A%22" + type + "%5F" + id + "%22%2C%22htmlHostDomain%22%3A%22www%2Estileproject%2Ecom%22%2C%22height%22%3A%22508%22%2C%22appdataurl%22%3A%22http%3A%2F%2Fwww%2Estileproject%2Ecom%2Fgetcdnurl%2F%22%2C%22playerOnly%22%3A%22true%22%2C%22request%22%3A%22getAllData%22%2C%22width%22%3A%22640%22%7D";
-            br.postPage("/getcdnurl/", postData);
-            directurl = br.getRegex("\"file\": \"(http://[^<>\"]*?)\"").getMatch(0);
+        directurl = br.getRegex("\"contentUrl\"\\s*:\\s*\"(http[^\"]+)").getMatch(0);
+        if (!StringUtils.isEmpty(directurl)) {
+            return directurl;
         }
-        return directurl;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
+        final Regex videoMETA = br.getRegex("(VideoFile|VideoMeta)_(\\d+)");
+        final String type = videoMETA.getMatch(0);
+        final String id = videoMETA.getMatch(1);
+        final String cb = br.getRegex("\\?cb=(\\d+)\\'").getMatch(0);
+        if (type == null || id == null || cb == null) {
+            return null;
+        }
+        final String postData = "cacheBuster=" + System.currentTimeMillis() + "&jsonRequest=%7B%22path%22%3A%22" + type + "%5F" + id + "%22%2C%22cb%22%3A%22" + cb + "%22%2C%22loaderUrl%22%3A%22http%3A%2F%2Fcdn1%2Estatic%2Eatlasfiles%2Ecom%2Fplayer%2Fmemberplayer%2Eswf%3Fcb%3D" + cb + "%22%2C%22returnType%22%3A%22json%22%2C%22file%22%3A%22" + type + "%5F" + id + "%22%2C%22htmlHostDomain%22%3A%22www%2Estileproject%2Ecom%22%2C%22height%22%3A%22508%22%2C%22appdataurl%22%3A%22http%3A%2F%2Fwww%2Estileproject%2Ecom%2Fgetcdnurl%2F%22%2C%22playerOnly%22%3A%22true%22%2C%22request%22%3A%22getAllData%22%2C%22width%22%3A%22640%22%7D";
+        br.postPage("/getcdnurl/", postData);
+        return br.getRegex("\"file\": \"(http://[^<>\"]*?)\"").getMatch(0);
     }
 }

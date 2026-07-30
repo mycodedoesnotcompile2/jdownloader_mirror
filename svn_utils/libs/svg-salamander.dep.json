@@ -32,7 +32,7 @@
     "version":"1.1.4.1-appwork.jre16",
     "vulnerabilities":[]
   },
-  "minJRE":"1.6",
+  "minJRE":"1.8",
   "minReleasedAgeDays":null,
   "provider":"maven",
   "renames":null,

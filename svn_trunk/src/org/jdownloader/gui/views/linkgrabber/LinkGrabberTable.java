@@ -1,9 +1,17 @@
 package org.jdownloader.gui.views.linkgrabber;
 
 import java.awt.AWTKeyStroke;
+import java.awt.AlphaComposite;
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Composite;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.LayoutManager;
+import java.awt.Rectangle;
+import java.awt.RenderingHints;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.InputEvent;
@@ -58,10 +66,13 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTable;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTableModelData;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTableModelFilter;
 import org.jdownloader.gui.views.downloads.table.HorizontalScrollbarAction;
 import org.jdownloader.gui.views.linkgrabber.bottombar.MenuManagerLinkgrabberTabBottombar;
 import org.jdownloader.gui.views.linkgrabber.contextmenu.ConfirmLinksContextAction;
 import org.jdownloader.gui.views.linkgrabber.contextmenu.MenuManagerLinkgrabberTableContext;
+import org.jdownloader.gui.views.linkgrabber.quickfilter.FilterTable;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
@@ -520,5 +531,136 @@ public class LinkGrabberTable extends PackageControllerTable<CrawledPackage, Cra
         final InputMap input3 = getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
         final ActionMap actions = getActionMap();
         this.linkAction(input, input2, input3, actions, focusAction, ks);
+    }
+
+    @Override
+    public void paintComponent(final Graphics g) {
+        super.paintComponent(g);
+        paintAllHiddenWarning(g);
+    }
+
+    /**
+     * When the table is empty although links are loaded, all of them got hidden by the active filters. In that case a large,
+     * semi-transparent red hint is painted into the background of the (otherwise empty) table so the user understands why nothing
+     * shows up. Search filtering takes precedence over linkgrabber views: only one of the two messages is ever shown.
+     */
+    private void paintAllHiddenWarning(final Graphics g) {
+        final LinkGrabberTableModel model = (LinkGrabberTableModel) getModel();
+        if (model.getRowCount() > 0) {
+            // something is visible, nothing to warn about
+            return;
+        }
+        final int total = LinkCollector.getInstance().getAllChildren().size();
+        if (total <= 0) {
+            // linkgrabber is genuinely empty (no links loaded), not a filtering issue
+            return;
+        }
+        final String message;
+        if (model.isFilteredView()) {
+            // a non-view filter (i.e. the search field) is active -> search wins over views
+            message = _GUI.T.LinkGrabberTable_allLinksHiddenBySearch(Integer.toString(total));
+        } else if (hasActiveViewFilter(model)) {
+            message = _GUI.T.LinkGrabberTable_allLinksHiddenByViews(Integer.toString(total));
+        } else {
+            // empty for some other reason (should not happen), don't paint a misleading hint
+            return;
+        }
+        drawCenteredWarning((Graphics2D) g, message);
+    }
+
+    /** Whether at least one linkgrabber view (FilterTable) is currently applied to the model. */
+    private boolean hasActiveViewFilter(final LinkGrabberTableModel model) {
+        final PackageControllerTableModelData<CrawledPackage, CrawledLink> data = model.getTableData();
+        if (data == null) {
+            return false;
+        }
+        return containsViewFilter(data.getChildrenFilters()) || containsViewFilter(data.getPackageFilters());
+    }
+
+    private boolean containsViewFilter(final List<PackageControllerTableModelFilter<CrawledPackage, CrawledLink>> filters) {
+        if (filters == null) {
+            return false;
+        }
+        for (final PackageControllerTableModelFilter<CrawledPackage, CrawledLink> filter : filters) {
+            if (filter instanceof FilterTable) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void drawCenteredWarning(final Graphics2D g2, final String message) {
+        final Rectangle visibleRect = getVisibleRect();
+        if (visibleRect.width <= 0 || visibleRect.height <= 0) {
+            return;
+        }
+        final Composite orgComposite = g2.getComposite();
+        final Font orgFont = g2.getFont();
+        final Color orgColor = g2.getColor();
+        final Object orgAA = g2.getRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING);
+        try {
+            g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            // wrap into lines, then scale the font down until every line fits the available width
+            final int maxWidth = Math.max(1, visibleRect.width - 40);
+            int fontSize = Math.max(14, visibleRect.height / 12);
+            Font font;
+            List<String> lines;
+            FontMetrics fm;
+            while (true) {
+                font = orgFont.deriveFont(Font.BOLD, (float) fontSize);
+                fm = g2.getFontMetrics(font);
+                lines = wrapText(message, fm, maxWidth);
+                int widest = 0;
+                for (final String line : lines) {
+                    widest = Math.max(widest, fm.stringWidth(line));
+                }
+                if (widest <= maxWidth || fontSize <= 14) {
+                    break;
+                }
+                fontSize -= 2;
+            }
+            g2.setFont(font);
+            g2.setColor(Color.RED);
+            // real red, partly transparent as requested
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.5f));
+            final int lineHeight = fm.getHeight();
+            final int totalHeight = lineHeight * lines.size();
+            int y = visibleRect.y + (visibleRect.height - totalHeight) / 2 + fm.getAscent();
+            for (final String line : lines) {
+                final int x = visibleRect.x + (visibleRect.width - fm.stringWidth(line)) / 2;
+                g2.drawString(line, x, y);
+                y += lineHeight;
+            }
+        } finally {
+            g2.setComposite(orgComposite);
+            g2.setFont(orgFont);
+            g2.setColor(orgColor);
+            if (orgAA != null) {
+                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, orgAA);
+            }
+        }
+    }
+
+    /** Greedy word wrap so the warning stays inside the given width. */
+    private List<String> wrapText(final String text, final FontMetrics fm, final int maxWidth) {
+        final List<String> lines = new ArrayList<String>();
+        final String[] words = text.split(" ");
+        StringBuilder current = new StringBuilder();
+        for (final String word : words) {
+            final String candidate = current.length() == 0 ? word : current.toString() + " " + word;
+            if (fm.stringWidth(candidate) > maxWidth && current.length() > 0) {
+                lines.add(current.toString());
+                current = new StringBuilder(word);
+            } else {
+                current = new StringBuilder(candidate);
+            }
+        }
+        if (current.length() > 0) {
+            lines.add(current.toString());
+        }
+        if (lines.size() == 0) {
+            lines.add(text);
+        }
+        return lines;
     }
 }

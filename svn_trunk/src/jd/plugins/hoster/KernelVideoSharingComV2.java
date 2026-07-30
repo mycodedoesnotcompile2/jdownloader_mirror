@@ -88,7 +88,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 52931 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53076 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -1204,7 +1204,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
             }
         }
         if (br.containsHTML("class=\"sponsor\"") && br.containsHTML(">\\s*VISIT OFFICIAL SITE")) {
-            /* 2026-06-10: e.g. fapbox.com, freeviewmovies.com, nakedtube.com */
+            /* 2026-06-10: e.g. fapbox.com, freeviewmovies.com, nakedtube.com, stileproject.com, pornrabbit.com */
             return "Sponsored content or unavailable video";
         }
         return null;

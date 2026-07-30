@@ -421,6 +421,24 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
     private ExtCheckBox                               cbLinkEnabled;
     private JComboBox                                 cobDownloadListDupe;
     private ExtCheckBox                               cbDownloadListDupe;
+    protected ExtCheckBox                             cbNegate;
+
+    public boolean isNegated() {
+        return cbNegate != null && cbNegate.isSelected();
+    }
+
+    public void setNegated(boolean negated) {
+        if (cbNegate != null) {
+            cbNegate.setSelected(negated);
+        }
+    }
+
+    /**
+     * Hook to add an optional "invert this rule" checkbox. Only view/exception rules support it (see
+     * {@link ExceptionsRuleDialog}); the default is a no-op so filter and packagizer dialogs stay unchanged.
+     */
+    protected void addNegateGui(JComponent panel) {
+    }
 
     public String getIconKey() {
         return iconKey;
@@ -550,6 +568,7 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         });
         panel.add(btnIcon, "height 22!,width 22!");
         panel.add(txtName, "spanx,growx,pushx,height 22!");
+        addNegateGui(panel);
         panel.add(createHeader(getIfText()), "gaptop 10,spanx,growx,pushx");
         addConditionGui(panel);
         // link enabled status

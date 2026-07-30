@@ -1822,19 +1822,62 @@
       "signatures":{},
       "version":"2026.187.1 5ae2220ad86eab1364821329ff58d28828bddb19",
       "vulnerabilities":null
+    },
+    {
+      "changes":"2026.189.0 b9a86cf0cd115f1e60b5815533f3fcfd2f9e8f4b\t: Add dev.cv, store.cv, and sch.ac to PSL private domains for Code Fost Host (#2989)",
+      "date":"2026-07-08T09:45:31.178+02:00",
+      "dependencies":null,
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"71f10962519e15d087b1ccffffdbca3422838a4ff50a62a3852c23e896253e1f"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "signatures":{},
+      "version":"2026.189.0 b9a86cf0cd115f1e60b5815533f3fcfd2f9e8f4b",
+      "vulnerabilities":null
+    },
+    {
+      "changes":"2026.194.0 df10c7f6b126c0da1c4f81ea02af1c2909d00d13\t: Add IPv64.net dynamic DNS domains (#3009)\r\n2026.194.1 1305f826c862616ccdf465b20933ff1c4ba4a8fe\t: Add mygov.scot (#2900)\r\n2026.194.2 627618788d0310f765a037b4f8a4adc71a9c1595\t: Add cyb.ge, llc.ge, online.ge and tnx.ge (#2963)\r\n2026.194.3 3ead8a2410ca07470a02b8e92e03edc19cbe358d\t: Update `.no` (#3029)\r\n2026.194.4 8eb9e60139cb2c62ccec664554adae3767dc1374\t: Adding aero.in, alumni.in, school.in and ub.in (#2988)\r\n2026.195.0 f8d153aafe2dd6aa1c27cfdabaeb41b90ece3d48\t: remove ac.tj from public_suffix_list.dat (#3001)\r\n2026.196.0 9b5c814414374aa19a93dc6dd7e47c01909524cc\t: util: gTLD data autopull updates for 2026-07-15T16:20:56 UTC (#3042)\n\nCo-authored-by: GitHub <noreply@github.com>\n\nRegistry Operator change for .KYOTO - comment only",
+      "date":"2026-07-16T12:00:32.252+02:00",
+      "dependencies":null,
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"d2ae7d02585e00b8cb5427dc660d3d45e2a49f618d61c83344fc80502236194c"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "signatures":{},
+      "version":"2026.196.0 9b5c814414374aa19a93dc6dd7e47c01909524cc",
+      "vulnerabilities":null
     }
   ],
   "installed":{
-    "changes":"2026.189.0 b9a86cf0cd115f1e60b5815533f3fcfd2f9e8f4b\t: Add dev.cv, store.cv, and sch.ac to PSL private domains for Code Fost Host (#2989)",
-    "date":"2026-07-08T09:45:31.178+02:00",
+    "changes":"2026.201.0 efb337b9a27d9520672f01dc494494900df18f46\t: Remove Storj Labs entries from public_suffix_list.dat (#3063)\r\n2026.201.1 edcf9a410dbb4d6b52c0cdb485e95578ed816717\t: Delete protonet.io and Protonet GmbH entry (#3048)\r\n2026.201.2 97e05b81e5deffa70f3a9cce81ac3acb37b46f6f\t: AI Agent notice about not modifying the repo PR template (#3043)\r\n2026.201.3 dce40fc2c486ed956eeeeddb826a53ac156b9de0\t: Remove hzc.io RethinkDB entries from public_suffix_list.dat (#3052)\r\n2026.201.4 66380ae99d65180c662336959526bcfa9f6680d6\t: Remove api.stdlib.com from public suffix list (#3051)\r\n2026.201.5 93560af4d157ed99d53e5db2576e8c20adf25af5\t: Remove cryptonomic.net Cryptonomic entries from public_suffix_list.dat (#3050)\r\n2026.201.6 4a11152dbd5de9c37e7e37795ff29faad307b024\t: Update `.it` (#3049)\r\n2026.201.7 ca355e4aadee94e349e1f9c86145618cf762249d\t: Remove Bytemark Hosting entries: uk0.bigv.io dh.bytemark.co.uk vm.bytemark.co.uk (#3053)\r\n2026.203.0 54cf5588656759f9ce7ab8a087c7be336bcf8d12\t: Remove onfabrica.com Fabrica Technologies entry (#3065)\r\n2026.203.1 8ab4253fd2cbaf4c411bd7ccea56bff0db0e82cf\t: Add a workflow that checks the PR template is filled out (#3077)\r\n2026.204.0 438c5e02a9db7870300cb3108258aeefc8467c36\t: Remove deta.dev, deta.app entries from public_suffix_list.dat (#3066)\r\n2026.204.1 93b4eb174b2da9ee3f6effc363b579a96a65c93a\t: Add playcode.site to PRIVATE section (#3072)\r\n2026.205.0 f85a38e61c222ea2d9901a41296c6c74fd3e2c28\t: util: gTLD data autopull updates for 2026-07-24T16:40:16 UTC (#3090)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2026.206.0 e1b8015c3b2f0f4f8c18659c2480fc1a22c07b20\t: Remove Acorn Labs on-acorn.io entries from public_suffix_list.dat (#3093)",
+    "date":"2026-07-28T15:12:26.9+02:00",
     "dependencies":null,
     "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
     "files":[
       "",
       ".github",
       ".github/pull_request_template.md",
+      ".github/scripts",
+      ".github/scripts/check_pr_template.py",
       ".github/workflows",
       ".github/workflows/deploy-site.yml",
+      ".github/workflows/pr_template_check.yml",
       ".github/workflows/psltool-fmt.yml",
       ".github/workflows/psltool_pr_check.yml",
       ".github/workflows/test.yml",
@@ -1842,6 +1885,7 @@
       ".github/workflows/validate.yml",
       ".gitignore",
       ".travis.yml",
+      "AGENTS.md",
       "CODE_OF_CONDUCT.md",
       "CONTRIBUTING.md",
       "LICENSE",
@@ -1931,7 +1975,7 @@
       "tools/psltool",
       "tools/psltool/psltool.go"
     ],
-    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"71f10962519e15d087b1ccffffdbca3422838a4ff50a62a3852c23e896253e1f"},
+    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"fe6adc7fb8014f57d28d69b18d0aa3e581efb432544922e12131a5d4a87bd954"},
     "licenses":[{
       "name":"Mozilla Public License 2.0",
       "spdx_id":"MPL-2.0",
@@ -1942,7 +1986,7 @@
     "minJRE":null,
     "name":"\"Public Suffix List Library\"",
     "signatures":{},
-    "version":"2026.189.0 b9a86cf0cd115f1e60b5815533f3fcfd2f9e8f4b",
+    "version":"2026.206.0 e1b8015c3b2f0f4f8c18659c2480fc1a22c07b20",
     "vulnerabilities":null
   },
   "minJRE":null,

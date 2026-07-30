@@ -48,9 +48,10 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.CivitaiCom;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52188 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53076 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { CivitaiCom.class })
 public class CivitaiComCrawler extends PluginForDecrypt {
+    /* Docs: https://developer.civitai.com/site/reference/ */
     public static final String API_BASE = "https://civitai.com/api/v1";
 
     public CivitaiComCrawler(PluginWrapper wrapper) {
@@ -100,10 +101,6 @@ public class CivitaiComCrawler extends PluginForDecrypt {
         final String itemID = urlregex.getMatch(1);
         final CivitaiCom hosterplugin = (CivitaiCom) this.getNewPluginForHostInstance(this.getHost());
         final CivitaiComConfig cfg = PluginJsonConfig.get(CivitaiComConfig.class);
-        /*
-         * Using API: https://github.com/civitai/civitai/wiki/REST-API-Reference,
-         * https://wiki.civitai.com/wiki/Civitai_API#GET_/api/v1/images
-         */
         final List<Map<String, Object>> modelVersions = new ArrayList<Map<String, Object>>();
         /**
          * 2024-07-18: About the "nsfw" parameter: According to their docs, without nsfw parameter, all items will be returned but that is
@@ -388,6 +385,7 @@ public class CivitaiComCrawler extends PluginForDecrypt {
                 logger.info("Stopping because: Current page did not contain any new items -> Reached end?");
                 break pagination;
             }
+            /* Continue to next page */
             page++;
             this.sleep(paginationSleepMillis, param);
         }

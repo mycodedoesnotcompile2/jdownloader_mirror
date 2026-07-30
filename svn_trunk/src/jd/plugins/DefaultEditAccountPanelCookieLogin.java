@@ -31,7 +31,9 @@ public class DefaultEditAccountPanelCookieLogin extends MigPanel implements Acco
         if (this.pass == null) {
             return null;
         } else {
-            return new String(this.pass.getPassword());
+            /* Apply plugin-specific correction before validation. */
+            final String password = new String(this.pass.getPassword());
+            return this.plg.updateAccountPassword(new Account(null, password), password);
         }
     }
 

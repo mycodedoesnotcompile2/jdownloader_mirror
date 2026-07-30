@@ -67,7 +67,7 @@ public class QuickFilterExceptionsTable extends FilterTable {
                 }
             };
             newAllFilters.add(filter);
-            if (!filter.isEnabled()) {
+            if (filter.isViewActive()) {
                 newEnabledFilters.add(filter);
             }
         }
@@ -78,7 +78,9 @@ public class QuickFilterExceptionsTable extends FilterTable {
     }
 
     private void setEnabled(boolean enabled, Filter filter) {
-        if (!enabled) {
+        // membership in the actively-hiding set depends on the rule type (see ExceptionFilter#isViewActive), not directly on
+        // the raw checkbox state: normal views are active when unchecked, negated views when checked.
+        if (filter instanceof ExceptionFilter && ((ExceptionFilter) filter).isViewActive()) {
             enabledFilters.add(filter);
         } else {
             enabledFilters.remove(filter);

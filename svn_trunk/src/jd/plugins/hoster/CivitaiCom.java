@@ -16,12 +16,24 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Exceptions;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.config.CivitaiComConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
+import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
@@ -34,19 +46,11 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Exceptions;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.config.CivitaiComConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 52665 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53077 $", interfaceVersion = 3, names = {}, urls = {})
 public class CivitaiCom extends PluginForHost {
     public CivitaiCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -115,6 +119,11 @@ public class CivitaiCom extends PluginForHost {
         }
     }
 
+    private String getContentURL(final DownloadLink link) {
+        /* 2026-07-29: Temp workaround to avoid Cloudflare problems, CF seems to be configured less aggressive for the .com domain. */
+        return link.getPluginPatternMatcher().replace("civitai.red/", "civitai.com/");
+    }
+
     private String getFID(final DownloadLink link) {
         final Regex regex_image = new Regex(link.getPluginPatternMatcher(), PATTERN_IMAGE);
         final Regex regex_download_models;
@@ -139,30 +148,24 @@ public class CivitaiCom extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        return requestFileInformation(link, null, false);
+        final Account account = AccountController.getInstance().getValidAccount(this.getHost());
+        return requestFileInformation(link, account);
     }
 
-    private AvailableStatus requestFileInformation(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
+    private AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
         final String contentID;
-        final Regex regex_image = new Regex(link.getPluginPatternMatcher(), PATTERN_IMAGE);
+        final String contenturl = this.getContentURL(link);
+        final Regex regex_image = new Regex(contenturl, PATTERN_IMAGE);
         final Regex regex_download_models;
         String extDefault = null;
         if (regex_image.patternFind()) {
             contentID = regex_image.getMatch(0);
             extDefault = ".jpg";
-        } else if ((regex_download_models = new Regex(link.getPluginPatternMatcher(), PATTERN_DOWNLOAD_MODELS)).patternFind()) {
+        } else if ((regex_download_models = new Regex(contenturl, PATTERN_DOWNLOAD_MODELS)).patternFind()) {
             contentID = regex_download_models.getMatch(0);
         } else {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        if (!link.isNameSet()) {
-            /* Fallback */
-            if (extDefault != null) {
-                link.setName(contentID + extDefault);
-            } else {
-                link.setName(contentID);
-            }
         }
         this.setBrowserExclusive();
         if (account != null) {
@@ -171,7 +174,10 @@ public class CivitaiCom extends PluginForHost {
         try {
             final CivitaiComConfig cfg = PluginJsonConfig.get(CivitaiComConfig.class);
             if (regex_image.patternFind()) {
-                br.getPage(link.getPluginPatternMatcher());
+                if (account != null) {
+                    return requestFileInformationImageAPI(link, account, contentID);
+                }
+                br.getPage(contenturl);
                 if (br.getHttpConnection().getResponseCode() == 404) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 } else if (br.getHttpConnection().getResponseCode() == 503) {
@@ -214,7 +220,8 @@ public class CivitaiCom extends PluginForHost {
                 }
                 /**
                  * 2024-03-11: Important: Do not open up the regex for original image too much or you run into risk of accidentally
-                 * downloading the wrong image, see: </br> https://board.jdownloader.org/showthread.php?t=95419
+                 * downloading the wrong image, see: </br>
+                 * https://board.jdownloader.org/showthread.php?t=95419
                  */
                 /* 2023-09-11: Base URL hardcoded from: https://civitai.com/_next/static/chunks/pages/_app-191d571abe9dc30e.js */
                 final String baseURL = "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/";
@@ -237,14 +244,14 @@ public class CivitaiCom extends PluginForHost {
                 link.setProperty(PROPERTY_DATE, imagemap.get("createdAt"));
                 link.setProperty(PROPERTY_USERNAME, user.get("username"));
             } else {
-                if (isDownload) {
+                if (PluginEnvironment.DOWNLOAD.isCurrentPluginEnvironment()) {
                     /* Do nothing - download handling will take care. */
                     return AvailableStatus.UNCHECKABLE;
                 }
-                basicLinkCheck(br, br.createGetRequest(link.getPluginPatternMatcher()), link, null, extDefault, FILENAME_SOURCE.CUSTOM, FILENAME_SOURCE.HEADER);
+                basicLinkCheck(br, br.createGetRequest(contenturl), link, null, extDefault, FILENAME_SOURCE.CUSTOM, FILENAME_SOURCE.HEADER);
             }
         } catch (final AccountRequiredException e) {
-            if (isDownload) {
+            if (PluginEnvironment.DOWNLOAD.isCurrentPluginEnvironment()) {
                 throw e;
             } else {
                 /* File is online but account is required to download it. */
@@ -271,23 +278,73 @@ public class CivitaiCom extends PluginForHost {
         return AvailableStatus.TRUE;
     }
 
+    @SuppressWarnings("unchecked")
+    /** Disadvantage: This cannot find the name of the image (because images have no names and so we need to fetch the postID??)! */
+    private AvailableStatus requestFileInformationImageAPI(final DownloadLink link, final Account account, final String imageID) throws Exception {
+        if (link == null || account == null || imageID == null) {
+            throw new IllegalArgumentException();
+        }
+        this.login(account);
+        /* GET /api/v1/images?imageId=<id> — Authorization header already set by caller via login() */
+        br.getPage("https://" + getHost() + "/api/v1/images?imageId=" + imageID);
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final Map<String, Object> response = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final List<Object> items = (List<Object>) response.get("items");
+        if (items == null || items.isEmpty()) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final Map<String, Object> item = (Map<String, Object>) items.get(0);
+        final String cdnURL = (String) item.get("url");
+        if (StringUtils.isEmpty(cdnURL)) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final String type = item.get("type").toString();
+        link.setProperty(PROPERTY_TYPE, type);
+        link.setProperty(PROPERTY_DATE, item.get("createdAt"));
+        link.setProperty(PROPERTY_USERNAME, item.get("username"));
+        /* Build direct URL for original/optimized quality */
+        final String directURL;
+        if ("video".equalsIgnoreCase(type)) {
+            directURL = cdnURL + "/optimized=true/" + Encoding.urlEncode(imageID);
+        } else {
+            directURL = cdnURL + "/original=true/" + Encoding.urlEncode(imageID);
+        }
+        link.setProperty(PROPERTY_DIRECTURL, directURL);
+        final CivitaiComConfig cfg = PluginJsonConfig.get(CivitaiComConfig.class);
+        String filename;
+        if (cfg.isUseIndexIDForImageFilename()) {
+            filename = imageID;
+            /* Ensure correct file extension based on direct URL. */
+            final String ext = getFileNameExtensionFromURL(cdnURL, null);
+            if (ext != null) {
+                filename = this.applyFilenameExtension(filename, ext);
+            }
+        } else {
+            filename = Plugin.getFileNameFromURL(new URL(cdnURL));
+        }
+        link.setFinalFileName(filename);
+        return AvailableStatus.TRUE;
+    }
+
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         handleDownload(link, null);
     }
 
     private void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
-        requestFileInformation(link, account, true);
+        requestFileInformation(link, account);
+        final String contenturl = this.getContentURL(link);
         String dllink;
-        if (new Regex(link.getPluginPatternMatcher(), PATTERN_IMAGE).patternFind()) {
+        if (new Regex(contenturl, PATTERN_IMAGE).patternFind()) {
             dllink = link.getStringProperty(PROPERTY_DIRECTURL);
             if (StringUtils.isEmpty(dllink)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
             }
         } else {
-            dllink = link.getPluginPatternMatcher();
             br.setFollowRedirects(false);
-            br.getPage(link.getPluginPatternMatcher());
+            br.getPage(contenturl);
             dllink = br.getRedirectLocation();
             if (dllink == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
@@ -380,6 +437,16 @@ public class CivitaiCom extends PluginForHost {
     }
 
     @Override
+    protected String getDefaultFileName(final DownloadLink link) {
+        final String fid = getFID(link);
+        if (new Regex(link.getPluginPatternMatcher(), PATTERN_IMAGE).patternFind()) {
+            return fid + ".jpg";
+        } else {
+            return fid;
+        }
+    }
+
+    @Override
     public boolean hasCaptcha(DownloadLink link, jd.plugins.Account acc) {
         return false;
     }
@@ -390,10 +457,6 @@ public class CivitaiCom extends PluginForHost {
     }
 
     @Override
-    public void reset() {
-    }
-
-    @Override
     public void resetDownloadlink(final DownloadLink link) {
         link.removeProperty(PROPERTY_DIRECTURL);
     }
@@ -401,6 +464,16 @@ public class CivitaiCom extends PluginForHost {
     @Override
     protected String getAPILoginHelpURL() {
         return "https://" + getHost() + "/user/account";
+    }
+
+    @Override
+    public String updateAccountPassword(final Account account, final String password) {
+        if (password == null) {
+            return null;
+        }
+        String ret = super.updateAccountPassword(account, password);
+        ret = ret.toLowerCase(Locale.ROOT);
+        return ret;
     }
 
     @Override

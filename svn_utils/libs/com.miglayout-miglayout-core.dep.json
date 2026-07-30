@@ -1,0 +1,56 @@
+{
+  "artefact":"com.miglayout/miglayout-core",
+  "dependencies":null,
+  "filter":["^(?!.*-test\\.jar$).+(-sources)?\\.jar$"],
+  "history":[],
+  "installed":{
+    "changes":null,
+    "date":"2026-07-29T12:09:11.72+02:00",
+    "dependencies":[],
+    "description":"MiGLayout - core layout logic",
+    "files":[
+      "",
+      "meta.json",
+      "miglayout-core-javadoc.jar",
+      "miglayout-core-javadoc.jar.asc",
+      "miglayout-core-javadoc.jar.md5",
+      "miglayout-core-javadoc.jar.sha1",
+      "miglayout-core-parent.pom",
+      "miglayout-core-parent.pom.md5",
+      "miglayout-core-parent.pom.sha1",
+      "miglayout-core-sources.jar",
+      "miglayout-core-sources.jar.asc",
+      "miglayout-core-sources.jar.md5",
+      "miglayout-core-sources.jar.sha1",
+      "miglayout-core.jar",
+      "miglayout-core.jar.asc",
+      "miglayout-core.jar.md5",
+      "miglayout-core.jar.sha1",
+      "miglayout-core.pom",
+      "miglayout-core.pom.asc",
+      "miglayout-core.pom.md5",
+      "miglayout-core.pom.sha1"
+    ],
+    "hashes":{
+      "miglayout-core.jar":"cf3cb12d94b76c2f80c113977d0372d037784002943e566fcdac6b92d076935e",
+      "miglayout-core-sources.jar":"fb3f4c1932c4248375861023fb4108e06a067676c932288ca9665e122e99d1f1"
+    },
+    "licenses":["BSD"],
+    "minJRE":"JVM_1_8",
+    "name":"MiGLayout Core",
+    "signatures":{
+      "miglayout-core.jar":"-----BEGIN PGP SIGNATURE-----\r\nVersion: GnuPG v2\r\n\r\niQEcBAABAgAGBQJgfxZwAAoJENtF06YqGDziK4QH/3e7ACWZOuBDKzi3nhg+NJjx\r\nEn8xd/nf9eZM8+nUUXsbYXMCKmfamM3Exusq5gF+orW8hIG725cqxHFQKr7m1f36\r\nFF0TJ1THD9s4xAdbqDv9Y9Fd4pWNz7NBBlC+PFiDR7SCvkAZvtGteY897GHJ/w7H\r\nTxfT07qX8HCuwJZTqk7SV7Xf6b+39FtxLS1aMqZ7rwSmUfCUnf3xZAoZhqY2oOhy\r\nfoa4iIM5XCMUpi2jAK3MfSaBM+jInvYBKwbEBKWsG9fkro4r6Xy3jC5ecxUuj6IJ\r\nPew1qHiiZGfTBB/Twy3lY9DWAcxtPxWGfonL19AO0P251rZceWOzqESIpwKGQsg=\r\n=FXMF\r\n-----END PGP SIGNATURE-----\r\n",
+      "miglayout-core-sources.jar":"-----BEGIN PGP SIGNATURE-----\r\nVersion: GnuPG v2\r\n\r\niQEcBAABAgAGBQJgfxZwAAoJENtF06YqGDziCYUH/3xPC+HmM/NMvAmTmE5Dbv/d\r\nfo0+WTDFAsSXWudW/wI/fKHg1KYv8bxesm1F0VwHu8+m31WJgwGUpwZgW47Wvxoc\r\n74NwfEE/5tVXyl/buucFIHqJIbqxxyF6JHCM8xTWZJJjHgOxouAPFS6ec+R20w0U\r\nhDU1Ea+rHg6IW/PVykwPrmbmQFNRfE/zqN0aS1lrGZKYkgYV/BPXEQSxXv6QAA0m\r\nCUbuG3gtgEinsJe0HcR6w2QKC3xQ4McvLoPJq8YKYzIjFERnQpAm7+ExAv1LxiE/\r\nBzTkZYwao68LCb+GuBdnRD+UK/PPDSPCEnMZGYU56NuUmocejCNZoFXeLtaWTqE=\r\n=ngoi\r\n-----END PGP SIGNATURE-----\r\n"
+    },
+    "version":"5.3",
+    "vulnerabilities":[]
+  },
+  "minJRE":"1.8",
+  "minReleasedAgeDays":null,
+  "provider":"maven",
+  "renames":null,
+  "requiredBy":[],
+  "version":"/.*/",
+  "autoRenameEnabled":true,
+  "confirm":true
+}

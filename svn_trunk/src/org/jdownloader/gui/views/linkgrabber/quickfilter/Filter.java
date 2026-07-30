@@ -64,6 +64,15 @@ public abstract class Filter {
         return enabled;
     }
 
+    /**
+     * Whether this view currently filters the linkgrabber table (belongs to the actively hiding set). By default a view is
+     * active when it is UNCHECKED (checked = "show all"). Inverted views override this (see ExceptionFilter). Used both for the
+     * hiding logic and to decide when the (red) hidden-count is shown.
+     */
+    public boolean isViewActive() {
+        return !isEnabled();
+    }
+
     public void setEnabled(boolean enabled) {
         if (this.enabled == enabled) {
             return;

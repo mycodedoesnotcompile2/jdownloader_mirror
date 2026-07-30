@@ -93,7 +93,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 53035 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53076 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -2309,43 +2309,43 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                     break download1;
                 }
                 /* Extra handling for imagehosts */
-                if (StringUtils.isEmpty(dllink) && this.isImagehoster()) {
+                find_image_directurl: if (StringUtils.isEmpty(dllink)) {
                     checkErrors(br, getCorrectBR(br), link, account);
                     Form imghost_next_form = findImageForm(this.br);
-                    if (imghost_next_form != null) {
-                        int counter = -1;
-                        final int countermax = 3;
-                        do {
-                            counter++;
-                            logger.info(String.format(Locale.ROOT, "imghost_next_form loop %d / %d", counter + 1, countermax));
-                            // this.handleCaptcha(link, imghost_next_form);
-                            submitForm(imghost_next_form);
-                            checkErrors(br, getCorrectBR(br), link, account);
-                            dllink = getDllink(link, account, br, getCorrectBR(br));
-                            /* For imagehosts, filenames are often not given until we can actually see/download the image. */
-                            final String imageFilename = regexImagehosterFilename(br);
-                            if (imageFilename != null) {
-                                link.setName(Encoding.htmlOnlyDecode(imageFilename));
-                            }
-                            if (this.isAbort()) {
-                                throw new InterruptedException();
-                            } else if (!StringUtils.isEmpty(dllink)) {
-                                logger.info("Found image directurl: " + dllink);
-                                break download1;
-                            } else if (counter >= countermax) {
-                                logger.warning("Imagehost handling exceeded max tries");
-                                break;
-                            } else {
-                                /* Continue to next try */
-                                imghost_next_form = findImageForm(this.br);
-                                if (imghost_next_form == null) {
-                                    logger.warning("Failed to find next imghost_next_form and no directurl present -> Stepping out of imagehost handling");
-                                    break;
-                                }
-                                continue;
-                            }
-                        } while (true);
+                    if (imghost_next_form == null) {
+                        break find_image_directurl;
                     }
+                    int counter = -1;
+                    final int countermax = 3;
+                    do {
+                        counter++;
+                        logger.info(String.format(Locale.ROOT, "imghost_next_form loop %d / %d", counter + 1, countermax));
+                        // this.handleCaptcha(link, imghost_next_form);
+                        submitForm(imghost_next_form);
+                        checkErrors(br, getCorrectBR(br), link, account);
+                        dllink = getDllink(link, account, br, getCorrectBR(br));
+                        /* For imagehosts, filenames are often not given until we can actually see/download the image. */
+                        final String imageFilename = regexImagehosterFilename(br);
+                        if (imageFilename != null) {
+                            link.setName(Encoding.htmlOnlyDecode(imageFilename));
+                        }
+                        if (this.isAbort()) {
+                            throw new InterruptedException();
+                        } else if (!StringUtils.isEmpty(dllink)) {
+                            logger.info("Found image directurl: " + dllink);
+                            break download1;
+                        } else if (counter >= countermax) {
+                            logger.warning("Imagehost handling exceeded max tries");
+                            break;
+                        }
+                        /* Continue to next try */
+                        imghost_next_form = findImageForm(this.br);
+                        if (imghost_next_form == null) {
+                            logger.warning("Failed to find next imghost_next_form and no directurl present -> Stepping out of imagehost handling");
+                            break;
+                        }
+                        continue;
+                    } while (counter <= countermax);
                 }
                 if (!StringUtils.isEmpty(dllink) || !StringUtils.isEmpty(officialDownloadURL)) {
                     logger.info("Stepping out of download1 loop because: Found directurl");
@@ -4963,7 +4963,10 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     /** Returns Form required to click on 'continue to image' for image-hosts. */
     public Form findImageForm(final Browser br) {
         final Form imghost_next_form = br.getFormbyKey("next");
-        if (imghost_next_form != null && imghost_next_form.hasInputFieldByName("method_premium")) {
+        if (imghost_next_form == null) {
+            return null;
+        }
+        if (imghost_next_form.hasInputFieldByName("method_premium")) {
             imghost_next_form.remove("method_premium");
         }
         return imghost_next_form;

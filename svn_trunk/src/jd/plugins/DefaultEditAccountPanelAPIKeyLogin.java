@@ -8,8 +8,6 @@ import javax.swing.JLabel;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter.HighlightPainter;
 
-import jd.gui.swing.components.linkbutton.JLink;
-
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtPasswordField;
 import org.appwork.swing.components.ExtTextField;
@@ -18,6 +16,8 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.gui.InputChangedCallbackInterface;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.accounts.AccountBuilderInterface;
+
+import jd.gui.swing.components.linkbutton.JLink;
 
 /** Use this for plugins which need API key login instead of username/password. */
 public class DefaultEditAccountPanelAPIKeyLogin extends MigPanel implements AccountBuilderInterface {
@@ -32,10 +32,11 @@ public class DefaultEditAccountPanelAPIKeyLogin extends MigPanel implements Acco
     protected String getPassword() {
         if (this.pass == null) {
             return null;
-        } else {
-            /* Return trimmed value since API keys typically never begin/end with whitespaces. */
-            return StringUtils.trim(new String(this.pass.getPassword()));
         }
+        /* Apply plugin-specific correction before validation (updateAccountPassword also trims for API key logins). */
+        String password = new String(this.pass.getPassword());
+        password = this.plg.updateAccountPassword(new Account(null, password), password);
+        return password;
     }
 
     public boolean updateAccount(Account input, Account output) {

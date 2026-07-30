@@ -50,7 +50,7 @@
     "version":"0.1.2",
     "vulnerabilities":[]
   },
-  "minJRE":"1.6",
+  "minJRE":"1.8",
   "minReleasedAgeDays":null,
   "provider":"maven",
   "renames":{"dec.jar":"brotli.jar"},

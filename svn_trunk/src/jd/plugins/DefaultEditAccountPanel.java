@@ -33,7 +33,9 @@ public class DefaultEditAccountPanel extends MigPanel implements AccountBuilderI
         if (EMPTYPW.equals(new String(this.pass.getPassword()))) {
             return null;
         }
-        return new String(this.pass.getPassword());
+        /* Apply plugin-specific correction before validation. */
+        final String password = new String(this.pass.getPassword());
+        return this.plg.updateAccountPassword(new Account(null, password), password);
     }
 
     protected String getUsername() {

@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.Regex;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -28,7 +27,7 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.hoster.StileProjectCom;
 
-@DecrypterPlugin(revision = "$Revision: 50142 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53076 $", interfaceVersion = 3, names = {}, urls = {})
 public class StileProjectComDecrypter extends PornEmbedParser {
     public StileProjectComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -69,12 +68,11 @@ public class StileProjectComDecrypter extends PornEmbedParser {
 
     @Override
     protected String getFileTitle(final CryptedLink param, final Browser br) {
-        final Regex type1 = new Regex(param.getCryptedUrl(), StileProjectCom.TYPE_NORMAL);
-        if (type1.patternFind()) {
-            return type1.getMatch(0).replace("-", " ").trim();
-        } else {
-            return new Regex(param.getCryptedUrl(), StileProjectCom.TYPE_NORMAL2).getMatch(1).replace("-", " ").trim();
+        String title = StileProjectCom.getURLTitleCleaned(br.getURL());
+        if (title == null) {
+            title = StileProjectCom.getURLTitleCleaned(param.getCryptedUrl());
         }
+        return title;
     }
 
     @Override

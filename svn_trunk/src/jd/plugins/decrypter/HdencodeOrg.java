@@ -17,7 +17,9 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
+import org.appwork.storage.TypeRef;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 
 import jd.PluginWrapper;
@@ -28,13 +30,15 @@ import jd.parser.html.Form;
 import jd.parser.html.HTMLParser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 51464 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53076 $", interfaceVersion = 3, names = {}, urls = {})
 public class HdencodeOrg extends PluginForDecrypt {
     public HdencodeOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -79,6 +83,18 @@ public class HdencodeOrg extends PluginForDecrypt {
         br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        /**
+         * 2026-07-29: Website has changed significantly. For now I only added detection for unsupported captcha type since fixing the
+         * plugin makes no sense as long as we cannot handle the captcha.
+         */
+        final Browser brc = br.cloneBrowser();
+        brc.getPage("/wp-json/content-protector/v1/security");
+        /* e.g. {"require_altcha":true,"require_turnstile":false,"require_image_captcha":false} */
+        final Map<String, Object> captchainfo = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+        if (Boolean.TRUE.equals(captchainfo.get("require_altcha"))) {
+            /* 2026-07-29 */
+            throw new DecrypterRetryException(RetryReason.UNSUPPORTED_CAPTCHA, "Unsupported captcha type 'altcha.org'");
         }
         int maxCaptchaForm = 3;
         boolean captchaFailed = true;

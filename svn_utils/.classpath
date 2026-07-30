@@ -6,6 +6,7 @@
 	<classpathentry kind="lib" path="libs/svgSalamander.jar"/>
 	<classpathentry kind="lib" path="dev_libs/jna.jar" sourcepath="dev_libs/jna-sources.jar"/>
 	<classpathentry kind="lib" path="dev_libs/jna-platform.jar" sourcepath="dev_libs/jna-platform-sources.jar"/>
+	<classpathentry kind="lib" path="libs/miglayout-core.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
 		<attributes>
 			<attribute name="module" value="true"/>
