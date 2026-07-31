@@ -103,6 +103,7 @@
 		<copy todir="${dist}/libs">
 			<fileset dir="${dep.awu}/libs" includes="**/*.jar">
 				<exclude name="miglayout.jar" />
+				<exclude name="miglayout-core.jar" />
 				<exclude name="**/*.info" />
 			</fileset>
 		</copy>
@@ -324,6 +325,7 @@
 
 		<jar duplicate="fail" file="${dist}/JDownloader.jar" manifest="${dist}/Manifest.MF">
 			<zipfileset src="${dep.awu}/libs/miglayout.jar" excludes="META-INF/*" />
+			<zipfileset src="${dep.awu}/libs/miglayout-core.jar" excludes="META-INF/*" />
 			<zipfileset src="${res}/libs/proxyVole.jar" excludes="META-INF/*" />
 			<fileset dir="${working}">
 				<include name="version.nfo" />

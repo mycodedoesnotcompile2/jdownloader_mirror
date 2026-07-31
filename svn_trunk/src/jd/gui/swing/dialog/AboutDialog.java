@@ -444,7 +444,7 @@ public class AboutDialog extends AbstractDialog<Integer> {
         stats.add(new JLabel("Extraction:"));
         final JPanel extraction = new JPanel(new MigLayout("ins 0,wrap 2"));
         extraction.add(createLink("7ZipJBindings (" + get7ZipJBindingDetails() + ")", "https://github.com/borisbrodski/sevenzipjbinding"));
-        extraction.add(createLink("Zip4J 1.3.3", "https://github.com/srikanth-lingala/zip4j"));
+        extraction.add(createLink("Zip4J 2.11.6", "https://github.com/srikanth-lingala/zip4j"));
         stats.add(extraction);
         final ExtButton ffmpegLink = createLink("Loading.....please wait", "https://ffmpeg.org/");
         stats.add(new JLabel("FFmpeg:"), "");

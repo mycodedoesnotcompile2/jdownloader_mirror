@@ -2,8 +2,8 @@ package org.jdownloader.extensions.extraction.multi;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashSet;
@@ -13,16 +13,19 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 
 import jd.controlling.downloadcontroller.IfFileExistsDialogInterface;
-import net.lingala.zip4j.core.ZipFile;
+import net.lingala.zip4j.ZipFile;
 import net.lingala.zip4j.exception.ZipException;
-import net.lingala.zip4j.io.ZipInputStream;
+import net.lingala.zip4j.io.inputstream.ZipInputStream;
+import net.lingala.zip4j.model.ExtraDataRecord;
 import net.lingala.zip4j.model.FileHeader;
 import net.sf.sevenzipjbinding.SevenZipException;
 
 import org.appwork.utils.Files;
+import org.appwork.utils.Hash;
 import org.appwork.utils.Regex;
 import org.appwork.utils.ReusableByteArrayOutputStream;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.logging2.extmanager.Log;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.dialog.DialogNoAnswerException;
 import org.jdownloader.controlling.FileCreationManager;
@@ -45,9 +48,9 @@ import org.jdownloader.extensions.extraction.gui.iffileexistsdialog.IfFileExists
 import org.jdownloader.settings.IfFileExistsAction;
 
 public class Zip4J extends IExtraction {
-    private volatile int               crack                   = 0;
-    private ZipFile                    zipFile                 = null;
-    private static final ArchiveType[] SUPPORTED_ARCHIVE_TYPES = new ArchiveType[] { ArchiveType.ZIP_MULTI2 };
+    private volatile int              crack                   = 0;
+    private ZipFile                   zipFile                 = null;
+    public static final ArchiveType[] SUPPORTED_ARCHIVE_TYPES = new ArchiveType[] { ArchiveType.ZIP_MULTI2, ArchiveType.ZIP_MULTI, ArchiveType.ZIP_SINGLE };
 
     @Override
     public Archive buildArchive(ArchiveFactory link, boolean allowDeepInspection) throws ArchiveException {
@@ -64,13 +67,13 @@ public class Zip4J extends IExtraction {
         }
         final AtomicReference<Signature> passwordFound = new AtomicReference<Signature>(null);
         try {
-            final List<?> items = zipFile.getFileHeaders();
+            final List<FileHeader> items = zipFile.getFileHeaders();
             final HashSet<String> checkedExtensions = new HashSet<String>();
             final ReusableByteArrayOutputStream buffer = new ReusableByteArrayOutputStream(64 * 1024);
             final SignatureCheckingOutStream signatureOutStream = new SignatureCheckingOutStream(ctl, passwordFound, ctl.getFileSignatures(), buffer, getConfig().getMaxCheckedFileSizeDuringOptimizedPasswordFindingInBytes(), optimized);
             final byte[] readBuffer = new byte[32767];
             fileLoop: for (int index = 0; index < items.size(); index++) {
-                final FileHeader item = (FileHeader) items.get(index);
+                final FileHeader item = items.get(index);
                 // Skip folders
                 if (item == null || item.isDirectory() || !item.isEncrypted()) {
                     continue fileLoop;
@@ -81,7 +84,7 @@ public class Zip4J extends IExtraction {
                     /* pw found */
                     break fileLoop;
                 } else {
-                    final String path = item.getFileName();
+                    final String path = getFileName(item);
                     final String ext = Files.getExtension(path);
                     if (checkedExtensions.add(ext) || !optimized) {
                         try {
@@ -89,8 +92,9 @@ public class Zip4J extends IExtraction {
                             signatureOutStream.reset();
                             signatureOutStream.setSignatureLength(path, remaining);
                             logger.fine("Validating password: " + path + "|" + password);
-                            zipFile.setPassword(password);
-                            final InputStream is;
+                            zipFile.setPassword(password.toCharArray());
+                            zipFile.setUseUtf8CharsetForPasswords(true);
+                            final ZipInputStream is;
                             try {
                                 is = zipFile.getInputStream(item);
                             } catch (ZipException e) {
@@ -143,16 +147,13 @@ public class Zip4J extends IExtraction {
         }
     }
 
-    private final ExtractionExtension extension;
-
     public Zip4J(ExtractionExtension extension) {
         crack = 0;
-        this.extension = extension;
     }
 
     public File getExtractFilePath(final FileHeader item, final ExtractionController ctrl, final AtomicBoolean skipped) throws MultiSevenZipException, ZipException {
         final Archive archive = getExtractionController().getArchive();
-        String itemPath = item.getFileName();
+        String itemPath = getFileName(item);
         final ArchiveFile firstArchiveFile = archive.getArchiveFiles().get(0);
         Matcher filter = null;
         if ((filter = isFiltered(itemPath)) != null) {
@@ -278,28 +279,44 @@ public class Zip4J extends IExtraction {
     public void setLastModifiedDate(FileHeader item, File extractTo) {
         // Set last write time
         try {
-            final long modified;
-            if (getConfig().isUseOriginalFileDate()) {
-                final int date = item.getLastModFileTime();
-                if (date >= 0) {
-                    modified = date * 1000l;
-                } else {
-                    modified = -1;
-                }
-            } else {
-                modified = System.currentTimeMillis();
+            final String fileName = getFileName(item);
+            long lastModified = 0;
+            if (!getConfig().isUseOriginalFileDate() || (lastModified = item.getLastModifiedTimeEpoch()) <= 0) {
+                lastModified = System.currentTimeMillis();
             }
-            if (modified == 0) {
-                return;
-            }
-            if (!extractTo.setLastModified(modified)) {
-                logger.warning("Could not set last write/modified time(" + modified + "/" + new Date(modified) + ") for " + item.getFileName());
+            if (!extractTo.setLastModified(lastModified)) {
+                logger.warning("Could not set last write/modified time(" + lastModified + "/" + new Date(lastModified) + ") for " + fileName);
             } else {
-                logger.warning("Set last write/modified time(" + modified + "/" + new Date(modified) + ")  for " + item.getFileName());
+                logger.warning("Set last write/modified time(" + lastModified + "/" + new Date(lastModified) + ")  for " + fileName);
             }
         } catch (final Throwable e) {
             logger.log(e);
         }
+    }
+
+    private String getFileName(FileHeader fileHeader) {
+        if (fileHeader.getExtraDataRecords() != null) {
+            for (ExtraDataRecord extraDataRecord : fileHeader.getExtraDataRecords()) {
+                final long identifier = extraDataRecord.getHeader();
+                if (identifier == 0x7075) {
+                    final byte[] data = extraDataRecord.getData();
+                    if (data[0] == 1) {
+                        try {
+                            final long fileNameCRC32 = Hash.getCRC32(fileHeader.getFileName().getBytes("ISO_8859_1"));
+                            final long fileNameCheckCRC32 = Integer.toUnsignedLong(ByteBuffer.wrap(Arrays.copyOfRange(data, 1, 5)).order(ByteOrder.LITTLE_ENDIAN).getInt());
+                            final String ret = new String(data, 5, data.length - 5, "UTF-8");
+                            if (fileNameCheckCRC32 == fileNameCRC32) {
+                                return ret;
+                            }
+                            throw new IOException("CRC32 Missmatch for: " + fileHeader.getFileName() + "<->" + ret);
+                        } catch (IOException e) {
+                            Log.log(e);
+                        }
+                    }
+                }
+            }
+        }
+        return fileHeader.getFileName();
     }
 
     @Override
@@ -310,13 +327,13 @@ public class Zip4J extends IExtraction {
             ctrl.setProcessedBytes(0);
             if (zipFile.isEncrypted()) {
                 final String pw = archive.getFinalPassword();
-                zipFile.setPassword(pw);
+                zipFile.setPassword(pw.toCharArray());
+                zipFile.setUseUtf8CharsetForPasswords(true);
             }
-            final List<?> items = zipFile.getFileHeaders();
+            final List<FileHeader> items = zipFile.getFileHeaders();
             byte[] readBuffer = new byte[32767];
             for (int index = 0; index < items.size(); index++) {
-                final FileHeader item = (FileHeader) items.get(index);
-
+                final FileHeader item = items.get(index);
                 // Skip folders
                 if (item == null || item.isDirectory()) {
                     continue;
@@ -336,7 +353,7 @@ public class Zip4J extends IExtraction {
                     /* error */
                     throw new ZipException("Extraction error, extractTo == null");
                 }
-                final String itemPath = item.getFileName();
+                final String itemPath = getFileName(item);
                 ctrl.setCurrentActiveItem(new Item(itemPath, size, extractTo));
                 try {
                     final FilesBytesCacheWriter call = new FilesBytesCacheWriter(extractTo, getExtractionController(), getConfig()) {
@@ -365,9 +382,12 @@ public class Zip4J extends IExtraction {
                         is.close();
                         is = null;
                     } finally {
-                        call.close();
-                        if (is != null) {
-                            is.close(true);
+                        try {
+                            call.close();
+                        } finally {
+                            if (is != null) {
+                                is.close();
+                            }
                         }
                     }
                     setLastModifiedDate(item, extractTo);
@@ -430,7 +450,7 @@ public class Zip4J extends IExtraction {
                 for (int index = 0; index < fileHeaders.size(); index++) {
                     final FileHeader fileHeader = (FileHeader) fileHeaders.get(index);
                     if (fileHeader != null) {
-                        final String itemPath = fileHeader.getFileName();
+                        final String itemPath = getFileName(fileHeader);
                         if (StringUtils.isEmpty(itemPath) || isFiltered(itemPath) != null) {
                             continue;
                         }
@@ -466,6 +486,15 @@ public class Zip4J extends IExtraction {
 
     @Override
     public void close() {
+        final ZipFile zipFile = this.zipFile;
+        if (zipFile != null) {
+            this.zipFile = null;
+            try {
+                zipFile.close();
+            } catch (IOException e) {
+                logger.log(e);
+            }
+        }
     }
 
     @Override
@@ -490,18 +519,22 @@ public class Zip4J extends IExtraction {
                 }
                 if (ret.isComplete()) {
                     final ZipFile zipFile = new ZipFile(archive.getArchiveFiles().get(0).getFilePath());
-                    final ArrayList<String> splitZipFiles = zipFile.getSplitZipFiles();
-                    if (splitZipFiles != null) {
-                        for (String splitZipFile : splitZipFiles) {
-                            if (splitZipFile.endsWith("z010")) {
-                                // workaround for bug in Zip4jUtil.getSplitZipFiles, if i>9 must be i>9
-                                splitZipFile = splitZipFile.replaceFirst("z010$", "z10");
-                            }
-                            if (archive.getArchiveFileByPath(splitZipFile) == null) {
-                                final File missingFile = new File(splitZipFile);
-                                ret.add(new DummyArchiveFile(new MissingArchiveFile(missingFile.getName(), splitZipFile)));
+                    try {
+                        final List<File> splitZipFiles = zipFile.getSplitZipFiles();
+                        if (splitZipFiles != null) {
+                            for (File splitZipFile : splitZipFiles) {
+                                String splitZipFilePath = splitZipFile.getPath();
+                                if (splitZipFilePath.endsWith("z010")) {
+                                    // workaround for bug in Zip4jUtil.getSplitZipFiles, if i>9 must be i>9
+                                    splitZipFilePath = splitZipFilePath.replaceFirst("z010$", "z10");
+                                }
+                                if (archive.getArchiveFileByPath(splitZipFilePath) == null) {
+                                    ret.add(new DummyArchiveFile(new MissingArchiveFile(splitZipFile.getName(), splitZipFilePath)));
+                                }
                             }
                         }
+                    } finally {
+                        zipFile.close();
                     }
                 }
                 return ret;

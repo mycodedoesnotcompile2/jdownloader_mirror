@@ -40,8 +40,8 @@ public enum JavaVersion implements JavaVersionInterface {
     JVM_24_0(68, "24"),
     JVM_25_0(69, "25", true),
     JVM_26_0(70, "26"),
-    JVM_27_0(71, "27"/* planned */),
-    JVM_28_0(72, "28"/* planned */),
+    JVM_27_0(71, "27"/* EA */),
+    JVM_28_0(72, "28"/* EA */),
     JVM_29_0(73, "29", true/* planned */) {
         private final long next;
         {

@@ -93,12 +93,8 @@ public class Multi extends IExtraction {
     private final ExtractionExtension  extension;
     private final static ArchiveType[] SUPPORTED_ARCHIVE_TYPES;
     static {
-        final ArrayList<ArchiveType> archiveTypes = new ArrayList<ArchiveType>();
-        for (final ArchiveType archiveType : ArchiveType.values()) {
-            if (!archiveType.name().startsWith("ZIP_MULTI2")) {
-                archiveTypes.add(archiveType);
-            }
-        }
+        final ArrayList<ArchiveType> archiveTypes = new ArrayList<ArchiveType>(Arrays.asList(ArchiveType.values()));
+        archiveTypes.removeAll(Arrays.asList(Zip4J.SUPPORTED_ARCHIVE_TYPES));
         SUPPORTED_ARCHIVE_TYPES = archiveTypes.toArray(new ArchiveType[0]);
     }
 
