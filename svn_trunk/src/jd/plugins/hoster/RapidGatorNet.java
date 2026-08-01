@@ -28,9 +28,37 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.WeakHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.swing.JLabel;
+
+import jd.PluginWrapper;
+import jd.controlling.AccountController;
+import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
+import jd.gui.swing.components.linkbutton.JLink;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.parser.html.Form;
+import jd.parser.html.InputField;
+import jd.parser.html.InputField.ElementType;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginConfigPanelNG;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
@@ -59,34 +87,7 @@ import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-import jd.PluginWrapper;
-import jd.controlling.AccountController;
-import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.http.URLConnectionAdapter;
-import jd.gui.swing.components.linkbutton.JLink;
-import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
-import jd.parser.html.Form;
-import jd.parser.html.InputField;
-import jd.parser.html.InputField.ElementType;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginConfigPanelNG;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-
-@HostPlugin(revision = "$Revision: 53056 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53087 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -337,8 +338,8 @@ public class RapidGatorNet extends PluginForHost {
         try {
             if (this.looksLikeDownloadableContent(con)) {
                 /**
-                 * Looks like direct-downloadable item. </br>
-                 * Either we're logged in as a premium user or this item was made hot-linked by a premium user.
+                 * Looks like direct-downloadable item. </br> Either we're logged in as a premium user or this item was made hot-linked by a
+                 * premium user.
                  */
                 if (con.getCompleteContentLength() > 0) {
                     if (con.isContentDecoded()) {
@@ -480,10 +481,9 @@ public class RapidGatorNet extends PluginForHost {
                 }
                 if (finalDownloadURL != null) {
                     /**
-                     * Premium downloadlink found! </br>
-                     * This does not mean that the user owns a premium account. It can also mean that this is a subscription-only file and
-                     * the user owns the needed subscription. </br>
-                     * The maps down below help us to determine the resumeability of such items.
+                     * Premium downloadlink found! </br> This does not mean that the user owns a premium account. It can also mean that this
+                     * is a subscription-only file and the user owns the needed subscription. </br> The maps down below help us to determine
+                     * the resumeability of such items.
                      */
                     logger.info("Premium account or active subscription");
                     if (account != null) {
@@ -552,9 +552,8 @@ public class RapidGatorNet extends PluginForHost {
                 if (cfg.isEnableFreeDownloadModeCaptchaDuringPreDownloadWait() && lastUsedCaptchaType != null) {
                     /**
                      * 2023-10-03: A small trick: We know their captcha key and can thus always obtain captcha solutions at any point of
-                     * time. </br>
-                     * Requesting the captcha here basically allows us to solve it during the serverside wait time which is impossible to do
-                     * in browser.
+                     * time. </br> Requesting the captcha here basically allows us to solve it during the serverside wait time which is
+                     * impossible to do in browser.
                      */
                     final long timeBeforeCaptchaInput = Time.systemIndependentCurrentJVMTimeMillis();
                     if (CAPTCHA_TYPE_RECAPTCHA.equals(lastUsedCaptchaType)) { /* reCaptcha captcha */
@@ -711,8 +710,8 @@ public class RapidGatorNet extends PluginForHost {
                 link.setResumeable(false);
             }
             /**
-             * Save timestamp when download was started. </br>
-             * Serverside wait time until next download can be started counts from beginning of first/last download.
+             * Save timestamp when download was started. </br> Serverside wait time until next download can be started counts from beginning
+             * of first/last download.
              */
             if (currentIP != null) {
                 synchronized (blockedIPsMap) {
@@ -776,11 +775,10 @@ public class RapidGatorNet extends PluginForHost {
     public int getChallengeTimeout(Challenge<?> challenge) {
         /**
          * If users need more than X seconds to enter the captcha [in free download mode before final download-step] and we actually send
-         * the captcha input after this time has passed, rapidgator will 'ban' the IP of the user for at least 60 minutes. </br>
-         * RG will first display a precise errormessage but then it will display the same message which is displayed when the user has
-         * reached the daily/hourly download-limit. </br>
-         * This function exists to avoid this. Instead of sending the captcha it can throw a retry exception, avoiding the 60+ minutes IP
-         * 'ban'.
+         * the captcha input after this time has passed, rapidgator will 'ban' the IP of the user for at least 60 minutes. </br> RG will
+         * first display a precise errormessage but then it will display the same message which is displayed when the user has reached the
+         * daily/hourly download-limit. </br> This function exists to avoid this. Instead of sending the captcha it can throw a retry
+         * exception, avoiding the 60+ minutes IP 'ban'.
          */
         if (useShortChallengeTimeoutToAvoidServersideBan) {
             return FREE_CAPTCHA_EXPIRE_TIME_MILLIS;
@@ -892,6 +890,7 @@ public class RapidGatorNet extends PluginForHost {
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         synchronized (account) {
+            account.removeProperty("premium_end_time");// from API response
             if (PluginJsonConfig.get(RapidGatorConfig.class).isEnableAPIPremium()) {
                 return fetchAccountInfoAPI(account);
             } else {
@@ -955,11 +954,12 @@ public class RapidGatorNet extends PluginForHost {
                 final Number traffic_max = (Number) trafficmap.get("total");
                 final Number premium_end_time_timestamp = (Number) usermap.get("premium_end_time");
                 if (premium_end_time_timestamp != null) {
+                    account.setProperty("premium_end_time", premium_end_time_timestamp);
                     /*
                      * 2019-12-23: Premium accounts expire too early if we just set the expire-date. Using their Android App even they will
                      * display the wrong expire date there. We have to add 24 hours to correct this.
                      */
-                    ai.setValidUntil(premium_end_time_timestamp.longValue() * 1000l + (24 * 60 * 60 * 1000l), br);
+                    ai.setValidUntil(TimeUnit.SECONDS.toMillis(premium_end_time_timestamp.longValue()) + TimeUnit.DAYS.toMillis(1), br);
                 }
                 if (traffic_left != null) {
                     ai.setTrafficLeft(traffic_left.longValue());
@@ -1059,7 +1059,20 @@ public class RapidGatorNet extends PluginForHost {
                  * E.g. subscriptions
                  */
                 br.getPage("/Payment/Payment");
-                expireDate = br.getRegex("\\d+\\s*</td>\\s*<td style=\"width.*?>(\\d{4}-\\d{2}-\\d{2})\\s*<").getMatch(0);
+                final String expireDates[] = br.getRegex("\\d+\\s*</td>\\s*<td style=\"width.*?>(\\d{4}-\\d{2}-\\d{2})\\s*<").getColumn(0);
+                if (expireDates != null) {
+                    // first entry in table doesn't have to be the longest 'valid until'
+                    // there can be another entry with longer 'valid until' but additional bought traffic/premium will be above this
+                    // entry/line
+                    long longestValidUntil = -1;
+                    for (final String nextExpireDate : expireDates) {
+                        final long nextValidUntil = TimeFormatter.getMilliSeconds(nextExpireDate + " 23:59:59", "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
+                        if (nextValidUntil >= longestValidUntil) {
+                            longestValidUntil = nextValidUntil;
+                            expireDate = nextExpireDate;
+                        }
+                    }
+                }
             }
             if (expireDate != null) {
                 /*
@@ -1067,8 +1080,14 @@ public class RapidGatorNet extends PluginForHost {
                  * fetchAccountInfo_api. In website mode we set it like this to make sure that the user can use his account the whole last
                  * day no matter which exact time of the day it expires.
                  */
-                expireDate += " 23:59:59";
-                ai.setValidUntil(TimeFormatter.getMilliSeconds(expireDate, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH), br);
+                long validUntil = TimeFormatter.getMilliSeconds(expireDate + " 23:59:59", "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
+                Number premium_end_time = (Number) account.getProperty("premium_end_time");
+                if (premium_end_time != null) {
+                    // prefer longer premium_end_time by api response
+                    premium_end_time = TimeUnit.SECONDS.toMillis(premium_end_time.longValue()) + TimeUnit.DAYS.toMillis(1);
+                    validUntil = Math.max(validUntil, premium_end_time.longValue());
+                }
+                ai.setValidUntil(validUntil, br);
             } else {
                 logger.warning("Could not find premium expire date!");
             }
@@ -1293,8 +1312,8 @@ public class RapidGatorNet extends PluginForHost {
                 captcha_url = findLoginCaptchaURL(br);
                 if (accountRequires2FALoginCode && br.containsHTML(">\\s*Invalid auth code")) {
                     /**
-                     * Previously entered 2FA code is invalid. This also means that the users' login credentials are valid. </br>
-                     * Ask user for another 2FA login code in next round.
+                     * Previously entered 2FA code is invalid. This also means that the users' login credentials are valid. </br> Ask user
+                     * for another 2FA login code in next round.
                      */
                     logger.info("2FA login: User entered invalid 2FA code");
                 } else if (this.requiresTwoFALogin(loginform)) {
@@ -1855,8 +1874,8 @@ public class RapidGatorNet extends PluginForHost {
     /**
      * Returns error message for files that require the user to be subscribed to a specific uploader to be able to download them. <br>
      *
-     * This can even happen for premium account owners since an extra subscription is needed to download such files. </br>
-     * This can be the same as when "isBuyFile()" returns true but with a more detailed error message.
+     * This can even happen for premium account owners since an extra subscription is needed to download such files. </br> This can be the
+     * same as when "isBuyFile()" returns true but with a more detailed error message.
      */
     private String getErrormessageSubscriberOnlyDownload(final Browser br) {
         return br.getRegex("(The files of this publisher \"[^\"<>]+\" can be downloaded only by subscribers\\.)").getMatch(0);
@@ -1916,11 +1935,11 @@ public class RapidGatorNet extends PluginForHost {
         if (br.containsHTML("id=\"exceeded_storage\"")) {
             /**
              * 2024-10-31: <br>
-             * Your storage space is full. Delete some files or upgrade to the new
-             * <a href="/article/premium" style="color: #ff801a;">storage plan</a>.<br>
+             * Your storage space is full. Delete some files or upgrade to the new <a href="/article/premium"
+             * style="color: #ff801a;">storage plan</a>.<br>
              * It looks like this error can happen even when a user is not logged in. At this moment we just assume that this means that the
-             * uploaders' account is out of space and for this reason, the file can't be downloaded. </br>
-             * This could also be a fake message which they display whenever the user tried to use a blocked proxy/VPN.
+             * uploaders' account is out of space and for this reason, the file can't be downloaded. </br> This could also be a fake message
+             * which they display whenever the user tried to use a blocked proxy/VPN.
              *
              */
             throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Uploaders' storage is full. Wait until uploader buys more traffic to download this file");
