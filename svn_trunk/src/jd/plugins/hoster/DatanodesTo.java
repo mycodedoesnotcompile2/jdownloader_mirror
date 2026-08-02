@@ -15,10 +15,13 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.io.IOException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.exceptions.WTFException;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
@@ -30,7 +33,6 @@ import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
-import jd.parser.html.Form.MethodType;
 import jd.parser.html.InputField;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
@@ -39,7 +41,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52983 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53088 $", interfaceVersion = 3, names = {}, urls = {})
 public class DatanodesTo extends XFileSharingProBasic {
     public DatanodesTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -151,25 +153,38 @@ public class DatanodesTo extends XFileSharingProBasic {
     @Override
     protected Form findFormDownload2Free(final Browser br) {
         Form form = super.findFormDownload2Free(br);
-        if (form == null) {
-            /* Special: Form gets added via JS. Assume that if we find the pre download wait, we can return the static form. */
-            final String waitStr = regexWaittime(br);
-            if (waitStr != null) {
-                final String fuid = this.getFUIDFromURL(this.getDownloadLink());
-                final String randStr = br.getRegex("rand=\"([^\"]+)\"").getMatch(0);
-                form = new Form();
-                form.setMethod(MethodType.POST);
-                form.put("op", "download2");
-                form.put("id", fuid);
-                form.put("rand", randStr != null ? Encoding.urlEncode(randStr) : "");
-                form.put("referer", Encoding.urlEncode(br.getURL()));
-                form.put("method_free", "Free Download >>");
-                form.put("method_premium", "");
-            }
-        }
         if (form != null) {
-            /* Add special non-XFS-default key:value pair */
             form.put("g_captch__a", "1");
+            return form;
+        }
+        /* Special: Form gets added via JS. Assume that if we find the pre download wait, we can return the static form. */
+        final String waitStr = regexWaittime(br);
+        if (waitStr != null) {
+            final String fuid = this.getFUIDFromURL(this.getDownloadLink());
+            final String randStr = br.getRegex("rand=\"([^\"]+)\"").getMatch(0);
+            final String dl_token = br.getRegex("dl-token=\"([^\"]+)\"").getMatch(0);
+            final StringBuilder formString = new StringBuilder();
+            try {
+                formString.append("<form method=\"POST\">").append("\r\n");
+                formString.append("<input type=\"text\" id=\"op\" name=\"op\" value=\"" + URLEncoder.encode("download2", "UTF-8") + "\">").append("\r\n");
+                formString.append("<input type=\"text\" id=\"g_captch__a\" name=\"g_captch__a\" value=\"" + URLEncoder.encode("1", "UTF-8") + "\">").append("\r\n");
+                formString.append("<input type=\"text\" id=\"id\" name=\"id\" value=\"" + URLEncoder.encode(fuid, "UTF-8") + "\">").append("\r\n");
+                formString.append("<input type=\"text\" id=\"rand\" name=\"rand\" value=\"" + URLEncoder.encode(StringUtils.valueOrEmpty(randStr), "UTF-8") + "\">").append("\r\n");
+                if (dl_token != null) {
+                    formString.append("<input type=\"text\" id=\"dl_token\" name=\"dl_token\" value=\"" + URLEncoder.encode(dl_token, "UTF-8") + "\">").append("\r\n");
+                }
+                formString.append("<input type=\"text\" id=\"referer\" name=\"referer\" value=\"" + URLEncoder.encode(br.getURL(), "UTF-8") + "\">").append("\r\n");
+                formString.append("<input type=\"text\" id=\"method_free\" name=\"method_free\" value=\"" + URLEncoder.encode("Free Download >>", "UTF-8") + "\">").append("\r\n");
+                formString.append("<input type=\"text\" id=\"method_premium\" name=\"method_premium\" value=\"" + URLEncoder.encode("", "UTF-8") + "\">").append("\r\n");
+                final String captcha_html = br.getRegex("captcha-html=\"(.*?)\"").getMatch(0);
+                if (captcha_html != null) {
+                    formString.append(Encoding.htmlOnlyDecode(captcha_html));
+                }
+                formString.append("</form>").append("\r\n");
+                form = new Form(formString.toString());
+            } catch (IOException e) {
+                throw new WTFException(e);
+            }
         }
         return form;
     }
