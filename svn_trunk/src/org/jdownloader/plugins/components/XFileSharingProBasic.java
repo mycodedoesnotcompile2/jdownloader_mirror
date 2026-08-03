@@ -93,7 +93,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 53076 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53089 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -2900,7 +2900,19 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     protected boolean handleCloudflareTurnstileCaptcha(final DownloadLink link, Browser br, final Form captchaForm) throws Exception {
-        final CaptchaHelperHostPluginCloudflareTurnstile ts = new CaptchaHelperHostPluginCloudflareTurnstile(this, br);
+        final CaptchaHelperHostPluginCloudflareTurnstile ts = new CaptchaHelperHostPluginCloudflareTurnstile(this, br) {
+            @Override
+            public String getSiteKey() {
+                if (captchaForm == null) {
+                    return super.getSiteKey();
+                }
+                final String siteKey = super.getSiteKey(captchaForm.getHtmlCode());
+                if (siteKey != null) {
+                    return siteKey;
+                }
+                return super.getSiteKey();
+            }
+        };
         /**
          * This contains a workaround for a widespread design-flaw when using an interactive captcha and a long wait-time in browser: <br>
          * We need to split up the total wait time in such a case otherwise our solution token will expire before we get the chance to send
@@ -2916,7 +2928,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     protected boolean handleHCaptcha(final DownloadLink link, Browser br, final Form captchaForm) throws Exception {
-        final CaptchaHelperHostPluginHCaptcha hCaptcha = getCaptchaHelperHostPluginHCaptcha(this, br);
+        final CaptchaHelperHostPluginHCaptcha hCaptcha = getCaptchaHelperHostPluginHCaptcha(this, br, captchaForm);
         /**
          * This contains a workaround for a widespread design-flaw when using hcaptcha and a long wait-time in browser: <br>
          * We need to split up the total waittime in such a case otherwise our solution token will expire before we get the chance to send
@@ -2934,7 +2946,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
          * This contains a workaround for a widespread design-flaw when using reCaptchaV2 and a long wait-time in browser: We need to split
          * up the wait in such a case.
          */
-        final CaptchaHelperHostPluginRecaptchaV2 rc2 = getCaptchaHelperHostPluginRecaptchaV2(this, br);
+        final CaptchaHelperHostPluginRecaptchaV2 rc2 = getCaptchaHelperHostPluginRecaptchaV2(this, br, captchaForm);
         logger.info("Detected captcha method \"RecaptchaV2\" normal-type '" + rc2.getType() + "' for this host");
         this.waitBeforeInteractiveCaptcha(link, rc2.getSolutionTimeout());
         final String recaptchaV2Response = rc2.getToken();
@@ -2942,12 +2954,36 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         return true;
     }
 
-    protected CaptchaHelperHostPluginHCaptcha getCaptchaHelperHostPluginHCaptcha(PluginForHost plugin, Browser br) throws PluginException {
-        return new CaptchaHelperHostPluginHCaptcha(this, br);
+    protected CaptchaHelperHostPluginHCaptcha getCaptchaHelperHostPluginHCaptcha(PluginForHost plugin, Browser br, final Form captchaForm) throws PluginException {
+        return new CaptchaHelperHostPluginHCaptcha(this, br) {
+            @Override
+            public String getSiteKey() {
+                if (captchaForm == null) {
+                    return super.getSiteKey();
+                }
+                final String siteKey = super.getSiteKey(captchaForm.getHtmlCode());
+                if (siteKey != null) {
+                    return siteKey;
+                }
+                return super.getSiteKey();
+            }
+        };
     }
 
-    protected CaptchaHelperHostPluginRecaptchaV2 getCaptchaHelperHostPluginRecaptchaV2(PluginForHost plugin, Browser br) throws PluginException {
-        return new CaptchaHelperHostPluginRecaptchaV2(this, br);
+    protected CaptchaHelperHostPluginRecaptchaV2 getCaptchaHelperHostPluginRecaptchaV2(PluginForHost plugin, Browser br, final Form captchaForm) throws PluginException {
+        return new CaptchaHelperHostPluginRecaptchaV2(this, br) {
+            @Override
+            public String getSiteKey() {
+                if (captchaForm == null) {
+                    return super.getSiteKey();
+                }
+                final String siteKey = super.getSiteKey(captchaForm.getHtmlCode());
+                if (siteKey != null) {
+                    return siteKey;
+                }
+                return super.getSiteKey();
+            }
+        };
     }
 
     /** Handles all kinds of captchas, also login-captcha - fills captcha answer into given captchaForm. */
@@ -2959,14 +2995,14 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             final String captchaResponse;
             final CaptchaHosterHelperInterface captchaHelper;
             if (containsHCaptcha(getCorrectBR(br))) {
-                final CaptchaHelperHostPluginHCaptcha hCaptcha = getCaptchaHelperHostPluginHCaptcha(this, br);
+                final CaptchaHelperHostPluginHCaptcha hCaptcha = getCaptchaHelperHostPluginHCaptcha(this, br, captchaForm);
                 logger.info("Detected captcha method \"hCaptcha\" type '" + hCaptcha.getType() + "' for this host");
                 captchaHelper = hCaptcha;
                 this.waitBeforeInteractiveCaptcha(link, hCaptcha.getSolutionTimeout());
                 captchaResponse = hCaptcha.getToken();
             } else {
                 /* Assume reCaptchaV2 is required */
-                final CaptchaHelperHostPluginRecaptchaV2 rc2 = getCaptchaHelperHostPluginRecaptchaV2(this, br);
+                final CaptchaHelperHostPluginRecaptchaV2 rc2 = getCaptchaHelperHostPluginRecaptchaV2(this, br, captchaForm);
                 logger.info("Detected captcha method \"RecaptchaV2\" type '" + rc2.getType() + "' for this host");
                 captchaHelper = rc2;
                 this.waitBeforeInteractiveCaptcha(link, rc2.getSolutionTimeout());
@@ -5959,16 +5995,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 setAccountLimitsByType(account, AccountType.PREMIUM);
             }
         }
-        final Object premium_bandwidthO = result.get("premium_bandwidth");
-        String premium_bandwidthBytesStr = null;
-        if (premium_bandwidthO != null) {
-            premium_bandwidthBytesStr = premium_bandwidthO.toString();
-        }
-        final Object traffic_leftO = result.get("traffic_left");
-        String traffic_leftBytesStr = null;
-        if (traffic_leftO != null) {
-            traffic_leftBytesStr = traffic_leftO.toString();
-        }
+        final String premium_bandwidthBytesStr = StringUtils.valueOfOrNull(result.get("premium_bandwidth"));
+        final String traffic_leftBytesStr = StringUtils.valueOfOrNull(result.get("traffic_left"));
         if (premium_bandwidthBytesStr != null) {
             ai.setTrafficLeft(parseSize(Size.TRAFFIC, premium_bandwidthBytesStr));
         } else if (traffic_leftBytesStr != null) {
@@ -5976,18 +6004,15 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
         {
             /* Now set less relevant account information */
-            final Object balanceO = result.get("balance"); // Double returned as string
-            if (balanceO != null) {
-                final String balanceStr = balanceO.toString();
-                if (balanceStr.matches("[0-9.]+")) {
-                    ai.setAccountBalance(Double.parseDouble(balanceStr), Currency.getInstance("USD"));
-                }
+            final String balanceStr = StringUtils.valueOfOrNull(result.get("balance")); // Double returned as string
+            if (balanceStr != null && balanceStr.matches("[0-9.]+")) {
+                ai.setAccountBalance(Double.parseDouble(balanceStr), Currency.getInstance("USD"));
             }
             /* 2019-07-26: values can also be "inf" for "Unlimited": "storage_left":"inf" */
             // final long storage_left = JavaScriptEngineFactory.toLong(entries.get("storage_left"), 0);
-            final Object storage_usedO = result.get("storage_used");
-            if (storage_usedO != null) {
-                ai.setUsedSpace(parseSize(Size.STORAGE, storage_usedO.toString()));
+            final String storage_used = StringUtils.valueOfOrNull(result.get("storage_used"));
+            if (storage_used != null) {
+                ai.setUsedSpace(parseSize(Size.STORAGE, storage_used));
             }
         }
         final Object files_totalO = result.get("files_total");

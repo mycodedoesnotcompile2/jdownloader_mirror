@@ -41,7 +41,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 53088 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53090 $", interfaceVersion = 3, names = {}, urls = {})
 public class DatanodesTo extends XFileSharingProBasic {
     public DatanodesTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -221,7 +221,7 @@ public class DatanodesTo extends XFileSharingProBasic {
     @Override
     public void handleCaptcha(final DownloadLink link, Browser br, final Form captchaForm) throws Exception {
         if (captchaForm != null && br.containsHTML("g-recaptcha-response")) {
-            final CaptchaHelperHostPluginRecaptchaV2 rc2 = getCaptchaHelperHostPluginRecaptchaV2(this, br);
+            final CaptchaHelperHostPluginRecaptchaV2 rc2 = getCaptchaHelperHostPluginRecaptchaV2(this, br, captchaForm);
             logger.info("Detected captcha method \"RecaptchaV2\" type '" + rc2.getType() + "' for this host");
             final CaptchaHosterHelperInterface captchaHelper = rc2;
             this.waitBeforeInteractiveCaptcha(link, rc2.getSolutionTimeout());
