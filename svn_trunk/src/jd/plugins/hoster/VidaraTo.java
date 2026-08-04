@@ -21,6 +21,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.requests.PostRequest;
@@ -33,13 +39,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 53083 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53105 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidaraTo extends PluginForHost {
     public VidaraTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -168,8 +168,8 @@ public class VidaraTo extends PluginForHost {
         if (hlsbest == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final String url_hls = hlsbest.getDownloadurl();
         checkFFmpeg(link, "Download a HLS Stream");
+        final String url_hls = hlsbest.getDownloadurl();
         dl = new HLSDownloader(link, br, url_hls);
         dl.startDownload();
     }

@@ -3,9 +3,6 @@ package org.jdownloader.extensions.extraction.split;
 import java.io.File;
 import java.util.List;
 
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.plugins.DownloadLink;
-
 import org.appwork.utils.IO;
 import org.appwork.utils.Regex;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
@@ -24,6 +21,9 @@ import org.jdownloader.extensions.extraction.bindings.crawledlink.CrawledLinkFac
 import org.jdownloader.extensions.extraction.bindings.downloadlink.DownloadLinkArchiveFactory;
 import org.jdownloader.extensions.extraction.multi.ArchiveException;
 import org.jdownloader.extensions.extraction.multi.CheckException;
+
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.plugins.DownloadLink;
 
 public class HachaSplit extends IExtraction {
     public static class HachaHeader {
@@ -183,7 +183,7 @@ public class HachaSplit extends IExtraction {
             if (factory instanceof DownloadLinkArchiveFactory) {
                 for (final DownloadLink link : ((DownloadLinkArchiveFactory) factory).getDownloadLinks()) {
                     final ExtensionsFilterInterface hint = CompiledFiletypeFilter.getExtensionsFilterInterface(link.getMimeHint());
-                    if (hint != null && !hint.isSameExtensionGroup(CompiledFiletypeFilter.ArchiveExtensions.NUM)) {
+                    if (hint != null && !hint.isSameExtensionGroup(CompiledFiletypeFilter.ArchiveExtensions.ZIP)) {
                         return false;
                     }
                 }
@@ -192,7 +192,7 @@ public class HachaSplit extends IExtraction {
                     final DownloadLink dlLink = link.getDownloadLink();
                     if (dlLink != null) {
                         final ExtensionsFilterInterface hint = CompiledFiletypeFilter.getExtensionsFilterInterface(dlLink.getMimeHint());
-                        if (hint != null && !hint.isSameExtensionGroup(CompiledFiletypeFilter.ArchiveExtensions.NUM)) {
+                        if (hint != null && !hint.isSameExtensionGroup(CompiledFiletypeFilter.ArchiveExtensions.ZIP)) {
                             return false;
                         }
                     }

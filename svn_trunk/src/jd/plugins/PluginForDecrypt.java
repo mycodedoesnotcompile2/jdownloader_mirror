@@ -27,29 +27,6 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import jd.PluginWrapper;
-import jd.config.SubConfiguration;
-import jd.controlling.ProgressController;
-import jd.controlling.captcha.CaptchaSettings;
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcollector.LinkCollector.JobLinkCrawler;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.linkcrawler.LinkCrawler.LinkCrawlerGeneration;
-import jd.controlling.linkcrawler.LinkCrawlerDistributer;
-import jd.controlling.linkcrawler.LinkCrawlerThread;
-import jd.http.Browser;
-import jd.http.Browser.BlockedByException;
-import jd.http.Browser.BrowserException;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
-import jd.plugins.DecrypterRetryException.RetryReason;
-import jd.utils.JDUtilities;
-
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.timetracker.TimeTracker;
 import org.appwork.timetracker.TrackerJob;
@@ -85,12 +62,34 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.plugins.controller.UpdateRequiredClassNotFoundException;
 import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.translate._JDT;
+
+import jd.PluginWrapper;
+import jd.config.SubConfiguration;
+import jd.controlling.ProgressController;
+import jd.controlling.captcha.CaptchaSettings;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcollector.LinkCollector.JobLinkCrawler;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.LinkCrawler.LinkCrawlerGeneration;
+import jd.controlling.linkcrawler.LinkCrawlerDistributer;
+import jd.controlling.linkcrawler.LinkCrawlerThread;
+import jd.http.Browser;
+import jd.http.Browser.BlockedByException;
+import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.plugins.DecrypterRetryException.RetryReason;
+import jd.utils.JDUtilities;
 
 /**
  * Dies ist die Oberklasse für alle Plugins, die Links entschlüsseln können
@@ -114,10 +113,6 @@ public abstract class PluginForDecrypt extends Plugin {
     @Override
     public SubConfiguration getPluginConfig() {
         return SubConfiguration.getConfig(lazyC.getDisplayName());
-    }
-
-    public FEATURE[] getFeatures() {
-        return new FEATURE[0];
     }
 
     @Override
@@ -146,16 +141,16 @@ public abstract class PluginForDecrypt extends Plugin {
     }
 
     /**
-     * Use this when e.g. crawling folders & subfolders from cloud-services. </br> Use this to find the last path in order to continue to
-     * build the path until all subfolders are crawled.
+     * Use this when e.g. crawling folders & subfolders from cloud-services. </br>
+     * Use this to find the last path in order to continue to build the path until all subfolders are crawled.
      */
     protected final String getAdoptedCloudFolderStructure() {
         return getAdoptedCloudFolderStructure(null);
     }
 
     /**
-     * Use this when e.g. crawling folders & subfolders from cloud-services. </br> Use this to find the last path in order to continue to
-     * build the path until all subfolders are crawled.
+     * Use this when e.g. crawling folders & subfolders from cloud-services. </br>
+     * Use this to find the last path in order to continue to build the path until all subfolders are crawled.
      */
     protected final String getAdoptedCloudFolderStructure(final String fallback) {
         CrawledLink current = getCurrentLink();

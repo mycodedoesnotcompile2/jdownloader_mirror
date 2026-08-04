@@ -41,7 +41,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51785 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53091 $", interfaceVersion = 2, names = {}, urls = {})
 public class SharingWtf extends YetiShareCore {
     public SharingWtf(PluginWrapper wrapper) {
         super(wrapper);
@@ -218,6 +218,9 @@ public class SharingWtf extends YetiShareCore {
         } else if (br.containsHTML(">\\s*You are now required to login in order to download")) {
             /* 2025-07-28 */
             throw new AccountRequiredException("You are now required to login in order to download");
+        } else if (br.containsHTML(">\\s*You need to be a member to download")) {
+            /* 2026-08-03 */
+            throw new AccountRequiredException("You need to be a member to download");
         }
         final String dailyLimitReachedText = br.getRegex(">\\s*(You have reached the daily download limit of \\d+ files)").getMatch(0);
         if (dailyLimitReachedText != null) {

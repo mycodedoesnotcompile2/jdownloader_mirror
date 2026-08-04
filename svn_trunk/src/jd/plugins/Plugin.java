@@ -39,34 +39,6 @@ import java.util.regex.Pattern;
 
 import javax.swing.Icon;
 
-import jd.PluginWrapper;
-import jd.config.ConfigContainer;
-import jd.config.SubConfiguration;
-import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.linkchecker.LinkCheckerThread;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.linkcrawler.LinkCrawler.LinkCrawlerGeneration;
-import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
-import jd.controlling.linkcrawler.LinkCrawlerThread;
-import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
-import jd.controlling.reconnect.ipcheck.IPCheckException;
-import jd.controlling.reconnect.ipcheck.OfflineException;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.BrowserSettingsThread;
-import jd.http.ProxySelectorInterface;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.SimpleFTP.ENCODING;
-import jd.nutils.encoding.Encoding;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-import jd.plugins.PluginForHost.FILENAME_SOURCE;
-import jd.plugins.components.SiteType.SiteTemplate;
-import jd.utils.JDUtilities;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
@@ -111,6 +83,7 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginHost;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.plugins.controller.PluginClassLoader;
 import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChild;
 import org.jdownloader.plugins.controller.UpdateRequiredClassNotFoundException;
@@ -120,6 +93,34 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.translate._JDT;
+
+import jd.PluginWrapper;
+import jd.config.ConfigContainer;
+import jd.config.SubConfiguration;
+import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.linkchecker.LinkCheckerThread;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.LinkCrawler.LinkCrawlerGeneration;
+import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
+import jd.controlling.linkcrawler.LinkCrawlerThread;
+import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
+import jd.controlling.reconnect.ipcheck.IPCheckException;
+import jd.controlling.reconnect.ipcheck.OfflineException;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.BrowserSettingsThread;
+import jd.http.ProxySelectorInterface;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.SimpleFTP.ENCODING;
+import jd.nutils.encoding.Encoding;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.PluginForHost.FILENAME_SOURCE;
+import jd.plugins.components.SiteType.SiteTemplate;
+import jd.utils.JDUtilities;
 
 /**
  * Diese abstrakte Klasse steuert den Zugriff auf weitere Plugins. Alle Plugins müssen von dieser Klasse abgeleitet werden.
@@ -704,10 +705,31 @@ public abstract class Plugin implements ActionListener {
                 return allowFileNameExtension(filenameOrg, filetypeNew, filetypeNew);
             }
         } else if (filetypeNew != null) {
-            return (CompiledFiletypeFilter.VideoExtensions.MP4.isSameExtensionGroup(filetypeOld) || CompiledFiletypeFilter.ImageExtensions.JPG.isSameExtensionGroup(filetypeOld) || CompiledFiletypeFilter.AudioExtensions.MP3.isSameExtensionGroup(filetypeOld)) && filetypeNew.isSameExtensionGroup(filetypeOld);
+            boolean ret = (CompiledFiletypeFilter.VideoExtensions.MP4.isSameExtensionGroup(filetypeOld) || CompiledFiletypeFilter.ImageExtensions.JPG.isSameExtensionGroup(filetypeOld) || CompiledFiletypeFilter.AudioExtensions.MP3.isSameExtensionGroup(filetypeOld)) && filetypeNew.isSameExtensionGroup(filetypeOld);
+            ret |= CompiledFiletypeFilter.VideoExtensions.MP4.isSameExtensionGroup(filetypeNew) && hasFeature(FEATURE.VIDEO_STREAMING);
+            ret |= CompiledFiletypeFilter.VideoExtensions.MP4.isSameExtensionGroup(filetypeNew) && (hasFeature(FEATURE.REQUIRES_HLS_DOWNLOADS) || hasFeature(FEATURE.REQUIRES_HLS_DOWNLOADS_ONLY));
+            ret |= CompiledFiletypeFilter.ImageExtensions.BMP.isSameExtensionGroup(filetypeNew) && hasFeature(FEATURE.IMAGE_HOST);
+            ret |= CompiledFiletypeFilter.AudioExtensions.AAC.isSameExtensionGroup(filetypeNew) && hasFeature(FEATURE.AUDIO_STREAMING);
+            return ret;
         } else {
             return false;
         }
+    }
+
+    public boolean hasFeature(final LazyPlugin.FEATURE feature) {
+        if (feature == null) {
+            return false;
+        }
+        final LazyPlugin.FEATURE[] features = getFeatures();
+        if (features == null) {
+            return false;
+        }
+        for (int i = 0; i < features.length; i++) {
+            if (features[i] == feature) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -1496,6 +1518,10 @@ public abstract class Plugin implements ActionListener {
         if (job != null) {
             job.validate();
         }
+    }
+
+    public FEATURE[] getFeatures() {
+        return new FEATURE[0];
     }
 
     public boolean hasChallengeResponse() {

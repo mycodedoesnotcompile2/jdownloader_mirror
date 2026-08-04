@@ -33,33 +33,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.swing.JLabel;
 
-import jd.PluginWrapper;
-import jd.controlling.AccountController;
-import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
-import jd.gui.swing.components.linkbutton.JLink;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
-import jd.parser.html.Form;
-import jd.parser.html.InputField;
-import jd.parser.html.InputField.ElementType;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginConfigPanelNG;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
@@ -87,7 +60,34 @@ import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 53087 $", interfaceVersion = 3, names = {}, urls = {})
+import jd.PluginWrapper;
+import jd.controlling.AccountController;
+import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
+import jd.gui.swing.components.linkbutton.JLink;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.parser.html.Form;
+import jd.parser.html.InputField;
+import jd.parser.html.InputField.ElementType;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginConfigPanelNG;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+
+@HostPlugin(revision = "$Revision: 53094 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -145,30 +145,31 @@ public class RapidGatorNet extends PluginForHost {
         return ret.toArray(new String[0]);
     }
 
-    private final int                API_SESSION_ID_REFRESH_TIMEOUT_MINUTES      = 45;
+    private final int                API_SESSION_ID_REFRESH_TIMEOUT_MINUTES            = 45;
     /*
      * 2020-01-07: Use 120 minutes for the website login for now. Consider disabling this on negative feedback as frequent website logins
      * may lead to login-captchas!
      */
-    private final int                WEBSITE_SESSION_ID_REFRESH_TIMEOUT_MINUTES  = 120;
-    private static Map<String, Long> blockedIPsMap                               = new HashMap<String, Long>();
-    private final String             PROPERTY_LAST_BLOCKED_IPS_MAP               = "rapidgatornet__last_blockedIPsMap";
-    private final String             PROPERTY_LAST_DOWNLOAD_STARTED_TIMESTAMP    = "rapidgatornet__last_download_started_timestamp";
-    private final String             PROPERTY_sessionid                          = "session_id";
-    private final String             PROPERTY_timestamp_session_create_api       = "session_create";
-    private final String             PROPERTY_timestamp_session_create_website   = "session_create_website";
-    private final String             PROPERTY_HOTLINK                            = "HOTLINK";
-    private static final String      PROPERTY_SOLO_SUBSCRIPTIONS                 = "solo_subscriptions_json";
+    private final int                WEBSITE_SESSION_ID_REFRESH_TIMEOUT_MINUTES        = 120;
+    private static Map<String, Long> blockedIPsMap                                     = new HashMap<String, Long>();
+    private final String             PROPERTY_LAST_BLOCKED_IPS_MAP                     = "rapidgatornet__last_blockedIPsMap";
+    private final String             PROPERTY_LAST_DOWNLOAD_STARTED_TIMESTAMP          = "rapidgatornet__last_download_started_timestamp";
+    private final String             PROPERTY_HOTLINK                                  = "HOTLINK";
+    private final String             PROPERTY_ACCOUNT_sessionid                        = "session_id";
+    private final String             PROPERTY_ACCOUNT_timestamp_session_create_api     = "session_create";
+    private final String             PROPERTY_ACCOUNT_timestamp_session_create_website = "session_create_website";
+    private static final String      PROPERTY_ACCOUNT_SOLO_SUBSCRIPTIONS               = "solo_subscriptions_json";
+    private static final String      PROPERTY_ACCOUNT_API_PREMIUM_END_TIME             = "api_premium_end_time";
     /* 2019-12-12: Lowered from 2 to 1 hour */
-    private final long               FREE_RECONNECTWAIT_GENERAL_MILLIS           = 1 * 60 * 60 * 1001L;
-    private final long               FREE_RECONNECTWAIT_DAILYLIMIT_MILLIS        = 3 * 60 * 60 * 1000L;
-    private final long               FREE_RECONNECTWAIT_BETWEEN_DOWNLOADS_MILLIS = 2 * 60 * 60 * 1000L;
-    private final int                FREE_CAPTCHA_EXPIRE_TIME_MILLIS             = 105 * 1000;
+    private final long               FREE_RECONNECTWAIT_GENERAL_MILLIS                 = 1 * 60 * 60 * 1001L;
+    private final long               FREE_RECONNECTWAIT_DAILYLIMIT_MILLIS              = 3 * 60 * 60 * 1000L;
+    private final long               FREE_RECONNECTWAIT_BETWEEN_DOWNLOADS_MILLIS       = 2 * 60 * 60 * 1000L;
+    private final int                FREE_CAPTCHA_EXPIRE_TIME_MILLIS                   = 105 * 1000;
     /* Don't touch the following! */
-    private static AtomicInteger     freeRunning                                 = new AtomicInteger(0);
-    private static final String      PROPERTY_LAST_USED_CAPTCHA_TYPE             = "last_used_captcha_type_v2";
-    private static final String      CAPTCHA_TYPE_RECAPTCHA                      = "recaptcha";
-    private static final String      CAPTCHA_TYPE_TURNSTILE                      = "turnstile";
+    private static AtomicInteger     freeRunning                                       = new AtomicInteger(0);
+    private static final String      PROPERTY_LAST_USED_CAPTCHA_TYPE                   = "last_used_captcha_type_v2";
+    private static final String      CAPTCHA_TYPE_RECAPTCHA                            = "recaptcha";
+    private static final String      CAPTCHA_TYPE_TURNSTILE                            = "turnstile";
 
     @Override
     public String getAGBLink() {
@@ -338,8 +339,8 @@ public class RapidGatorNet extends PluginForHost {
         try {
             if (this.looksLikeDownloadableContent(con)) {
                 /**
-                 * Looks like direct-downloadable item. </br> Either we're logged in as a premium user or this item was made hot-linked by a
-                 * premium user.
+                 * Looks like direct-downloadable item. </br>
+                 * Either we're logged in as a premium user or this item was made hot-linked by a premium user.
                  */
                 if (con.getCompleteContentLength() > 0) {
                     if (con.isContentDecoded()) {
@@ -481,9 +482,10 @@ public class RapidGatorNet extends PluginForHost {
                 }
                 if (finalDownloadURL != null) {
                     /**
-                     * Premium downloadlink found! </br> This does not mean that the user owns a premium account. It can also mean that this
-                     * is a subscription-only file and the user owns the needed subscription. </br> The maps down below help us to determine
-                     * the resumeability of such items.
+                     * Premium downloadlink found! </br>
+                     * This does not mean that the user owns a premium account. It can also mean that this is a subscription-only file and
+                     * the user owns the needed subscription. </br>
+                     * The maps down below help us to determine the resumeability of such items.
                      */
                     logger.info("Premium account or active subscription");
                     if (account != null) {
@@ -552,8 +554,9 @@ public class RapidGatorNet extends PluginForHost {
                 if (cfg.isEnableFreeDownloadModeCaptchaDuringPreDownloadWait() && lastUsedCaptchaType != null) {
                     /**
                      * 2023-10-03: A small trick: We know their captcha key and can thus always obtain captcha solutions at any point of
-                     * time. </br> Requesting the captcha here basically allows us to solve it during the serverside wait time which is
-                     * impossible to do in browser.
+                     * time. </br>
+                     * Requesting the captcha here basically allows us to solve it during the serverside wait time which is impossible to do
+                     * in browser.
                      */
                     final long timeBeforeCaptchaInput = Time.systemIndependentCurrentJVMTimeMillis();
                     if (CAPTCHA_TYPE_RECAPTCHA.equals(lastUsedCaptchaType)) { /* reCaptcha captcha */
@@ -710,8 +713,8 @@ public class RapidGatorNet extends PluginForHost {
                 link.setResumeable(false);
             }
             /**
-             * Save timestamp when download was started. </br> Serverside wait time until next download can be started counts from beginning
-             * of first/last download.
+             * Save timestamp when download was started. </br>
+             * Serverside wait time until next download can be started counts from beginning of first/last download.
              */
             if (currentIP != null) {
                 synchronized (blockedIPsMap) {
@@ -775,10 +778,11 @@ public class RapidGatorNet extends PluginForHost {
     public int getChallengeTimeout(Challenge<?> challenge) {
         /**
          * If users need more than X seconds to enter the captcha [in free download mode before final download-step] and we actually send
-         * the captcha input after this time has passed, rapidgator will 'ban' the IP of the user for at least 60 minutes. </br> RG will
-         * first display a precise errormessage but then it will display the same message which is displayed when the user has reached the
-         * daily/hourly download-limit. </br> This function exists to avoid this. Instead of sending the captcha it can throw a retry
-         * exception, avoiding the 60+ minutes IP 'ban'.
+         * the captcha input after this time has passed, rapidgator will 'ban' the IP of the user for at least 60 minutes. </br>
+         * RG will first display a precise errormessage but then it will display the same message which is displayed when the user has
+         * reached the daily/hourly download-limit. </br>
+         * This function exists to avoid this. Instead of sending the captcha it can throw a retry exception, avoiding the 60+ minutes IP
+         * 'ban'.
          */
         if (useShortChallengeTimeoutToAvoidServersideBan) {
             return FREE_CAPTCHA_EXPIRE_TIME_MILLIS;
@@ -890,7 +894,7 @@ public class RapidGatorNet extends PluginForHost {
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         synchronized (account) {
-            account.removeProperty("premium_end_time");// from API response
+            account.removeProperty(PROPERTY_ACCOUNT_API_PREMIUM_END_TIME);
             if (PluginJsonConfig.get(RapidGatorConfig.class).isEnableAPIPremium()) {
                 return fetchAccountInfoAPI(account);
             } else {
@@ -954,7 +958,7 @@ public class RapidGatorNet extends PluginForHost {
                 final Number traffic_max = (Number) trafficmap.get("total");
                 final Number premium_end_time_timestamp = (Number) usermap.get("premium_end_time");
                 if (premium_end_time_timestamp != null) {
-                    account.setProperty("premium_end_time", premium_end_time_timestamp);
+                    account.setProperty(PROPERTY_ACCOUNT_API_PREMIUM_END_TIME, premium_end_time_timestamp);
                     /*
                      * 2019-12-23: Premium accounts expire too early if we just set the expire-date. Using their Android App even they will
                      * display the wrong expire date there. We have to add 24 hours to correct this.
@@ -986,7 +990,7 @@ public class RapidGatorNet extends PluginForHost {
     }
 
     private boolean hasAtLeastOneActiveSoloSubscription(final Account account) {
-        final String subscriptionsJson = account.getStringProperty(PROPERTY_SOLO_SUBSCRIPTIONS);
+        final String subscriptionsJson = account.getStringProperty(PROPERTY_ACCOUNT_SOLO_SUBSCRIPTIONS);
         if (subscriptionsJson == null) {
             return false;
         }
@@ -1081,9 +1085,9 @@ public class RapidGatorNet extends PluginForHost {
                  * day no matter which exact time of the day it expires.
                  */
                 long validUntil = TimeFormatter.getMilliSeconds(expireDate + " 23:59:59", "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
-                Number premium_end_time = (Number) account.getProperty("premium_end_time");
+                Number premium_end_time = (Number) account.getProperty(PROPERTY_ACCOUNT_API_PREMIUM_END_TIME);
                 if (premium_end_time != null) {
-                    // prefer longer premium_end_time by api response
+                    /* Prefer longer premium_end_time from api response */
                     premium_end_time = TimeUnit.SECONDS.toMillis(premium_end_time.longValue()) + TimeUnit.DAYS.toMillis(1);
                     validUntil = Math.max(validUntil, premium_end_time.longValue());
                 }
@@ -1107,7 +1111,7 @@ public class RapidGatorNet extends PluginForHost {
         }
         find_solo_subscriptions: {
             /* Clear possibly stale subscription information first. It gets set again below if we still find valid subscriptions. */
-            account.removeProperty(PROPERTY_SOLO_SUBSCRIPTIONS);
+            account.removeProperty(PROPERTY_ACCOUNT_SOLO_SUBSCRIPTIONS);
             final Browser brc = br.cloneBrowser();
             brc.getPage("/subscription/list");
             final String[][] subscriptions = brc.getRegex("<td[^>]*>\\s*(\\d+-\\d+-\\d+ \\d+:\\d+:\\d+)\\s*</td>\\s*<td[^>]*>\\s*<a href=\"(/subscription/links/id/[^\"]+)\">\\s*(.*?)\\s*</a>\\s*</td>\\s*<td[^>]*>\\s*(.*?)\\s*</td>\\s*<td[^>]*>\\s*(\\d+-\\d+-\\d+ \\d+:\\d+:\\d+)\\s*</td>\\s*<td[^>]*>\\s*(.*?)\\s*</td>\\s*<td[^>]*>\\s*(.*?)\\s*</td>").getMatches();
@@ -1174,7 +1178,7 @@ public class RapidGatorNet extends PluginForHost {
              * Store collected subscription information (including inactive ones) as json string property so we can display it via
              * extendAccountSettingsPanel.
              */
-            account.setProperty(PROPERTY_SOLO_SUBSCRIPTIONS, JSonStorage.serializeToJson(subscriptionInfoMap));
+            account.setProperty(PROPERTY_ACCOUNT_SOLO_SUBSCRIPTIONS, JSonStorage.serializeToJson(subscriptionInfoMap));
             if (numberofValidSubscriptions == 0) {
                 logger.info("User has zero active solo subscriptions with traffic");
                 break find_solo_subscriptions;
@@ -1242,12 +1246,12 @@ public class RapidGatorNet extends PluginForHost {
                     /* Do not validate cookies */
                     return;
                 }
-                final long cookies_timestamp = account.getLongProperty(PROPERTY_timestamp_session_create_website, 0);
+                final long cookies_timestamp = account.getLongProperty(PROPERTY_ACCOUNT_timestamp_session_create_website, 0);
                 logger.info("VerifyCookies:Timestamp:" + cookies_timestamp + "|Age:" + TimeFormatter.formatMilliSeconds((System.currentTimeMillis() - cookies_timestamp), 0));
                 accessMainpage(br);
                 if (isLoggedINWebsite(br)) {
                     logger.info("Successfully validated cookies:Timestamp:" + cookies_timestamp + "|Age:" + TimeFormatter.formatMilliSeconds((System.currentTimeMillis() - cookies_timestamp), 0));
-                    if (sessionReUseAllowed(account, PROPERTY_timestamp_session_create_website, WEBSITE_SESSION_ID_REFRESH_TIMEOUT_MINUTES)) {
+                    if (sessionReUseAllowed(account, PROPERTY_ACCOUNT_timestamp_session_create_website, WEBSITE_SESSION_ID_REFRESH_TIMEOUT_MINUTES)) {
                         setAccountTypeWebsite(account, br);
                         setAccountSession(account, br);
                         return;
@@ -1312,8 +1316,8 @@ public class RapidGatorNet extends PluginForHost {
                 captcha_url = findLoginCaptchaURL(br);
                 if (accountRequires2FALoginCode && br.containsHTML(">\\s*Invalid auth code")) {
                     /**
-                     * Previously entered 2FA code is invalid. This also means that the users' login credentials are valid. </br> Ask user
-                     * for another 2FA login code in next round.
+                     * Previously entered 2FA code is invalid. This also means that the users' login credentials are valid. </br>
+                     * Ask user for another 2FA login code in next round.
                      */
                     logger.info("2FA login: User entered invalid 2FA code");
                 } else if (this.requiresTwoFALogin(loginform)) {
@@ -1405,9 +1409,9 @@ public class RapidGatorNet extends PluginForHost {
     private void clearAccountSession(Account account, Browser br) {
         synchronized (account) {
             br.clearCookies(null);
-            final long cookies_timestamp = account.getLongProperty(PROPERTY_timestamp_session_create_website, 0);
+            final long cookies_timestamp = account.getLongProperty(PROPERTY_ACCOUNT_timestamp_session_create_website, 0);
             account.clearCookies("");
-            account.removeProperty(PROPERTY_timestamp_session_create_website);
+            account.removeProperty(PROPERTY_ACCOUNT_timestamp_session_create_website);
             if (cookies_timestamp > 0) {
                 logger.info("ClearCookies:Timestamp:" + cookies_timestamp + "|Age:" + TimeFormatter.formatMilliSeconds((System.currentTimeMillis() - cookies_timestamp), 0));
             }
@@ -1417,7 +1421,7 @@ public class RapidGatorNet extends PluginForHost {
     private void setAccountSession(Account account, Browser br) {
         synchronized (account) {
             account.saveCookies(br.getCookies(br.getHost()), "");
-            account.setProperty(PROPERTY_timestamp_session_create_website, System.currentTimeMillis());
+            account.setProperty(PROPERTY_ACCOUNT_timestamp_session_create_website, System.currentTimeMillis());
         }
     }
 
@@ -1466,7 +1470,7 @@ public class RapidGatorNet extends PluginForHost {
     /** Returns session_id stored on given account object. */
     private String getAccountSession(final Account account) {
         synchronized (account) {
-            return account.getStringProperty(PROPERTY_sessionid, null);
+            return account.getStringProperty(PROPERTY_ACCOUNT_sessionid, null);
         }
     }
 
@@ -1479,14 +1483,14 @@ public class RapidGatorNet extends PluginForHost {
             }
             String session_id = getAccountSession(account);
             if (session_id != null) {
-                final long session_timestamp = account.getLongProperty(PROPERTY_timestamp_session_create_api, 0);
+                final long session_timestamp = account.getLongProperty(PROPERTY_ACCOUNT_timestamp_session_create_api, 0);
                 logger.info("VerifySession:" + session_id + "|Timestamp:" + session_timestamp + "|Age:" + TimeFormatter.formatMilliSeconds((System.currentTimeMillis() - session_timestamp), 0));
                 /* Try to re-use last token */
                 br.getPage(getAPIBase() + "user/info?token=" + Encoding.urlEncode(session_id));
                 try {
                     final Map<String, Object> response = handleErrors_api(null, null, account, br);
                     logger.info("Successfully validated last session:" + session_id + "|Timestamp:" + session_timestamp + "|Age:" + TimeFormatter.formatMilliSeconds((System.currentTimeMillis() - session_timestamp), 0));
-                    if (sessionReUseAllowed(account, PROPERTY_timestamp_session_create_api, API_SESSION_ID_REFRESH_TIMEOUT_MINUTES)) {
+                    if (sessionReUseAllowed(account, PROPERTY_ACCOUNT_timestamp_session_create_api, API_SESSION_ID_REFRESH_TIMEOUT_MINUTES)) {
                         final Map<String, Object> ret = new HashMap<String, Object>(response);
                         // required for later use of getAccountSession(Map)
                         ret.put("token", session_id);
@@ -1519,8 +1523,8 @@ public class RapidGatorNet extends PluginForHost {
 
     private void setAccountSession(Account account, final String session_id) {
         synchronized (account) {
-            account.setProperty(PROPERTY_sessionid, session_id);
-            account.setProperty(PROPERTY_timestamp_session_create_api, System.currentTimeMillis());
+            account.setProperty(PROPERTY_ACCOUNT_sessionid, session_id);
+            account.setProperty(PROPERTY_ACCOUNT_timestamp_session_create_api, System.currentTimeMillis());
         }
     }
 
@@ -1529,9 +1533,9 @@ public class RapidGatorNet extends PluginForHost {
             final String session_id = getAccountSession(account);
             if (clear_session_id == null || clear_session_id.equals(session_id)) {
                 account.setType(null);
-                final long session_timestamp = account.getLongProperty(PROPERTY_timestamp_session_create_api, 0);
-                account.removeProperty(PROPERTY_sessionid);
-                account.removeProperty(PROPERTY_timestamp_session_create_api);
+                final long session_timestamp = account.getLongProperty(PROPERTY_ACCOUNT_timestamp_session_create_api, 0);
+                account.removeProperty(PROPERTY_ACCOUNT_sessionid);
+                account.removeProperty(PROPERTY_ACCOUNT_timestamp_session_create_api);
                 if (session_id != null) {
                     logger.info("ClearSession:" + session_id + "|Timestamp:" + session_timestamp + "|Age:" + TimeFormatter.formatMilliSeconds((System.currentTimeMillis() - session_timestamp), 0));
                 }
@@ -1874,8 +1878,8 @@ public class RapidGatorNet extends PluginForHost {
     /**
      * Returns error message for files that require the user to be subscribed to a specific uploader to be able to download them. <br>
      *
-     * This can even happen for premium account owners since an extra subscription is needed to download such files. </br> This can be the
-     * same as when "isBuyFile()" returns true but with a more detailed error message.
+     * This can even happen for premium account owners since an extra subscription is needed to download such files. </br>
+     * This can be the same as when "isBuyFile()" returns true but with a more detailed error message.
      */
     private String getErrormessageSubscriberOnlyDownload(final Browser br) {
         return br.getRegex("(The files of this publisher \"[^\"<>]+\" can be downloaded only by subscribers\\.)").getMatch(0);
@@ -1935,11 +1939,11 @@ public class RapidGatorNet extends PluginForHost {
         if (br.containsHTML("id=\"exceeded_storage\"")) {
             /**
              * 2024-10-31: <br>
-             * Your storage space is full. Delete some files or upgrade to the new <a href="/article/premium"
-             * style="color: #ff801a;">storage plan</a>.<br>
+             * Your storage space is full. Delete some files or upgrade to the new
+             * <a href="/article/premium" style="color: #ff801a;">storage plan</a>.<br>
              * It looks like this error can happen even when a user is not logged in. At this moment we just assume that this means that the
-             * uploaders' account is out of space and for this reason, the file can't be downloaded. </br> This could also be a fake message
-             * which they display whenever the user tried to use a blocked proxy/VPN.
+             * uploaders' account is out of space and for this reason, the file can't be downloaded. </br>
+             * This could also be a fake message which they display whenever the user tried to use a blocked proxy/VPN.
              *
              */
             throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Uploaders' storage is full. Wait until uploader buys more traffic to download this file");
@@ -2071,7 +2075,7 @@ public class RapidGatorNet extends PluginForHost {
     @Override
     public void extendAccountSettingsPanel(final Account account, final PluginConfigPanelNG panel) {
         super.extendAccountSettingsPanel(account, panel);
-        final String subscriptionsJson = account.getStringProperty(PROPERTY_SOLO_SUBSCRIPTIONS);
+        final String subscriptionsJson = account.getStringProperty(PROPERTY_ACCOUNT_SOLO_SUBSCRIPTIONS);
         if (subscriptionsJson == null) {
             /* User has no solo subscriptions at all (neither active nor inactive) -> Do not display any extra information. */
             return;

@@ -74,66 +74,67 @@ public class Zip4J extends IExtraction {
             final byte[] readBuffer = new byte[32767];
             fileLoop: for (int index = 0; index < items.size(); index++) {
                 final FileHeader item = items.get(index);
-                // Skip folders
                 if (item == null || item.isDirectory() || !item.isEncrypted()) {
+                    /* skip folders and non-encrypted entries */
                     continue fileLoop;
-                } else if (ctl.gotKilled()) {
+                }
+                if (ctl.gotKilled()) {
                     /* extraction got aborted */
                     break fileLoop;
-                } else if (passwordFound.get() != null) {
+                }
+                if (passwordFound.get() != null) {
                     /* pw found */
                     break fileLoop;
-                } else {
-                    final String path = getFileName(item);
-                    final String ext = Files.getExtension(path);
-                    if (checkedExtensions.add(ext) || !optimized) {
-                        try {
-                            long remaining = item.getUncompressedSize();
-                            signatureOutStream.reset();
-                            signatureOutStream.setSignatureLength(path, remaining);
-                            logger.fine("Validating password: " + path + "|" + password);
-                            zipFile.setPassword(password.toCharArray());
-                            zipFile.setUseUtf8CharsetForPasswords(true);
-                            final ZipInputStream is;
-                            try {
-                                is = zipFile.getInputStream(item);
-                            } catch (ZipException e) {
-                                throw new IOException(e.getMessage(), e);
+                }
+                final String path = getFileName(item);
+                final String ext = Files.getExtension(path);
+                if (!checkedExtensions.add(ext) && optimized) {
+                    /* in optimized mode only one file per extension is checked */
+                    continue fileLoop;
+                }
+                try {
+                    long remaining = item.getUncompressedSize();
+                    signatureOutStream.reset();
+                    signatureOutStream.setSignatureLength(path, remaining);
+                    logger.fine("Validating password: " + path + "|" + password);
+                    zipFile.setPassword(password.toCharArray());
+                    zipFile.setUseUtf8CharsetForPasswords(true);
+                    final ZipInputStream is;
+                    try {
+                        is = zipFile.getInputStream(item);
+                    } catch (ZipException e) {
+                        throw new IOException(e.getMessage(), e);
+                    }
+                    try {
+                        while (passwordFound.get() == null) {
+                            final int read = is.read(readBuffer);
+                            if (read == -1) {
+                                break;
                             }
-                            try {
-                                while (passwordFound.get() == null) {
-                                    final int read = is.read(readBuffer);
-                                    if (read == -1) {
-                                        break;
-                                    } else {
-                                        final int write = signatureOutStream.write(readBuffer, 0, read);
-                                        if (write == 0) {
-                                            break;
-                                        } else {
-                                            remaining -= write;
-                                        }
-                                    }
-                                }
-                            } finally {
-                                is.close();
+                            final int write = signatureOutStream.write(readBuffer, 0, read);
+                            if (write == 0) {
+                                break;
                             }
-                            if (remaining == 0) {
-                                passwordFound.compareAndSet(null, new Signature("UNKNOWN:Extraction:OK", null, null, ext));
-                                break fileLoop;
-                            }
-                        } catch (SevenZipException e) {
-                            logger.log(e);
-                        } catch (IOException e) {
-                            if (StringUtils.startsWithCaseInsensitive(e.getMessage(), "Wrong Password")) {
-                                logger.log(e);
-                            } else {
-                                throw e;
-                            }
-                        } finally {
-                            if (passwordFound.get() != null) {
-                                logger.info("Verified Password:" + password + "|" + path + "|" + passwordFound.get());
-                            }
+                            remaining -= write;
                         }
+                    } finally {
+                        is.close();
+                    }
+                    if (remaining == 0) {
+                        passwordFound.compareAndSet(null, new Signature("UNKNOWN:Extraction:OK", null, null, ext));
+                        break fileLoop;
+                    }
+                } catch (SevenZipException e) {
+                    logger.log(e);
+                } catch (IOException e) {
+                    if (StringUtils.startsWithCaseInsensitive(e.getMessage(), "Wrong Password")) {
+                        logger.log(e);
+                    } else {
+                        throw e;
+                    }
+                } finally {
+                    if (passwordFound.get() != null) {
+                        logger.info("Verified Password:" + password + "|" + path + "|" + passwordFound.get());
                     }
                 }
             }
@@ -300,7 +301,7 @@ public class Zip4J extends IExtraction {
                 final long identifier = extraDataRecord.getHeader();
                 if (identifier == 0x7075) {
                     final byte[] data = extraDataRecord.getData();
-                    if (data[0] == 1) {
+                    if (data != null && data.length >= 5 && data[0] == 1) {
                         try {
                             final long fileNameCRC32 = Hash.getCRC32(fileHeader.getFileName().getBytes("ISO_8859_1"));
                             final long fileNameCheckCRC32 = Integer.toUnsignedLong(ByteBuffer.wrap(Arrays.copyOfRange(data, 1, 5)).order(ByteOrder.LITTLE_ENDIAN).getInt());
@@ -327,6 +328,9 @@ public class Zip4J extends IExtraction {
             ctrl.setProcessedBytes(0);
             if (zipFile.isEncrypted()) {
                 final String pw = archive.getFinalPassword();
+                if (StringUtils.isEmpty(pw)) {
+                    throw new MultiSevenZipException("No password available for encrypted archive", ExtractionControllerConstants.EXIT_CODE_FATAL_ERROR);
+                }
                 zipFile.setPassword(pw.toCharArray());
                 zipFile.setUseUtf8CharsetForPasswords(true);
             }

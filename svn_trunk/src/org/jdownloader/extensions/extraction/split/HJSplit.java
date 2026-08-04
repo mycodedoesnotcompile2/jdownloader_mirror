@@ -19,10 +19,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.plugins.DownloadLink;
-import jd.utils.JDHexUtils;
-
 import org.appwork.utils.Regex;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter.ExtensionsFilterInterface;
@@ -41,6 +37,10 @@ import org.jdownloader.extensions.extraction.bindings.crawledlink.CrawledLinkFac
 import org.jdownloader.extensions.extraction.bindings.downloadlink.DownloadLinkArchiveFactory;
 import org.jdownloader.extensions.extraction.multi.ArchiveException;
 import org.jdownloader.extensions.extraction.multi.CheckException;
+
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.plugins.DownloadLink;
+import jd.utils.JDHexUtils;
 
 /**
  * Joins HJSplit files.
@@ -173,7 +173,7 @@ public class HJSplit extends IExtraction {
             if (factory instanceof DownloadLinkArchiveFactory) {
                 for (final DownloadLink link : ((DownloadLinkArchiveFactory) factory).getDownloadLinks()) {
                     final ExtensionsFilterInterface hint = CompiledFiletypeFilter.getExtensionsFilterInterface(link.getMimeHint());
-                    if (hint != null && !hint.isSameExtensionGroup(CompiledFiletypeFilter.ArchiveExtensions.NUM)) {
+                    if (hint != null && !hint.isSameExtensionGroup(CompiledFiletypeFilter.ArchiveExtensions.ZIP)) {
                         return false;
                     }
                 }
@@ -182,7 +182,7 @@ public class HJSplit extends IExtraction {
                     final DownloadLink dlLink = link.getDownloadLink();
                     if (dlLink != null) {
                         final ExtensionsFilterInterface hint = CompiledFiletypeFilter.getExtensionsFilterInterface(dlLink.getMimeHint());
-                        if (hint != null && !hint.isSameExtensionGroup(CompiledFiletypeFilter.ArchiveExtensions.NUM)) {
+                        if (hint != null && !hint.isSameExtensionGroup(CompiledFiletypeFilter.ArchiveExtensions.ZIP)) {
                             return false;
                         }
                     }

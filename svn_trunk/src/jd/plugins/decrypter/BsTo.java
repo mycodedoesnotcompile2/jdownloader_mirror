@@ -44,7 +44,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 53064 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53094 $", interfaceVersion = 2, names = {}, urls = {})
 public class BsTo extends PluginForDecrypt {
     public BsTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -129,128 +129,136 @@ public class BsTo extends PluginForDecrypt {
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)>\\s*(Seite|Serie) nicht gefunden[^<]*<")) {
+        } else if (br.containsHTML(">\\s*(Seite|Serie) nicht gefunden[^<]*<")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("<h2[^>]*>\\s*Startseite\\s*</h2>")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("class=\"hoster-player deactivated\"")) {
+            /* 2026-08-03: e.g. /Too-Close-To-Home/1/8-The-Evil-Dragon */
+            // <h3>Für diese Episode existiert kein Stream</h3>
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        // final String urlpart = new Regex(parameter, "(serie/.+)").getMatch(0);
-        if (contenturl.matches(TYPE_SINGLE)) {
-            String finallink = br.getRegex("\"(https?[^<>\"]*?)\" target=\"_blank\"><span class=\"icon link_go\"").getMatch(0);
-            if (finallink == null) {
-                finallink = br.getRegex("<iframe\\s+[^>]+src\\s*=\\s*(\"|'|)(.*?)\\1").getMatch(1);
-                // hoster player
+        {
+            // final String urlpart = new Regex(parameter, "(serie/.+)").getMatch(0);
+            if (contenturl.matches(TYPE_SINGLE)) {
+                String finallink = br.getRegex("\"(https?[^<>\"]*?)\" target=\"_blank\"><span class=\"icon link_go\"").getMatch(0);
                 if (finallink == null) {
-                    finallink = br.getRegex("\"(https?[^<>\"]*?)\" target=\"_blank\" class=\"hoster-player\">").getMatch(0);
+                    finallink = br.getRegex("<iframe\\s+[^>]+src\\s*=\\s*(\"|'|)(.*?)\\1").getMatch(1);
+                    // hoster player
                     if (finallink == null) {
-                        // final failover?
-                        finallink = br.getRegex("https?://(\\w+\\.)?[^/]+/out/\\d+").getMatch(-1);
+                        finallink = br.getRegex("\"(https?[^<>\"]*?)\" target=\"_blank\" class=\"hoster-player\">").getMatch(0);
+                        if (finallink == null) {
+                            // final failover?
+                            finallink = br.getRegex("https?://(\\w+\\.)?[^/]+/out/\\d+").getMatch(-1);
+                        }
                     }
                 }
-            }
-            if (finallink == null) {
-                /* 2019-07-26: New */
-                final String security_token = br.getRegex("<meta name=\"security_token\" content=\"([a-f0-9]+)\" />").getMatch(0);
-                final String lid = br.getRegex("data\\-lid=\"(\\d+)\"").getMatch(0);
-                if (security_token == null || lid == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                String rcKey = br.getRegex("<script>series\\.init\\s*\\(\\d+, \\d+, '([^<>\"\\']+)'\\);</script>").getMatch(0);
-                if (rcKey == null) {
-                    /* 2021-01-18: Hardcoded reCaptchaV2Key */
-                    rcKey = "6LfG_SYaAAAAABmtgbmBRni8SvFepX0EEun1f5-5";
-                }
-                final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br, rcKey).getToken();
-                br.postPage("/ajax/embed.php", "token=" + security_token + "&LID=" + lid + "&ticket=" + Encoding.urlEncode(recaptchaV2Response));
-                finallink = PluginJSonUtils.getJson(br, "link");
-                if (StringUtils.isEmpty(finallink) || !finallink.startsWith("http")) {
-                    logger.warning("Failed to find finallink");
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                /* 2019-07-26: Sadly we cannot re-use these tokens! */
-                // this.getPluginConfig().setProperty("recaptchaV2Response", recaptchaV2Response);
-            } else if (StringUtils.containsIgnoreCase(finallink, br.getHost() + "/out")) {
-                br.setFollowRedirects(false);
-                br.getPage(finallink);
-                if (br.getRedirectLocation() == null || br.containsHTML("g-recaptcha")) {
-                    final Form form = br.getForm(0);
-                    if (form == null) {
+                if (finallink == null) {
+                    /* 2019-07-26: New */
+                    final String security_token = br.getRegex("<meta name=\"security_token\" content=\"([a-f0-9]+)\" />").getMatch(0);
+                    final String lid = br.getRegex("data\\-lid=\"(\\d+)\"").getMatch(0);
+                    if (security_token == null || lid == null) {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
-                    final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
-                    form.put("token", Encoding.urlEncode(recaptchaV2Response));
-                    br.submitForm(form);
-                }
-                finallink = br.getRedirectLocation();
-            }
-            ret.add(createDownloadlink(finallink));
-        } else {
-            /* Crawl all mirrors of a single download */
-            String mirrorlist = br.getRegex("<ul class=\"hoster-tabs top\">(.*?)<ul class=\"hoster-tabs bottom\">").getMatch(0);
-            if (mirrorlist == null || mirrorlist.length() == 0) {
-                /* Crawl all episodes of a series --> All mirrors in that */
-                mirrorlist = br.getRegex("<table class=\"episodes\">.*?</table>").getMatch(-1);
-            }
-            final String[] mirrorURLs = new Regex(mirrorlist, "<a[^>]*href=\"(serie/[^/]+/\\d+/[^/]+/[a-z]{2,}/[^/\"]+)\"").getColumn(0);
-            if (mirrorURLs == null || mirrorURLs.length == 0) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            logger.info("Number of possible downloadlinks TOTAL: " + mirrorURLs.length);
-            /* Add only user preferred host or all available hosts. */
-            String userHosterPrioListStr = PluginJsonConfig.get(BsToConfig.class).getHosterPriorityString();
-            if (userHosterPrioListStr != null) {
-                userHosterPrioListStr = userHosterPrioListStr.replace(" ", "").toLowerCase(Locale.ENGLISH);
-                final String[] hosterPrioList = userHosterPrioListStr.split(",");
-                logger.info("Trying to add only one user priorized host");
-                final HashMap<String, List<String>> packages = new HashMap<String, List<String>>();
-                for (final String mirrorURL : mirrorURLs) {
-                    final String uniqueID = mirrorURL.substring(0, mirrorURL.lastIndexOf("/"));
-                    if (packages.containsKey(uniqueID)) {
-                        packages.get(uniqueID).add(mirrorURL);
-                    } else {
-                        final List<String> newList = new ArrayList<String>();
-                        newList.add(mirrorURL);
-                        packages.put(uniqueID, newList);
+                    String rcKey = br.getRegex("<script>series\\.init\\s*\\(\\d+, \\d+, '([^<>\"\\']+)'\\);</script>").getMatch(0);
+                    if (rcKey == null) {
+                        /* 2021-01-18: Hardcoded reCaptchaV2Key */
+                        rcKey = "6LfG_SYaAAAAABmtgbmBRni8SvFepX0EEun1f5-5";
                     }
+                    final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br, rcKey).getToken();
+                    br.postPage("/ajax/embed.php", "token=" + security_token + "&LID=" + lid + "&ticket=" + Encoding.urlEncode(recaptchaV2Response));
+                    finallink = PluginJSonUtils.getJson(br, "link");
+                    if (StringUtils.isEmpty(finallink) || !finallink.startsWith("http")) {
+                        logger.warning("Failed to find finallink");
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                    /* 2019-07-26: Sadly we cannot re-use these tokens! */
+                    // this.getPluginConfig().setProperty("recaptchaV2Response", recaptchaV2Response);
+                } else if (StringUtils.containsIgnoreCase(finallink, br.getHost() + "/out")) {
+                    br.setFollowRedirects(false);
+                    br.getPage(finallink);
+                    if (br.getRedirectLocation() == null || br.containsHTML("g-recaptcha")) {
+                        final Form form = br.getForm(0);
+                        if (form == null) {
+                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                        }
+                        final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
+                        form.put("token", Encoding.urlEncode(recaptchaV2Response));
+                        br.submitForm(form);
+                    }
+                    finallink = br.getRedirectLocation();
                 }
-                logger.info("Number of packages found: " + packages.size());
-                final List<String> userAllowedMirrorURLs = new ArrayList<String>();
-                /* Now decide which mirrors we actually want to crawl based on a user setting. */
-                for (final Entry<String, List<String>> entry : packages.entrySet()) {
-                    final List<String> packageMirrorIDs = entry.getValue();
-                    if (packageMirrorIDs.size() == 1) {
-                        /* Only 1 host available -> Crawl that */
-                        userAllowedMirrorURLs.add(packageMirrorIDs.get(0));
-                    } else if (hosterPrioList != null) {
-                        /* Try to prefer user selected hosts/mirrors */
-                        boolean hasFoundPreferredHost = false;
-                        mirrorLoop: for (final String userPreferredHost : hosterPrioList) {
-                            for (final String mirrorURL : packageMirrorIDs) {
-                                final String hoster = new Regex(mirrorURL, "/([^/]+)$").getMatch(0);
-                                if (hoster.equalsIgnoreCase(userPreferredHost)) {
-                                    userAllowedMirrorURLs.add(mirrorURL);
-                                    hasFoundPreferredHost = true;
-                                    break mirrorLoop;
+                ret.add(createDownloadlink(finallink));
+            } else {
+                /* Crawl all mirrors of a single download */
+                String mirrorlist = br.getRegex("<ul class=\"hoster-tabs top\">(.*?)<ul class=\"hoster-tabs bottom\">").getMatch(0);
+                if (mirrorlist == null || mirrorlist.length() == 0) {
+                    /* Crawl all episodes of a series --> All mirrors in that */
+                    mirrorlist = br.getRegex("<table class=\"episodes\">.*?</table>").getMatch(-1);
+                }
+                final String[] mirrorURLs = new Regex(mirrorlist, "<a[^>]*href=\"(serie/[^/]+/\\d+/[^/]+/[a-z]{2,}/[^/\"]+)\"").getColumn(0);
+                if (mirrorURLs == null || mirrorURLs.length == 0) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                logger.info("Number of possible downloadlinks TOTAL: " + mirrorURLs.length);
+                /* Add only user preferred host or all available hosts. */
+                String userHosterPrioListStr = PluginJsonConfig.get(BsToConfig.class).getHosterPriorityString();
+                if (userHosterPrioListStr != null) {
+                    userHosterPrioListStr = userHosterPrioListStr.replace(" ", "").toLowerCase(Locale.ENGLISH);
+                    final String[] hosterPrioList = userHosterPrioListStr.split(",");
+                    logger.info("Trying to add only one user priorized host");
+                    final HashMap<String, List<String>> packages = new HashMap<String, List<String>>();
+                    for (final String mirrorURL : mirrorURLs) {
+                        final String uniqueID = mirrorURL.substring(0, mirrorURL.lastIndexOf("/"));
+                        if (packages.containsKey(uniqueID)) {
+                            packages.get(uniqueID).add(mirrorURL);
+                        } else {
+                            final List<String> newList = new ArrayList<String>();
+                            newList.add(mirrorURL);
+                            packages.put(uniqueID, newList);
+                        }
+                    }
+                    logger.info("Number of packages found: " + packages.size());
+                    final List<String> userAllowedMirrorURLs = new ArrayList<String>();
+                    /* Now decide which mirrors we actually want to crawl based on a user setting. */
+                    for (final Entry<String, List<String>> entry : packages.entrySet()) {
+                        final List<String> packageMirrorIDs = entry.getValue();
+                        if (packageMirrorIDs.size() == 1) {
+                            /* Only 1 host available -> Crawl that */
+                            userAllowedMirrorURLs.add(packageMirrorIDs.get(0));
+                        } else if (hosterPrioList != null) {
+                            /* Try to prefer user selected hosts/mirrors */
+                            boolean hasFoundPreferredHost = false;
+                            mirrorLoop: for (final String userPreferredHost : hosterPrioList) {
+                                for (final String mirrorURL : packageMirrorIDs) {
+                                    final String hoster = new Regex(mirrorURL, "/([^/]+)$").getMatch(0);
+                                    if (hoster.equalsIgnoreCase(userPreferredHost)) {
+                                        userAllowedMirrorURLs.add(mirrorURL);
+                                        hasFoundPreferredHost = true;
+                                        break mirrorLoop;
+                                    }
                                 }
                             }
-                        }
-                        if (!hasFoundPreferredHost) {
-                            /* Fallback */
+                            if (!hasFoundPreferredHost) {
+                                /* Fallback */
+                                userAllowedMirrorURLs.addAll(packageMirrorIDs);
+                            }
+                        } else {
+                            /* Crawl all mirrors */
                             userAllowedMirrorURLs.addAll(packageMirrorIDs);
                         }
-                    } else {
-                        /* Crawl all mirrors */
-                        userAllowedMirrorURLs.addAll(packageMirrorIDs);
                     }
-                }
-                logger.info("Number of user allowed mirrors via priorized hosts handling: " + userAllowedMirrorURLs.size());
-                for (final String singleLink : userAllowedMirrorURLs) {
-                    final String url = Request.getLocation("/" + singleLink, br.getRequest());
-                    ret.add(createDownloadlink(url));
-                }
-            } else {
-                logger.info("User didn't define priorized hosts -> Crawling all");
-                for (final String singleLink : mirrorURLs) {
-                    final String url = Request.getLocation("/" + singleLink, br.getRequest());
-                    ret.add(createDownloadlink(url));
+                    logger.info("Number of user allowed mirrors via priorized hosts handling: " + userAllowedMirrorURLs.size());
+                    for (final String singleLink : userAllowedMirrorURLs) {
+                        final String url = Request.getLocation("/" + singleLink, br.getRequest());
+                        ret.add(createDownloadlink(url));
+                    }
+                } else {
+                    logger.info("User didn't define priorized hosts -> Crawling all");
+                    for (final String singleLink : mirrorURLs) {
+                        final String url = Request.getLocation("/" + singleLink, br.getRequest());
+                        ret.add(createDownloadlink(url));
+                    }
                 }
             }
         }

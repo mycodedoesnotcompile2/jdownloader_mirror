@@ -12,13 +12,13 @@ import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import jd.plugins.LinkInfo;
-
 import org.appwork.utils.ByteArrayUtils;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.controlling.filter.FiletypeFilter.TypeMatchType;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
+
+import jd.plugins.LinkInfo;
 
 public class CompiledFiletypeFilter {
     private final Pattern[]                   list;
@@ -995,7 +995,6 @@ public class CompiledFiletypeFilter {
             }
         },
         R_NUM("[r-z]\\d{2}"),
-        NUM("\\d{1,4}"),
         MultiZip("z\\d{1,4}"),
         ACE("(ace|c\\d{2,4})") {
             private final Pattern pattern = Pattern.compile("(?i)application/x-ace-compressed");

@@ -32,30 +32,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import jd.controlling.linkcollector.LinkCollectingJob;
-import jd.controlling.linkcollector.LinkCollector.JobLinkCrawler;
-import jd.controlling.linkcollector.LinkOrigin;
-import jd.controlling.linkcollector.LinkOriginDetails;
-import jd.controlling.linkcrawler.LinkCrawlerConfig.DirectHTTPPermission;
-import jd.controlling.linkcrawler.LinkCrawlerRule.RULE;
-import jd.http.AuthenticationFactory;
-import jd.http.Browser;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.PostRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.parser.html.HTMLParser;
-import jd.parser.html.HTMLParser.HtmlParserCharSequence;
-import jd.parser.html.HTMLParser.HtmlParserResultSet;
-import jd.plugins.CryptedLink;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import jd.plugins.Plugin;
-import jd.plugins.PluginForDecrypt;
-import jd.plugins.PluginForHost;
-import jd.plugins.PluginsC;
-
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.storage.config.JsonConfig;
@@ -92,6 +68,30 @@ import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.settings.GeneralSettings;
+
+import jd.controlling.linkcollector.LinkCollectingJob;
+import jd.controlling.linkcollector.LinkCollector.JobLinkCrawler;
+import jd.controlling.linkcollector.LinkOrigin;
+import jd.controlling.linkcollector.LinkOriginDetails;
+import jd.controlling.linkcrawler.LinkCrawlerConfig.DirectHTTPPermission;
+import jd.controlling.linkcrawler.LinkCrawlerRule.RULE;
+import jd.http.AuthenticationFactory;
+import jd.http.Browser;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.PostRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.parser.html.HTMLParser;
+import jd.parser.html.HTMLParser.HtmlParserCharSequence;
+import jd.parser.html.HTMLParser.HtmlParserResultSet;
+import jd.plugins.CryptedLink;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import jd.plugins.Plugin;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.PluginForHost;
+import jd.plugins.PluginsC;
 
 public class LinkCrawler {
     private static enum DISTRIBUTE {
@@ -1327,7 +1327,6 @@ public class LinkCrawler {
         if (directHttpPlugin != null) {
             try {
                 invokeLazyHosterPlugin(getCurrentLinkCrawlerGeneration(), null, directHttpPlugin, new LazyHosterPluginInvokation<Void>() {
-
                     @Override
                     public Void invoke(PluginForHost plugin) throws Exception {
                         ReflectionUtils.invoke(plugin.getClass(), "updateFilename", plugin, String.class, link, con);
@@ -1577,6 +1576,9 @@ public class LinkCrawler {
                     } else {
                         /* Different URL */
                         deeperSource = crawledLinkFactorybyURL(current_url);
+                        if (matchingRule != null) {
+                            deeperSource.setMatchingRule(matchingRule);
+                        }
                         forwardCrawledLinkInfos(source, deeperSource, lm, getAndClearSourceURLs(source), true);
                         sourceURLs = getAndClearSourceURLs(deeperSource);
                     }
@@ -1586,6 +1588,10 @@ public class LinkCrawler {
                         if (inspectedLinks.size() >= 0) {
                             final boolean singleDest = inspectedLinks.size() == 1;
                             for (final CrawledLink possibleCryptedLink : inspectedLinks) {
+                                if (possibleCryptedLink.getMatchingRule() == null && matchingRule != null) {
+                                    // might already be set by LinkCrawlerDeepInspector.deepInspect
+                                    possibleCryptedLink.setMatchingRule(matchingRule);
+                                }
                                 forwardCrawledLinkInfos(deeperSource, possibleCryptedLink, lm, sourceURLs, singleDest);
                             }
                             crawl(generation, inspectedLinks);
@@ -1656,6 +1662,7 @@ public class LinkCrawler {
                         logger.info("SUBMITFORM: Submitting form from index [" + index + "]");
                         nextRequest = br.createFormRequest(targetform);
                         next = new BrowserCrawledLink(br, nextRequest);
+                        next.setMatchingRule(matchingRule);
                         forwardCrawledLinkInfos(source, next, lm, getAndClearSourceURLs(source), true);
                         if (finalPackageName != null) {
                             PackageInfo.setName(next, finalPackageName);
@@ -1672,6 +1679,9 @@ public class LinkCrawler {
                     }
                     final boolean singleDest = possibleCryptedLinks.size() == 1;
                     for (final CrawledLink possibleCryptedLink : possibleCryptedLinks) {
+                        if (matchingRule != null) {
+                            possibleCryptedLink.setMatchingRule(matchingRule);
+                        }
                         forwardCrawledLinkInfos(deeperSource, possibleCryptedLink, lm, sourceURLs, singleDest);
                         if (finalPackageName != null) {
                             PackageInfo.setName(possibleCryptedLink, finalPackageName);
@@ -1741,6 +1751,9 @@ public class LinkCrawler {
                     }
                     final boolean singleDeepCryptedDest = possibleDeepCryptedLinks.size() == 1;
                     for (final CrawledLink possibleDeepCryptedLink : possibleDeepCryptedLinks) {
+                        if (matchingRule != null) {
+                            possibleDeepCryptedLink.setMatchingRule(matchingRule);
+                        }
                         forwardCrawledLinkInfos(deeperSource, possibleDeepCryptedLink, lm, sourceURLs, singleDeepCryptedDest);
                         if (finalPackageName != null) {
                             PackageInfo.setName(possibleDeepCryptedLink, finalPackageName);
@@ -1843,7 +1856,9 @@ public class LinkCrawler {
             }
             return next;
         } finally {
-            con.disconnect();
+            if (con != null) {
+                con.disconnect();
+            }
         }
     }
 

@@ -68,7 +68,7 @@ import jd.plugins.hoster.ZdfDeMediathek;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface.SubtitleType;
 
-@DecrypterPlugin(revision = "$Revision: 53067 $", interfaceVersion = 3, names = { "zdf.de", "logo.de", "zdfheute.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?logo\\.de/.+", "https?://(?:www\\.)?zdfheute\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
+@DecrypterPlugin(revision = "$Revision: 53097 $", interfaceVersion = 3, names = { "zdf.de", "logo.de", "zdfheute.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?logo\\.de/.+", "https?://(?:www\\.)?zdfheute\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
 public class ZDFMediathekDecrypter extends PluginForDecrypt {
     private boolean                          fastlinkcheck             = false;
     private final String                     TYPE_ZDF                  = "(?i)https?://(?:www\\.)?(?:zdf\\.de|3sat\\.de)/.+";
@@ -216,7 +216,6 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         }
         return dl;
     }
-
     /* Do not delete this code! This can crawl embedded ZDF IDs! */
     // private void crawlEmbeddedUrlsHeute() throws Exception {
     // br.getPage(this.PARAMETER);
@@ -422,12 +421,25 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         final ZdfMetadata websiteMetadata = parseMetadataFromWebsite(html_unescaped);
         /* 2. Single video via embedded ptmd-template (new zdfmediathek 2026) -> preferred way whenever present. */
         final String ptmdTemplate = new Regex(html_unescaped, "\"ptmdTemplate\"\\s*:\\s*\"(/tmd/[^\"]+)\"").getMatch(0);
+        final String sophoraID_from_url = this.getSophoraIDFromURL_safe(br.getURL());
         if (ptmdTemplate != null) {
             logger.info("Found ptmdTemplate in website -> Using new way");
+            if (sophoraID_from_url != null) {
+                /* We know that this is a single video so we can skip the steps down below. */
+                logger.info("Found single video_id in browser url -> Trying old method first, using new method as fallback");
+                try {
+                    /* Try old way first if possible because it provides easy and safe access to the metadata we want. */
+                    return crawlZdfVideoViaSophoraID(param, sophoraID_from_url, websiteMetadata);
+                } catch (final PluginException ple) {
+                    if (ple.getLinkStatus() != LinkStatus.ERROR_FILE_NOT_FOUND) {
+                        throw ple;
+                    }
+                    logger.info("Using new way");
+                }
+            }
             return this.crawlZdfVideoViaPtmdTemplate(param, ptmdTemplate, websiteMetadata);
         }
         /* 3. No ptmd-template found -> fall back to the old ways (content-document, embedded videos, ...). */
-        final String sophoraID_from_url = this.getSophoraIDFromURL_safe(br.getURL());
         if (sophoraID_from_url != null) {
             /* We know that this is a single video so we can skip the steps down below. */
             logger.info("Found single video_id in browser url");
@@ -573,7 +585,18 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         final ZdfMetadata md = new ZdfMetadata();
         String videoTitle = new Regex(html_unescaped, "\"av_title\"\\s*:\\s*\"([^\"]+)\"").getMatch(0);
         if (videoTitle == null) {
-            videoTitle = new Regex(html_unescaped, "\"page_title\"\\s*:\\s*\"([^\"]+)\"").getMatch(0);
+            /*
+             * Do NOT use "page_title" here: the website embeds a 404-fallback block ("Uups!!", page_type "TextPage") in its next.js flight
+             * data whose "page_title"/"publication_timestamp" appear before the real content -> that would yield the wrong title/date.
+             * Prefer the film's own og:title / JSON-LD instead.
+             */
+            videoTitle = new Regex(html_unescaped, "property=\"og:title\"\\s+content=\"([^\"]+)\"").getMatch(0);
+        }
+        if (videoTitle == null) {
+            videoTitle = new Regex(html_unescaped, "\"@type\"\\s*:\\s*\"VideoObject\"\\s*,\\s*\"name\"\\s*:\\s*\"([^\"]+)\"").getMatch(0);
+        }
+        if (videoTitle == null) {
+            videoTitle = new Regex(html_unescaped, "<title>([^<]+)</title>").getMatch(0);
         }
         final String show = new Regex(html_unescaped, "\"av_show\"\\s*:\\s*\"([^\"]+)\"").getMatch(0);
         final String tvStation = new Regex(html_unescaped, "\"av_broadcaster\"\\s*:\\s*\"([^\"]+)\"").getMatch(0);
@@ -585,9 +608,17 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         final String episodeNumberStr = new Regex(html_unescaped, "\"episodeNumber\"\\s*:\\s*(\\d+)").getMatch(0);
         final Integer seasonNumber = seasonNumberStr != null ? Integer.valueOf(seasonNumberStr) : null;
         final Integer episodeNumber = episodeNumberStr != null ? Integer.valueOf(episodeNumberStr) : null;
+        /*
+         * Take the date from the film's own metadata (av_publication_timestamp / JSON-LD uploadDate / editorialDate). Never fall back to a
+         * bare "publication_timestamp": the embedded 404-fallback block ("Uups!!") carries its own publication_timestamp which would
+         * otherwise be picked up (wrong date).
+         */
         String date = new Regex(html_unescaped, "\"av_publication_timestamp\"\\s*:\\s*\"(\\d{4}-\\d{2}-\\d{2})").getMatch(0);
         if (date == null) {
-            date = new Regex(html_unescaped, "\"publication_timestamp\"\\s*:\\s*\"(\\d{4}-\\d{2}-\\d{2})").getMatch(0);
+            date = new Regex(html_unescaped, "\"uploadDate\"\\s*:\\s*\"(\\d{4}-\\d{2}-\\d{2})").getMatch(0);
+        }
+        if (date == null) {
+            date = new Regex(html_unescaped, "\"editorialDate\"\\s*:\\s*\"(\\d{4}-\\d{2}-\\d{2})").getMatch(0);
         }
         md.dateFormatted = date;
         applyTitleAndShow(md, videoTitle, show, seasonNumber, episodeNumber);

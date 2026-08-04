@@ -56,8 +56,6 @@ import java.util.WeakHashMap;
 
 import javax.net.ssl.KeyManager;
 
-import jd.plugins.Plugin;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.IO;
@@ -79,6 +77,8 @@ import org.jdownloader.auth.AuthenticationInfo.Type;
 import org.jdownloader.auth.Login;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.net.BCSSLSocketStreamFactory;
+
+import jd.plugins.Plugin;
 
 /**
  * SimpleFTP is a simple package that implements a Java FTP client. With SimpleFTP, you can connect to an FTP server and upload multiple
@@ -376,7 +376,6 @@ public abstract class SimpleFTP {
             try {
                 // TODO: add SSLSocketStream options support, caching + retry + trustAll
                 return getSSLSocketStreamFactory().create(ret, address.getAddress().getHostAddress(), address.getPort(), true, null, new TrustCallback() {
-
                     @Override
                     public void onTrustResult(TrustProviderInterface provider, String authType, TrustResult result) {
                     }
@@ -863,7 +862,6 @@ public abstract class SimpleFTP {
         if (StringUtils.startsWithCaseInsensitive(response, "234")) {
             // TODO: add SSLSocketStream options support, caching + retry + trustAll
             socket = getSSLSocketStreamFactory().create(getControlSocket(), "", getPort(), true, null, new TrustCallback() {
-
                 @Override
                 public void onTrustResult(TrustProviderInterface provider, String authType, TrustResult result) {
                 }
@@ -1379,6 +1377,27 @@ public abstract class SimpleFTP {
                     final String name = entry[3];
                     final long size = isFile ? Long.parseLong(entry[2]) : -1;
                     ret.add(new SimpleFTPListEntry(isFile, name.replaceAll(" ", "%20"), cwd, size));
+                } else if (entry.length == 6) {
+                    final boolean isFile = entry[0].startsWith("-");
+                    final boolean isFolder = entry[0].startsWith("d");
+                    final String name = entry[5];
+                    final boolean isLinkFlag;
+                    if (name.contains(" -> ")) {
+                        // symlink
+                        isLinkFlag = true;
+                    } else {
+                        isLinkFlag = entry[0].startsWith("l");
+                    }
+                    final boolean isFileFlag = isFile || !isFolder;
+                    final long size = isFile ? Long.parseLong(entry[3]) : -1;
+                    if (isLinkFlag) {
+                        final String link[] = new Regex(name, "^(.*?)\\s*->\\s*(.+)$").getRow(0);
+                        ret.add(new SimpleFTPListEntry(link[0].replaceAll(" ", "%20"), link[1].replaceAll(" ", "%20"), cwd));
+                    } else if (isFileFlag) {
+                        ret.add(new SimpleFTPListEntry(true, name.replaceAll(" ", "%20"), cwd, size));
+                    } else {
+                        ret.add(new SimpleFTPListEntry(false, name.replaceAll(" ", "%20"), cwd, size));
+                    }
                 } else if (entry.length == 7) {
                     final boolean isFile = entry[0].startsWith("-");
                     final boolean isFolder = entry[0].startsWith("d");
@@ -1447,8 +1466,12 @@ public abstract class SimpleFTP {
         // t/T=sticky bit
         String[][] matches = new Regex(listResponse, "([dbclps\\-]{1}[rwxsStT-]+)\\s+(\\d+)\\s+(\\S+)\\s+(\\S+)\\s+(\\d+)\\s+(\\S+\\s+\\S+\\s+\\S+)\\s+(.*?)[$\r\n]+").getMatches();
         if (matches == null || matches.length == 0) {
-            /* date,time,size,name */
-            matches = new Regex(listResponse, "(\\S+)\\s+(\\S+)\\s+(<DIR>|\\d+)\\s+(.*?)[$\r\n]+").getMatches();
+            // -rw-rw-rw- 0 875191186 875191186 Jun 01 12:00 Example.mkv
+            matches = new Regex(listResponse, "([dbclps\\-]{1}[rwxsStT-]+)\\s+(\\d+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+\\s+\\S+\\s+\\S+)\\s+(.*?)[$\r\n]+").getMatches();
+            if (matches == null || matches.length == 0) {
+                /* date,time,size,name */
+                matches = new Regex(listResponse, "(\\S+)\\s+(\\S+)\\s+(<DIR>|\\d+)\\s+(.*?)[$\r\n]+").getMatches();
+            }
         }
         return matches;
     }

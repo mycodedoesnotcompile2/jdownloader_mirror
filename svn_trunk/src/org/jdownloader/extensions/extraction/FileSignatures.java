@@ -18,6 +18,7 @@ package org.jdownloader.extensions.extraction;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.regex.Pattern;
 
 import org.appwork.utils.Application;
@@ -33,33 +34,32 @@ public class FileSignatures {
     }
 
     public static String readFileSignature(final File f, final int length) throws IOException {
-        FileInputStream reader = null;
-        try {
-            final StringBuilder sig = new StringBuilder();
-            if (length > 0 && f.exists()) {
-                reader = new FileInputStream(f);
-                for (int i = 0; i < length; i++) {
-                    final int h = reader.read();
-                    if (h != -1) {
-                        final String s = Integer.toHexString(h);
-                        if (s.length() < 2) {
-                            sig.append('0');
-                        }
-                        sig.append(s);
-                    } else {
-                        break;
-                    }
-                }
-            }
-            return sig.toString();
-        } finally {
+        final StringBuilder sig = new StringBuilder();
+        if (length > 0 && f.exists()) {
+            final FileInputStream reader = new FileInputStream(f);
             try {
-                if (reader != null) {
-                    reader.close();
-                }
-            } catch (final Throwable e) {
+                return readFileSignature(reader, length);
+            } finally {
+                reader.close();
             }
         }
+        return sig.toString();
+    }
+
+    public static String readFileSignature(final InputStream reader, final int length) throws IOException {
+        final StringBuilder sig = new StringBuilder();
+        for (int i = 0; i < length; i++) {
+            final int h = reader.read();
+            if (h == -1) {
+                break;
+            }
+            final String s = Integer.toHexString(h);
+            if (s.length() < 2) {
+                sig.append('0');
+            }
+            sig.append(s);
+        }
+        return sig.toString();
     }
 
     /**

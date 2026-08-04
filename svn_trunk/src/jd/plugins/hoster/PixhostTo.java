@@ -15,16 +15,22 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.appwork.utils.StringUtils;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter.CompiledFiletypeExtension;
+import org.jdownloader.extensions.extraction.FileSignatures;
+import org.jdownloader.extensions.extraction.Signature;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.DownloadLink;
@@ -35,7 +41,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PixhostToGallery;
 
-@HostPlugin(revision = "$Revision: 53042 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53106 $", interfaceVersion = 3, names = {}, urls = {})
 public class PixhostTo extends PluginForHost {
     public PixhostTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -175,10 +181,10 @@ public class PixhostTo extends PluginForHost {
         final boolean isPartOfGallery = br.containsHTML("class=\"show-gallery\"");
         /* 2019-01-31: It is better to grab the filename via URL! */
         String filename = br.getRegex("title\\s*:\\s*'([^<>\"\\']+)'").getMatch(0);
-        if (filename == null) {
-            filename = br.getRegex("class=\"fa fa-picture-o\"[^>]*>\\s*</i>([^<]+)<").getMatch(0);
+        if (StringUtils.isEmpty(filename)) {
+            filename = br.getRegex("class=\"fa fa-picture-o\"[^>]*>\\s*</i>\\s*([^<]+)\\s*<").getMatch(0);
         }
-        if (isPartOfGallery) {
+        if (isPartOfGallery || StringUtils.isEmpty(filename)) {
             /*
              * Prefer filename from URL as it is unique. For items which are part of a gallery, the title given in html code may be the same
              * for all items.
@@ -206,7 +212,7 @@ public class PixhostTo extends PluginForHost {
         }
         if (!StringUtils.isEmpty(dllink)) {
             dllink = Encoding.htmlOnlyDecode(dllink);
-            basicLinkCheck(br.cloneBrowser(), br.createHeadRequest(dllink), link, filename, ext);
+            basicLinkCheck(br.cloneBrowser(), br.createGetRequest(dllink), link, filename, ext);
         }
         return AvailableStatus.TRUE;
     }
@@ -220,6 +226,37 @@ public class PixhostTo extends PluginForHost {
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, free_resume, free_maxchunks);
         handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
+    }
+
+    @Override
+    protected boolean looksLikeDownloadableContent(final URLConnectionAdapter con) {
+        if (con.isOK() && StringUtils.equalsIgnoreCase(con.getContentType(), "text/plain")) {
+            /* Check if response is indeed image content. */
+            peek: try {
+                if (!con.isConnected()) {
+                    break peek;
+                }
+                final int maxPeek = 32;
+                final byte[] peekBytes = con.peek(maxPeek);
+                if (peekBytes.length == 0) {
+                    break peek;
+                }
+                final String signatureString = FileSignatures.readFileSignature(new ByteArrayInputStream(peekBytes), maxPeek);
+                if (signatureString == null) {
+                    break peek;
+                }
+                final Signature signature = new FileSignatures().getSignature(signatureString);
+                if (signature == null) {
+                    break peek;
+                }
+                final CompiledFiletypeExtension extension = CompiledFiletypeFilter.getExtensionsFilterInterface(signature.getId());
+                return extension != null && CompiledFiletypeFilter.ImageExtensions.JPG.isSameExtensionGroup(extension);
+            } catch (IOException e) {
+                logger.log(e);
+            } catch (IllegalStateException ignore) {
+            }
+        }
+        return super.looksLikeDownloadableContent(con);
     }
 
     @Override

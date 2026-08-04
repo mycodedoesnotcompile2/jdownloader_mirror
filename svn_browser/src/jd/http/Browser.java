@@ -145,6 +145,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
         STRICT_ORIGIN,
         STRICT_ORIGIN_WHEN_CROSS_ORIGIN,
         UNSAFE_URL;
+
         public static boolean isSameProtocol(final Request current, final Request next) {
             return StringUtils.equalsIgnoreCase(current.getURL().getProtocol(), next.getURL().getProtocol());
         }
@@ -1912,8 +1913,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
     }
 
     /**
-     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site </br> auto completes Sec-Fetch-Site, some websites(eg
-     * facebook) check it
+     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site </br>
+     * auto completes Sec-Fetch-Site, some websites(eg facebook) check it
      */
     protected void autoCompleteHeaders(final Request request) {
         if (request == null) {
@@ -2707,7 +2708,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
     }
 
     /**
-     * Sets Browser upper page load limit Byte value. </br> Use Integer.MAX_VALUE for "unlimited" (do not use "-1"!).
+     * Sets Browser upper page load limit Byte value. </br>
+     * Use Integer.MAX_VALUE for "unlimited" (do not use "-1"!).
      *
      * @since JD2
      * @param i
@@ -2858,14 +2860,16 @@ public class Browser implements HTTPConnectionFactoryInterface {
     }
 
     /**
-     * Checks for block by firewalls and similar. </br> To be called after a sent request.
+     * Checks for block by firewalls and similar. </br>
+     * To be called after a sent request.
      */
     public void checkForBlockedByAfterLoadConnection(Request request) throws IOException {
-        if (this.getThrowExceptionOnBlockedBy(request)) {
-            final BlockedTypeInterface blockedType = this.getBlockedType(request);
-            if (blockedType != null) {
-                throw new BlockedByException(request, blockedType);
-            }
+        if (!this.getThrowExceptionOnBlockedBy(request)) {
+            return;
+        }
+        final BlockedTypeInterface blockedType = this.getBlockedType(request);
+        if (blockedType != null) {
+            throw new BlockedByException(request, blockedType);
         }
     }
 
@@ -2885,11 +2889,12 @@ public class Browser implements HTTPConnectionFactoryInterface {
         }
         // final boolean isCloudflareHeaderCfRayExistent = req.getResponseHeader("cf-ray") != null;
         final boolean isCloudflareServer = StringUtils.containsIgnoreCase(request.getResponseHeader(HTTPConstants.HEADER_RESPONSE_SERVER), "cloudflare");
-        final boolean isTypicalCloudflareResponseCode = con.getResponseCode() == 403 || con.getResponseCode() == 502 || con.getResponseCode() == 503 || con.getResponseCode() == 429 || con.getResponseCode() == 522 || con.getResponseCode() == 523 || con.getResponseCode() == 526;
-        /* 526: Invalid SSL certificate */
+        final boolean isTypicalCloudflareResponseCode = con.getResponseCode() == 403 || con.getResponseCode() == 502 || con.getResponseCode() == 503 || con.getResponseCode() == 429 || con.getResponseCode() == 520 || con.getResponseCode() == 521 || con.getResponseCode() == 522 || con.getResponseCode() == 523 || con.getResponseCode() == 524 || con.getResponseCode() == 525 || con.getResponseCode() == 526;
+        /* 520: Web server is returning an unknown error | 526: Invalid SSL certificate */
         /**
          * TODO: 2023-12-21: Maybe remove reliance on http status-code as it looks like literally any status code can be returned when a
-         * Cloudflare block happens. </br> I've just added code 502 to the list of "Cloudflare response-codes".
+         * Cloudflare block happens. </br>
+         * I've just added code 502 to the list of "Cloudflare response-codes".
          */
         /*
          * It is really important to also check for Cloudflare html else stuff will fail/break e.g. icerbox.com wrong login -> Cloudflare
@@ -2911,7 +2916,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 }
                 /* 2023-06-06: This is only a text output. Do not use the errormessage/text for anything else at this moment!! */
                 final String errorText = request.getRegex("<h1[^>]*>\\s*(.*?)\\s*</h1>").getMatch(0);
-                browser.getLogger().info("Cloudflare parsed errormessage: " + errorText);
+                browser.getLogger().info("Cloudflare parsed error message: " + errorText);
                 if (errorCode != null) {
                     if (errorCode.matches("5\\d{2}")) {
                         /* e.g. 502 */
@@ -3797,8 +3802,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
                     return null;
                 }
                 if (true) { /*
-                 * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
-                 */
+                             * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
+                             */
                     /* See new ESET NOD32 html code 2023: https://board.jdownloader.org/showthread.php?t=91433 */
                     return null;
                 }
@@ -4022,8 +4027,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
     }
 
     /**
-     * Returns true if any antiddos provider/other sort of blocking is blocking at this moment. </br> See also:
-     * https://svn.jdownloader.org/issues/89834
+     * Returns true if any antiddos provider/other sort of blocking is blocking at this moment. </br>
+     * See also: https://svn.jdownloader.org/issues/89834
      */
     public boolean isBlocked() {
         final Request request = this.getRequest();

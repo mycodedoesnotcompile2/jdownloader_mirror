@@ -45,7 +45,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ORFMediathek;
 
-@DecrypterPlugin(revision = "$Revision: 53004 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53094 $", interfaceVersion = 2, names = {}, urls = {})
 public class OrfAt extends PluginForDecrypt {
     public OrfAt(PluginWrapper wrapper) {
         super(wrapper);
@@ -312,6 +312,13 @@ public class OrfAt extends PluginForDecrypt {
          * over again -> the gapless master is just the whole-episode version of the exact same encode ladder.
          */
         final HashSet<Integer> cachedAvailableHeights = new HashSet<Integer>();
+        /*
+         * Set to true once a GEO block is detected during HLS probing. Just like age restriction can be bypassed via the gapless stream, a
+         * GEO block on the HLS streams can often be bypassed via the progressive streams -> once we hit it, we stop probing/offering HLS
+         * (including gapless HLS) for the rest of this pass and only offer progressive streams. If a progressive stream then also turns out
+         * to be GEO-blocked, the GEO exception is thrown as usual (see progressive filesize check below).
+         */
+        boolean geoBlockedForceProgressiveOnly = false;
         crawlSegments: {
             if (has_active_youth_protection) {
                 /* Age restricted items are only ever accessible via the gapless stream -> skip segment handling entirely. */
@@ -323,7 +330,7 @@ public class OrfAt extends PluginForDecrypt {
                  */
                 break crawlSegments;
             }
-            final boolean allowProgressive = cfg != null ? cfg.getBooleanProperty(ORFMediathek.PROGRESSIVE_STREAM, ORFMediathek.PROGRESSIVE_STREAM_default) : true;
+            boolean allowProgressive = cfg != null ? cfg.getBooleanProperty(ORFMediathek.PROGRESSIVE_STREAM, ORFMediathek.PROGRESSIVE_STREAM_default) : true;
             final boolean user_wants_HLS = cfg != null ? cfg.getBooleanProperty(ORFMediathek.HLS_STREAM, ORFMediathek.HLS_STREAM_default) : true;
             final boolean findProgressiveFilesizeEvenIfDisabled = cfg != null ? cfg.getBooleanProperty(ORFMediathek.SETTING_FIND_PROGRESSIVE_FILESIZE_EVEN_IF_DISABLED, ORFMediathek.SETTING_FIND_PROGRESSIVE_FILESIZE_EVEN_IF_DISABLED_default) : false;
             /* HDS is permanently broken server-side (since 2024-02-20) -> HDS streams are always skipped, no setting for it anymore. */
@@ -400,6 +407,14 @@ public class OrfAt extends PluginForDecrypt {
                  */
                 boolean skipProgressiveForBest_HLS = false;
                 find_hls_qualities: if (crawlHLS) {
+                    if (geoBlockedForceProgressiveOnly) {
+                        /*
+                         * A GEO block was detected during HLS probing earlier in this pass -> HLS is GEO-blocked, only progressive can
+                         * bypass it. Skip HLS entirely for this (and every remaining) segment.
+                         */
+                        logger.info("Skipping HLS probe for this segment: GEO block detected earlier -> progressive-only mode for this pass");
+                        break find_hls_qualities;
+                    }
                     if (CACHE_HLS_QUALITY_ACROSS_SEGMENTS && !user_wants_HLS && allowProgressive && Boolean.FALSE.equals(cachedFoundHeightAboveProgressiveCap)) {
                         /*
                          * We already established for an earlier segment of this video that HLS doesn't offer anything above progressive's
@@ -471,7 +486,23 @@ public class OrfAt extends PluginForDecrypt {
                              * next quality tag.
                              */
                             final String hlsPlaylistUrl = hlsUrlByQuality.get(hlsQualityTag);
-                            heightsFromMaster = findHlsMasterQualityHeights(brc, hlsPlaylistUrl);
+                            try {
+                                heightsFromMaster = findHlsMasterQualityHeights(brc, hlsPlaylistUrl);
+                            } catch (final DecrypterRetryException e) {
+                                if (e.getReason() == RetryReason.GEO) {
+                                    /*
+                                     * HLS is GEO-blocked -> just like the age restriction bypass via the gapless stream, we try to bypass
+                                     * the GEO block via the progressive streams. Enable progressive-only mode for the rest of this pass and
+                                     * skip HLS from here on. If a progressive stream then also turns out to be GEO-blocked, the GEO
+                                     * exception is thrown as usual further down.
+                                     */
+                                    logger.info("GEO block detected during HLS check -> switching to progressive-only mode for this pass");
+                                    geoBlockedForceProgressiveOnly = true;
+                                    allowProgressive = true;
+                                    break find_hls_qualities;
+                                }
+                                throw e;
+                            }
                             hlsMaster = hlsPlaylistUrl;
                             workingHlsQuality = hlsQualityTag;
                             break;
@@ -769,7 +800,16 @@ public class OrfAt extends PluginForDecrypt {
                         finalresults.add(createSubtitleLink(subtitleurl, subtitle_ext, chosenVideoResult, hosterplugin, sourceurl));
                     }
                 }
-                if (cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_THUMBNAIL, ORFMediathek.Q_THUMBNAIL_default) && !StringUtils.isEmpty(thumbnailurl)) {
+                final boolean userWantsThumbnail = cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_THUMBNAIL, ORFMediathek.Q_THUMBNAIL_default);
+                if (!StringUtils.isEmpty(thumbnailurl) && (userWantsThumbnail || chosenVideoResults.isEmpty())) {
+                    if (chosenVideoResults.isEmpty() && !userWantsThumbnail) {
+                        /**
+                         * No video quality could be found for this segment at all -> add the thumbnail even though the user disabled it, so
+                         * this segment still yields at least one result instead of being lost entirely. <br>
+                         * Rare case e.g. GEO-blocked + all progressive qualities broken.
+                         */
+                        logger.info("No video quality found for this segment -> Adding thumbnail despite the user having it disabled");
+                    }
                     finalresults.add(createThumbnailLink(thumbnailurl, hosterplugin));
                 }
                 /* Add more properties which are the same for all results of this segment */
@@ -800,6 +840,13 @@ public class OrfAt extends PluginForDecrypt {
         }
         crawlGapless: {
             if (!allowCrawlGapless) {
+                break crawlGapless;
+            } else if (geoBlockedForceProgressiveOnly) {
+                /*
+                 * HLS is GEO-blocked and gapless streams only ever exist as HLS -> there is no progressive gapless variant to fall back to,
+                 * so attempting gapless here would just re-trigger the same GEO block. Skip it and keep the progressive results we found.
+                 */
+                logger.info("Skipping gapless HLS crawling: GEO block active -> progressive-only mode for this pass");
                 break crawlGapless;
             }
             /*

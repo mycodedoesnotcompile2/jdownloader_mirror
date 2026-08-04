@@ -10,8 +10,6 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import jd.plugins.ParsedFilename;
-
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.annotations.AbstractValidator;
 import org.appwork.storage.config.events.GenericConfigEventListener;
@@ -21,29 +19,27 @@ import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.os.CrossSystem;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter.ArchiveExtensions;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter.ExtensionsFilterInterface;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
+
+import jd.plugins.ParsedFilename;
 
 public class LinknameCleaner {
     public static final String    end        = "($|\\.html?)";
     public static final Pattern   par        = Pattern.compile("(.*?)(\\.p\\d+$|\\.par$)" + end, Pattern.CASE_INSENSITIVE);
     public static final Pattern   par2       = Pattern.compile("(.*?)(\\.vol\\d+\\.par2$|\\.vol\\d+(?:\\+|-)\\d+\\.par2$|\\.par2$)", Pattern.CASE_INSENSITIVE);
     public static final Pattern[] parPats    = new Pattern[] { par2, par };
-
     public static final Pattern   pat0       = Pattern.compile("(.*)(\\.|_|-)pa?r?t?\\.?[0-9]+.(rar|rev|exe)", Pattern.CASE_INSENSITIVE);
     public static final Pattern   pat1       = Pattern.compile("(.*)(\\.|_|-)part\\.?[0]*[1].(rar|rev|exe)" + end, Pattern.CASE_INSENSITIVE);
     public static final Pattern   pat3       = Pattern.compile("(.*)\\.(?:rar|rev)" + end, Pattern.CASE_INSENSITIVE);
     public static final Pattern   pat4       = Pattern.compile("(.*)\\.r\\d+" + end, Pattern.CASE_INSENSITIVE);
     public static final Pattern[] rarPats    = new Pattern[] { pat0, pat1, pat3, pat4 };
-
     public static final Pattern   pat6       = Pattern.compile("(.*)\\.zip" + end, Pattern.CASE_INSENSITIVE);
     public static final Pattern   pat6_split = Pattern.compile("(.*)[a-z]\\.zip" + end, Pattern.CASE_INSENSITIVE);
     public static final Pattern   pat7       = Pattern.compile("(.*)\\.z\\d+" + end, Pattern.CASE_INSENSITIVE);
     public static final Pattern   pat8       = Pattern.compile("(?is).*\\.7z\\.[\\d]+" + end, Pattern.CASE_INSENSITIVE);
     public static final Pattern   pat9       = Pattern.compile("(.*)\\.a." + end, Pattern.CASE_INSENSITIVE);
     public static final Pattern[] zipPats    = new Pattern[] { pat6_split, pat6, pat7, pat8, pat9 };
-
     public static final Pattern   pat10      = Pattern.compile("(.*)\\._((_[a-z]{1})|([a-z]{2}))(\\.|$)");
     public static Pattern         pat11      = null;
     public static Pattern[]       ffsjPats   = null;
@@ -56,11 +52,11 @@ public class LinknameCleaner {
             /* not loaded yet */
         }
     }
-    public static final Pattern   pat13      = Pattern.compile("(part\\d+)", Pattern.CASE_INSENSITIVE);
-    public static final Pattern   pat17      = Pattern.compile("(.+)\\.\\d+\\.xtm" + end);
-    public static final Pattern   pat18      = Pattern.compile("(.*)\\.isz" + end, Pattern.CASE_INSENSITIVE);
-    public static final Pattern   pat19      = Pattern.compile("(.*)\\.i\\d{2}$", Pattern.CASE_INSENSITIVE);
-    public static final Pattern[] iszPats    = new Pattern[] { pat18, pat19 };
+    public static final Pattern   pat13   = Pattern.compile("(part\\d+)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern   pat17   = Pattern.compile("(.+)\\.\\d+\\.xtm" + end);
+    public static final Pattern   pat18   = Pattern.compile("(.*)\\.isz" + end, Pattern.CASE_INSENSITIVE);
+    public static final Pattern   pat19   = Pattern.compile("(.*)\\.i\\d{2}$", Pattern.CASE_INSENSITIVE);
+    public static final Pattern[] iszPats = new Pattern[] { pat18, pat19 };
 
     public static enum EXTENSION_SETTINGS {
         KEEP,
@@ -68,8 +64,8 @@ public class LinknameCleaner {
         REMOVE_ALL
     }
 
-    private static volatile Map<Pattern, String> FILENAME_REPLACEMAP                  = new HashMap<Pattern, String>();
-    private static volatile Map<String, String>  FILENAME_REPLACEMAP_DEFAULT          = new HashMap<String, String>();
+    private static volatile Map<Pattern, String> FILENAME_REPLACEMAP         = new HashMap<Pattern, String>();
+    private static volatile Map<String, String>  FILENAME_REPLACEMAP_DEFAULT = new HashMap<String, String>();
     static {
         final ObjectKeyHandler replaceMapKeyHandler = CFG_GENERAL.FILENAME_CHARACTER_REGEX_REPLACEMAP;
         FILENAME_REPLACEMAP_DEFAULT = (Map<String, String>) replaceMapKeyHandler.getDefaultValue();
@@ -102,8 +98,8 @@ public class LinknameCleaner {
         });
         FILENAME_TOO_LONG_REPLACEMAP = convertReplaceMap(FILENAME_TOO_LONG_REPLACEMAP_DEFAULT, (Map<String, String>) replaceMapKeyHandler.getValue());
     }
-    private static volatile Map<Pattern, String> PACKAGENAME_REPLACEMAP               = new HashMap<Pattern, String>();
-    private static volatile Map<String, String>  PACKAGENAME_REPLACEMAP_DEFAULT       = new HashMap<String, String>();
+    private static volatile Map<Pattern, String> PACKAGENAME_REPLACEMAP         = new HashMap<Pattern, String>();
+    private static volatile Map<String, String>  PACKAGENAME_REPLACEMAP_DEFAULT = new HashMap<String, String>();
     static {
         final ObjectKeyHandler replaceMapKeyHandler = CFG_GENERAL.PACKAGE_NAME_CHARACTER_REGEX_REPLACEMAP;
         PACKAGENAME_REPLACEMAP_DEFAULT = (Map<String, String>) replaceMapKeyHandler.getDefaultValue();
@@ -191,8 +187,8 @@ public class LinknameCleaner {
             }
         }
         /**
-         * Users can put anything into that replace map. </br> Try to avoid the results of adding something like ".+" resulting in empty
-         * filenames.
+         * Users can put anything into that replace map. </br>
+         * Try to avoid the results of adding something like ".+" resulting in empty filenames.
          */
         if (!StringUtils.isEmpty(newstr)) {
             return newstr;
@@ -209,7 +205,9 @@ public class LinknameCleaner {
     }
 
     /**
-     * Shortens given filename to max length. </br> Keeps file extension. </br> Returns null if filename can't be shortened.
+     * Shortens given filename to max length. </br>
+     * Keeps file extension. </br>
+     * Returns null if filename can't be shortened.
      */
     public static String shortenFilename(final ParsedFilename pfilename, final int maxLength) {
         if (pfilename == null) {
@@ -421,7 +419,7 @@ public class LinknameCleaner {
                 final int extLength = ext.length();
                 final ExtensionsFilterInterface knownExt = CompiledFiletypeFilter.getExtensionsFilterInterface(ext);
                 // Case 1: Known extension (not archive number)
-                if (knownExt != null && !ArchiveExtensions.NUM.equals(knownExt)) {
+                if (knownExt != null) {
                     name = name.substring(0, lastPoint);
                     continue;
                 }
