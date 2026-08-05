@@ -15,15 +15,15 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Pattern;
 
 import org.appwork.utils.formatter.SizeFormatter;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -32,7 +32,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52886 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53113 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileDitchCom extends PluginForHost {
     public FileDitchCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -45,18 +45,22 @@ public class FileDitchCom extends PluginForHost {
         return br;
     }
 
-    private static final Pattern DLLINK = Pattern.compile("<a href=\"([^\"]+)\" class=\"btn btn\\-main\"");
-
     @Override
     public String getAGBLink() {
-        return "https://new.fileditch.com/";
+        return "https://" + getHost();
     }
 
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "fileditchfiles.me" });
+        ret.add(new String[] { "fileditchfiles.st", "fileditchfiles.me", "fileditch.com" });
         return ret;
+    }
+
+    @Override
+    public String rewriteHost(final String host) {
+        /* 2026-08-04: Main domain changed from fileditchfiles.me to fileditchfiles.st */
+        return this.rewriteHost(getPluginDomains(), host);
     }
 
     public static String[] getAnnotationNames() {
@@ -71,7 +75,7 @@ public class FileDitchCom extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://" + buildHostsPatternPart(domains) + "/file\\.php\\?f=/([a-z0-9]{3,})/([^/#\\?]+)");
+            ret.add("https?://" + buildHostsPatternPart(domains) + "/[^/]+/([a-f0-9]+)/([^/\\?#]+)");
         }
         return ret.toArray(new String[0]);
     }
@@ -79,12 +83,12 @@ public class FileDitchCom extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         br.getPage(link.getPluginPatternMatcher());
+        handleAntiBotChallenge(br);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("<h2>File unreachable</h2>")) {
+        } else if (br.containsHTML("<h2>\\s*File unreachable\\s*</h2>")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        link.setFinalFileName(br.getRegex("<span>/[^<]*/([^</]+)</span>").getMatch(0));
         link.setDownloadSize(SizeFormatter.getSize(null, br.getRegex("<span class=\"size\">([^<]+)</span>").getMatch(0), true, false));
         return AvailableStatus.TRUE;
     }
@@ -92,10 +96,75 @@ public class FileDitchCom extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
         requestFileInformation(link);
-        final String dlurl = Encoding.htmlDecode(br.getRegex(DLLINK).getMatch(0));
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dlurl, true, 0);
+        final String js = br.getRegex("var u = \\[([^\\]]+)\\]\\.join\\(\"\"\\)").getMatch(0);
+        final String dllink = js.replace("\",\"", "").replace("\"", "").replace("\\", "");
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 0);
         handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
+    }
+
+    /**
+     * Detects and solves the JavaScript proof-of-work anti-bot challenge ("Verifying your browser…"). </br>
+     * The site hands out a hidden form which requires a nonce so that SHA-256(pow_challenge + ":" + nonce) has "pow_diff" leading zero
+     * bits. Once solved, the form is posted back and the real page is returned.
+     */
+    private void handleAntiBotChallenge(final Browser br) throws Exception {
+        int round = 0;
+        while (br.containsHTML("name\\s*=\\s*\"pow_challenge\"")) {
+            if (round++ >= 3) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Failed to solve anti-bot challenge");
+            }
+            if (this.isAbort()) {
+                throw new InterruptedException();
+            }
+            final Form pow = br.getFormbyKey("pow_challenge");
+            if (pow == null) {
+                break;
+            }
+            final String challenge = pow.getInputFieldByName("pow_challenge").getValue();
+            final String diffStr = pow.getInputFieldByName("pow_diff").getValue();
+            if (challenge == null || diffStr == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final int diff = Integer.parseInt(diffStr.trim());
+            final String nonce = solveProofOfWork(challenge, diff);
+            pow.put("pow_nonce", nonce);
+            br.submitForm(pow);
+        }
+    }
+
+    /** Brute-forces a nonce so that SHA-256(challenge + ":" + nonce) has the requested number of leading zero bits. */
+    private String solveProofOfWork(final String challenge, final int diff) throws Exception {
+        final MessageDigest md = MessageDigest.getInstance("SHA-256");
+        final String prefix = challenge + ":";
+        long nonce = 0;
+        while (true) {
+            if (this.isAbort()) {
+                throw new InterruptedException();
+            }
+            md.reset();
+            final byte[] hash = md.digest((prefix + nonce).getBytes("US-ASCII"));
+            if (hasLeadingZeroBits(hash, diff)) {
+                return Long.toString(nonce);
+            }
+            nonce++;
+        }
+    }
+
+    private boolean hasLeadingZeroBits(final byte[] bytes, final int need) {
+        final int full = need >> 3;
+        final int rem = need & 7;
+        for (int i = 0; i < full; i++) {
+            if (bytes[i] != 0) {
+                return false;
+            }
+        }
+        if (rem != 0) {
+            if ((bytes[full] & ((0xFF << (8 - rem)) & 0xFF)) != 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override

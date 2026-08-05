@@ -68,7 +68,7 @@ import jd.plugins.hoster.ZdfDeMediathek;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface.SubtitleType;
 
-@DecrypterPlugin(revision = "$Revision: 53097 $", interfaceVersion = 3, names = { "zdf.de", "logo.de", "zdfheute.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?logo\\.de/.+", "https?://(?:www\\.)?zdfheute\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
+@DecrypterPlugin(revision = "$Revision: 53111 $", interfaceVersion = 3, names = { "zdf.de", "logo.de", "zdfheute.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?logo\\.de/.+", "https?://(?:www\\.)?zdfheute\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
 public class ZDFMediathekDecrypter extends PluginForDecrypt {
     private boolean                          fastlinkcheck             = false;
     private final String                     TYPE_ZDF                  = "(?i)https?://(?:www\\.)?(?:zdf\\.de|3sat\\.de)/.+";
@@ -419,10 +419,22 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         }
         /* Always collect metadata from the website - it is used by whichever path is taken below. */
         final ZdfMetadata websiteMetadata = parseMetadataFromWebsite(html_unescaped);
+        /*
+         * Count the distinct video items present on the page. Overview/collection listing pages (e.g. /spielfilm-highlights-104) embed one
+         * hero ptmd-template per teaser -> such pages must NOT be treated as a single video (that would crawl only the first teaser and,
+         * worse, label it with the page-level title like "Spielfilm-Highlights"). They are handled by the multi-item branch further below.
+         */
+        final String[] videoCanonicals = new Regex(html_unescaped, "\"__typename\":\"Video\",[^\\}]*\"canonical\":\"([\\w-]+)").getColumn(0);
+        final HashSet<String> uniqueVideoCanonicals = new HashSet<String>();
+        if (videoCanonicals != null) {
+            uniqueVideoCanonicals.addAll(Arrays.asList(videoCanonicals));
+        }
+        final boolean isSingleVideoPage = uniqueVideoCanonicals.size() == 1;
         /* 2. Single video via embedded ptmd-template (new zdfmediathek 2026) -> preferred way whenever present. */
         final String ptmdTemplate = new Regex(html_unescaped, "\"ptmdTemplate\"\\s*:\\s*\"(/tmd/[^\"]+)\"").getMatch(0);
         final String sophoraID_from_url = this.getSophoraIDFromURL_safe(br.getURL());
-        if (ptmdTemplate != null) {
+        /* Only take the single-video fast-path when the URL clearly identifies one video or the page really contains just one. */
+        if (ptmdTemplate != null && (sophoraID_from_url != null || isSingleVideoPage)) {
             logger.info("Found ptmdTemplate in website -> Using new way");
             if (sophoraID_from_url != null) {
                 /* We know that this is a single video so we can skip the steps down below. */
@@ -438,6 +450,21 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
                 }
             }
             return this.crawlZdfVideoViaPtmdTemplate(param, ptmdTemplate, websiteMetadata);
+        }
+        /*
+         * Overview/collection listing page (per-teaser ptmd-templates present but multiple distinct videos and no single-video URL): crawl
+         * only the page's hero element - i.e. the one with the visible play button, which is the first "heroVideo" (e.g. "Largo Winch" on
+         * /spielfilm-highlights-104). Fall back to the first listed video if no heroVideo is present. It is crawled via its own
+         * content-document (crawlZdfVideoViaSophoraID without website metadata) so it gets its correct title/date instead of the page-level
+         * title (e.g. "Spielfilm-Highlights").
+         */
+        if (ptmdTemplate != null && videoCanonicals != null && videoCanonicals.length > 0) {
+            String heroSophoraID = new Regex(html_unescaped, "\"heroVideo\"\\s*:\\s*\\{[^\\}]*?\"canonical\"\\s*:\\s*\"([\\w-]+)\"").getMatch(0);
+            if (heroSophoraID == null) {
+                heroSophoraID = videoCanonicals[0];
+            }
+            logger.info("Overview page detected -> crawling only the hero element: " + heroSophoraID);
+            return crawlZdfVideoViaSophoraID(param, heroSophoraID);
         }
         /* 3. No ptmd-template found -> fall back to the old ways (content-document, embedded videos, ...). */
         if (sophoraID_from_url != null) {

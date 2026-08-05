@@ -87,7 +87,7 @@ import jd.plugins.PluginConfigPanelNG;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53094 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53114 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -1049,6 +1049,10 @@ public class RapidGatorNet extends PluginForHost {
                  */
                 ai.setUnlimitedTraffic();
             }
+            /*
+             * 2026-08-04: Looks like this place is not used anymore to display the account expire date, see "/Payment/Payment" handling
+             * down below.
+             */
             String expireDate = br.getRegex("Premium services will end on ([^<>\"]*?)\\.<br").getMatch(0);
             if (expireDate == null) {
                 if (expireDate == null) {
@@ -1085,11 +1089,11 @@ public class RapidGatorNet extends PluginForHost {
                  * day no matter which exact time of the day it expires.
                  */
                 long validUntil = TimeFormatter.getMilliSeconds(expireDate + " 23:59:59", "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
-                Number premium_end_time = (Number) account.getProperty(PROPERTY_ACCOUNT_API_PREMIUM_END_TIME);
-                if (premium_end_time != null) {
+                Number premium_end_time_from_api = (Number) account.getProperty(PROPERTY_ACCOUNT_API_PREMIUM_END_TIME);
+                if (premium_end_time_from_api != null) {
                     /* Prefer longer premium_end_time from api response */
-                    premium_end_time = TimeUnit.SECONDS.toMillis(premium_end_time.longValue()) + TimeUnit.DAYS.toMillis(1);
-                    validUntil = Math.max(validUntil, premium_end_time.longValue());
+                    premium_end_time_from_api = TimeUnit.SECONDS.toMillis(premium_end_time_from_api.longValue()) + TimeUnit.DAYS.toMillis(1);
+                    validUntil = Math.max(validUntil, premium_end_time_from_api.longValue());
                 }
                 ai.setValidUntil(validUntil, br);
             } else {

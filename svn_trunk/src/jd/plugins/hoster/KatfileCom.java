@@ -23,19 +23,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import jd.PluginWrapper;
-import jd.controlling.faviconcontroller.FavIcons;
-import jd.http.Browser;
-import jd.parser.html.Form;
-import jd.parser.html.InputField;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.DownloadLink;
-import jd.plugins.HostPlugin;
-import jd.plugins.PluginException;
 
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
@@ -45,7 +34,20 @@ import org.jdownloader.plugins.components.config.XFSConfigKatfile;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
-@HostPlugin(revision = "$Revision: 53015 $", interfaceVersion = 3, names = {}, urls = {})
+import jd.PluginWrapper;
+import jd.controlling.faviconcontroller.FavIcons;
+import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.parser.html.Form.MethodType;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.DownloadLink;
+import jd.plugins.HostPlugin;
+import jd.plugins.PluginException;
+
+@HostPlugin(revision = "$Revision: 53112 $", interfaceVersion = 3, names = {}, urls = {})
 public class KatfileCom extends XFileSharingProBasic {
     public KatfileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -175,20 +177,51 @@ public class KatfileCom extends XFileSharingProBasic {
 
     @Override
     public Form findFormDownload1Free(final Browser br) throws Exception {
-        final Form download1 = super.findFormDownload1Free(br);
-        final boolean formFixRequired = false;
-        if (formFixRequired && download1 != null) {
-            /* 2022-09-02 - fixed in Form class */
-            final String formkey = "method_free";
-            final InputField method_free = download1.getInputField(formkey);
-            String value = method_free.getValue();
-            if (value == null) {
-                value = "Start Download";
+        Form download1 = super.findFormDownload1Free(br);
+        if (download1 != null) {
+            return download1;
+        }
+        if (download1 == null) {
+            /*
+             * 2026-08-04: Website was re-built by AI: The download-page no longer contains a real HTML <form> for op=download1. Instead the
+             * parameters are stored in JavaScript variables and the request is fired via fetch(). We rebuild the Form from those JS
+             * variables. </br> Example JS: </br> var FILE_ID = "ja1fgtaq8um6"; </br> var REFERER = ""; </br> var USR_LOGIN = ""; </br> var
+             * FNAME = "filename.rar"; </br> var POST_URL = window.location.href.split('#')[0];
+             */
+            final String html = getCorrectBR(br);
+            final String fileID = new Regex(html, "var\\s+FILE_ID\\s*=\\s*\"([^\"]+)\"").getMatch(0);
+            if (fileID != null) {
+                final String fname = new Regex(html, "var\\s+FNAME\\s*=\\s*\"([^\"]*)\"").getMatch(0);
+                final String referer = new Regex(html, "var\\s+REFERER\\s*=\\s*\"([^\"]*)\"").getMatch(0);
+                final String usrLogin = new Regex(html, "var\\s+USR_LOGIN\\s*=\\s*\"([^\"]*)\"").getMatch(0);
+                download1 = new Form();
+                download1.setMethod(MethodType.POST);
+                /* POST_URL = current page URL */
+                download1.setAction(br.getURL());
+                download1.put("op", "download1");
+                download1.put("usr_login", usrLogin != null ? Encoding.urlEncode(usrLogin) : "");
+                download1.put("id", fileID);
+                download1.put("fname", fname != null ? Encoding.urlEncode(fname) : "");
+                download1.put("referer", referer != null ? Encoding.urlEncode(referer) : "");
+                download1.put("method_free", "1");
             }
-            download1.remove("method_free");
-            download1.put("method_free", value);
         }
         return download1;
+    }
+
+    @Override
+    protected Form findFormDownload2Free(final Browser br) {
+        final Form download2 = super.findFormDownload2Free(br);
+        if (download2 != null) {
+            /*
+             * 2026-08-04: The re-built website requires an additional "device_id" (random UUID, persisted in localStorage on the website)
+             * on the op=download2 request. We generate one on the fly.
+             */
+            if (download2.getInputFieldByName("device_id") == null) {
+                download2.put("device_id", UUID.randomUUID().toString());
+            }
+        }
+        return download2;
     }
 
     @Override
@@ -261,7 +294,6 @@ public class KatfileCom extends XFileSharingProBasic {
             return super.isOffline(link, br);
         }
     }
-
     // @Override
     // protected boolean isPremiumOnlyURL(final Browser br) {
     // final String url = br != null ? br.getURL() : null;

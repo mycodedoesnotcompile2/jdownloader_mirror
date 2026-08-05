@@ -4,6 +4,7 @@ import java.awt.event.ActionEvent;
 import java.util.List;
 import java.util.Set;
 
+import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogNoAnswerException;
@@ -18,26 +19,108 @@ import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.components.packagetable.LinkTreeUtils;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 import org.jdownloader.images.NewTheme;
+import org.jdownloader.plugins.config.Order;
+import org.jdownloader.settings.UrlDisplayType;
 
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
+import jd.controlling.packagecontroller.AbstractPackageNode;
 import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
 
-public class OpenInBrowserAction extends CustomizableTableContextAppAction<FilePackage, DownloadLink> implements ActionContext {
+/**
+ * "Open in Browser" context menu action.
+ *
+ * This class holds the complete functionality and is used directly by the DownloadTable. The LinkGrabber variant
+ * ({@link org.jdownloader.gui.views.linkgrabber.contextmenu.OpenInBrowserAction}) simply derives from it with the CrawledPackage /
+ * CrawledLink types, so the logic only exists once.
+ */
+public class OpenInBrowserAction<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> extends CustomizableTableContextAppAction<PackageType, ChildrenType> implements ActionContext {
     private static final long   serialVersionUID = 7911375550836173693L;
     private final static String NAME             = _GUI.T.gui_table_contextmenu_browselink();
+
+    /**
+     * Selectable link type for the "Open in Browser" action.
+     *
+     * DEFAULT keeps the classic behaviour (open the default display URL, see {@link LinkTreeUtils#getURLs}). All other values map to a
+     * {@link UrlDisplayType} and open exactly that URL type (see {@link LinkTreeUtils#getUrlByType}).
+     */
+    public static enum LinkType implements LabelInterface {
+        DEFAULT(null),
+        CUSTOM(UrlDisplayType.CUSTOM),
+        REFERRER(UrlDisplayType.REFERRER),
+        ORIGIN(UrlDisplayType.ORIGIN),
+        CONTAINER(UrlDisplayType.CONTAINER),
+        CONTENT(UrlDisplayType.CONTENT);
+
+        private final UrlDisplayType urlDisplayType;
+
+        private LinkType(final UrlDisplayType urlDisplayType) {
+            this.urlDisplayType = urlDisplayType;
+        }
+
+        /**
+         * @return the mapped {@link UrlDisplayType}, or null for {@link #DEFAULT}.
+         */
+        public UrlDisplayType getUrlDisplayType() {
+            return urlDisplayType;
+        }
+
+        @Override
+        public String getLabel() {
+            if (urlDisplayType != null) {
+                return urlDisplayType.getTranslatedName();
+            }
+            return _GUI.T.gui_table_contextmenu_browselink_urltype_default();
+        }
+    }
 
     public OpenInBrowserAction() {
         setIconKey(IconKey.ICON_BROWSE);
         setName(NAME);
     }
 
-    private int threshold = 50;
-    private int delay     = 1000;
+    private int      threshold         = 50;
+    private int      delay             = 1000;
+    private LinkType linkType          = LinkType.DEFAULT;
+    private boolean  fallbackToDefault = true;
+
+    public static String getTranslationLinkType() {
+        return _GUI.T.gui_table_contextmenu_browselink_urltype();
+    }
+
+    @Order(10)
+    @Customizer(link = "#getTranslationLinkType")
+    public LinkType getLinkType() {
+        return linkType;
+    }
+
+    public void setLinkType(LinkType linkType) {
+        if (linkType == null) {
+            this.linkType = LinkType.DEFAULT;
+        } else {
+            this.linkType = linkType;
+        }
+    }
+
+    public static String getTranslationFallbackToDefault() {
+        return _GUI.T.gui_table_contextmenu_browselink_urltype_fallback();
+    }
+
+    @Order(20)
+    @Customizer(link = "#getTranslationFallbackToDefault")
+    public boolean isFallbackToDefault() {
+        return fallbackToDefault;
+    }
+
+    public void setFallbackToDefault(boolean fallbackToDefault) {
+        this.fallbackToDefault = fallbackToDefault;
+    }
 
     public static String getTranslationOpenDelay() {
         return _GUI.T.gui_table_contextmenu_browselink_delay();
     }
 
+    @Order(30)
     @Customizer(link = "#getTranslationOpenDelay")
     public int getOpenDelay() {
         return delay;
@@ -51,6 +134,7 @@ public class OpenInBrowserAction extends CustomizableTableContextAppAction<FileP
         return _GUI.T.gui_table_contextmenu_browselink_maxurls();
     }
 
+    @Order(40)
     @Customizer(link = "#getTranslationMaxOpenThreshold")
     public int getMaxOpenThreshold() {
         return threshold;
@@ -61,7 +145,7 @@ public class OpenInBrowserAction extends CustomizableTableContextAppAction<FileP
     }
 
     @Override
-    protected void onRequestUpdateSelection(Object requestor, SelectionType selectionType, SelectionInfo<FilePackage, DownloadLink> selectionInfo) {
+    protected void onRequestUpdateSelection(Object requestor, SelectionType selectionType, SelectionInfo<PackageType, ChildrenType> selectionInfo) {
         final int threshold = getMaxOpenThreshold();
         if (!CrossSystem.isOpenBrowserSupported() || threshold == 0) {
             setEnabled(false);
@@ -75,13 +159,21 @@ public class OpenInBrowserAction extends CustomizableTableContextAppAction<FileP
             setEnabled(true);
             return;
         }
-        final List<DownloadLink> links = selectionInfo.getChildren();
+        final List<ChildrenType> links = selectionInfo.getChildren();
         if (links.size() > threshold) {
             setEnabled(false);
             return;
         }
-        for (final DownloadLink link : links) {
-            if (link.getView().getDisplayUrl() != null) {
+        for (final ChildrenType child : links) {
+            final DownloadLink link;
+            if (child instanceof DownloadLink) {
+                link = (DownloadLink) child;
+            } else if (child instanceof CrawledLink) {
+                link = ((CrawledLink) child).getDownloadLink();
+            } else {
+                link = null;
+            }
+            if (link != null && link.getView().getDisplayUrl() != null) {
                 setEnabled(true);
                 return;
             }
@@ -98,7 +190,7 @@ public class OpenInBrowserAction extends CustomizableTableContextAppAction<FileP
     }
 
     @Override
-    protected void onActionPerformed(ActionEvent e, SelectionType selectionType, final SelectionInfo<FilePackage, DownloadLink> selectionInfo) {
+    protected void onActionPerformed(ActionEvent e, SelectionType selectionType, final SelectionInfo<PackageType, ChildrenType> selectionInfo) {
         if (SelectionInfo.isEmpty(selectionInfo)) {
             return;
         } else if (!isEnabled()) {
@@ -107,7 +199,20 @@ public class OpenInBrowserAction extends CustomizableTableContextAppAction<FileP
         new Thread("OpenInBrowserAction") {
             public void run() {
                 final int delay = getOpenDelay();
-                final Set<String> urls = LinkTreeUtils.getURLs(selectionInfo, true);
+                final LinkType linkType = getLinkType();
+                final Set<String> urls;
+                if (linkType == null || linkType == LinkType.DEFAULT) {
+                    urls = LinkTreeUtils.getURLs(selectionInfo, true);
+                } else {
+                    urls = LinkTreeUtils.getURLs(selectionInfo, linkType.getUrlDisplayType(), isFallbackToDefault());
+                }
+                if (urls == null || urls.isEmpty()) {
+                    /**
+                     * Do not open progress dialog on empty list. Can be empty if e.g. users' selected url-type is not available for any
+                     * item of the selection. <br>
+                     */
+                    return;
+                }
                 final ProgressDialog pg = new ProgressDialog(new ProgressGetter() {
                     private int total = -1;
                     private int current;

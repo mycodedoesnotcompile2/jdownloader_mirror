@@ -201,6 +201,15 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Max URLs to open" })
     String gui_table_contextmenu_browselink_maxurls();
 
+    @Default(lngs = { "en" }, values = { "Type of links to open" })
+    String gui_table_contextmenu_browselink_urltype();
+
+    @Default(lngs = { "en" }, values = { "Default (display URL order with fallback)" })
+    String gui_table_contextmenu_browselink_urltype_default();
+
+    @Default(lngs = { "en" }, values = { "Allow fallback to default if selected url type is not available" })
+    String gui_table_contextmenu_browselink_urltype_fallback();
+
     @Default(lngs = { "en" }, values = { "Check Online Status" })
     String gui_table_contextmenu_check();
 

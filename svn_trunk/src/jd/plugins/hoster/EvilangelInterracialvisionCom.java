@@ -25,8 +25,8 @@ import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
 @HostPlugin(revision = "$Revision: 53110 $", interfaceVersion = 3, names = {}, urls = {})
-public class EvilangelAdulttimeCom extends EvilangelCore {
-    public EvilangelAdulttimeCom(PluginWrapper wrapper) {
+public class EvilangelInterracialvisionCom extends EvilangelCore {
+    public EvilangelInterracialvisionCom(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(this.getPremiumRegisterLink());
     }
@@ -34,7 +34,7 @@ public class EvilangelAdulttimeCom extends EvilangelCore {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "adulttime.com" });
+        ret.add(new String[] { "interracialvision.com" });
         return ret;
     }
 
