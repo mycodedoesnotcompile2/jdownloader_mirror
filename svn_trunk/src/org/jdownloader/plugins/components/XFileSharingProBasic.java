@@ -93,7 +93,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 53089 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53123 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -2144,7 +2144,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         link.setAvailable(true);
         try {
             final String[] tabla_data = new Regex(html_for_fuid, "<td>?(.*?)</td>").getColumn(0);
-            final String size = tabla_data.length >= 2 ? tabla_data[2] : null;
+            final String size = tabla_data.length >= 3 ? tabla_data[2] : null;
             if (size != null) {
                 /*
                  * Filesize should definitely be given - but at this stage we are quite sure that the file is online so let's not throw an
@@ -4007,21 +4007,18 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
          * to wait.
          */
         int passedTime = (int) ((Time.systemIndependentCurrentJVMTimeMillis() - timeBefore) / 1000);
-        waitSeconds -= passedTime;
         if (passedTime > 0) {
             /* This usually means that the user had to solve a captcha which cuts down the remaining time we have to wait. */
             logger.info("Total passed time during captcha: " + passedTime);
         }
-        if (waitSeconds > 0) {
-            logger.info("Waiting final waittime: " + waitSeconds);
-            sleep(waitSeconds * 1000l, link);
-        } else if (waitSeconds < waitSeconds) {
+        waitSeconds -= passedTime;
+        if (waitSeconds <= 0) {
             /* User needed more time to solve the captcha so there is no waittime left :) */
             logger.info("Congratulations: Time to solve captcha was higher than waittime --> No waittime left");
-        } else {
-            /* No wait time at all */
-            logger.info("Found no waittime");
+            return;
         }
+        logger.info("Waiting final waittime: " + waitSeconds);
+        sleep(waitSeconds * 1000l, link);
     }
 
     /**
@@ -4929,7 +4926,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         String ret = br.getRegex("/api/account/info\\?key=([a-z0-9]+)").getMatch(0);
         if (ret == null) {
             // darkibox.com, <input type="text" class="form-control" value="......" readonly onfocus="this.select();">
-            final String rets[][] = br.getRegex("<input[^>]*value\\s*=\\s*\"([a-z0-9]{16,})\"[^>]readonly").getMatches();
+            final String rets[][] = br.getRegex("<input[^>]*value\\s*=\\s*\"([a-z0-9]{16,})\"[^>]*readonly").getMatches();
             if (rets.length == 1 && rets[0].length == 1) {
                 ret = rets[0][0];
             }
@@ -6249,7 +6246,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                         /* Use cached name */
                         final String name = link.getName();
                         if (name != null && isVideohost) {
-                            link.setName(this.applyFilenameExtension(filename, ".mp4"));
+                            link.setName(this.applyFilenameExtension(name, ".mp4"));
                         }
                     }
                 }

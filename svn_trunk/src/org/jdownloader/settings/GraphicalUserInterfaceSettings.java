@@ -252,6 +252,13 @@ public interface GraphicalUserInterfaceSettings extends ConfigInterface {
     void setOverviewPanelDownloadPanelIncludeDisabledLinks(boolean b);
 
     @AboutConfig
+    @DefaultBooleanValue(true)
+    @DescriptionForConfigEntry("Count disabled links normally in the 'selected' column of the download overview when the selection consists exclusively of disabled links, even if 'include disabled links' is turned off")
+    boolean isOverviewPanelDownloadPanelForceIncludeSelectedIfAllDisabled();
+
+    void setOverviewPanelDownloadPanelForceIncludeSelectedIfAllDisabled(boolean b);
+
+    @AboutConfig
     @DefaultBooleanValue(false)
     boolean isDownloadPanelOverviewSettingsVisible();
 

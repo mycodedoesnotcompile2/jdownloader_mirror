@@ -33,6 +33,7 @@ public class DownloadOverViewHeader extends AbstractPanelHeader {
         final CheckboxMenuItem filtered = new CheckboxMenuItem(_GUI.T.OverViewHeader_actionPerformed_visible_only_(), CFG_GUI.OVERVIEW_PANEL_VISIBLE_ONLY_INFO_VISIBLE);
         final CheckboxMenuItem selected = new CheckboxMenuItem(_GUI.T.OverViewHeader_actionPerformed_selected_(), CFG_GUI.OVERVIEW_PANEL_SELECTED_INFO_VISIBLE);
         pu.add(new CheckboxMenuItem(_GUI.T.OverViewHeader_disabled(), CFG_GUI.OVERVIEW_PANEL_DOWNLOAD_PANEL_INCLUDE_DISABLED_LINKS));
+        pu.add(new CheckboxMenuItem(_GUI.T.OverViewHeader_disabled_force_selected(), CFG_GUI.OVERVIEW_PANEL_DOWNLOAD_PANEL_FORCE_INCLUDE_SELECTED_IF_ALL_DISABLED));
         pu.add(new CheckboxMenuItem(_GUI.T.OverViewHeader_actionPerformed_smart_(), CFG_GUI.OVERVIEW_PANEL_SMART_INFO_VISIBLE, total, filtered, selected));
         pu.add(new JSeparator(JSeparator.HORIZONTAL));
         pu.add(total);

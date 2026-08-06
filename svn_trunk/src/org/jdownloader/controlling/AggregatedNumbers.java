@@ -133,6 +133,15 @@ public class AggregatedNumbers {
     private final long disabledDownloadsFinished;
     private final long disabledDownloadsFailed;
     private final long disabledDownloadsSkipped;
+    private final int  enabledLinkCount;
+    private final int  disabledLinkCount;
+
+    /**
+     * @return true if the aggregated set contains at least one link and all contained links are disabled.
+     */
+    public final boolean hasOnlyDisabledLinks() {
+        return disabledLinkCount > 0 && enabledLinkCount == 0;
+    }
 
     private final static class AggregatedDownloadLink {
         private long         bytesTotal  = -1;
@@ -252,6 +261,8 @@ public class AggregatedNumbers {
         long downloadsFailedDisabled = 0l;
         int running = 0;
         int connections = 0;
+        int enabledLinkCount = 0;
+        int disabledLinkCount = 0;
         long enabledUnfinishedTotalBytes = -1;
         long enabledUnfinishedLoadedBytes = 0;
         for (PackageView<FilePackage, DownloadLink> packageView : packageViews) {
@@ -272,6 +283,7 @@ public class AggregatedNumbers {
                     running++;
                 }
                 if (linkInfo.enabled) {
+                    enabledLinkCount++;
                     boolean enabledUnfinished = false;
                     if (state == null) {
                         if (skipReason != null) {
@@ -305,6 +317,7 @@ public class AggregatedNumbers {
                         }
                     }
                 } else {
+                    disabledLinkCount++;
                     if (state == null) {
                         if (skipReason != null) {
                             downloadsSkippedDisabled++;
@@ -361,6 +374,8 @@ public class AggregatedNumbers {
         }
         this.enabledUnfinishedTotalBytes = enabledUnfinishedTotalBytes;
         this.linkCount = linkCount;
+        this.enabledLinkCount = enabledLinkCount;
+        this.disabledLinkCount = disabledLinkCount;
         this.formatter = initNumberFormat();
     }
 

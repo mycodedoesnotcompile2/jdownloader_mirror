@@ -35,4 +35,20 @@ private final AtomicLong              CACHED_LOID_TIMESTAMP = new AtomicLong(-1)
 
 Never use `static` for such fields — `final` + atomic wrapper is the correct JDownloader convention.
 
+## Throw After a Method That Only Ever Throws
+
+When a method's sole purpose is to throw (it never returns normally), any call to it must be followed by an explicit `throw` — even though that code is unreachable. This keeps the compiler's control-flow analysis happy (e.g. definite-assignment, missing-return-statement) and documents the intent at the call site.
+
+Prefer a `WTFException` (`org.appwork.exceptions.WTFException`) for this unreachable line — it signals "this can never happen" more clearly than a generic `PluginException(LinkStatus.ERROR_PLUGIN_DEFECT)`.
+
+**Example** (from `HighWayMeFolder3`):
+```java
+if (account == null) {
+    errorAccountNeeded();
+    /* Unreachable code */
+    throw new WTFException();
+}
+```
+where `errorAccountNeeded()` always throws (e.g. `AccountRequiredException`).
+
 Do not include a Co-Authored-By line or "Generated with Claude Code" footer in any commit message.

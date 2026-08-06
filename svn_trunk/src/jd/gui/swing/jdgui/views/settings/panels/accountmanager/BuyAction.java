@@ -115,6 +115,17 @@ public class BuyAction extends AbstractAction {
                                     combo.requestFocus();
                                 }
 
+                                @Override
+                                protected void initFocus(final javax.swing.JComponent focus) {
+                                    // focus the search field instead of the default OK button. initFocus runs on
+                                    // windowGainedFocus (after the dialog is visible), so requestFocusInWindow sticks here.
+                                    if (combo != null) {
+                                        combo.getTextField().requestFocusInWindow();
+                                    } else {
+                                        super.initFocus(focus);
+                                    }
+                                }
+
                                 protected String getIconConstraints() {
                                     return "gapright 10,gaptop 2,width 32!,height 32!,alignx center, aligny center";
                                 }

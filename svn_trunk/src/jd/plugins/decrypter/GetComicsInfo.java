@@ -41,9 +41,9 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 48652 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53120 $", interfaceVersion = 3, names = {}, urls = {})
 public class GetComicsInfo extends antiDDoSForDecrypt {
-    private final String DOWNLOAD_SINGLE_PAGES = "DOWNLOAD_SINGLE_PAGES";
+    private final String PROPERTY_DOWNLOAD_SINGLE_PAGES = "DOWNLOAD_SINGLE_PAGES";
 
     public GetComicsInfo(PluginWrapper wrapper) {
         super(wrapper);
@@ -94,9 +94,9 @@ public class GetComicsInfo extends antiDDoSForDecrypt {
             final Request request = br.createGetRequest(contenturl);
             request.getHeaders().put("X-Requested-With", "XMLHttpRequest");
             final String page = br.getPage(request).toString();
-            String[][] regExMatches = new Regex(page, "(https?://.*?)(\\s|$)").getMatches();
-            for (String[] regExMatch : regExMatches) {
-                String matchedURL = Encoding.htmlDecode(regExMatch[0]);
+            final String[][] regExMatches = new Regex(page, "(https?://.*?)(\\s|$)").getMatches();
+            for (final String[] regExMatch : regExMatches) {
+                final String matchedURL = Encoding.htmlDecode(regExMatch[0]);
                 ret.add(createDownloadlink(matchedURL));
             }
         } else {
@@ -167,7 +167,7 @@ public class GetComicsInfo extends antiDDoSForDecrypt {
                 Collections.addAll(links, br.getRegex("href\\s*=\\s*\"([^\"]+)\"[^>]+class\\s*=\\s*\"pagination-button").getColumn(0));
             }
             if (!links.isEmpty()) {
-                for (String link : links) {
+                for (final String link : links) {
                     String detectedLink = null;
                     if (StringUtils.containsIgnoreCase(link, "run.php-urls")) {
                         // checks for correct referer!
@@ -187,17 +187,21 @@ public class GetComicsInfo extends antiDDoSForDecrypt {
                     } else {
                         detectedLink = Encoding.htmlOnlyDecode(link);
                     }
-                    if (new Regex(detectedLink, ".*(imgur\\.com|windsplay\\.com|/contact|/sitemap|/how-to-download).*").matches()) {
+                    if (new Regex(detectedLink, ".*(imgur\\.com|windsplay\\.com|/contact|/sitemap|/how-to-download).*").patternFind()) {
+                        continue;
+                    } else if (new Regex(detectedLink, ".*\\.js$").patternFind()) {
+                        /* Skip js urls */
                         continue;
                     }
-                    if (!getPluginConfig().getBooleanProperty(DOWNLOAD_SINGLE_PAGES, true)) {
+                    if (!getPluginConfig().getBooleanProperty(PROPERTY_DOWNLOAD_SINGLE_PAGES, true)) {
                         if (StringUtils.containsIgnoreCase(detectedLink, "readcomicsonline.ru")) {
                             detectedLink = null;
                         }
                     }
-                    if (StringUtils.isNotEmpty(detectedLink)) {
-                        ret.add(createDownloadlink(detectedLink, false));
+                    if (StringUtils.isEmpty(detectedLink)) {
+                        continue;
                     }
+                    ret.add(createDownloadlink(detectedLink, false));
                 }
             }
             final FilePackage fp = FilePackage.getInstance();
@@ -213,6 +217,12 @@ public class GetComicsInfo extends antiDDoSForDecrypt {
     }
 
     private void setConfigElements() {
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), DOWNLOAD_SINGLE_PAGES, "Include single-page hosters?").setDefaultValue(true));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), PROPERTY_DOWNLOAD_SINGLE_PAGES, "Include single-page hosters?").setDefaultValue(true));
+    }
+
+    @Override
+    public int getMaxConcurrentProcessingInstances() {
+        /* 2026-08-05: Try to avoid rate limit */
+        return 1;
     }
 }

@@ -41,7 +41,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 53091 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53122 $", interfaceVersion = 2, names = {}, urls = {})
 public class SharingWtf extends YetiShareCore {
     public SharingWtf(PluginWrapper wrapper) {
         super(wrapper);
@@ -139,7 +139,10 @@ public class SharingWtf extends YetiShareCore {
     public String[] scanInfo(final DownloadLink link, final String[] fileInfo) {
         /* 2020-01-17: Special */
         super.scanInfo(link, fileInfo);
-        final String betterFilename = br.getRegex("class=\"text-muted small\"[^>]*>([^<]+)").getMatch(0);
+        String betterFilename = br.getRegex("class=\"text-muted small\"[^>]*>([^<]+)").getMatch(0);
+        if (betterFilename == null) {
+            betterFilename = br.getRegex("<title>([^<]+) - sharing\\.wtf</title>").getMatch(0);
+        }
         if (!StringUtils.isEmpty(betterFilename)) {
             fileInfo[0] = betterFilename;
         }

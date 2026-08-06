@@ -16,12 +16,15 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
 import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.components.config.OkRuConfig;
 import org.jdownloader.plugins.components.config.OkRuConfig.Quality;
 import org.jdownloader.plugins.components.hls.HlsContainer;
@@ -37,10 +40,10 @@ import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
-import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -49,16 +52,45 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52650 $", interfaceVersion = 3, names = { "ok.ru" }, urls = { "https?://(?:[A-Za-z0-9]+\\.)?ok\\.ru/(?:video|videoembed|web-api/video/moviePlayer|live)/(\\d+(-\\d+)?)" })
+@HostPlugin(revision = "$Revision: 53122 $", interfaceVersion = 3, names = {}, urls = {})
 public class OkRu extends PluginForHost {
     public OkRu(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://" + getHost() + "/dk?st.cmd=anonymRegistrationEnterPhone");
     }
 
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        ret.add(new String[] { "ok.ru" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    private static final Pattern PATTERN_VIDEO = Pattern.compile("/(?:video|videoembed|web-api/video/moviePlayer|live)/(\\d+(-\\d+)?)", Pattern.CASE_INSENSITIVE);
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:[a-z0-9]+\\.)?" + buildHostsPatternPart(domains) + PATTERN_VIDEO.pattern());
+        }
+        return ret.toArray(new String[0]);
+    }
+
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING };
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING, LazyPlugin.FEATURE.COOKIE_LOGIN_ONLY };
     }
 
     @Override
@@ -72,7 +104,7 @@ public class OkRu extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), "/(\\d+(-\\d+)?)$").getMatch(0);
+        return new Regex(link.getPluginPatternMatcher(), PATTERN_VIDEO).getMatch(0);
     }
 
     private String              dllink                                         = null;
@@ -105,7 +137,7 @@ public class OkRu extends PluginForHost {
             if (StringUtils.isEmpty(metadataSrc) && metadataUrl != null) {
                 metadataUrl = Encoding.htmlDecode(metadataUrl);
                 br.postPage(metadataUrl, "st.location=AutoplayLayerMovieRBlock%2FanonymVideo%2Fanonym");
-                metadataSrc = br.toString();
+                metadataSrc = br.getRequest().getHtmlCode();
             }
             // final List<Object> ressourcelist = (List<Object>) entries.get("");
             entries = JavaScriptEngineFactory.jsonToJavaMap(metadataSrc);
@@ -132,9 +164,6 @@ public class OkRu extends PluginForHost {
         }
         final String extDefault = ".mp4";
         final String fid = this.getFID(link);
-        if (!link.isNameSet()) {
-            link.setName(fid + extDefault);
-        }
         br.getPage("https://" + this.getHost() + "/video/" + fid);
         /* Offline or private video */
         if (isOffline(this.br)) {
@@ -340,8 +369,6 @@ public class OkRu extends PluginForHost {
         requestFileInformation(link, account, true);
         if (br.containsHTML("class=\"fierr\"") || br.containsHTML("(?i)>\\s*Access to this video is restricted")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Download impossible - video corrupted?", 3 * 60 * 60 * 1000l);
-        } else if (br.containsHTML("class=\"fierr\"") || br.containsHTML("(?i)>\\s*Access to this video is restricted")) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Download impossible - video corrupted?", 3 * 60 * 60 * 1000l);
         } else if (br.containsHTML(">\\s*This video is not available in your region")) {
             throw new PluginException(LinkStatus.ERROR_FATAL, "GEO-blocked");
         } else if (paidContent) {
@@ -385,47 +412,35 @@ public class OkRu extends PluginForHost {
         }
     }
 
-    public boolean login(final Account account, final boolean force) throws Exception {
+    public boolean login(final Account account, final boolean validate) throws Exception {
         synchronized (account) {
             br.setFollowRedirects(true);
             br.setCookiesExclusive(true);
             prepBR(this.br);
-            final Cookies cookies = account.loadCookies("");
-            if (cookies != null) {
-                logger.info("Attempting cookie login");
-                br.setCookies(cookies);
-                if (!force) {
-                    logger.info("Trust cookies without login");
-                    return false;
+            final Cookies userCookies = account.loadUserCookies();
+            if (userCookies == null) {
+                /* Only display cookie login instructions on first login attempt */
+                if (!account.hasEverBeenValid()) {
+                    showCookieLoginInfo();
                 }
-                br.getPage("https://" + this.getHost() + "/");
-                if (isLoggedin(br)) {
-                    logger.info("Cookie login successful");
-                    /* Refresh cookie timestamp */
-                    account.saveCookies(br.getCookies(br.getHost()), "");
-                    return true;
-                } else {
-                    logger.info("Cookie login failed");
-                    br.clearCookies(null);
-                    account.clearCookies("");
-                }
+                throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_required());
             }
-            logger.info("Performing full login");
-            br.getPage("https://" + this.getHost());
-            final Form loginform = br.getFormbyActionRegex(".*AnonymLogin.*");
-            if (loginform == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find loginform");
+            logger.info("Attempting user cookie login");
+            br.setCookies(userCookies);
+            if (!validate) {
+                logger.info("Trust cookies without login");
+                return false;
             }
-            loginform.put("st.email", Encoding.urlEncode(account.getUser()));
-            loginform.put("st.password", Encoding.urlEncode(account.getPass()));
-            if (loginform.hasInputFieldByName("st.st.flashVer")) {
-                loginform.put("st.st.flashVer", "0.0.0");
-            }
-            br.submitForm(loginform);
+            br.getPage("https://" + this.getHost() + "/");
             if (!isLoggedin(br)) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+                logger.info("Cookie login failed");
+                if (account.hasEverBeenValid()) {
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
+                } else {
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
+                }
             }
-            account.saveCookies(br.getCookies(br.getHost()), "");
+            logger.info("Cookie login successful");
             return true;
         }
     }
@@ -460,6 +475,11 @@ public class OkRu extends PluginForHost {
     @Override
     public boolean hasCaptcha(final DownloadLink link, final Account acc) {
         return false;
+    }
+
+    @Override
+    protected String getDefaultFileName(final DownloadLink link) {
+        return this.getFID(link) + ".mp4";
     }
 
     @Override
@@ -515,17 +535,5 @@ public class OkRu extends PluginForHost {
     @Override
     public Class<? extends PluginConfigInterface> getConfigInterface() {
         return OkRuConfig.class;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

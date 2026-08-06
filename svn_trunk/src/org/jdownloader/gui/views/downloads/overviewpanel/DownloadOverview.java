@@ -57,7 +57,7 @@ public class DownloadOverview extends AbstractOverviewPanel<AggregatedNumbers, F
                 setFiltered(filtered.getFailedString(includeDisabled));
             }
             if (selected != null) {
-                setSelected(selected.getFailedString(includeDisabled));
+                setSelected(selected.getFailedString(isIncludeDisabledSelected(selected)));
             }
         }
 
@@ -69,6 +69,20 @@ public class DownloadOverview extends AbstractOverviewPanel<AggregatedNumbers, F
 
     private boolean isIncludeDisabled() {
         return CFG_GUI.OVERVIEW_PANEL_DOWNLOAD_PANEL_INCLUDE_DISABLED_LINKS.isEnabled();
+    }
+
+    /**
+     * Same as {@link #isIncludeDisabled()}, but for the "selected" column: even when the setting is off, a selection that
+     * consists exclusively of disabled links should still be counted normally instead of showing zeros.
+     */
+    private boolean isIncludeDisabledSelected(AggregatedNumbers selected) {
+        if (isIncludeDisabled()) {
+            return true;
+        }
+        if (CFG_GUI.OVERVIEW_PANEL_DOWNLOAD_PANEL_FORCE_INCLUDE_SELECTED_IF_ALL_DISABLED.isEnabled() && selected != null && selected.hasOnlyDisabledLinks()) {
+            return true;
+        }
+        return false;
     }
 
     private final class SkippedEntry extends DataEntry<AggregatedNumbers> {
@@ -86,7 +100,7 @@ public class DownloadOverview extends AbstractOverviewPanel<AggregatedNumbers, F
                 setFiltered(filtered.getSkippedString(includeDisabled));
             }
             if (selected != null) {
-                setSelected(selected.getSkippedString(includeDisabled));
+                setSelected(selected.getSkippedString(isIncludeDisabledSelected(selected)));
             }
         }
 
@@ -111,7 +125,7 @@ public class DownloadOverview extends AbstractOverviewPanel<AggregatedNumbers, F
                 setFiltered(filtered.getFinishedString(includeDisabled));
             }
             if (selected != null) {
-                setSelected(selected.getFinishedString(includeDisabled));
+                setSelected(selected.getFinishedString(isIncludeDisabledSelected(selected)));
             }
         }
 
@@ -256,7 +270,7 @@ public class DownloadOverview extends AbstractOverviewPanel<AggregatedNumbers, F
                 setFiltered(filtered.getLoadedBytesString(includeDisabled));
             }
             if (selected != null) {
-                setSelected(selected.getLoadedBytesString(includeDisabled));
+                setSelected(selected.getLoadedBytesString(isIncludeDisabledSelected(selected)));
             }
         }
 
@@ -281,7 +295,7 @@ public class DownloadOverview extends AbstractOverviewPanel<AggregatedNumbers, F
                 setFiltered(filtered.getRemainingBytesString(includeDisabled));
             }
             if (selected != null) {
-                setSelected(selected.getRemainingBytesString(includeDisabled));
+                setSelected(selected.getRemainingBytesString(isIncludeDisabledSelected(selected)));
             }
         }
 
@@ -306,7 +320,7 @@ public class DownloadOverview extends AbstractOverviewPanel<AggregatedNumbers, F
                 setFiltered(filtered.getTotalBytesString(includeDisabled));
             }
             if (selected != null) {
-                setSelected(selected.getTotalBytesString(includeDisabled));
+                setSelected(selected.getTotalBytesString(isIncludeDisabledSelected(selected)));
             }
         }
 
@@ -358,6 +372,7 @@ public class DownloadOverview extends AbstractOverviewPanel<AggregatedNumbers, F
         // new line
         // DownloadWatchDog.getInstance().getActiveDownloads(), DownloadWatchDog.getInstance().getDownloadSpeedManager().connections()
         CFG_GUI.OVERVIEW_PANEL_DOWNLOAD_PANEL_INCLUDE_DISABLED_LINKS.getEventSender().addListener(this, true);
+        CFG_GUI.OVERVIEW_PANEL_DOWNLOAD_PANEL_FORCE_INCLUDE_SELECTED_IF_ALL_DISABLED.getEventSender().addListener(this, true);
         final MigPanel settings = new MigPanel("ins 2 0 0 0 ,wrap 3", "[][fill][fill]", "[]2[]");
         SwingUtils.setOpaque(settings, false);
         settings.add(new JSeparator(JSeparator.VERTICAL), "spany,pushy,growy");

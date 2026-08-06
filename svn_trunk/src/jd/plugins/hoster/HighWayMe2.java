@@ -41,7 +41,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 52757 $", interfaceVersion = 4, names = { "high-way.me" }, urls = { "https?://high-way\\.me/onlinetv\\.php\\?id=\\d+[^/]+" })
+@HostPlugin(revision = "$Revision: 53116 $", interfaceVersion = 4, names = { "high-way.me" }, urls = { "https?://high-way\\.me/onlinetv\\.php\\?id=\\d+[^/]+" })
 public class HighWayMe2 extends HighWayCore {
     protected static MultiHosterManagement mhm                      = new MultiHosterManagement("high-way.me");
     private static final String            urlWebsiteAPICredentials = "high-way.me/pages/cred/";
@@ -64,6 +64,24 @@ public class HighWayMe2 extends HighWayCore {
     @Override
     public String getWebsiteBase() {
         return "https://" + this.getHost() + "/";
+    }
+
+    /**
+     * Usenet username of the given account. </br>
+     * Public accessor so decrypter plugins (e.g. HighWayMeFolder3 for the /dav /cloud JSON API) can build the required HTTP basic auth.
+     */
+    @Override
+    public String getUseNetUsername(final Account account) {
+        return super.getUseNetUsername(account);
+    }
+
+    /**
+     * Usenet password of the given account. </br>
+     * Public accessor so decrypter plugins (e.g. HighWayMeFolder3 for the /dav /cloud JSON API) can build the required HTTP basic auth.
+     */
+    @Override
+    public String getUseNetPassword(final Account account) {
+        return super.getUseNetPassword(account);
     }
 
     @Override

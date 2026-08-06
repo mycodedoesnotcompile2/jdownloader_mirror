@@ -236,6 +236,11 @@ public class CFG_GUI {
      * Include disabled links in the totalbytes and loadedbytes calculation
      **/
     public static final BooleanKeyHandler                              OVERVIEW_PANEL_DOWNLOAD_PANEL_INCLUDE_DISABLED_LINKS    = SH.getKeyHandler("OverviewPanelDownloadPanelIncludeDisabledLinks", BooleanKeyHandler.class);
+    /**
+     * Count disabled links normally in the 'selected' column of the download overview when the selection consists
+     * exclusively of disabled links, even if 'include disabled links' is turned off
+     **/
+    public static final BooleanKeyHandler                              OVERVIEW_PANEL_DOWNLOAD_PANEL_FORCE_INCLUDE_SELECTED_IF_ALL_DISABLED = SH.getKeyHandler("OverviewPanelDownloadPanelForceIncludeSelectedIfAllDisabled", BooleanKeyHandler.class);
     public static final BooleanKeyHandler                              OVERVIEW_PANEL_LINKGRABBER_LINKS_COUNT_VISIBLE          = SH.getKeyHandler("OverviewPanelLinkgrabberLinksCountVisible", BooleanKeyHandler.class);
     public static final BooleanKeyHandler                              PREMIUM_EXPIRE_WARNING_ENABLED                          = SH.getKeyHandler("PremiumExpireWarningEnabled", BooleanKeyHandler.class);
     public static final BooleanKeyHandler                              SPEED_METER_VISIBLE                                     = SH.getKeyHandler("SpeedMeterVisible", BooleanKeyHandler.class);

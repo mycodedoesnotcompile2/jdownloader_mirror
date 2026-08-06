@@ -38,7 +38,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.GenericM3u8;
 
-@DecrypterPlugin(revision = "$Revision: 51405 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53122 $", interfaceVersion = 3, names = {}, urls = {})
 public class SlidesliveCom extends PluginForDecrypt {
     public SlidesliveCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -92,7 +92,7 @@ public class SlidesliveCom extends PluginForDecrypt {
         if (playerToken == null || slidesHost == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        br.getPage("https://ben.slideslive.com/player/" + contentID + "?player_token=" + Encoding.urlEncode(playerToken));
+        br.getPage("https://slideslive.com/player/" + contentID + "?player_token=" + Encoding.urlEncode(playerToken));
         final String externalVideoServiceID = br.getRegex("#EXT-SL-VOD-VIDEO-SERVICE-NAME:(.*?)\\s").getMatch(0);
         final String videoID = br.getRegex("EXT-SL-VOD-VIDEO-ID:(.*?)\\s").getMatch(0);
         if (videoID == null) {
@@ -130,7 +130,7 @@ public class SlidesliveCom extends PluginForDecrypt {
             final String[] items = brc.getRegex("<slideName>([^<]+)</slideName>").getColumn(0);
             if (items != null && items.length > 0) {
                 for (final String slideName : items) {
-                    final String directurl = "https://" + slidesHost + "/" + contentID + "/slides/" + slideName + imagesExt + "?h=432&f=webp&s=lambda&accelerate_s3=1";
+                    final String directurl = "https://" + slidesHost + "/" + contentID + "/slides/original/" + slideName + imagesExt + "?class=432";
                     final DownloadLink image = createDownloadlink(DirectHTTP.createURLForThisPlugin(directurl));
                     image.setAvailable(true);
                     ret.add(image);
@@ -158,7 +158,7 @@ public class SlidesliveCom extends PluginForDecrypt {
                     continue;
                 }
                 final String slideName = imagemap.get("name").toString();
-                final String directurl = "https://" + slidesHost + "/" + contentID + "/slides/" + slideName + imagesExt + "?h=432&f=webp&s=lambda&accelerate_s3=1";
+                final String directurl = "https://" + slidesHost + "/" + contentID + "/slides/original/" + slideName + imagesExt + "?class=432";
                 final DownloadLink image = createDownloadlink(DirectHTTP.createURLForThisPlugin(directurl));
                 image.setAvailable(true);
                 ret.add(image);

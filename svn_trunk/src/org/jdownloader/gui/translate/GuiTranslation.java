@@ -4138,6 +4138,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Include Disabled Links" })
     String OverViewHeader_disabled();
 
+    @Default(lngs = { "en" }, values = { "Count disabled links when all selected items are disabled" })
+    String OverViewHeader_disabled_force_selected();
+
     @Default(lngs = { "en" }, values = { "Enable the %s1 Service" })
     String captchasolver_configpanel_enabled(String name);
 

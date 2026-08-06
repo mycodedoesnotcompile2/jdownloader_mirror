@@ -18,11 +18,13 @@ package jd.plugins.hoster;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.formatter.SizeFormatter;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
@@ -32,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53113 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53117 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileDitchCom extends PluginForHost {
     public FileDitchCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -73,11 +75,31 @@ public class FileDitchCom extends PluginForHost {
     }
 
     public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    /** New URL type e.g. https://fileditchfiles.st/balpha1/43339e614f5b3f28ebb9/00_Testdata.part3.rar */
+    private static final Pattern PATTERN_FILE     = Pattern.compile("/[^/]+/([a-f0-9]+)/([^/\\?#]+)");
+    /** Old URL type e.g. https://fileditchfiles.me/file.php?f=/abc123/00_Testdata.part3.rar */
+    private static final Pattern PATTERN_FILE_OLD = Pattern.compile("/file\\.php\\?f=/([a-z0-9]{3,})/([^/#\\?]+)");
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
-        for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://" + buildHostsPatternPart(domains) + "/[^/]+/([a-f0-9]+)/([^/\\?#]+)");
+        for (final String[] domains : pluginDomains) {
+            final String hostsPattern = buildHostsPatternPart(domains);
+            ret.add("https?://" + hostsPattern + "/(" + PATTERN_FILE.pattern().substring(1) + "|" + PATTERN_FILE_OLD.pattern().substring(1) + ")");
         }
         return ret.toArray(new String[0]);
+    }
+
+    @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        final String fname = new Regex(link.getPluginPatternMatcher(), PATTERN_FILE_OLD).getMatch(1);
+        if (fname != null) {
+            return fname;
+        }
+        /* Other (new) kinds of links contain the filename at the end of their path so auto handling will handle these just fine. */
+        return super.getDefaultFileName(link);
     }
 
     @Override

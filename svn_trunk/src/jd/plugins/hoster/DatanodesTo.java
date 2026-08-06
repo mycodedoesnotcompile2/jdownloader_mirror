@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.appwork.exceptions.WTFException;
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
@@ -40,8 +41,9 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 53090 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53121 $", interfaceVersion = 3, names = {}, urls = {})
 public class DatanodesTo extends XFileSharingProBasic {
     public DatanodesTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -214,6 +216,7 @@ public class DatanodesTo extends XFileSharingProBasic {
             super.prepBrowser(prepBr, host);
             /* 2023-02-21: Bypasses their simple "referer protection" */
             prepBr.getHeaders().put("Referer", "https://datanodes.to/users");
+            prepBr.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, UserAgents.generate().getUserAgentString());
         }
         return prepBr;
     }
@@ -252,10 +255,15 @@ public class DatanodesTo extends XFileSharingProBasic {
     @Override
     protected String getDllink(final DownloadLink link, final Account account, final Browser br, String src) {
         if (src != null && src.startsWith("{")) {
-            try {
+            extract_url_from_json: try {
                 /* Parse json response */
                 final Map<String, Object> entries = restoreFromString(src, TypeRef.MAP);
-                String url = entries.get("url").toString();
+                String url = (String) entries.get("url");
+                if (StringUtils.isEmpty(url)) {
+                    logger.warning("Failed to find directurl in json");
+                    /* Do not return here, return at the end of the function!! */
+                    break extract_url_from_json;
+                }
                 /* Check for encoded value and decode it if needed. */
                 if (StringUtils.startsWithCaseInsensitive(url, "https%3A%2F")) {
                     url = Encoding.htmlDecode(url);
