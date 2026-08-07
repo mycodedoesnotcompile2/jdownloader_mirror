@@ -1,6 +1,7 @@
 package org.jdownloader.controlling.packagizer;
 
 import java.io.File;
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -50,6 +51,7 @@ import org.appwork.utils.event.EventSuppressor;
 import org.appwork.utils.event.queue.QueueAction;
 import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.swing.dialog.Dialog;
 import org.jdownloader.controlling.FileCreationEvent;
 import org.jdownloader.controlling.FileCreationListener;
 import org.jdownloader.controlling.FileCreationManager;
@@ -60,6 +62,7 @@ import org.jdownloader.extensions.extraction.BooleanStatus;
 import org.jdownloader.extensions.extraction.ExtractionController;
 import org.jdownloader.extensions.extraction.bindings.downloadlink.DownloadLinkArchive;
 import org.jdownloader.extensions.extraction.bindings.downloadlink.DownloadLinkArchiveFile;
+import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
@@ -704,6 +707,59 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
                 listener.onPackagizerUpdate();
             }
         });
+    }
+
+    public void importList(final File file) {
+        importList(file, false);
+    }
+
+    /**
+     * Reads {@link PackagizerRule}s from the given file and imports them via {@link #addAll(java.util.List)}. If displayDialog is
+     * true, reading/parsing errors and files without any valid rules are reported to the user via a dialog; otherwise they are only
+     * logged.
+     */
+    public void importList(final File file, final boolean displayDialog) {
+        final List<PackagizerRule> contents;
+        try {
+            contents = JSonStorage.restoreFromString(IO.readFileToString(file), new TypeRef<ArrayList<PackagizerRule>>() {
+            });
+        } catch (Throwable e) {
+            LogController.CL().log(e);
+            if (displayDialog) {
+                Dialog.getInstance().showExceptionDialog(_GUI.T.lit_error_occured(), file.getAbsolutePath() + "-" + e.getMessage(), e);
+            }
+            return;
+        }
+        if (contents == null || contents.size() == 0) {
+            if (displayDialog) {
+                Dialog.getInstance().showErrorDialog(_GUI.T.LinkgrabberFilter_LinkgrabberFilter_import_invalid(file.getName()));
+            }
+            return;
+        }
+        addAll(contents);
+    }
+
+    public void exportList(final File target, final List<PackagizerRule> rules) {
+        exportList(target, rules, false);
+    }
+
+    /**
+     * Writes the given {@link PackagizerRule}s as JSON to the target file, overwriting an existing file. If displayDialog is true,
+     * write errors are reported to the user via a dialog; otherwise they are only logged. The caller is responsible for selecting
+     * the target file (e.g. via a file chooser).
+     */
+    public void exportList(final File target, final List<PackagizerRule> rules, final boolean displayDialog) {
+        try {
+            if (target.exists() && !target.delete()) {
+                throw new IOException("Could not delete/overwrite:" + target);
+            }
+            IO.writeStringToFile(target, JSonStorage.serializeToJson(rules));
+        } catch (IOException e) {
+            LogController.CL().log(e);
+            if (displayDialog) {
+                Dialog.getInstance().showExceptionDialog(_GUI.T.lit_error_occured(), e.getMessage(), e);
+            }
+        }
     }
 
     public void add(PackagizerRule linkFilter) {

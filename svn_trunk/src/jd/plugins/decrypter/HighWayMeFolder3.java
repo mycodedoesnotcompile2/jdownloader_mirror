@@ -53,7 +53,7 @@ import jd.plugins.hoster.HighWayMe2;
  * It recursively walks the users' HIGHWAY cloud via the JSON API and returns all contained files. </br>
  * Docs: https://high-way.me/threads/highway-api.201/ (section "HIGHWAY DAV JSON API")
  */
-@DecrypterPlugin(revision = "$Revision: 53116 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53126 $", interfaceVersion = 3, names = {}, urls = {})
 public class HighWayMeFolder3 extends PluginForDecrypt {
     public HighWayMeFolder3(PluginWrapper wrapper) {
         super(wrapper);
@@ -171,16 +171,22 @@ public class HighWayMeFolder3 extends PluginForDecrypt {
                         numberofFolders++;
                     }
                 } else if (StringUtils.equalsIgnoreCase(type, "file")) {
-                    final String fileURL = resolveURL(folderURL, item.get("downloadUrl").toString());
-                    /* Add as plain direct-http download link for now. */
-                    final DownloadLink link = this.createDownloadlink("directhttp://" + fileURL);
+                    final String path = item.get("path").toString();
+                    /*
+                     * Stable canonical URL used as identifier only. The real (fresh, expiring) download URL is fetched by the host plugin
+                     * on demand via the DAV JSON API.
+                     */
+                    final String canonicalURL = added.getProtocol() + "://" + added.getHost() + path.replace(" ", "%20");
+                    final DownloadLink link = this.createDownloadlink(canonicalURL);
                     link.setName(item.get("name").toString());
                     link.setVerifiedFileSize(((Number) item.get("size")).longValue());
                     link.setRelativeDownloadFolderPath(currentPath);
+                    /* Let our high-way.me host plugin handle check & download of this cloud/DAV file. */
+                    link.setHost(hosterplugin.getHost());
+                    link.setDefaultPlugin(hosterplugin);
                     link.setAvailable(true);
                     link._setFilePackage(fp);
                     ret.add(link);
-                    distribute(link);
                     numberofFiles++;
                 }
             }
@@ -196,9 +202,8 @@ public class HighWayMeFolder3 extends PluginForDecrypt {
     }
 
     private void errorAccountNeeded() throws AccountRequiredException {
-        final String msg = "Account benötigt, um Dateien aus der eigenen High-Way Cloud (/dav bzw. /cloud) einfügen zu können.";
-        displayBubbleNotification("Account benötigt", msg);
-        throw new AccountRequiredException(msg);
+        displayBubbleNotification("Account benötigt", "Account benötigt, um Dateien aus der eigenen High-Way Cloud einfügen zu können.");
+        throw new AccountRequiredException();
     }
 
     /** Handles the JSON error responses documented for the DAV JSON API. */

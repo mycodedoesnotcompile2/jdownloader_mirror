@@ -20,7 +20,7 @@ public class SettingsFilterTable extends AbstractFilterTable {
     private LinkgrabberFilter linkgrabberFilter;
 
     public SettingsFilterTable(LinkgrabberFilter linkgrabberFilter) {
-        super(new FilterTableModel("FilterTable2"));
+        super(new FilterTableModel("FilterTable2"), ImportAction.EXT);
         this.setSearchEnabled(true);
         this.linkgrabberFilter = linkgrabberFilter;
     }

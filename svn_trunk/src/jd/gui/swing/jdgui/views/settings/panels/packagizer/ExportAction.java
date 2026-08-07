@@ -2,13 +2,11 @@ package jd.gui.swing.jdgui.views.settings.panels.packagizer;
 
 import java.awt.event.ActionEvent;
 import java.io.File;
-import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.swing.filechooser.FileFilter;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.utils.IO;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogNoAnswerException;
@@ -16,6 +14,7 @@ import org.appwork.utils.swing.dialog.ExtFileChooserDialog;
 import org.appwork.utils.swing.dialog.FileChooserSelectionMode;
 import org.appwork.utils.swing.dialog.FileChooserType;
 import org.jdownloader.actions.AppAction;
+import org.jdownloader.controlling.packagizer.PackagizerController;
 import org.jdownloader.controlling.packagizer.PackagizerRule;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
@@ -69,20 +68,27 @@ public class ExportAction extends AppAction {
             d.setMultiSelection(false);
             Dialog.I().showDialog(d);
             File saveto = d.getSelectedFile();
-            if (saveto != null) {
-                if (!saveto.getName().endsWith(ext)) {
-                    saveto = new File(saveto.getAbsolutePath() + ext);
-                }
-                try {
-                    if (saveto.exists() && !saveto.delete()) {
-                        throw new IOException("Could not delete/overwrite:" + saveto);
-                    }
-                    IO.writeStringToFile(saveto, JSonStorage.serializeToJson(export));
-                } catch (IOException e1) {
-                    LogController.CL().log(e1);
-                    Dialog.getInstance().showExceptionDialog(_GUI.T.lit_error_occured(), e1.getMessage(), e1);
-                }
+            if (saveto == null) {
+                return;
             }
+            if (!saveto.getName().endsWith(ext)) {
+                saveto = new File(saveto.getAbsolutePath() + ext);
+            }
+            // Snapshot the rules on the EDT (getTableData() may be a live list), then write off the EDT: the file IO (and the
+            // error dialog) would otherwise block the GUI.
+            final List<PackagizerRule> exportList = new ArrayList<PackagizerRule>(export);
+            final File target = saveto;
+            final Thread thread = new Thread("Export packagizer rules") {
+                {
+                    setDaemon(true);
+                }
+
+                @Override
+                public void run() {
+                    PackagizerController.getInstance().exportList(target, exportList, true);
+                }
+            };
+            thread.start();
         } catch (DialogNoAnswerException e1) {
             LogController.CL().log(e1);
         }

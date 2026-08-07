@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53117 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53126 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileDitchCom extends PluginForHost {
     public FileDitchCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -55,7 +55,7 @@ public class FileDitchCom extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "fileditchfiles.st", "fileditchfiles.me", "fileditch.com" });
+        ret.add(new String[] { "fileditchfiles.st", "fileditchfiles.me", "fileditch.com", "theditch.st" });
         return ret;
     }
 
@@ -79,17 +79,42 @@ public class FileDitchCom extends PluginForHost {
     }
 
     /** New URL type e.g. https://fileditchfiles.st/balpha1/43339e614f5b3f28ebb9/00_Testdata.part3.rar */
-    private static final Pattern PATTERN_FILE     = Pattern.compile("/[^/]+/([a-f0-9]+)/([^/\\?#]+)");
+    private static final Pattern PATTERN_FILE       = Pattern.compile("/[^/]+/([a-f0-9]+)/([^/\\?#]+)");
     /** Old URL type e.g. https://fileditchfiles.me/file.php?f=/abc123/00_Testdata.part3.rar */
-    private static final Pattern PATTERN_FILE_OLD = Pattern.compile("/file\\.php\\?f=/([a-z0-9]{3,})/([^/#\\?]+)");
+    private static final Pattern PATTERN_FILE_OLD   = Pattern.compile("/file\\.php\\?f=/([a-z0-9]{3,})/([^/#\\?]+)");
+    private static final Pattern PATTERN_FILE_SHORT = Pattern.compile("/([a-z0-9]{8})");
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
             final String hostsPattern = buildHostsPatternPart(domains);
-            ret.add("https?://" + hostsPattern + "/(" + PATTERN_FILE.pattern().substring(1) + "|" + PATTERN_FILE_OLD.pattern().substring(1) + ")");
+            ret.add("https?://" + hostsPattern + "/(" + PATTERN_FILE.pattern().substring(1) + "|" + PATTERN_FILE_OLD.pattern().substring(1) + "|" + PATTERN_FILE_SHORT.pattern().substring(0) + ")");
         }
         return ret.toArray(new String[0]);
+    }
+
+    @Override
+    public String getLinkID(final DownloadLink link) {
+        final String fid = getFID(link);
+        if (fid != null) {
+            return this.getHost() + "://" + fid;
+        } else {
+            return super.getLinkID(link);
+        }
+    }
+
+    private String getFID(final DownloadLink link) {
+        final String url = link.getPluginPatternMatcher();
+        String fid = new Regex(url, PATTERN_FILE).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(url, PATTERN_FILE_OLD).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        fid = new Regex(url, PATTERN_FILE_SHORT).getMatch(0);
+        return fid;
     }
 
     @Override
@@ -118,7 +143,10 @@ public class FileDitchCom extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
         requestFileInformation(link);
-        final String js = br.getRegex("var u = \\[([^\\]]+)\\]\\.join\\(\"\"\\)").getMatch(0);
+        final String js = br.getRegex("var u = \\[(.*?)\\]\\.join\\(\"\"\\)").getMatch(0);
+        if (js == null) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         final String dllink = js.replace("\",\"", "").replace("\"", "").replace("\\", "");
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 0);
         handleConnectionErrors(br, dl.getConnection());

@@ -24,6 +24,8 @@ import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -38,7 +40,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52973 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53129 $", interfaceVersion = 3, names = {}, urls = {})
 public class FuckingfastCo extends PluginForHost {
     public FuckingfastCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -171,8 +173,18 @@ public class FuckingfastCo extends PluginForHost {
             // 2026-07-09
             final Browser brc = br.cloneBrowser();
             /* Should respond with plaintext "OK" and the header down below that we need. */
-            brc.postPage(golink, "");
+            final UrlQuery query = new UrlQuery();
+            if (br.containsHTML("challenges\\.cloudflare\\.com/turnstile/") && br.containsHTML("turnstileSuccess:\\s*false")) {
+                /* 2026-08-06 */
+                /* Hardcoded key date: 2026-08-06 */
+                final String cfTurnstileResponse = new CaptchaHelperHostPluginCloudflareTurnstile(this, br, "0x4AAAAAABg7-KFH60E_65uI").getToken();
+                query.appendEncoded("cf-turnstile-response", cfTurnstileResponse);
+            }
+            brc.postPage(golink, query);
             dllink = brc.getRequest().getResponseHeader("Hx-Redirect");
+            if (dllink == null && !"OK".equalsIgnoreCase(br.getRequest().getHtmlCode())) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unexpected go-response");
+            }
         }
         if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

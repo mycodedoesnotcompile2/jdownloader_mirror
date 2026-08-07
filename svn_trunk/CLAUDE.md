@@ -1,5 +1,9 @@
 # JDownloader Project Rules
 
+## Comments
+
+**All code comments must be written in English.** This applies to every comment (line comments, block comments, Javadoc), regardless of the language used in the conversation.
+
 ## Java Compatibility
 
 **All Java code in this project must be Java 1.6 compatible.**

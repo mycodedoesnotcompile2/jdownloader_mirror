@@ -19,10 +19,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
+import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -35,7 +37,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 52597 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53132 $", interfaceVersion = 3, names = {}, urls = {})
 public class ArdaudiothekDe extends PluginForDecrypt {
     public ArdaudiothekDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -67,189 +69,236 @@ public class ArdaudiothekDe extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
+    /*
+     * Matches both the old numeric URL layouts and the new ardsounds.de URN based ones. Group 1 = content ID (numeric or URN):</br>
+     * /sendung/<slug>/<numeric-id|urn:ard:show:...></br>
+     * /episode/[<slug>/...]<numeric-id|urn:ard:episode|section|extra:...>
+     */
+    private static final Pattern PATTERN_CONTENT = Pattern.compile("/(?:sendung|episode)/(?:[\\w\\-]+/)*(\\d+|urn:ard:[a-z]+:[a-fA-F0-9]+)/?");
+
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(sendung/[\\w\\-]+/(\\d+|urn:\\w+:\\w+:\\w+)/?|episode/([\\w\\-]+/[\\w\\-]+/[\\w\\-]+/)?(\\d+|urn:\\w+:\\w+:\\w+)/?)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_CONTENT.pattern());
         }
         return ret.toArray(new String[0]);
     }
 
-    public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        String episodeTargetID = null;
+    /** GraphQL API endpoint, see https://api.ardaudiothek.de/docs/ */
+    private static final String                 API_BASE       = "https://api.ardaudiothek.de/graphql";
+    private static final String                 QUERY_EPISODE  = "query($id:ID!){item(id:$id){id title description duration startDate episodeNumber image{url1X1} show{id title} programSet{id publicationService{organizationName}} audioList{href distributionType audioBitrate audioCodec}}}";
+    private static final String                 QUERY_SHOW     = "query($id:ID!,$count:Int!,$after:Cursor){show(id:$id){id title description publicationService{organizationName} items(first:$count after:$after filter:{isPublished:{equalTo:true}}){pageInfo{hasNextPage endCursor} nodes{id url title description duration startDate episodeNumber image{url1X1} audioList{href distributionType audioBitrate audioCodec}}}}}";
+    private static final int                    ITEMS_PER_PAGE = 24;
 
-        List<Map<String, Object>> episodes = null;
-        int infiniteLoopPreventionCounter = -1;
-        FilePackage fp = null;
-        String urlToAccess = param.getCryptedUrl();
-        final boolean doSpecialHandlingToFindSingleEpisodePosition;
-        if (urlToAccess.matches("(?i).*urn:\\w+:episode.*")) {
-            doSpecialHandlingToFindSingleEpisodePosition = false;
-        } else {
-            doSpecialHandlingToFindSingleEpisodePosition = true;
+    public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
+        final String contentURL = param.getCryptedUrl();
+        final String id = new Regex(contentURL, PATTERN_CONTENT).getMatch(0);
+        if (id == null) {
+            /* Should never happen as this is enforced by the plugin pattern. */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        Map<String, Object> publicationService = null;
+        final boolean isShow;
+        if (id.startsWith("urn:")) {
+            /* The type is encoded in the URN itself. */
+            isShow = id.startsWith("urn:ard:show:");
+        } else {
+            /* Old numeric layout: only the path tells us show vs. single episode. */
+            isShow = contentURL.contains("/sendung/");
+        }
+        if (isShow) {
+            return crawlShow(id);
+        } else {
+            return crawlEpisode(id, contentURL);
+        }
+    }
+
+    /** Crawls a single episode/section/extra via item(id: ...). */
+    private ArrayList<DownloadLink> crawlEpisode(final String id, final String contentURL) throws Exception {
+        final Map<String, Object> data = callGraphql(QUERY_EPISODE, "{\"id\":\"" + id + "\"}");
+        final Map<String, Object> item = data != null ? (Map<String, Object>) data.get("item") : null;
+        if (item == null) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final String station = (String) JavaScriptEngineFactory.walkJson(item, "programSet/publicationService/organizationName");
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        ret.add(buildEpisodeLink(item, contentURL, station, 0, 1, true));
+        final Map<String, Object> show = (Map<String, Object>) item.get("show");
+        final String showTitle = show != null ? (String) show.get("title") : null;
+        if (showTitle != null) {
+            final FilePackage fp = FilePackage.getInstance();
+            fp.setName(showTitle);
+            final Object showID = JavaScriptEngineFactory.walkJson(item, "programSet/id");
+            if (showID != null) {
+                fp.setPackageKey("ardaudiothek://show/" + showID);
+            }
+            fp.addLinks(ret);
+        }
+        return ret;
+    }
+
+    /** Crawls a complete show (all published episodes) via show(id: ...). */
+    private ArrayList<DownloadLink> crawlShow(final String id) throws Exception {
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final List<Map<String, Object>> allNodes = new ArrayList<Map<String, Object>>();
+        String showTitle = null;
+        String showDescription = null;
+        String showID = null;
+        String station = null;
+        String after = null;
         int page = 0;
-        final int maxItemsPerPage = 12;
         do {
             page++;
-            infiniteLoopPreventionCounter++;
-            br.getPage(urlToAccess);
-            if (br.getHttpConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            urlToAccess = null;
-            final String json = br.getRegex("type=\"application/json\">([^<]+)<").getMatch(0);
-            final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
-            final Map<String, Object> data = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "props/pageProps/initialData/data");
-            final Map<String, Object> result = (Map<String, Object>) data.get("result");
-            final Map<String, Object> podcastEpisode = (Map<String, Object>) data.get("item");
-            if (result == null && podcastEpisode == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            if (result != null) {
-                /* This means we got a podcast with multiple episodes. */
-                final String podcastID = result.get("id").toString();
-                final Map<String, Object> pageInfo = (Map<String, Object>) JavaScriptEngineFactory.walkJson(result, "items/pageInfo");
-                final int totalNumberofItems = ((Number) result.get("numberOfElements")).intValue();
-                publicationService = (Map<String, Object>) result.get("publicationService");
-                final String podcastTitle = result.get("title").toString();
-                final String podcastDescription = (String) result.get("description");
-                if (fp == null) {
-                    fp = FilePackage.getInstance();
-                    fp.setName(podcastTitle);
-                    fp.setComment(podcastDescription);
-                }
-                final Map<String, Object> items = (Map<String, Object>) result.get("items");
-                episodes = (List<Map<String, Object>>) items.get("nodes");
-                final ArrayList<DownloadLink> results = this.processEpisodes(episodes, totalNumberofItems, episodeTargetID, 0);
-                fp.addLinks(results);
-                ret.addAll(results);
-                logger.info("Crawled page " + page + " | Found items: " + ret.size() + "/" + totalNumberofItems);
-                if (episodes.size() == maxItemsPerPage && Boolean.TRUE.equals(pageInfo.get("hasNextPage"))) {
-                    ret.addAll(this.crawlPagination(podcastID, maxItemsPerPage, maxItemsPerPage, totalNumberofItems, fp));
-                    break;
+            final String variables = "{\"id\":\"" + id + "\",\"count\":" + ITEMS_PER_PAGE + (after != null ? ",\"after\":\"" + after + "\"" : "") + "}";
+            final Map<String, Object> data = callGraphql(QUERY_SHOW, variables);
+            final Map<String, Object> show = data != null ? (Map<String, Object>) data.get("show") : null;
+            if (show == null) {
+                if (page == 1) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 } else {
-                    logger.info("Stopping because: There is only one page");
-                    break;
-                }
-            } else {
-                /* Single episode */
-                publicationService = (Map<String, Object>) podcastEpisode.get("publicationService");
-                episodeTargetID = podcastEpisode.get("id").toString();
-                if (doSpecialHandlingToFindSingleEpisodePosition) {
-                    /*
-                     * Access main podcast URL but then later only pick this episode so we get to know the position of that single added
-                     * episode.
-                     */
-                    final Map<String, Object> programSet = (Map<String, Object>) podcastEpisode.get("programSet");
-                    urlToAccess = programSet.get("path").toString();
-                    logger.info("Accessing main podcast URL in order to find context of single wished episode: " + urlToAccess);
-                    continue;
-                } else {
-                    episodes = new ArrayList<Map<String, Object>>();
-                    episodes.add(podcastEpisode);
-                    ret.addAll(processEpisodes(episodes, 1, episodeTargetID, 0));
                     break;
                 }
             }
-        } while ((infiniteLoopPreventionCounter <= 1 && urlToAccess != null));
-        return ret;
-    }
-
-    private ArrayList<DownloadLink> crawlPagination(final String podcastID, final int maxItemsPerPage, int offset, final int totalNumberofItems, final FilePackage fp) throws IOException, PluginException {
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final Browser brc = br.cloneBrowser();
-        brc.getHeaders().put("Accept", "*/*");
-        /* Starts from 2 as page 1 = website -> html code and gets crawled in beforehand. */
-        int page = 1;
-        pagination: do {
-            page++;
-            /* API docs: https://api.ardaudiothek.de/docs/ */
-            brc.getPage("https://api.ardaudiothek.de/graphql?query=query%20ProgramSetEpisodesQuery(%24id%3AID!%2C%24offset%3AInt!%2C%24count%3AInt!)%7Bresult%3AprogramSet(id%3A%24id)%7Bitems(offset%3A%24offset%20first%3A%24count%20orderBy%3APUBLISH_DATE_DESC%20filter%3A%7BisPublished%3A%7BequalTo%3Atrue%7D%7D)%7BpageInfo%7BhasNextPage%20endCursor%7Dnodes%7Bid%20title%20publishDate%20summary%20duration%20path%20image%7Burl%20url1X1%20description%20attribution%7DprogramSet%7Bid%20title%20path%20publicationService%7Btitle%20genre%20path%20organizationName%7D%7Daudios%7Burl%20downloadUrl%20allowDownload%7D%7D%7D%7D%7D&variables=%7B%22id%22%3A%22" + podcastID + "%22%2C%22offset%22%3A" + offset + "%2C%22count%22%3A" + maxItemsPerPage + "%7D");
-            final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-            final Map<String, Object> items = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "data/result/items");
+            if (showTitle == null) {
+                showTitle = (String) show.get("title");
+                showDescription = (String) show.get("description");
+                showID = show.get("id") != null ? show.get("id").toString() : null;
+                station = (String) JavaScriptEngineFactory.walkJson(show, "publicationService/organizationName");
+            }
+            final Map<String, Object> items = (Map<String, Object>) show.get("items");
             final Map<String, Object> pageInfo = (Map<String, Object>) items.get("pageInfo");
-            final List<Map<String, Object>> episodes = (List<Map<String, Object>>) items.get("nodes");
-            final ArrayList<DownloadLink> results = this.processEpisodes(episodes, totalNumberofItems, null, offset);
-            if (fp != null) {
-                fp.addLinks(results);
+            final List<Map<String, Object>> nodes = (List<Map<String, Object>>) items.get("nodes");
+            if (nodes != null) {
+                allNodes.addAll(nodes);
             }
-            ret.addAll(results);
-            logger.info("Crawled page " + page + " | Found items: " + ret.size() + "/" + totalNumberofItems);
+            logger.info("Crawled page " + page + " | Found items so far: " + allNodes.size());
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
-                break pagination;
-            } else if (Boolean.FALSE.equals(pageInfo.get("hasNextPage"))) {
+                break;
+            } else if (!Boolean.TRUE.equals(pageInfo.get("hasNextPage"))) {
                 logger.info("Stopping because: Reached last page");
-                break pagination;
-            } else if (episodes.size() < maxItemsPerPage) {
-                /* Double fail-safe */
-                logger.info("Stopping because: Current page contains less items than " + maxItemsPerPage);
-                break pagination;
+                break;
             }
-            /* Continue to next page */
-            offset += episodes.size();
-            continue;
-        } while (true);
+            after = (String) pageInfo.get("endCursor");
+        } while (after != null);
+        if (allNodes.isEmpty()) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final FilePackage fp = FilePackage.getInstance();
+        fp.setName(showTitle);
+        if (!StringUtils.isEmpty(showDescription)) {
+            fp.setComment(showDescription);
+        }
+        if (showID != null) {
+            fp.setPackageKey("ardaudiothek://show/" + showID);
+        }
+        final int padLength = StringUtils.getPadLength(allNodes.size());
+        final boolean single = allNodes.size() == 1;
+        int position = 1;
+        for (final Map<String, Object> node : allNodes) {
+            final String episodeURL = (String) node.get("url");
+            ret.add(buildEpisodeLink(node, episodeURL, station, padLength, position, single));
+            position++;
+        }
+        fp.addLinks(ret);
         return ret;
     }
 
-    private ArrayList<DownloadLink> processEpisodes(final List<Map<String, Object>> episodes, final int totalNumberofEpisodes, final String episodeTargetID, final int offset) throws PluginException, IOException {
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final int padLength = StringUtils.getPadLength(totalNumberofEpisodes);
-        int position = offset + 1;
-        for (final Map<String, Object> episode : episodes) {
-            final String episodeID = episode.get("id").toString();
-            final String episodeSummary = (String) episode.get("summary");
-            /* Is available if we open the single URL to an episode. */
-            final String episodeFullDescription = (String) episode.get("description");
-            final List<Map<String, Object>> audios = (List<Map<String, Object>>) episode.get("audios");
-            /* Find direct-url: We prefer original downloadurl and only use streaming URL as fallback. */
-            String urlStreaming = null;
-            String urlDownload = null;
-            for (final Map<String, Object> audio : audios) {
-                if ((Boolean) audio.get("allowDownload")) {
-                    urlDownload = audio.get("downloadUrl").toString();
-                } else {
-                    urlStreaming = audio.get("url").toString();
-                }
-            }
-            if (StringUtils.isEmpty(urlStreaming) && StringUtils.isEmpty(urlDownload)) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            final DownloadLink link = this.createDownloadlink(urlDownload != null ? urlDownload : urlStreaming);
-            if (episodes.size() == 1) {
-                link.setFinalFileName(episode.get("title") + ".mp3");
-            } else {
-                link.setFinalFileName(StringUtils.formatByPadLength(padLength, position) + " - " + episode.get("title") + ".mp3");
-            }
-            link.setAvailable(true);
-            if (!StringUtils.isEmpty(episodeFullDescription)) {
-                link.setComment(episodeFullDescription);
-            } else if (!StringUtils.isEmpty(episodeSummary)) {
-                link.setComment(episodeSummary);
-            }
-            /* Estimate filesize based on bitrate of 160kb/s */
-            final Number durationSeconds = (Number) episode.get("duration");
-            if (durationSeconds != null) {
-                link.setDownloadSize((durationSeconds.longValue() * 160 * 1024) / 8);
-            }
-            final String path = (String) episode.get("path");
-            if (!StringUtils.isEmpty(path)) {
-                link.setContentUrl(br.getURL(path).toString());
-            }
-            if (StringUtils.equals(episodeID, episodeTargetID)) {
-                /* User wants to have one specific episode only */
-                ret.clear();
-                ret.add(link);
-                return ret;
-            }
-            /* Continue to next item */
-            ret.add(link);
-            position++;
+    /** Builds one DownloadLink from an episode item/node using its best available audio format. */
+    private DownloadLink buildEpisodeLink(final Map<String, Object> episode, final String contentURL, final String station, final int padLength, final int position, final boolean single) throws PluginException {
+        final List<Map<String, Object>> audios = (List<Map<String, Object>>) episode.get("audioList");
+        final Map<String, Object> best = pickBestAudio(audios);
+        if (best == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        return ret;
+        String href = best.get("href").toString();
+        if (href.startsWith("//")) {
+            href = "https:" + href;
+        }
+        final DownloadLink link = this.createDownloadlink(href);
+        final String title = (String) episode.get("title");
+        String ext = new Regex(href, "\\.([A-Za-z0-9]{2,4})(?:\\?.*)?$").getMatch(0);
+        if (ext == null) {
+            ext = "mp3";
+        }
+        final String filename;
+        if (single) {
+            filename = title + "." + ext;
+        } else {
+            filename = StringUtils.formatByPadLength(padLength, position) + " - " + title + "." + ext;
+        }
+        link.setFinalFileName(filename);
+        link.setAvailable(true);
+        final String description = (String) episode.get("description");
+        if (!StringUtils.isEmpty(description)) {
+            link.setComment(description);
+        }
+        /* Estimate filesize based on the bitrate of the chosen audio format. */
+        final Number durationSeconds = (Number) episode.get("duration");
+        final Number bitrate = (Number) best.get("audioBitrate");
+        if (durationSeconds != null && bitrate != null) {
+            link.setDownloadSize((durationSeconds.longValue() * bitrate.longValue() * 1000) / 8);
+        }
+        if (!StringUtils.isEmpty(contentURL)) {
+            link.setContentUrl(contentURL);
+        }
+        /* Preserve additional metadata. */
+        final Object episodeNumber = episode.get("episodeNumber");
+        if (episodeNumber != null) {
+            link.setProperty("episodeNumber", episodeNumber);
+        }
+        final String startDate = (String) episode.get("startDate");
+        if (!StringUtils.isEmpty(startDate)) {
+            link.setProperty("date", startDate);
+        }
+        if (!StringUtils.isEmpty(station)) {
+            link.setProperty("station", station);
+        }
+        final String thumbnail = (String) JavaScriptEngineFactory.walkJson(episode, "image/url1X1");
+        if (!StringUtils.isEmpty(thumbnail)) {
+            link.setProperty("thumbnailurl", thumbnail.replace("{width}", "448"));
+        }
+        return link;
+    }
+
+    /** Selects the best audio format: prefers real downloads and then the highest bitrate. */
+    private Map<String, Object> pickBestAudio(final List<Map<String, Object>> audios) {
+        if (audios == null || audios.isEmpty()) {
+            return null;
+        }
+        Map<String, Object> best = null;
+        long bestScore = -1;
+        for (final Map<String, Object> audio : audios) {
+            if (StringUtils.isEmpty((String) audio.get("href"))) {
+                continue;
+            }
+            final Number bitrate = (Number) audio.get("audioBitrate");
+            long score = bitrate != null ? bitrate.longValue() : 0;
+            if ("download".equals(audio.get("distributionType"))) {
+                score += 1000000;
+            }
+            if (score > bestScore) {
+                best = audio;
+                bestScore = score;
+            }
+        }
+        return best;
+    }
+
+    /** Performs a GraphQL POST request and returns the "data" object of the response. */
+    private Map<String, Object> callGraphql(final String query, final String variables) throws IOException, PluginException {
+        final Browser brc = br.cloneBrowser();
+        brc.getHeaders().put("Content-Type", "application/json");
+        brc.getHeaders().put("Accept", "application/json");
+        final String body = "{\"query\":\"" + query + "\",\"variables\":" + variables + "}";
+        brc.postPageRaw(API_BASE, body);
+        final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+        if (entries == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final Object errors = entries.get("errors");
+        if (errors != null) {
+            logger.warning("GraphQL returned errors: " + errors);
+        }
+        return (Map<String, Object>) entries.get("data");
     }
 }

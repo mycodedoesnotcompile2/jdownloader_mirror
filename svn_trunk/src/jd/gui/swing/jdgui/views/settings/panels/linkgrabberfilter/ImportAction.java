@@ -2,14 +2,9 @@ package jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter;
 
 import java.awt.event.ActionEvent;
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
 
 import javax.swing.filechooser.FileFilter;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.IO;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogNoAnswerException;
@@ -18,7 +13,6 @@ import org.appwork.utils.swing.dialog.FileChooserSelectionMode;
 import org.appwork.utils.swing.dialog.FileChooserType;
 import org.jdownloader.actions.AppAction;
 import org.jdownloader.controlling.filter.LinkFilterController;
-import org.jdownloader.controlling.filter.LinkgrabberFilterRule;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.logging.LogController;
@@ -64,27 +58,23 @@ public class ImportAction extends AppAction {
             if (files == null || files.length == 0) {
                 return;
             }
-            final List<LinkgrabberFilterRule> all = new ArrayList<LinkgrabberFilterRule>();
-            for (final File file : files) {
-                if (!file.isFile()) {
-                    continue;
+            // Read/parse/import off the EDT: importList does file IO and may show a modal dialog, which would block the GUI.
+            final Thread thread = new Thread("Import filter rules") {
+                {
+                    setDaemon(true);
                 }
-                final List<LinkgrabberFilterRule> contents;
-                try {
-                    contents = JSonStorage.restoreFromString(IO.readFileToString(file), new TypeRef<ArrayList<LinkgrabberFilterRule>>() {
-                    });
-                } catch (Throwable e1) {
-                    LogController.CL().log(e1);
-                    Dialog.getInstance().showExceptionDialog(_GUI.T.lit_error_occured(), file.getAbsolutePath() + "-" + e1.getMessage(), e1);
-                    continue;
+
+                @Override
+                public void run() {
+                    for (final File file : files) {
+                        if (!file.isFile()) {
+                            continue;
+                        }
+                        LinkFilterController.getInstance().importList(file, true);
+                    }
                 }
-                if (contents == null || contents.size() == 0) {
-                    Dialog.getInstance().showErrorDialog(_GUI.T.LinkgrabberFilter_LinkgrabberFilter_import_invalid(file.getName()));
-                } else {
-                    all.addAll(contents);
-                }
-            }
-            LinkFilterController.getInstance().addAll(all);
+            };
+            thread.start();
         } catch (DialogNoAnswerException e1) {
             LogController.CL().log(e1);
         }

@@ -60,7 +60,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 53065 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53129 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeviantArtCom extends PluginForHost {
     private final String               TYPE_DOWNLOADALLOWED_HTML                   = "class=\"text\">\\s*HTML download\\s*</span>";
     private final String               TYPE_DOWNLOADFORBIDDEN_HTML                 = "<div class=\"grf\\-indent\"";
@@ -78,6 +78,7 @@ public class DeviantArtCom extends PluginForHost {
     public static final String         PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL       = "image_display_or_preview_url";
     public static final String         PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL_2     = "image_display_or_preview_url_2";
     public static final String         PROPERTY_VIDEO_DISPLAY_OR_PREVIEW_URL       = "video_display_or_preview_url";
+    public static final String         PROPERTY_DOCUMENT_DISPLAY_OR_PREVIEW_URL    = "document_display_or_preview_url";
     private static final String        PROPERTY_DEVIATION_HTML                     = "deviation_html";
     private static final String        PROPERTY_TIER_ACCESS                        = "tier_access";
     public static final String         PROPERTY_IMAGE_POSITION                     = "image_position";
@@ -252,6 +253,7 @@ public class DeviantArtCom extends PluginForHost {
         link.setProperty(PROPERTY_DEVIATION_HTML, JavaScriptEngineFactory.walkJson(art, "textContent/html/markup"));
         final boolean isImage = isImage(link);
         final boolean isVideo = isVideo(link);
+        final boolean isDocument = isDocument(link);
         final Map<String, Object> media = (Map<String, Object>) art.get("media");
         try {
             final String baseUri = (String) media.get("baseUri");
@@ -263,6 +265,8 @@ public class DeviantArtCom extends PluginForHost {
                 bestTypesList = Arrays.asList(new String[] { "fullview" });
             } else if (isVideo) {
                 bestTypesList = Arrays.asList(new String[] { "video" });
+            } else if (isDocument) {
+                bestTypesList = Arrays.asList(new String[] { "pdf" });
             } else {
                 bestTypesList = new ArrayList<String>(0);
             }
@@ -276,6 +280,9 @@ public class DeviantArtCom extends PluginForHost {
                             if (bestType == null || ((Number) type.get("h")).intValue() > ((Number) bestType.get("h")).intValue()) {
                                 bestType = type;
                             }
+                        } else if (isDocument) {
+                            bestType = type;
+                            break typeStringLoop;
                         }
                     }
                 }
@@ -284,6 +291,7 @@ public class DeviantArtCom extends PluginForHost {
             Number unlimitedImageSize = null;
             String displayedVideoURL = null;
             Number displayedVideoSize = null;
+            String displayedDocumentURL = null;
             if (bestType != null) {
                 if (isImage) {
                     String c = (String) bestType.get("c");
@@ -310,12 +318,17 @@ public class DeviantArtCom extends PluginForHost {
                 } else if (isVideo) {
                     displayedVideoURL = (String) bestType.get("b");
                     displayedVideoSize = (Number) bestType.get("f");
+                } else if (isDocument) {
+                    /* The "s" field contains the full URL (including token) to view/download the document e.g. a .pdf file. */
+                    displayedDocumentURL = (String) bestType.get("s");
                 }
             }
             if (isImage && displayedImageURL != null) {
                 link.setProperty(PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL, displayedImageURL);
             } else if (isVideo && displayedVideoURL != null) {
                 link.setProperty(PROPERTY_VIDEO_DISPLAY_OR_PREVIEW_URL, displayedVideoURL);
+            } else if (isDocument && displayedDocumentURL != null) {
+                link.setProperty(PROPERTY_DOCUMENT_DISPLAY_OR_PREVIEW_URL, displayedDocumentURL);
             }
             link.setProperty("displayedImageURL", displayedImageURL);
             link.setProperty("unlimitedImageSize", unlimitedImageSize);
@@ -456,7 +469,6 @@ public class DeviantArtCom extends PluginForHost {
             if (download != null) {
                 officialDownloadurl = download.get("url").toString();
                 officialDownloadsizeBytes = (Number) download.get("filesize");
-                officialDownloadPossible = Boolean.TRUE;
             } else if (originalFile != null) {
                 officialDownloadsizeBytes = (Number) originalFile.get("filesize");
                 // originalFileExt = originalFile.get("type").toString();
@@ -562,6 +574,13 @@ public class DeviantArtCom extends PluginForHost {
                     allowGrabFilesizeFromHeader = true;
                 }
             }
+        } else if (isDocument(link)) {
+            /* Document download e.g. pdf file */
+            if (officialDownloadsizeBytes != null) {
+                link.setVerifiedFileSize(officialDownloadsizeBytes.longValue());
+            } else {
+                allowGrabFilesizeFromHeader = true;
+            }
         } else {
             logger.warning("Got unknown media type");
         }
@@ -646,6 +665,13 @@ public class DeviantArtCom extends PluginForHost {
                 }
             }
         }
+    }
+
+    private boolean isOfficiallyDownloadable(final DownloadLink link) {
+        if (link.hasProperty(PROPERTY_OFFICIAL_DOWNLOADURL)) {
+            return true;
+        }
+        return false;
     }
 
     private String getCommaSeparatedHumanReadableBlockedReasonString(final List<String> blockedReasons) {
@@ -953,6 +979,10 @@ public class DeviantArtCom extends PluginForHost {
         return StringUtils.equalsIgnoreCase(link.getStringProperty(PROPERTY_TYPE), "literature");
     }
 
+    public static boolean isDocument(DownloadLink link) {
+        return StringUtils.equalsIgnoreCase(link.getStringProperty(PROPERTY_TYPE), "pdf");
+    }
+
     private static boolean isBlurredImageLink(final String url) {
         if (StringUtils.containsIgnoreCase(url, ",blur_")) {
             return true;
@@ -975,6 +1005,8 @@ public class DeviantArtCom extends PluginForHost {
             } else {
                 return ".jpg";
             }
+        } else if (isDocument(link)) {
+            return ".pdf";
         } else if (isLiterature(link) || isStatus(link)) {
             /* TODO: Add proper handling to only download relevant text of this type of link and write it into .txt file. */
             return ".html";
@@ -1058,8 +1090,16 @@ public class DeviantArtCom extends PluginForHost {
                     dllink = multiImageGalleryPreviewUrl;
                 }
             }
-        } else if (officialDownloadurl != null) {
-            /* Non media item e.g. pdf file download */
+        } else if (isDocument(link)) {
+            /* Document e.g. pdf file download */
+            if (officialDownloadurl != null && ((LOGIN_ALWAYS_REQUIRED_FOR_OFFICIAL_DOWNLOAD && account != null) || !LOGIN_ALWAYS_REQUIRED_FOR_OFFICIAL_DOWNLOAD)) {
+                dllink = officialDownloadurl;
+            } else {
+                /* Fallback: Use the display URL of the document which can also be used as download URL. */
+                dllink = link.getStringProperty(PROPERTY_DOCUMENT_DISPLAY_OR_PREVIEW_URL);
+            }
+        } else if (this.isOfficiallyDownloadable(link) && officialDownloadurl != null) {
+            /* Other non media item */
             dllink = officialDownloadurl;
         }
         return dllink;

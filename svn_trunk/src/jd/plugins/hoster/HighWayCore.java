@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
@@ -67,9 +68,11 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 51885 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53126 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
+    /* Cloud/DAV file links added by crawler HighWayMeFolder3. */
+    private static final String                            PATTERN_DAV                            = "(?i)https?://cloud\\.[^/]+/(cloud|dav)/.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
     /* Contains <host><Boolean resume possible|impossible> */
     private static Map<String, Map<String, Boolean>>       hostResumeMap                          = new HashMap<String, Map<String, Boolean>>();
@@ -88,6 +91,8 @@ public abstract class HighWayCore extends UseNet {
     private final String                                   PROPERTY_ACCOUNT_MAX_DOWNLOADS_USENET  = "max_downloads_usenet";
     private final String                                   PROPERTY_ACCOUNT_USENET_USERNAME       = "usenetU";
     private final String                                   PROPERTY_ACCOUNT_USENET_PASSWORD       = "usenetP";
+    /* Fresh direct download URL of a cloud/DAV file, obtained on demand via the DAV JSON API. */
+    private final String                                   PROPERTY_DAV_FRESH_DIRECTURL           = "dav_fresh_directurl";
 
     public static interface HighWayMeConfigInterface extends UsenetAccountConfigInterface {
     };
@@ -125,9 +130,27 @@ public abstract class HighWayCore extends UseNet {
         }
     }
 
+    /** Returns true if the given link is a cloud/DAV file link added by crawler HighWayMeFolder3. */
+    private boolean isDavLink(final DownloadLink link) {
+        return link.getPluginPatternMatcher() != null && link.getPluginPatternMatcher().matches(PATTERN_DAV);
+    }
+
+    @Override
+    public String getPluginContentURL(final DownloadLink link) {
+        final String freshDirecturl = link.getStringProperty(PROPERTY_DAV_FRESH_DIRECTURL);
+        if (freshDirecturl != null) {
+            return freshDirecturl;
+        } else {
+            return super.getPluginContentURL(link);
+        }
+    }
+
     /** Returns true if an account is required to download the given item. */
     private boolean requiresAccount(final DownloadLink link) {
-        if (link.getPluginPatternMatcher() != null && link.getPluginPatternMatcher() != null && link.getPluginPatternMatcher().matches(PATTERN_TV)) {
+        if (isDavLink(link)) {
+            /* Cloud/DAV files can only be checked & downloaded with an account (usenet basic auth). */
+            return true;
+        } else if (link.getPluginPatternMatcher() != null && link.getPluginPatternMatcher().matches(PATTERN_TV)) {
             /* Account required. */
             return true;
         } else {
@@ -191,7 +214,7 @@ public abstract class HighWayCore extends UseNet {
                 return null;
             }
         } else {
-            /* Assume that we have a direct downloadable URL. */
+            /* Use URL-path without parameters as unique id. */
             try {
                 return new URL(link.getPluginPatternMatcher()).getPath();
             } catch (final MalformedURLException e) {
@@ -210,51 +233,115 @@ public abstract class HighWayCore extends UseNet {
     protected AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
         if (isUsenetLink(link)) {
             return super.requestFileInformation(link);
+        } else if (isDavLink(link)) {
+            return this.requestFileInformationDAV(link, account);
         } else if (link.getPluginPatternMatcher().matches(PATTERN_TV)) {
-            if (!link.isNameSet()) {
-                link.setName(this.getFID(link) + ".mp4");
-            }
-            if (account == null) {
-                return AvailableStatus.UNCHECKABLE;
-            }
-            this.login(account, false);
-            final String json_url = link.getPluginPatternMatcher().replaceAll("(?i)stream=(?:0|1)", "") + "&json=1";
-            br.getPage(json_url);
-            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            final Number code = (Number) entries.get("code");
-            if (code != null && code.intValue() != 0) {
-                /* E.g. {"code":"8","error":"ID nicht bekannt"} */
-                final String errormessage = (String) entries.get("error");
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, errormessage);
-            }
-            this.checkErrors(br, link, account);
-            link.setFinalFileName(entries.get("name").toString());
-            final String filesizeBytesStr = entries.get("size").toString();
-            if (filesizeBytesStr != null && filesizeBytesStr.matches("\\d+")) {
-                link.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
-            }
+            return this.requestFileInformationTV(link, account);
         } else {
-            /* Direct-URL download. */
-            final String filenameFromURL = Plugin.getFileNameFromURL(new URL(link.getPluginPatternMatcher()));
-            final String fallbackFilename;
-            if (filenameFromURL != null) {
-                fallbackFilename = filenameFromURL;
-            } else {
-                fallbackFilename = this.getFID(link);
-            }
-            if (!link.isNameSet() && fallbackFilename != null) {
-                /* Set fallback name */
-                link.setName(Encoding.htmlDecode(fallbackFilename).trim());
-            }
-            if (account == null) {
-                /* Some items might be checkable without account but we require an account for all items just in case. */
-                logger.info("Cannot check this link without account");
-                return AvailableStatus.UNCHECKABLE;
-            }
-            this.login(account, false);
-            checkDirecturl(link);
+            return this.requestFileInformationDirecturl(link, account);
+        }
+    }
+
+    /** Availability check for TV recorder links (onlinetv.php). */
+    protected AvailableStatus requestFileInformationTV(final DownloadLink link, final Account account) throws Exception {
+        if (!link.isNameSet()) {
+            link.setName(this.getFID(link) + ".mp4");
+        }
+        if (account == null) {
+            return AvailableStatus.UNCHECKABLE;
+        }
+        this.login(account, false);
+        final String json_url = link.getPluginPatternMatcher().replaceAll("(?i)stream=(?:0|1)", "") + "&json=1";
+        br.getPage(json_url);
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Number code = (Number) entries.get("code");
+        if (code != null && code.intValue() != 0) {
+            /* E.g. {"code":"8","error":"ID nicht bekannt"} */
+            final String errormessage = (String) entries.get("error");
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, errormessage);
+        }
+        this.checkErrors(br, link, account);
+        link.setFinalFileName(entries.get("name").toString());
+        final String filesizeBytesStr = entries.get("size").toString();
+        if (filesizeBytesStr != null && filesizeBytesStr.matches("\\d+")) {
+            link.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
         }
         return AvailableStatus.TRUE;
+    }
+
+    /** Availability check for plain direct-URL downloads (e.g. results of crawler HighWayMeFolder). */
+    protected AvailableStatus requestFileInformationDirecturl(final DownloadLink link, final Account account) throws Exception {
+        final String filenameFromURL = Plugin.getFileNameFromURL(new URL(link.getPluginPatternMatcher()));
+        final String fallbackFilename;
+        if (filenameFromURL != null) {
+            fallbackFilename = filenameFromURL;
+        } else {
+            fallbackFilename = this.getFID(link);
+        }
+        if (!link.isNameSet() && fallbackFilename != null) {
+            /* Set fallback name */
+            link.setName(Encoding.htmlDecode(fallbackFilename).trim());
+        }
+        if (account == null) {
+            /* Some items might be checkable without account but we require an account for all items just in case. */
+            logger.info("Cannot check this link without account");
+            return AvailableStatus.UNCHECKABLE;
+        }
+        this.login(account, false);
+        checkDirecturl(link);
+        return AvailableStatus.TRUE;
+    }
+
+    /**
+     * Availability check for cloud/DAV file links added by crawler HighWayMeFolder3. </br>
+     * We re-query the parent directory via the DAV JSON API which also gives us a fresh direct download URL. </br>
+     * API docs: https://high-way.me/threads/highway-api.201/ (section "HIGHWAY DAV JSON API")
+     */
+    protected AvailableStatus requestFileInformationDAV(final DownloadLink link, final Account account) throws Exception {
+        if (account == null) {
+            /* Account (usenet basic auth) is required to check/refresh cloud/DAV links. */
+            return AvailableStatus.UNCHECKABLE;
+        }
+        /*
+         * Use another browser instance since we do not want to set the json related headers on our main browser instance which we will use
+         * for downloading.
+         */
+        final Browser brc = br.cloneBrowser();
+        this.prepDavBasicAuthHeaders(brc, account);
+        /* Requesting the JSON of a file URL directly returns that file's metadata map. */
+        brc.getPage(link.getPluginPatternMatcher());
+        if (brc.getHttpConnection().getResponseCode() == 401) {
+            throw new AccountInvalidException("Datei gehört anderem Benutzer?");
+        } else if (brc.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final Map<String, Object> targetFile = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+        if (targetFile.get("error") != null) {
+            /* e.g. {"error":"not_found","message":"..."} */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        if (!"file".equalsIgnoreCase(targetFile.get("type").toString())) {
+            /* This should never happen: the URL we stored for a file now points to something that is not a file. */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        link.setFinalFileName(targetFile.get("name").toString());
+        link.setVerifiedFileSize(((Number) targetFile.get("size")).longValue());
+        /* Store fresh direct download URL for the actual download. */
+        final String freshDirecturl = targetFile.get("downloadUrl").toString();
+        link.setProperty(PROPERTY_DAV_FRESH_DIRECTURL, freshDirecturl);
+        return AvailableStatus.TRUE;
+    }
+
+    /** Sets the HTTP basic auth (usenet credentials) and JSON accept headers required by the DAV JSON API. */
+    private void prepDavBasicAuthHeaders(final Browser br, final Account account) throws PluginException {
+        final String usenetUsername = this.getUseNetUsername(account);
+        final String usenetPassword = this.getUseNetPassword(account);
+        if (StringUtils.isEmpty(usenetUsername) || StringUtils.isEmpty(usenetPassword)) {
+            /* Without usenet credentials we cannot access the DAV API -> Treat like a missing account. */
+            throw new AccountRequiredException();
+        }
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Basic " + Encoding.Base64Encode(usenetUsername + ":" + usenetPassword));
+        br.getHeaders().put("Accept", "application/json");
     }
 
     private void checkDirecturl(final DownloadLink link) throws IOException, PluginException {
@@ -332,22 +419,34 @@ public abstract class HighWayCore extends UseNet {
             throw new AccountRequiredException();
         }
         this.requestFileInformation(link, account);
-        if (account != null) {
-            this.login(account, false);
+        final String directurl;
+        if (isDavLink(link)) {
+            /* Use the fresh direct download URL we just obtained via the DAV JSON API. */
+            directurl = link.getStringProperty(PROPERTY_DAV_FRESH_DIRECTURL);
+            if (directurl == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+        } else {
+            if (account != null) {
+                this.login(account, false);
+            }
+            directurl = link.getPluginPatternMatcher();
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, link.getPluginPatternMatcher(), this.isResumeable(link, account), this.getMaxChunks(link, account));
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, directurl, this.isResumeable(link, account), this.getMaxChunks(link, account));
         handleSelfhostedFileConnectionErrors(br, dl.getConnection());
         dl.startDownload();
     }
 
     protected void handleSelfhostedFileConnectionErrors(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
-        if (!this.looksLikeDownloadableContent(con)) {
-            br.followConnection(true);
-            if (con.getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else {
-                this.throwFinalConnectionException(br, con);
-            }
+        if (this.looksLikeDownloadableContent(con)) {
+            /* No error */
+            return;
+        }
+        br.followConnection(true);
+        if (con.getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else {
+            this.throwFinalConnectionException(br, con);
         }
     }
 
@@ -441,7 +540,7 @@ public abstract class HighWayCore extends UseNet {
             /* Validate URL */
             dllink = new URL(dllink).toExternalForm();
             String hash = (String) entries.get("hash");
-            if (hash != null && !StringUtils.equalsIgnoreCase("hash", "null")) {
+            if (hash != null && !StringUtils.equalsIgnoreCase(hash, "null")) {
                 if (hash.matches("(?i)md5:[a-f0-9]{32}")) {
                     hash = hash.substring(hash.lastIndexOf(":") + 1);
                     logger.info("Set md5 hash given by multihost: " + hash);
@@ -450,9 +549,9 @@ public abstract class HighWayCore extends UseNet {
                     hash = hash.substring(hash.lastIndexOf(":") + 1);
                     logger.info("Set sha1 hash given by multihost: " + hash);
                     link.setSha1Hash(hash);
-                } else if (hash.matches("(?i)sha265:[a-f0-9]{40}")) {
+                } else if (hash.matches("(?i)sha256:[a-f0-9]{64}")) {
                     hash = hash.substring(hash.lastIndexOf(":") + 1);
-                    logger.info("Set sha265 hash given by multihost: " + hash);
+                    logger.info("Set sha256 hash given by multihost: " + hash);
                     link.setSha256Hash(hash);
                 } else {
                     logger.info("Unsupported file-hash string: " + hash);
@@ -466,6 +565,8 @@ public abstract class HighWayCore extends UseNet {
                 br.followConnection(true);
                 this.checkErrors(this.br, link, account);
                 getMultiHosterManagement().handleErrorGeneric(account, null, "unknowndlerror", 1, 3 * 60 * 1000l);
+                /* Unreachable code: handleErrorGeneric always throws. */
+                throw new WTFException();
             }
         } catch (final Exception e) {
             if (storedDirecturl != null) {
@@ -925,6 +1026,8 @@ public abstract class HighWayCore extends UseNet {
             case 10:
                 /* Host is not supported or not supported for free account users */
                 getMultiHosterManagement().putError(account, link, retrySeconds * 1000l, msg);
+                /* Unreachable code: putError always throws. */
+                throw new WTFException();
             case 11:
                 /**
                  * Host (not multihost) is currently under maintenance or offline --> Disable it for some time </br>

@@ -44,7 +44,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 53124 $", interfaceVersion = 3, names = { "dropx.to" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53128 $", interfaceVersion = 3, names = { "dropx.to" }, urls = { "" })
 public class DropxTo extends PluginForHost {
     private static final String          API_BASE                         = "https://dropx.to/api/jd";
     private static MultiHosterManagement mhm                              = new MultiHosterManagement("dropx.to");
@@ -274,18 +274,17 @@ public class DropxTo extends PluginForHost {
 
     @Override
     protected String getAPILoginHelpURL() {
-        return "https://dropx.to" + getHost();
+        return "https://" + getHost() + "/jdownloader";
     }
 
     @Override
     protected boolean looksLikeValidAPIKey(final String str) {
-        // if (str == null) {
-        // return false;
-        // } else if (str.matches("[a-f0-9]{24}")) {
-        // return true;
-        // } else {
-        // return false;
-        // }
-        return true;
+        if (str == null) {
+            return false;
+        } else if (str.matches("dxp_[a-zA-Z0-9\\-_]{70}")) {
+            return true;
+        } else {
+            return false;
+        }
     }
 }

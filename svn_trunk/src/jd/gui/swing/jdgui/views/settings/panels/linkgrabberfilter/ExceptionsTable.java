@@ -20,7 +20,7 @@ public class ExceptionsTable extends AbstractFilterTable {
     private LinkgrabberFilter linkgrabberFilter;
 
     public ExceptionsTable(LinkgrabberFilter linkgrabberFilter) {
-        super(new ExceptionsTableModel("ExceptionsTableModel"));
+        super(new ExceptionsTableModel("ExceptionsTableModel"), ImportAction.VIEW);
         this.setSearchEnabled(true);
         this.linkgrabberFilter = linkgrabberFilter;
     }

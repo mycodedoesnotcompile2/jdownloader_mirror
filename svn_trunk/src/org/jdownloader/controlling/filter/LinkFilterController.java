@@ -1,5 +1,7 @@
 package org.jdownloader.controlling.filter;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -19,10 +21,13 @@ import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.ConfigEvent;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
+import org.appwork.utils.IO;
 import org.appwork.utils.event.EventSuppressor;
 import org.appwork.utils.event.predefined.changeevent.ChangeEvent;
 import org.appwork.utils.event.predefined.changeevent.ChangeEventSender;
 import org.appwork.utils.event.queue.QueueAction;
+import org.appwork.utils.swing.dialog.Dialog;
+import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.logging.LogController;
 
 public class LinkFilterController implements LinkCrawlerFilter {
@@ -227,6 +232,29 @@ public class LinkFilterController implements LinkCrawlerFilter {
         }
     }
 
+    public void exportList(final File target, final List<LinkgrabberFilterRule> rules) {
+        exportList(target, rules, false);
+    }
+
+    /**
+     * Writes the given {@link LinkgrabberFilterRule}s as JSON to the target file, overwriting an existing file. If displayDialog is
+     * true, write errors are reported to the user via a dialog; otherwise they are only logged. The caller is responsible for
+     * selecting the target file (e.g. via a file chooser).
+     */
+    public void exportList(final File target, final List<LinkgrabberFilterRule> rules, final boolean displayDialog) {
+        try {
+            if (target.exists() && !target.delete()) {
+                throw new IOException("Could not delete/overwrite:" + target);
+            }
+            IO.writeStringToFile(target, JSonStorage.serializeToJson(rules));
+        } catch (IOException e) {
+            LogController.CL().log(e);
+            if (displayDialog) {
+                Dialog.getInstance().showExceptionDialog(_GUI.T.lit_error_occured(), e.getMessage(), e);
+            }
+        }
+    }
+
     public void add(LinkgrabberFilterRule linkFilter) {
         if (linkFilter == null) {
             return;
@@ -236,19 +264,54 @@ public class LinkFilterController implements LinkCrawlerFilter {
         addAll(addAll);
     }
 
+    public void importList(final File file) {
+        importList(file, false);
+    }
+
+    /**
+     * Reads {@link LinkgrabberFilterRule}s from the given file and imports them via {@link #addAll(java.util.List)}. If
+     * displayDialog is true, reading/parsing errors and files without any valid rules are reported to the user via a dialog;
+     * otherwise they are only logged.
+     */
+    public void importList(final File file, final boolean displayDialog) {
+        final List<LinkgrabberFilterRule> contents;
+        try {
+            contents = JSonStorage.restoreFromString(IO.readFileToString(file), new TypeRef<ArrayList<LinkgrabberFilterRule>>() {
+            });
+        } catch (Throwable e) {
+            LogController.CL().log(e);
+            if (displayDialog) {
+                Dialog.getInstance().showExceptionDialog(_GUI.T.lit_error_occured(), file.getAbsolutePath() + "-" + e.getMessage(), e);
+            }
+            return;
+        }
+        if (contents == null || contents.size() == 0) {
+            if (displayDialog) {
+                Dialog.getInstance().showErrorDialog(_GUI.T.LinkgrabberFilter_LinkgrabberFilter_import_invalid(file.getName()));
+            }
+            return;
+        }
+        addAll(contents);
+    }
+
     public void addAll(List<LinkgrabberFilterRule> all) {
         if (all == null || all.size() == 0) {
             return;
         }
         synchronized (this) {
             final HashSet<String> dupecheck = createDupeSet();
+            boolean modifiedFlag = false;
             for (LinkgrabberFilterRule rule : all) {
                 if (rule.isStaticRule()) {
                     continue;
                 }
                 if (dupecheck.add(JSonStorage.serializeToJson(rule))) {
+                    modifiedFlag = true;
                     filter.add(rule);
                 }
+            }
+            if (!modifiedFlag) {
+                return;
             }
             save(filter);
         }
