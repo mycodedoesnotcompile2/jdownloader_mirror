@@ -48,7 +48,7 @@ import org.jdownloader.gui.views.downloads.action.ResumeAction;
 import org.jdownloader.gui.views.downloads.action.RunCheckSumAction;
 import org.jdownloader.gui.views.downloads.action.SetDownloadFolderInDownloadTableAction;
 import org.jdownloader.gui.views.downloads.action.SkipAction;
-import org.jdownloader.gui.views.downloads.action.SplitPackagesByHost;
+import org.jdownloader.gui.views.downloads.action.SplitPackagesByHostDownloadlist;
 import org.jdownloader.gui.views.downloads.action.StopsignAction;
 import org.jdownloader.gui.views.downloads.context.submenu.DeleteMenuContainer;
 import org.jdownloader.gui.views.downloads.context.submenu.DevChunksMenuContainer;
@@ -141,7 +141,7 @@ public class MenuManagerDownloadTableContext extends ContextMenuManager<FilePack
         more.add(new MenuItemData(new ActionData(ResetAction.class)));
         more.add(new SeparatorData());
         more.add(new MenuItemData(new ActionData(MergeToPackageAction.class)));
-        more.add(new MenuItemData(new ActionData(SplitPackagesByHost.class)));
+        more.add(new MenuItemData(new ActionData(SplitPackagesByHostDownloadlist.class)));
         more.add(new MenuItemData(new ActionData(MergeSameNamedPackagesAction.class)));
         more.add(new MenuItemData(new ActionData(RunCheckSumAction.class)));
         more.add(new MenuItemData(new ActionData(ConfirmHashValuesDownloadAction.class)));

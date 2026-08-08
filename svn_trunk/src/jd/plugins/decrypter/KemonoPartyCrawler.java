@@ -64,7 +64,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.KemonoParty;
 
-@DecrypterPlugin(revision = "$Revision: 52975 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53145 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -431,7 +431,14 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         final ArrayList<DownloadLink> directResults = new ArrayList<DownloadLink>();
         int numberofResultsSimpleCount = 0;
         int index = 0;
-        final Boolean has_full = (Boolean) postmap.get("has_full");
+        Boolean has_full = (Boolean) postmap.get("has_full");
+        /* 2026-08-07: Workaround for possibly wrong/outdated "has_full" state. */
+        /* preview_state field is optional or only from pawchive */
+        final Object preview_stateO = postmap.get("preview_state");
+        if (Boolean.FALSE.equals(has_full) && preview_stateO instanceof String && preview_stateO.toString().equalsIgnoreCase("scraped")) {
+            logger.info("Found item with has_full == false AND preview_state == 'scraped'");
+            has_full = true;
+        }
         final Map<String, Object> filemap = (Map<String, Object>) postmap.get("file");
         if (!filemap.isEmpty() && filemap.get("path") != null) {
             final DownloadLink media = buildFileDownloadLinkAPI(dupes, useAdvancedDupecheck, filemap, index, has_full);

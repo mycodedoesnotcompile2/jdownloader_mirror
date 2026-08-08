@@ -1,6 +1,7 @@
 package org.jdownloader.gui.views.linkgrabber.contextmenu;
 
 import java.awt.event.ActionEvent;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -41,6 +42,7 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
     private LocationInList    location                = LocationInList.END_OF_LIST;
     private DownloadPath      downloadpath            = DownloadPath.GLOBAL_DEFAULT;
     private boolean           mergeSameNamedPackages  = false;
+    private SubfolderByPackage subfolderByPackage     = SubfolderByPackage.AUTO;
 
     public AbstractMergeToPackageAction() {
         setName(_GUI.T.MergeToPackageAction_MergeToPackageAction_());
@@ -87,6 +89,20 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
 
     public void setDownloadPath(DownloadPath path) {
         this.downloadpath = path;
+    }
+
+    public static String getTranslationForSubfolderByPackage() {
+        return _JDT.T.PackagizerSettings_folderbypackage_rule_name();
+    }
+
+    @Customizer(link = "#getTranslationForSubfolderByPackage")
+    @Order(202)
+    public SubfolderByPackage getSubfolderByPackage() {
+        return subfolderByPackage;
+    }
+
+    public void setSubfolderByPackage(SubfolderByPackage mode) {
+        this.subfolderByPackage = mode;
     }
 
     public static String getTranslationForLocation() {
@@ -155,6 +171,27 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
             @Override
             public String getLabel() {
                 return _GUI.T.MergeToPackageAction_setting_SettingDownloadPathChoiceGlobalDefaultDownloadDirectory();
+            }
+        };
+    }
+
+    public static enum SubfolderByPackage implements LabelInterface {
+        AUTO {
+            @Override
+            public String getLabel() {
+                return _GUI.T.lit_auto();
+            }
+        },
+        ENABLED {
+            @Override
+            public String getLabel() {
+                return _GUI.T.lit_enabled();
+            }
+        },
+        DISABLED {
+            @Override
+            public String getLabel() {
+                return _GUI.T.lit_disabled();
             }
         };
     }
@@ -242,6 +279,36 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
             /* PackageExpandMode.COLLAPSED */
             expandPackagePreSetState = false;
         }
+        final boolean subfolderByPackagePreSetState;
+        final SubfolderByPackage subfolderByPackageMode = this.getSubfolderByPackage();
+        switch (subfolderByPackageMode) {
+        case ENABLED:
+            subfolderByPackagePreSetState = true;
+            break;
+        case DISABLED:
+            subfolderByPackagePreSetState = false;
+            break;
+        case AUTO:
+        default:
+            /*
+             * AUTO: Enable the packagename subfolder if at least one of the involved source packages already uses the packagename
+             * subfolder tag. This covers "all use it" as well as the mixed case (some do, some don't).
+             */
+            boolean anyPackageUsesSubfolder = false;
+            for (final PackageView<PackageType, ChildrenType> pv : pvlist) {
+                final File raw = LinkTreeUtils.getRawDownloadDirectory(pv.getPackage());
+                /*
+                 * Compare the last path segment via File.getName() (pure in-memory string parsing) instead of
+                 * getAbsolutePath().endsWith. This also matches a trailing separator (e.g. "...\<jd:packagename>\").
+                 */
+                if (raw != null && PackagizerController.PACKAGETAG.equals(raw.getName())) {
+                    anyPackageUsesSubfolder = true;
+                    break;
+                }
+            }
+            subfolderByPackagePreSetState = anyPackageUsesSubfolder;
+            break;
+        }
         if (this.isDisplayNewPackageDialog()) {
             NewPackageDialog d = null;
             try {
@@ -254,6 +321,7 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
                 /* Set dialog default values */
                 d.setDownloadFolder(downloadFolder);
                 d.setMergeCheckboxDefaultValue(Boolean.TRUE.equals(this.isMergeSameNamedPackages()));
+                d.setSubfolderByPackage(subfolderByPackagePreSetState);
                 d.setExpandPackage(expandPackagePreSetState);
                 d.setPreSetPackageName(suggestedNewPackageName);
                 Dialog.getInstance().showDialog(d);
@@ -267,7 +335,7 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
         } else {
             final_mergeSameNamedPackages = Boolean.TRUE.equals(this.isMergeSameNamedPackages());
             final_newPackageName = suggestedNewPackageName;
-            final_downloadFolder = downloadFolder;
+            final_downloadFolder = NewPackageDialog.applySubfolderByPackage(downloadFolder, subfolderByPackagePreSetState);
             final_expandPackage = expandPackagePreSetState;
         }
         if (StringUtils.isEmpty(final_newPackageName)) {

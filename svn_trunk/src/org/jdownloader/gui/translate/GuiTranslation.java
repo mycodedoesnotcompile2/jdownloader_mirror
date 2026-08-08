@@ -1384,6 +1384,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Match names case insensitive" })
     String MergeSameNamedPackagesAction_Case_Insensitive();
 
+    @Default(lngs = { "en" }, values = { "Merge all regardless of selection" })
+    String MergeSameNamedPackagesAction_Merge_All();
+
     @Default(lngs = { "en" }, values = { "Set Download Directory" })
     String SetDownloadFolderAction_SetDownloadFolderAction_();
 
@@ -2848,7 +2851,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Menuitem is visible" })
     String InfoPanel_InfoPanel_hidden_2();
 
-    @Default(lngs = { "en" }, values = { "disabled" })
+    @Default(lngs = { "en" }, values = { "Disabled" })
     String lit_disabled();
 
     @Default(lngs = { "en" }, values = { "failed" })

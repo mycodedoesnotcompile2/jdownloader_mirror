@@ -12,6 +12,7 @@ import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtTextField;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.swing.dialog.AbstractDialog;
+import org.jdownloader.controlling.packagizer.PackagizerController;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.components.packagetable.LinkTreeUtils;
@@ -25,11 +26,13 @@ public class NewPackageDialog extends AbstractDialog<Object> {
     private FolderChooser       downloadFolderFolderChooserField;
     private JCheckBox           mergeCheckbox                             = null;
     private JCheckBox           expandCheckbox                            = null;
+    private JCheckBox           subfolderByPackageCheckbox                = null;
     private String              preSetDownloadFolder                      = null;
     private String              preSetPackageName                         = null;
     private boolean             mergeCheckboxDefaultValue                 = false;
     private boolean             displayCheckboxMergeWithSameNamedPackages = true;
     private boolean             expandCheckboxDefaultValue                = false;
+    private boolean             subfolderByPackageDefaultValue            = false;
 
     public NewPackageDialog(SelectionInfo<?, ?> selection) {
         super(0, _GUI.T.NewPackageDialog_NewPackageDialog_(), null, null, null);
@@ -76,14 +79,19 @@ public class NewPackageDialog extends AbstractDialog<Object> {
         downloadFolderFolderChooserField = new FolderChooser();
         File path = null;
         if (StringUtils.isNotEmpty(preSetDownloadFolder)) {
-            downloadFolderFolderChooserField.setText(preSetDownloadFolder);
+            downloadFolderFolderChooserField.setText(stripTrailingSubfolderTag(preSetDownloadFolder));
         } else {
             path = LinkTreeUtils.getRawDownloadDirectory(selection.getFirstPackage());
             if (path != null) {
-                downloadFolderFolderChooserField.setText(path.getAbsolutePath());
+                /* getPath(): no absolutization needed here, the raw directory is only used for display. */
+                downloadFolderFolderChooserField.setText(stripTrailingSubfolderTag(path.getPath()));
             }
         }
         p.add(downloadFolderFolderChooserField, "pushx,growx");
+        /* Subfolder-by-packagename checkbox must be the topmost checkbox, directly below the download path. */
+        subfolderByPackageCheckbox = new JCheckBox(_JDT.T.PackagizerSettings_folderbypackage_rule_name());
+        subfolderByPackageCheckbox.setSelected(subfolderByPackageDefaultValue);
+        p.add(subfolderByPackageCheckbox, "span 2");
         if (displayCheckboxMergeWithSameNamedPackages) {
             mergeCheckbox = new JCheckBox(_GUI.T.MergeSameNamedPackagesAction_());
             mergeCheckbox.setSelected(mergeCheckboxDefaultValue);
@@ -120,7 +128,61 @@ public class NewPackageDialog extends AbstractDialog<Object> {
     }
 
     public String getDownloadFolder() {
-        return downloadFolderFolderChooserField.getText();
+        final String folder = downloadFolderFolderChooserField.getText();
+        if (subfolderByPackageCheckbox != null) {
+            return applySubfolderByPackage(folder, subfolderByPackageCheckbox.isSelected());
+        }
+        return folder;
+    }
+
+    public void setSubfolderByPackage(boolean b) {
+        this.subfolderByPackageDefaultValue = b;
+    }
+
+    public boolean isSubfolderByPackage() {
+        if (subfolderByPackageCheckbox != null) {
+            return subfolderByPackageCheckbox.isSelected();
+        } else {
+            return this.subfolderByPackageDefaultValue;
+        }
+    }
+
+    /**
+     * Removes a trailing packagename subfolder tag ({@link PackagizerController#PACKAGETAG}) from the given folder, if present.
+     *
+     * Detection is done on the last path segment ({@link File#getName()}) rather than {@link String#endsWith(String)}, so a trailing
+     * separator (e.g. "...\<jd:packagename>\") does not hide the tag. Results are returned via {@link File#getPath()} instead of
+     * {@link File#getAbsolutePath()} to avoid its potential native IO call and to leave a relative path relative.
+     */
+    public static String stripTrailingSubfolderTag(final String folder) {
+        if (StringUtils.isEmpty(folder)) {
+            return folder;
+        }
+        final File f = new File(folder.trim());
+        if (PackagizerController.PACKAGETAG.equals(f.getName())) {
+            final File parent = f.getParentFile();
+            if (parent != null) {
+                return parent.getPath();
+            }
+        }
+        return folder;
+    }
+
+    /**
+     * Appends or removes the packagename subfolder tag depending on the given flag. The tag is stripped first so it can never be added
+     * twice, even if the given folder already ends with it. Like {@link #stripTrailingSubfolderTag(String)}, the result is built via
+     * {@link File#getPath()} to avoid the potential native IO call behind {@link File#getAbsolutePath()}.
+     */
+    public static String applySubfolderByPackage(final String folder, final boolean subfolderByPackage) {
+        final String cleaned = stripTrailingSubfolderTag(folder);
+        if (subfolderByPackage) {
+            if (StringUtils.isEmpty(cleaned)) {
+                return cleaned;
+            }
+            return new File(cleaned, PackagizerController.PACKAGETAG).getPath();
+        } else {
+            return cleaned;
+        }
     }
 
     public boolean isMergeWithSameNamedPackages() {

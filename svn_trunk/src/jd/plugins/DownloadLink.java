@@ -1825,14 +1825,6 @@ public class DownloadLink extends Property implements AbstractPackageChildrenNod
     }
 
     /**
-     * Adds HashInfo to list of existing HashInfo items. </br> Use with caution!! This does not remove/replace existing HashInfo items!
-     */
-    public void addHashInfo(final HashInfo hashInfo) {
-        // TODO: Implement "add" functionality, see https://svn.jdownloader.org/issues/90472
-        this.setHashInfo(hashInfo);
-    }
-
-    /**
      * Sets given HashInfo. </br> Replaces any already existing HashInfo!
      */
     public void setHashInfo(final HashInfo hashInfo) {
@@ -1854,6 +1846,25 @@ public class DownloadLink extends Property implements AbstractPackageChildrenNod
                 notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.HASHINFO, hashInfo));
             }
         }
+    }
+
+    /**
+     * Sets the strongest HashInfo item out of the given list. </br>
+     * As long as storing multiple HashInfo items is not properly supported, only a single HashInfo can be kept. The caller can therefore
+     * pass all available hashes and the strongest one is picked and stored. </br>
+     * This method will later be reworked so that multiple HashInfo items can be stored at the same time.
+     */
+    public void setHashInfos(final List<HashInfo> hashInfos) {
+        if (hashInfos == null || hashInfos.isEmpty()) {
+            return;
+        }
+        HashInfo strongest = null;
+        for (final HashInfo hashInfo : hashInfos) {
+            if (hashInfo != null && hashInfo.isStrongerThan(strongest)) {
+                strongest = hashInfo;
+            }
+        }
+        this.setHashInfo(strongest);
     }
 
     public void firePropertyChanged(DownloadLinkProperty.Property property, Object param) {

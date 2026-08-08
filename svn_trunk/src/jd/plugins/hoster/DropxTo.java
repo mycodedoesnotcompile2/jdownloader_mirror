@@ -44,7 +44,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 53128 $", interfaceVersion = 3, names = { "dropx.to" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53138 $", interfaceVersion = 3, names = { "dropx.to" }, urls = { "" })
 public class DropxTo extends PluginForHost {
     private static final String          API_BASE                         = "https://dropx.to/api/jd";
     private static MultiHosterManagement mhm                              = new MultiHosterManagement("dropx.to");
@@ -126,10 +126,21 @@ public class DropxTo extends PluginForHost {
             logger.info("Trying to re-use stored directurl: " + storedDirecturl);
             dllink = storedDirecturl;
         } else {
+            String passCode = link.getDownloadPassword();
+            if (link.isPasswordProtected() && passCode == null) {
+                passCode = getUserInput("Password?", link);
+            }
             final UrlQuery query = new UrlQuery();
             query.appendEncoded("url", link.getDefaultPlugin().buildExternalDownloadURL(link, this));
+            if (passCode != null) {
+                query.appendEncoded("password", passCode);
+            }
             br.postPage(API_BASE + "/download", query);
             final Map<String, Object> entries = this.checkErrors(br, account, link);
+            /* Given password was accepted -> Save it for later usage. */
+            if (passCode != null) {
+                link.setDownloadPassword(passCode);
+            }
             final Map<String, Object> data = (Map<String, Object>) entries.get("data");
             dllink = (String) data.get("link");
             if (StringUtils.isEmpty(dllink)) {
@@ -174,7 +185,6 @@ public class DropxTo extends PluginForHost {
             ai.setExpired(true);
         } else {
             account.setType(AccountType.PREMIUM);
-            ai.setStatus(AccountType.PREMIUM.getLabel() + " | " + type);
             ai.setTrafficMax(((Number) accountmap.get("trafficmax_daily")).longValue());
             ai.setTrafficLeft(((Number) accountmap.get("trafficleft")).longValue());
             /* timeleft is null if the account never expires. */
@@ -183,6 +193,8 @@ public class DropxTo extends PluginForHost {
                 ai.setValidUntil(System.currentTimeMillis() + ((Number) timeleftO).longValue());
             }
         }
+        /* Display type_label as-is: plan names can change over time and must reach users without a plugin update. */
+        ai.setStatus((String) accountmap.get("type_label"));
         account.setConcurrentUsePossible(true);
         /* 2. List of supported hosts */
         br.postPage(API_BASE + "/hosts", new UrlQuery());
@@ -241,7 +253,27 @@ public class DropxTo extends PluginForHost {
             if (status == 101) {
                 /* File is offline */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (status == 104) {
+                /* Invalid URL */
+                throw new PluginException(LinkStatus.ERROR_FATAL, msg);
+            } else if (status == 107) {
+                /* File is larger than the user's remaining traffic (not retryable). */
+                throw new PluginException(LinkStatus.ERROR_FATAL, msg);
+            } else if (status == 110) {
+                /* Missing or wrong download password */
+                link.setPasswordProtected(true);
+                link.setDownloadPassword(null);
+                throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong or missing download password");
+            } else if (status == 102 || status == 103 || status == 105 || status == 106) {
+                /*
+                 * Host-side problems: 102 = host temporarily unavailable, 103 = multihoster has no account at the filehost, 105 =
+                 * unsupported host, 106 = host maintenance -> temporarily disable this host.
+                 */
+                mhm.putError(account, link, retryMillis, msg);
+                /* Unreachable code */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+            /* Any other download error (e.g. 120 = download failed). */
             mhm.handleErrorGeneric(account, link, msg, 50, retryMillis);
             /* Unreachable code */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

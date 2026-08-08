@@ -45,6 +45,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.download.HashInfo;
 import jd.plugins.hoster.HighWayCore;
 import jd.plugins.hoster.HighWayMe2;
 
@@ -53,7 +54,7 @@ import jd.plugins.hoster.HighWayMe2;
  * It recursively walks the users' HIGHWAY cloud via the JSON API and returns all contained files. </br>
  * Docs: https://high-way.me/threads/highway-api.201/ (section "HIGHWAY DAV JSON API")
  */
-@DecrypterPlugin(revision = "$Revision: 53126 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53147 $", interfaceVersion = 3, names = {}, urls = {})
 public class HighWayMeFolder3 extends PluginForDecrypt {
     public HighWayMeFolder3(PluginWrapper wrapper) {
         super(wrapper);
@@ -181,6 +182,17 @@ public class HighWayMeFolder3 extends PluginForDecrypt {
                     link.setName(item.get("name").toString());
                     link.setVerifiedFileSize(((Number) item.get("size")).longValue());
                     link.setRelativeDownloadFolderPath(currentPath);
+                    /* Set file hashes if available (both fields can be null). */
+                    final List<HashInfo> hashInfos = new ArrayList<HashInfo>();
+                    final String md5 = (String) item.get("md5");
+                    if (md5 != null) {
+                        hashInfos.add(HashInfo.newInstanceSafe(md5, HashInfo.TYPE.MD5));
+                    }
+                    final String sha256 = (String) item.get("sha256");
+                    if (sha256 != null) {
+                        hashInfos.add(HashInfo.newInstanceSafe(sha256, HashInfo.TYPE.SHA256));
+                    }
+                    link.setHashInfos(hashInfos);
                     /* Let our high-way.me host plugin handle check & download of this cloud/DAV file. */
                     link.setHost(hosterplugin.getHost());
                     link.setDefaultPlugin(hosterplugin);

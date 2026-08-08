@@ -38,7 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50681 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53147 $", interfaceVersion = 3, names = {}, urls = {})
 public class AxfcNet extends PluginForHost {
     public AxfcNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -147,18 +147,20 @@ public class AxfcNet extends PluginForHost {
         } else {
             logger.warning("Failed to find filesize");
         }
+        final List<HashInfo> hashInfos = new ArrayList<HashInfo>();
         final String hash_md5 = br.getRegex("'MD5 HASH',\\s*'([a-f0-9]{32})").getMatch(0);
         if (hash_md5 != null) {
-            link.addHashInfo(HashInfo.newInstanceSafe(hash_md5, HashInfo.TYPE.MD5));
+            hashInfos.add(HashInfo.newInstanceSafe(hash_md5, HashInfo.TYPE.MD5));
         }
         final String hash_sha1 = br.getRegex("'SHA-1 HASH',\\s*'([a-f0-9]{40})").getMatch(0);
         if (hash_sha1 != null) {
-            link.addHashInfo(HashInfo.newInstanceSafe(hash_sha1, HashInfo.TYPE.SHA1));
+            hashInfos.add(HashInfo.newInstanceSafe(hash_sha1, HashInfo.TYPE.SHA1));
         }
         final String hash_sha256 = br.getRegex("'SHA-256 HASH',\\s*'([a-f0-9]{64})").getMatch(0);
         if (hash_sha256 != null) {
-            link.addHashInfo(HashInfo.newInstanceSafe(hash_sha256, HashInfo.TYPE.SHA256));
+            hashInfos.add(HashInfo.newInstanceSafe(hash_sha256, HashInfo.TYPE.SHA256));
         }
+        link.setHashInfos(hashInfos);
         if (StringUtils.isEmpty(link.getComment())) {
             final String description = br.getRegex("<h3>\\s*File description\\s*</h3>\\s*<p>([^<]+)</p>").getMatch(0);
             if (description != null) {

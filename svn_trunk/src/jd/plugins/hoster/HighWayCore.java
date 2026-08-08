@@ -67,8 +67,9 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
+import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 53126 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53147 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     /* Cloud/DAV file links added by crawler HighWayMeFolder3. */
@@ -326,6 +327,17 @@ public abstract class HighWayCore extends UseNet {
         }
         link.setFinalFileName(targetFile.get("name").toString());
         link.setVerifiedFileSize(((Number) targetFile.get("size")).longValue());
+        /* Set file hashes if available (both fields can be null). */
+        final List<HashInfo> hashInfos = new ArrayList<HashInfo>();
+        final String md5 = (String) targetFile.get("md5");
+        if (md5 != null) {
+            hashInfos.add(HashInfo.newInstanceSafe(md5, HashInfo.TYPE.MD5));
+        }
+        final String sha256 = (String) targetFile.get("sha256");
+        if (sha256 != null) {
+            hashInfos.add(HashInfo.newInstanceSafe(sha256, HashInfo.TYPE.SHA256));
+        }
+        link.setHashInfos(hashInfos);
         /* Store fresh direct download URL for the actual download. */
         final String freshDirecturl = targetFile.get("downloadUrl").toString();
         link.setProperty(PROPERTY_DAV_FRESH_DIRECTURL, freshDirecturl);

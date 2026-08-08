@@ -126,7 +126,15 @@ public abstract class AbstractSplitPackagesByHostAction<PackageType extends Abst
                 packageExpandState = d.isExpandPackage();
             } else {
                 newName = "";
-                newDownloadFolder = sel.getFirstPackage().getDownloadDirectory();
+                if (isLinkgrabber) {
+                    /*
+                     * Use the raw download folder so that dynamic tags (e.g. <jd:packagename>) are preserved and re-evaluated for the newly
+                     * created package. getDownloadDirectory() would return an already resolved path and bake the folder to a fixed value.
+                     */
+                    newDownloadFolder = ((CrawledPackage) sel.getFirstPackage()).getRawDownloadFolder();
+                } else {
+                    newDownloadFolder = sel.getFirstPackage().getDownloadDirectory();
+                }
             }
         } else {
             newName = null;
@@ -199,7 +207,6 @@ public abstract class AbstractSplitPackagesByHostAction<PackageType extends Abst
                         final String host = next2.getKey();
                         final String newPackageName = getNewPackageName(nameFactory, sourcePackage == null ? newName : sourcePackage.getName(), host);
                         final PackageType newPkg;
-                        List<PackageType> selectedPackages = new ArrayList<PackageType>();
                         if (merge) {
                             AbstractPackageNode destPackage = mergedPackages.get(newPackageName);
                             if (destPackage == null) {
@@ -211,7 +218,6 @@ public abstract class AbstractSplitPackagesByHostAction<PackageType extends Abst
                                 destPackage.setExpanded(final_packageExpandState);
                                 if (sourcePackage != null) {
                                     sourcePackage.copyPropertiesTo(destPackage);
-                                    selectedPackages.add((PackageType) sourcePackage);
                                 } else {
                                     destPackage.setDownloadFolder(newDownloadFolder);
                                 }
@@ -228,15 +234,20 @@ public abstract class AbstractSplitPackagesByHostAction<PackageType extends Abst
                             newPkg.setExpanded(final_packageExpandState);
                             if (sourcePackage != null) {
                                 sourcePackage.copyPropertiesTo(newPkg);
-                                selectedPackages.add((PackageType) sourcePackage);
                             } else {
                                 newPkg.setDownloadFolder(newDownloadFolder);
                             }
                             newPkg.setName(newPackageName);
                         }
-                        // Use merge instead of moveOrAddAt
+                        /*
+                         * Move only this host's links into the target package. We must NOT pass the source packages as srcPkgs here:
+                         * merge() would move ALL of their remaining children (i.e. links of other hosts) into this host's package,
+                         * defeating the split. Passing an empty (non-null) srcPkgs list would be even worse: together with
+                         * mergeSameNamedPackages=true merge() returns early and drops the links entirely. srcPkgs is therefore null; the
+                         * mergeSameNamedPackages flag still merges the new package with any already existing package of the same name.
+                         */
                         ps.setMergeSameNamedPackages(merge);
-                        controller.merge(newPkg, next2.getValue(), selectedPackages, ps);
+                        controller.merge(newPkg, next2.getValue(), null, ps);
                         // Increment index for next package
                         if (ps.getPackagePosition() != Integer.MAX_VALUE) {
                             ps.setPackagePosition(ps.getPackagePosition() + 1);

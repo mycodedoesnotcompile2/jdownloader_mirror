@@ -66,7 +66,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 
-@HostPlugin(revision = "$Revision: 53026 $", interfaceVersion = 3, names = { "zdf.de" }, urls = { "decryptedmediathek://.+" })
+@HostPlugin(revision = "$Revision: 53144 $", interfaceVersion = 3, names = { "zdf.de" }, urls = { "decryptedmediathek://.+" })
 public class ZdfDeMediathek extends PluginForHost {
     public static final String  PROPERTY_hlsBandwidth       = "hlsBandwidth";
     public static final String  PROPERTY_streamingType      = "streamingType";
@@ -244,6 +244,14 @@ public class ZdfDeMediathek extends PluginForHost {
                 this.postprocess(link);
             }
         }
+    }
+
+    @Override
+    protected void handleConnectionErrors(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
+        if (con.getResponseCode() == 403) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403 - GEO-blocked?");
+        }
+        super.handleConnectionErrors(br, con);
     }
 
     private boolean isSubtitle(final DownloadLink link) {

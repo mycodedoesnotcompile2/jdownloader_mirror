@@ -16,6 +16,8 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 import org.appwork.utils.Regex;
@@ -32,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50987 $", interfaceVersion = 3, names = { "apkmirror.com" }, urls = { "https?://(?:www\\.)?apkmirror\\.com/apk/(([^/]+)/([^/]+)/([^/]+)/([^/]+))\\-download/" })
+@HostPlugin(revision = "$Revision: 53147 $", interfaceVersion = 3, names = { "apkmirror.com" }, urls = { "https?://(?:www\\.)?apkmirror\\.com/apk/(([^/]+)/([^/]+)/([^/]+)/([^/]+))\\-download/" })
 public class ApkmirrorCom extends antiDDoSForHost {
     public ApkmirrorCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -87,15 +89,17 @@ public class ApkmirrorCom extends antiDDoSForHost {
             final String checksumSha1 = new Regex(crcSourceHTML, " SHA-1:\\s*<span[^>]*>([a-f0-9]{40})</span>").getMatch(0);
             final String checksumSha256 = new Regex(crcSourceHTML, " SHA-256:\\s*<span[^>]*>([a-f0-9]{64})</span>").getMatch(0);
             /* Set hashes for CRC check */
+            final List<HashInfo> hashInfos = new ArrayList<HashInfo>();
             if (!StringUtils.isEmpty(checksumMd5)) {
-                link.addHashInfo(HashInfo.newInstanceSafe(checksumMd5, HashInfo.TYPE.MD5));
+                hashInfos.add(HashInfo.newInstanceSafe(checksumMd5, HashInfo.TYPE.MD5));
             }
             if (!StringUtils.isEmpty(checksumSha1)) {
-                link.addHashInfo(HashInfo.newInstanceSafe(checksumSha1, HashInfo.TYPE.SHA1));
+                hashInfos.add(HashInfo.newInstanceSafe(checksumSha1, HashInfo.TYPE.SHA1));
             }
             if (!StringUtils.isEmpty(checksumSha256)) {
-                link.addHashInfo(HashInfo.newInstanceSafe(checksumSha256, HashInfo.TYPE.SHA256));
+                hashInfos.add(HashInfo.newInstanceSafe(checksumSha256, HashInfo.TYPE.SHA256));
             }
+            link.setHashInfos(hashInfos);
         } else {
             logger.warning("Failed to find CRC file hash source html");
         }

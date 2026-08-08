@@ -38,7 +38,7 @@ public abstract class AbstractMergeSameNamedPackagesAction<PackageType extends A
     }
 
     public static String getTranslationForMergeAll() {
-        return "Merge all regardless of selection";
+        return _GUI.T.MergeSameNamedPackagesAction_Merge_All();
     }
 
     @Customizer(link = "#getTranslationForMergeAll")
@@ -68,6 +68,9 @@ public abstract class AbstractMergeSameNamedPackagesAction<PackageType extends A
             return;
         }
         final SelectionInfo<PackageType, ChildrenType> sel = getSelection();
+        if (sel == null) {
+            return;
+        }
         final PackageController<PackageType, ChildrenType> controller = sel.getController();
         controller.getQueue().add(new QueueAction<Void, RuntimeException>() {
             @Override
@@ -77,7 +80,7 @@ public abstract class AbstractMergeSameNamedPackagesAction<PackageType extends A
                 settings.setMergeSameNamedPackagesCaseInsensitive(isMatchPackageNamesCaseInsensitive());
                 /* If user has selected package(s), only collect duplicates within selection. */
                 final List<PackageView<PackageType, ChildrenType>> selPackageViews = sel.getPackageViews();
-                if (isMergeAll() || sel == null || selPackageViews.size() == 0) {
+                if (isMergeAll() || selPackageViews == null || selPackageViews.size() == 0) {
                     /* Merge duplicates in whole list */
                     controller.merge(null, null, null, settings);
                 } else {
@@ -101,9 +104,12 @@ public abstract class AbstractMergeSameNamedPackagesAction<PackageType extends A
     @Override
     public boolean isEnabled() {
         final SelectionInfo<PackageType, ChildrenType> sel = getSelection();
+        if (sel == null) {
+            return false;
+        }
         final PackageController<PackageType, ChildrenType> controller = sel.getController();
         if (controller == null || controller.getPackages() == null || controller.getPackages().isEmpty()) {
-            /* Zero items in linkgrabberlist/downloadlist -> No duplicates that can be merged. */
+            /* Zero items in linkgrabberlist/downloadlist -> Nothing that can be merged. */
             return false;
         }
         return super.isEnabled();

@@ -89,7 +89,7 @@ import jd.plugins.decrypter.GoogleDriveCrawler;
 import jd.plugins.decrypter.GoogleDriveCrawler.JsonSchemeType;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 52379 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53147 $", interfaceVersion = 3, names = {}, urls = {})
 public class GoogleDrive extends PluginForHost {
     public GoogleDrive(PluginWrapper wrapper) {
         super(wrapper);
@@ -555,15 +555,17 @@ public class GoogleDrive extends PluginForHost {
             link.setVerifiedFileSize(filesize);
         }
         /* Set hashes for CRC check */
+        final List<HashInfo> hashInfos = new ArrayList<HashInfo>();
         if (!StringUtils.isEmpty(checksumMd5)) {
-            link.addHashInfo(HashInfo.newInstanceSafe(checksumMd5, HashInfo.TYPE.MD5));
+            hashInfos.add(HashInfo.newInstanceSafe(checksumMd5, HashInfo.TYPE.MD5));
         }
         if (!StringUtils.isEmpty(sha1Checksum)) {
-            link.addHashInfo(HashInfo.newInstanceSafe(sha1Checksum, HashInfo.TYPE.SHA1));
+            hashInfos.add(HashInfo.newInstanceSafe(sha1Checksum, HashInfo.TYPE.SHA1));
         }
         if (!StringUtils.isEmpty(checksumSha256)) {
-            link.addHashInfo(HashInfo.newInstanceSafe(checksumSha256, HashInfo.TYPE.SHA256));
+            hashInfos.add(HashInfo.newInstanceSafe(checksumSha256, HashInfo.TYPE.SHA256));
         }
+        link.setHashInfos(hashInfos);
         if (!StringUtils.isEmpty(description) && StringUtils.isEmpty(link.getComment())) {
             link.setComment(description);
         }

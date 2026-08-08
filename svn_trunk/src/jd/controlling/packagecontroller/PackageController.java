@@ -1,5 +1,6 @@
 package jd.controlling.packagecontroller;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -565,10 +566,10 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
      */
     public final static class PackageSettings {
         private int     packageposition                       = -1;
-        private Boolean mergePackageComments                  = Boolean.TRUE;
-        private Boolean mergeSameNamedPackages                = Boolean.FALSE;
-        private Boolean expandPackage                         = Boolean.FALSE;
-        private Boolean mergeSameNamedPackagesCaseInsensitive = Boolean.FALSE;
+        private boolean mergePackageComments                  = true;
+        private boolean mergeSameNamedPackages                = false;
+        private boolean expandPackage                         = false;
+        private boolean mergeSameNamedPackagesCaseInsensitive = false;
 
         public PackageSettings() {
             setPackagePosition(null);
@@ -603,53 +604,40 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
             return this;
         }
 
-        public Boolean getMergePackageComments() {
+        public boolean getMergePackageComments() {
             return mergePackageComments;
         }
 
         public PackageSettings setMergePackageComments(Boolean mergePackageComments) {
-            if (mergePackageComments == null) {
-                this.mergePackageComments = Boolean.TRUE;
-            } else {
-                this.mergePackageComments = mergePackageComments;
-            }
+            this.mergePackageComments = mergePackageComments == null ? true : mergePackageComments.booleanValue();
             return this;
         }
 
-        public Boolean getMergeSameNamedPackages() {
+        public boolean getMergeSameNamedPackages() {
             return mergeSameNamedPackages;
         }
 
-        public void setMergeSameNamedPackages(Boolean mergeSameNamedPackages) {
-            if (mergeSameNamedPackages == null) {
-                mergeSameNamedPackages = Boolean.FALSE;
-            } else {
-                this.mergeSameNamedPackages = mergeSameNamedPackages;
-            }
+        public PackageSettings setMergeSameNamedPackages(Boolean mergeSameNamedPackages) {
+            this.mergeSameNamedPackages = mergeSameNamedPackages == null ? false : mergeSameNamedPackages.booleanValue();
+            return this;
         }
 
-        public Boolean getExpandPackage() {
+        public boolean getExpandPackage() {
             return expandPackage;
         }
 
-        public void setExpandPackage(Boolean expandPackage) {
-            if (expandPackage == null) {
-                expandPackage = Boolean.FALSE;
-            } else {
-                this.expandPackage = expandPackage;
-            }
+        public PackageSettings setExpandPackage(Boolean expandPackage) {
+            this.expandPackage = expandPackage == null ? false : expandPackage.booleanValue();
+            return this;
         }
 
-        public Boolean getMergeSameNamedPackagesCaseInsensitive() {
+        public boolean getMergeSameNamedPackagesCaseInsensitive() {
             return mergeSameNamedPackagesCaseInsensitive;
         }
 
-        public void setMergeSameNamedPackagesCaseInsensitive(Boolean mergeSameNamedPackagesCaseInsensitive) {
-            if (mergeSameNamedPackagesCaseInsensitive == null) {
-                mergeSameNamedPackagesCaseInsensitive = Boolean.FALSE;
-            } else {
-                this.mergeSameNamedPackagesCaseInsensitive = mergeSameNamedPackagesCaseInsensitive;
-            }
+        public PackageSettings setMergeSameNamedPackagesCaseInsensitive(Boolean mergeSameNamedPackagesCaseInsensitive) {
+            this.mergeSameNamedPackagesCaseInsensitive = mergeSameNamedPackagesCaseInsensitive == null ? false : mergeSameNamedPackagesCaseInsensitive.booleanValue();
+            return this;
         }
     }
 
@@ -686,10 +674,8 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                 // TODO: Comment merging to dest does not yet work as expected
                 /* Prepare destination-package */
                 if (dest != null) {
-                    if (mergesettings.getExpandPackage() != null) {
-                        dest.setExpanded(mergesettings.getExpandPackage());
-                    }
-                    if (srcPkgs != null && Boolean.TRUE.equals(mergesettings.getMergePackageComments())) {
+                    dest.setExpanded(mergesettings.getExpandPackage());
+                    if (srcPkgs != null && mergesettings.getMergePackageComments()) {
                         /* Merge package comments */
                         final List<PackageType> allPackages = new ArrayList<PackageType>();
                         allPackages.add(dest);
@@ -721,6 +707,12 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                     }
                 }
                 if (mergesettings.getMergeSameNamedPackages()) {
+                    /*
+                     * Same-name merging re-enters merge(...) below, which schedules another QueueAction on the same QUEUE. Adding to the
+                     * QUEUE from within a running QueueAction is intentional here: the nested actions are appended and processed in order
+                     * by the same queue thread, so this does not deadlock. The mergeSameNamedPackages flag is disabled before recursing to
+                     * prevent an endless loop.
+                     */
                     final Map<String, List<PackageType>> dupes;
                     if (dest != null) {
                         final List<PackageType> mergePackages = new ArrayList<PackageType>();
@@ -757,6 +749,10 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                                     firstForeignDupe = dupe;
                                     break;
                                 }
+                            }
+                            if (firstForeignDupe == null) {
+                                /* All duplicates are the destination itself -> nothing foreign to merge into. */
+                                continue;
                             }
                             thisdupes.clear();
                             thisdupes.add(firstForeignDupe);
@@ -1187,6 +1183,10 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                 dupesSelection = new HashSet<String>();
                 for (final PackageType packageNode : packages) {
                     String packagename = packageNode.getName();
+                    if (packagename == null) {
+                        /* Package without a name cannot be matched by name. */
+                        continue;
+                    }
                     if (case_insensitive) {
                         packagename = packagename.toLowerCase(Locale.ENGLISH);
                     }
@@ -1196,17 +1196,26 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
             final Map<String, List<PackageType>> dupes = new HashMap<String, List<PackageType>>();
             for (final PackageType packageNode : allpackages) {
                 String packagename = packageNode.getName();
+                if (packagename == null) {
+                    /* Package without a name cannot be matched by name. */
+                    continue;
+                }
                 if (case_insensitive) {
                     packagename = packagename.toLowerCase(Locale.ENGLISH);
                 }
                 if (dupesSelection != null && !dupesSelection.contains(packagename)) {
                     continue;
                 }
-                String downloaddestination = LinkTreeUtils.getDownloadDirectory(packageNode).getPath();
+                final File downloadDirectory = LinkTreeUtils.getDownloadDirectory(packageNode);
+                String downloaddestination = downloadDirectory != null ? downloadDirectory.getPath() : null;
                 if (downloaddestination != null && CrossSystem.isWindows()) {
                     downloaddestination = downloaddestination.toLowerCase(Locale.ENGLISH);
                 }
-                final String compareString = packagename + downloaddestination;
+                /*
+                 * Separate name and destination with '|' so that e.g. name "ab" + path "c" cannot collide with name "a" + path "bc". A
+                 * plain concatenation would map both to the same key.
+                 */
+                final String compareString = packagename + "|" + (downloaddestination != null ? downloaddestination : "");
                 List<PackageType> thisdupeslist = dupes.get(compareString);
                 if (thisdupeslist == null) {
                     thisdupeslist = new ArrayList<PackageType>();
