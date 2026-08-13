@@ -80,7 +80,7 @@ public class ExternInterface {
         // NEW: Configure via CorsHandler API - cleaner, more maintainable, and configured once at server initialization
         corsHandler.setAllowedOrigins(allowedOrigins); // Allow all origins
         corsHandler.setAllowMethods(EnumSet.of(RequestMethod.OPTIONS, RequestMethod.GET, RequestMethod.POST));
-        corsHandler.setMaxAge(TimeUnit.MINUTES.toSeconds(30)); // 30 minutes
+        corsHandler.setMaxAge(TimeUnit.MINUTES.toMillis(30)); // 30 minutes
         corsHandler.setAllowHeadersFromRequest(true); // Dynamically take from request
         // Private Network Access: Allow for all origins (browser extensions and websites)
         corsHandler.addPrivateNetworkRequestRule(Pattern.compile(".*"), true);

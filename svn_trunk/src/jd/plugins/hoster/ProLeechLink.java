@@ -47,7 +47,7 @@ import org.jdownloader.plugins.components.config.ProleechLinkConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 52465 $", interfaceVersion = 3, names = { "proleech.link" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53154 $", interfaceVersion = 3, names = { "proleech.link" }, urls = { "" })
 public class ProLeechLink extends PluginForHost {
     public ProLeechLink(PluginWrapper wrapper) {
         super(wrapper);
@@ -260,17 +260,19 @@ public class ProLeechLink extends PluginForHost {
         /* Host specific traffic limits would be here: http://proleech.link/dl/debrid/deb_api.php?limits */
         br.getPage(API_BASE + "?hosts");
         final String[] supportedhostsAPI = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.STRING_ARRAY);
-        for (final String filehost_premium_online : supportedhostsAPI) {
-            if (filehost_premium_online.contains("/")) {
-                /* 2019-11-11: WTF They sometimes display multiple domains of one filehost in one entry, separated by ' / ' */
-                logger.info("Special case: Multiple domains of one filehost given: " + filehost_premium_online);
-                final String[] filehost_domains = filehost_premium_online.split("/");
-                for (String filehost_domain : filehost_domains) {
-                    filehost_domain = filehost_domain.trim();
-                    filehosts_premium_onlineArray.add(filehost_domain);
+        if (supportedhostsAPI != null) {
+            for (final String filehost_premium_online : supportedhostsAPI) {
+                if (filehost_premium_online.contains("/")) {
+                    /* 2019-11-11: WTF They sometimes display multiple domains of one filehost in one entry, separated by ' / ' */
+                    logger.info("Special case: Multiple domains of one filehost given: " + filehost_premium_online);
+                    final String[] filehost_domains = filehost_premium_online.split("/");
+                    for (String filehost_domain : filehost_domains) {
+                        filehost_domain = filehost_domain.trim();
+                        filehosts_premium_onlineArray.add(filehost_domain);
+                    }
+                } else {
+                    filehosts_premium_onlineArray.add(filehost_premium_online);
                 }
-            } else {
-                filehosts_premium_onlineArray.add(filehost_premium_online);
             }
         }
         ai.setMultiHostSupport(this, filehosts_premium_onlineArray);

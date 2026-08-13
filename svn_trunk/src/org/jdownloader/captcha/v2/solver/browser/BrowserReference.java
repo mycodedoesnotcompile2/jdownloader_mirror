@@ -113,11 +113,11 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
     protected final AtomicReference<HttpHandlerInfo> handlerInfo = new AtomicReference<HttpHandlerInfo>(null);
     protected final SingleReachableState             canClose    = new SingleReachableState("canClose");
     protected final static Queue                     QUEUE       = new Queue("BrowserReference") {
-        @Override
-        public void killQueue() {
-            LogController.CL().log(new Throwable("YOU CANNOT KILL ME!"));
-        }
-    };
+                                                                     @Override
+                                                                     public void killQueue() {
+                                                                         LogController.CL().log(new Throwable("YOU CANNOT KILL ME!"));
+                                                                     }
+                                                                 };
 
     public void open() throws IOException {
         if (!canClose.isReached()) {
@@ -282,7 +282,7 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.utils.net.httpserver.handler.HttpRequestHandler#onGetRequest(org.appwork.utils.net.httpserver.requests.GetRequest,
      * org.appwork.utils.net.httpserver.responses.HttpResponse)
      */
@@ -542,7 +542,7 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
         // NEW: Configure via CorsHandler API - cleaner, more maintainable, and configured once at server initialization
         corsHandler.setAllowedOrigins(allowedOrigins);
         corsHandler.setAllowMethods(EnumSet.of(RequestMethod.OPTIONS, RequestMethod.GET, RequestMethod.POST));
-        corsHandler.setMaxAge(TimeUnit.MINUTES.toSeconds(30)); // 30 minutes
+        corsHandler.setMaxAge(TimeUnit.MINUTES.toMillis(30)); // 30 minutes
         corsHandler.setAllowHeadersFromRequest(true); // Dynamically take from request
         // Private Network Access: Allow for local server address
         corsHandler.addPrivateNetworkRequestRule(Pattern.compile(".*"), true);

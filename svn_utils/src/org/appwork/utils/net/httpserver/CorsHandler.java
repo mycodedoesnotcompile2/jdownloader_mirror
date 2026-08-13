@@ -42,6 +42,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import org.appwork.net.protocol.http.HTTPConstants;
@@ -821,12 +822,11 @@ public class CorsHandler {
         }
         // Add Access-Control-Max-Age (typically for OPTIONS/preflight requests)
         // Note: HTTP header expects seconds, but we store milliseconds internally
-        Long maxAgeValue = getMaxAge();
+        final Long maxAgeValue = getMaxAge();
         if (maxAgeValue != null) {
             if (responseHeaders.get(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_MAX_AGE) == null) {
                 // Convert milliseconds to seconds for the HTTP header
-                long maxAgeSeconds = maxAgeValue / 1000;
-                responseHeaders.add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_MAX_AGE, String.valueOf(maxAgeSeconds)));
+                responseHeaders.add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_ACCESS_CONTROL_MAX_AGE, Long.toString(TimeUnit.MILLISECONDS.toSeconds(maxAgeValue.longValue()))));
             }
         }
         // Add Access-Control-Allow-Private-Network (for Private Network Access / PNA)
@@ -836,7 +836,7 @@ public class CorsHandler {
         // This is the correct behavior per CORS specification - we do NOT set this header unconditionally.
         // Check pattern-based rules first, then fall back to global setting
         if (isAllowPrivateNetworkFromRequest(origin)) {
-            String requestedPrivateNetwork = requestHeaders.getValue(HTTPConstants.ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK);
+            final String requestedPrivateNetwork = requestHeaders.getValue(HTTPConstants.ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK);
             if (requestedPrivateNetwork != null && !requestedPrivateNetwork.isEmpty()) {
                 // Only set the header if it was requested (which only happens in preflight requests)
                 // This ensures we don't unnecessarily set the header for non-preflight requests
@@ -899,8 +899,8 @@ public class CorsHandler {
             return true;
         } else {
             // no reason to set cors headers again.. already done for each request in HttpServerConnection.configure as early as possible.
-            // Set response code to 200 OK
-            response.setResponseCode(ResponseCode.SUCCESS_OK);
+            // Set response code to 204 No Content
+            response.setResponseCode(ResponseCode.SUCCESS_NO_CONTENT);
             // Set Content-Length to 0 (OPTIONS requests have no body)
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_LENGTH, "0"));
             // Response is ready to be sent

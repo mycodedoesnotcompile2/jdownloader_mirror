@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2026, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -40,7 +40,9 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.appwork.utils.Time;
 
 /**
  * @author daniel
@@ -87,20 +89,40 @@ public abstract class DelayedRunnable implements Runnable {
                 return thread;
             }
         });
-
         ret.setMaximumPoolSize(1);
         ret.setKeepAliveTime(10000, TimeUnit.MILLISECONDS);
         ret.allowCoreThreadTimeOut(true);
         return ret;
     }
 
-    private final ScheduledExecutorService service;
-    private final long                     delayInMS;
-    private final AtomicLong               lastRunRequest  = new AtomicLong(0);
-    private final AtomicLong               firstRunRequest = new AtomicLong(0);
-    private final AtomicBoolean            delayerSet      = new AtomicBoolean(false);
-    private final long                     maxInMS;
-    private final AtomicBoolean            delayerEnabled  = new AtomicBoolean(true);
+    private final ScheduledExecutorService    service;
+    private final long                        delayInMS;
+    private final AtomicReference<DelayState> state          = new AtomicReference<>(null);
+    private final long                        maxInMS;
+    private final AtomicBoolean               delayerEnabled = new AtomicBoolean(true);
+
+    public static class DelayState {
+        public final AtomicBoolean cycleToken;
+        public final long          firstRunRequest;
+        public final long          lastRunRequest;
+
+        // Erster Request eines neuen Zyklus: Erstellt ein FRISCHES cycleToken
+        public DelayState(long firstRunRequest) {
+            this(new AtomicBoolean(true), firstRunRequest, firstRunRequest);
+        }
+
+        // Interner Konstruktor zum Mitschleifen des Tokens
+        private DelayState(AtomicBoolean cycleToken, long firstRunRequest, long lastRunRequest) {
+            this.cycleToken = cycleToken;
+            this.firstRunRequest = firstRunRequest;
+            this.lastRunRequest = lastRunRequest;
+        }
+
+        // Folge-Request im selben Zyklus: cycleToken BLEIBT ERHALTEN!
+        public DelayState withNewRequest(long now) {
+            return new DelayState(this.cycleToken, this.firstRunRequest, now);
+        }
+    }
 
     public DelayedRunnable(final long minDelayInMS) {
         this(DelayedRunnable.getNewScheduledExecutorService(), minDelayInMS);
@@ -137,7 +159,7 @@ public abstract class DelayedRunnable implements Runnable {
     }
 
     public boolean isDelayerActive() {
-        return this.delayerSet.get();
+        return state.get() != null;
     }
 
     public boolean isDelayerEnabled() {
@@ -157,13 +179,107 @@ public abstract class DelayedRunnable implements Runnable {
     }
 
     public long getEstimatedNextRun() {
-        final long firstRunRequest = this.firstRunRequest.get();
-        if (firstRunRequest > 0) {
-            final long lastRunRequest = this.lastRunRequest.get();
-            final long currentTime = System.currentTimeMillis();
-            return Math.max(0, delayInMS - (currentTime - lastRunRequest));
+        final DelayState currentState = this.state.get();
+        // Wenn kein Timer aktiv ist (currentState == null)
+        if (currentState == null) {
+            return -1;
         }
-        return -1;
+        final long currentTime = Time.systemIndependentCurrentJVMTimeMillis();
+        final long minDif = Math.max(0, currentTime - currentState.lastRunRequest);
+        // Verbleibender Min-Delay
+        final long delayInMS = getMinimumDelay();
+        final long minRemaining = Math.max(0, delayInMS - minDif);
+        // Falls maxInMS konfiguriert ist, müssen wir auch den verbleibenden Max-Delay beachten!
+        final long maxInMS = getMaximumDelay();
+        if (maxInMS > 0) {
+            final long maxDif = Math.max(0, currentTime - currentState.firstRunRequest);
+            final long maxRemaining = Math.max(0, maxInMS - maxDif);
+            // Der nächste Run passiert beim früheren der beiden Termine
+            return Math.min(minRemaining, maxRemaining);
+        }
+        return minRemaining;
+    }
+
+    protected void scheduleTimer(final AtomicBoolean cycleToken, long delay) {
+        service.schedule(new Runnable() {
+            @Override
+            public void run() {
+                checkAndExecute(cycleToken);
+            }
+        }, delay, TimeUnit.MILLISECONDS);
+    }
+
+    private void checkAndExecute(final AtomicBoolean cycleToken) {
+        final DelayState currentState = state.get();
+        // TOKEN-PRÜFUNG:
+        // Läuft noch derselbe Zyklus? (Gehört das Token im aktuellen State zu diesem Timer?)
+        if (currentState == null || currentState.cycleToken != cycleToken || cycleToken.get() == false) {
+            return; // Outdated! Entweder abgearbeitet oder ein völlig neuer Zyklus läuft.
+        }
+        final long now = Time.systemIndependentCurrentJVMTimeMillis();
+        final long minDif = Math.max(0, now - currentState.lastRunRequest);
+        final long delayInMS = getMinimumDelay();
+        final long maxInMS = getMaximumDelay();
+        final long maxDif = (maxInMS > 0) ? Math.max(0, now - currentState.firstRunRequest) : 0;
+        // 1. Min- oder Max-Delay abgelaufen?
+        if (minDif >= delayInMS || (maxInMS > 0 && maxDif >= maxInMS)) {
+            executeNow(currentState);
+            return;
+        }
+        // 2. Noch Restzeit -> Re-Schedule für DASSELBE boundToken!
+        long nextDelay = delayInMS - minDif;
+        if (maxInMS > 0) {
+            long maxRemaining = maxInMS - maxDif;
+            nextDelay = Math.min(nextDelay, maxRemaining);
+        }
+        if (nextDelay < 10) {
+            executeNow(currentState);
+        } else {
+            // Wir schedulen erneut mit demselben Token
+            scheduleTimer(cycleToken, nextDelay);
+        }
+    }
+
+    protected void executeNow(final DelayState expectedState) {
+        // CAS-Schleife: Wir leeren den State NUR dann, wenn er immer noch zu UNSEREM CycleToken gehört!
+        while (true) {
+            final DelayState current = state.get();
+            // 1. Ist der Zyklus überhaupt noch aktiv und gehört zu unserem Token?
+            if (current == null || current.cycleToken != expectedState.cycleToken) {
+                return; // Ein anderer Thread war schneller und hat die Arbeit bereits ausgeführt!
+            }
+            // 2. Atomar auf null setzen – EGAL ob in der Zwischenzeit ein withNewRequest()
+            // den lastRunRequest im selben Zyklus aktualisiert hat!
+            if (state.compareAndSet(current, null)) {
+                break; // Erfolgreich! Wir übernehmen die Ausführung.
+            }
+        }
+        try {
+            if (expectedState.cycleToken.compareAndSet(true, false)) {
+                DelayedRunnable.this.delayedrun();
+            }
+        } catch (Throwable e) {
+            onUncaughtException(e);
+        } finally {
+            // Nachlauf-Check für Requests, die WÄHREND doActualWork reinkamen
+            final DelayState nextCycleState = state.get();
+            if (nextCycleState != null && nextCycleState.cycleToken.get()) {
+                final long now = Time.systemIndependentCurrentJVMTimeMillis();
+                final long minDif = Math.max(0, now - nextCycleState.lastRunRequest);
+                final long delayInMS = getMinimumDelay();
+                final long maxInMS = getMaximumDelay();
+                final long maxDif = (maxInMS > 0) ? Math.max(0, now - nextCycleState.firstRunRequest) : 0;
+                if (minDif >= delayInMS || (maxInMS > 0 && maxDif >= maxInMS)) {
+                    // Der NEUE Zyklus ist bereits fällig -> sofort ausführen
+                    service.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            checkAndExecute(nextCycleState.cycleToken);
+                        }
+                    });
+                }
+            }
+        }
     }
 
     @Override
@@ -176,86 +292,34 @@ public abstract class DelayedRunnable implements Runnable {
             }
             return;
         }
-        this.lastRunRequest.set(System.currentTimeMillis());
-        if (this.delayerSet.getAndSet(true) == true) {
-            return;
+        final long now = Time.systemIndependentCurrentJVMTimeMillis();
+        while (true) {
+            final DelayState oldState = state.get();
+            final DelayState newState;
+            if (oldState == null) {
+                newState = new DelayState(now);
+            } else {
+                newState = oldState.withNewRequest(now);
+            }
+            if (state.compareAndSet(oldState, newState)) {
+                if (oldState == null) {
+                    scheduleTimer(newState.cycleToken, getMinimumDelay());
+                }
+                return;
+            }
         }
-        this.firstRunRequest.compareAndSet(0, System.currentTimeMillis());
-        this.service.schedule(new Runnable() {
-            private void delayAgain(final long currentTime, Long nextDelay, final long minDif, final long thisRequestRun) {
-                if (DelayedRunnable.this.delayerSet.get() == false) {
-                    return;
-                }
-                if (nextDelay == null) {
-                    nextDelay = Math.max(0, DelayedRunnable.this.delayInMS - minDif);
-                }
-                if (nextDelay < 10) {
-                    this.runNow(currentTime, thisRequestRun, minDif);
-                    return;
-                }
-                DelayedRunnable.this.service.schedule(this, nextDelay, TimeUnit.MILLISECONDS);
-            }
-
-            public void run() {
-                if (DelayedRunnable.this.delayerSet.get() == false) {
-                    return;
-                }
-                final long thisRunRequest = DelayedRunnable.this.lastRunRequest.get();
-                final long currentTime = System.currentTimeMillis();
-                final long minDif = currentTime - thisRunRequest;
-                if (minDif >= DelayedRunnable.this.delayInMS) {
-                    /* minDelay reached, run now */
-                    this.runNow(currentTime, thisRunRequest, minDif);
-                    return;
-                }
-                final long firstRunRequest = DelayedRunnable.this.firstRunRequest.get();
-                Long nextDelay = null;
-                if (DelayedRunnable.this.maxInMS > 0) {
-                    final long maxDif = currentTime - firstRunRequest;
-                    if (maxDif >= DelayedRunnable.this.maxInMS) {
-                        /* maxDelay reached, run now */
-                        this.runNow(currentTime, thisRunRequest, minDif);
-                        return;
-                    }
-                    final long delay = DelayedRunnable.this.maxInMS - maxDif;
-                    nextDelay = Math.min(delay, DelayedRunnable.this.delayInMS);
-                }
-                this.delayAgain(currentTime, nextDelay, minDif, thisRunRequest);
-            }
-
-            private void runNow(final long currentTime, final long thisRunRequest, final long minDif) {
-                try {
-                    DelayedRunnable.this.delayedrun();
-                } catch (Throwable e) {
-                    onUncaughtException(e);
-                } finally {
-                    if (thisRunRequest != DelayedRunnable.this.lastRunRequest.get()) {
-                        DelayedRunnable.this.firstRunRequest.set(currentTime);
-                        this.delayAgain(currentTime, DelayedRunnable.this.delayInMS, minDif, thisRunRequest);
-                    } else {
-                        this.stop();
-                    }
-                }
-            }
-
-            private void stop() {
-                DelayedRunnable.this.firstRunRequest.set(0);
-                DelayedRunnable.this.delayerSet.set(false);
-            }
-        }, DelayedRunnable.this.delayInMS, TimeUnit.MILLISECONDS);
     }
 
     /**
      * @param e
      */
     protected void onUncaughtException(Throwable e) {
-        UncaughtExceptionHandler handler = Thread.getDefaultUncaughtExceptionHandler();
+        final UncaughtExceptionHandler handler = Thread.getDefaultUncaughtExceptionHandler();
         if (handler != null) {
             handler.uncaughtException(Thread.currentThread(), e);
         } else {
             e.printStackTrace();
         }
-
     }
 
     public void setDelayerEnabled(final boolean b) {
@@ -268,6 +332,7 @@ public abstract class DelayedRunnable implements Runnable {
     }
 
     public boolean stop() {
-        return this.delayerSet.compareAndSet(true, false);
+        final DelayState delayState = this.state.getAndSet(null);
+        return delayState != null && delayState.cycleToken.compareAndSet(true, false);
     }
 }

@@ -3,8 +3,6 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -28,12 +26,11 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.Hash;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
 import org.appwork.utils.encoding.Base64;
 import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.parser.UrlQuery;
 
-@DecrypterPlugin(revision = "$Revision: 52454 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "https?://(?:www\\.)?gofile\\.io/(?:#download#|\\?c=|d/)([A-Za-z0-9\\-]+)" })
+@DecrypterPlugin(revision = "$Revision: 53157 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "https?://(?:www\\.)?gofile\\.io/(?:#download#|\\?c=|d/)([A-Za-z0-9\\-]+)" })
 public class GoFileIoCrawler extends PluginForDecrypt {
     @Override
     public void init() {
@@ -45,44 +42,24 @@ public class GoFileIoCrawler extends PluginForDecrypt {
         return decryptIt(param, progress, null);
     }
 
-    protected static AtomicReference<String> WEBSITE_TOKEN           = new AtomicReference<String>();
-    protected static AtomicLong              WEBSITE_TOKEN_TIMESTAMP = new AtomicLong(-1);
-    protected final static long              WEBSITE_TOKEN_EXPIRE    = 30 * 60 * 1000l;
+    private final String UA = Base64.decodeToString("SkRvd25sb2FkZXI8LT5Hb2ZpbGU=");
 
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
-        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, Base64.decodeToString("SkRvd25sb2FkZXI8LT5Hb2ZpbGU="));
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, UA);
         br.setFollowRedirects(true);
         return br;
     }
 
-    public String getWebsiteToken(final Browser br) throws Exception {
-        synchronized (WEBSITE_TOKEN) {
-            String token = WEBSITE_TOKEN.get();
-            if (!StringUtils.isEmpty(token) && Time.systemIndependentCurrentJVMTimeMillis() - WEBSITE_TOKEN_TIMESTAMP.get() < WEBSITE_TOKEN_EXPIRE) {
-                return token;
-            } else {
-                final Browser brc = br.cloneBrowser();
-                final GetRequest req = brc.createGetRequest("https://" + getHost() + "/dist/js/config.js");
-                GofileIo.getPage(this, brc, req);
-                token = brc.getRegex("websiteToken\\s*(?::|=)\\s*\"(.*?)\"").getMatch(0);
-                if (token == null) {
-                    /* 2024-01-26 / 2024-12-03 */
-                    token = brc.getRegex("(?:fetchData|appdata)\\.wt\\s*(?::|=)\\s*\"(.*?)\"").getMatch(0);
-                    if (token == null) {
-                        /* 2024-03-11 */
-                        token = brc.getRegex("wt\\s*:\\s*\"([^\"]+)").getMatch(0);
-                    }
-                }
-                if (StringUtils.isEmpty(token)) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                WEBSITE_TOKEN.set(token);
-                WEBSITE_TOKEN_TIMESTAMP.set(Time.systemIndependentCurrentJVMTimeMillis());
-                return token;
-            }
+    private String generateWT(final String token) {
+        if (token == null) {
+            return null;
         }
+        final long currentUnixSec = System.currentTimeMillis() / 1000L;
+        final long timestampBlock = currentUnixSec / 14400L;
+        final String payload = String.format("%s::%s::%s::%d::%s", UA, "", token, timestampBlock, "9844d94d963d30");
+        return Hash.getSHA256(payload);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress, Account account) throws Exception {
@@ -92,7 +69,7 @@ public class GoFileIoCrawler extends PluginForDecrypt {
         final String folderID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
         final UrlQuery query = new UrlQuery();
         query.appendEncoded("contentId", folderID);
-        final String X_Website_Token = getWebsiteToken(br);
+        final String X_Website_Token = generateWT(token);
         String passCode = param.getDecrypterPassword();
         boolean passwordCorrect = true;
         boolean passwordRequired = false;
@@ -112,6 +89,7 @@ public class GoFileIoCrawler extends PluginForDecrypt {
                 req.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + token);
             }
             if (X_Website_Token != null) {
+                // TODO: still needed?
                 req.getHeaders().put("X-Website-Token", X_Website_Token);
             }
             req.getHeaders().put(new HTTPHeader(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://" + this.getHost()));

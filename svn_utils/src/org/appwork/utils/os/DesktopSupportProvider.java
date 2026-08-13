@@ -34,7 +34,6 @@
 package org.appwork.utils.os;
 
 import org.appwork.JNAHelper;
-import org.appwork.builddecision.BuildDecisions;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.os.CrossSystem.OperatingSystem;
 
@@ -47,7 +46,7 @@ public class DesktopSupportProvider {
         switch (os.getFamily()) {
         case WINDOWS:
             try {
-                if (JNAHelper.isJNAAvailable() && !BuildDecisions.contains(DesktopSupportWindowsViaJNA.DESKTOP_SUPPORT_WINDOWS_VIA_JNA_NO)) {
+                if (JNAHelper.isJNAAvailable()) {
                     return new org.appwork.utils.os.DesktopSupportWindowsViaJNA();
                 } else {
                     return new DesktopSupportWindows();

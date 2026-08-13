@@ -1849,13 +1849,15 @@ public class DownloadLink extends Property implements AbstractPackageChildrenNod
     }
 
     /**
-     * Sets the strongest HashInfo item out of the given list. </br>
-     * As long as storing multiple HashInfo items is not properly supported, only a single HashInfo can be kept. The caller can therefore
-     * pass all available hashes and the strongest one is picked and stored. </br>
-     * This method will later be reworked so that multiple HashInfo items can be stored at the same time.
+     * Sets the strongest HashInfo item out of the given list. </br> As long as storing multiple HashInfo items is not properly supported,
+     * only a single HashInfo can be kept. The caller can therefore pass all available hashes and the strongest one is picked and stored.
+     * </br> This method will later be reworked so that multiple HashInfo items can be stored at the same time.
      */
     public void setHashInfos(final List<HashInfo> hashInfos) {
-        if (hashInfos == null || hashInfos.isEmpty()) {
+        if (hashInfos == null) {
+            setHashInfo(null);
+            return;
+        } else if (hashInfos.isEmpty()) {
             return;
         }
         HashInfo strongest = null;
