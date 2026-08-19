@@ -49,7 +49,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.XHamsterCom;
 
-@DecrypterPlugin(revision = "$Revision: 52916 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53165 $", interfaceVersion = 3, names = {}, urls = {})
 public class XHamsterGallery extends PluginForDecrypt {
     public XHamsterGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -456,10 +456,10 @@ public class XHamsterGallery extends PluginForDecrypt {
                 logger.info("Json handling success: Items this page: " + videos.size());
             }
             /* Crawl links from html (legacy method) */
-            final String[] urls = br.getRegex("(/videos/[^<>\"']+)").getColumn(0);
-            if (urls != null && urls.length > 0) {
-                for (String url : urls) {
-                    url = br.getURL(url).toExternalForm();
+            final String[] paths = br.getRegex("(/videos/[^<>\"']+)").getColumn(0);
+            if (paths != null && paths.length > 0) {
+                for (final String path : paths) {
+                    final String url = br.getURL(path).toExternalForm();
                     if (new Regex(url, ignoreVideo).patternFind()) {
                         continue;
                     } else if (!hostPlugin.canHandle(url)) {
@@ -469,14 +469,14 @@ public class XHamsterGallery extends PluginForDecrypt {
                         /* Skip dupes */
                         continue;
                     }
-                    final DownloadLink dl = this.createDownloadlink(url);
+                    final DownloadLink video = this.createDownloadlink(url);
                     /* Set temp. name -> Will change once user starts downloading. */
-                    final String titleFromURL = url.replaceFirst("/videos/", "").replace("-", " ");
-                    dl.setName(titleFromURL + ".mp4");
-                    dl.setAvailable(true);
-                    dl._setFilePackage(fp);
-                    ret.add(dl);
-                    distribute(dl);
+                    final String titleFromURL = path.replaceFirst("/videos/", "").replace("-", " ");
+                    video.setName(titleFromURL + ".mp4");
+                    video.setAvailable(true);
+                    video._setFilePackage(fp);
+                    ret.add(video);
+                    distribute(video);
                     numberofNewItemsThisPage++;
                 }
             }

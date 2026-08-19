@@ -71,6 +71,27 @@ public class FileSystemHelper {
 
     public static final int FSCTL_SET_SPARSE = WinioctlUtil.CTL_CODE(Winioctl.FILE_DEVICE_FILE_SYSTEM, 49, Winioctl.METHOD_BUFFERED, Winioctl.FILE_SPECIAL_ACCESS);
 
+    public static Boolean supportsSparseFiles(File file) {
+        final File rootPath = Files.guessRoot(file);
+        if (rootPath == null || !rootPath.exists()) {
+            return null;
+        }
+        final IntByReference fileSystemFlags = new IntByReference();
+        try {
+            final char[] volumeNameBuffer = new char[261];
+            final char[] fileSystemNameBuffer = new char[261];
+            final boolean success = Kernel32.INSTANCE.GetVolumeInformation(rootPath.getAbsolutePath(), volumeNameBuffer, volumeNameBuffer.length, null, null, fileSystemFlags, fileSystemNameBuffer, fileSystemNameBuffer.length);
+            if (!success) {
+                throw new IOException("GetVolumeInformation:" + file + "|" + Kernel32Util.formatMessage(com.sun.jna.platform.win32.Kernel32.INSTANCE.GetLastError()));
+            }
+        } catch (Exception e) {
+            LogController.CL().log(e);
+            return false;
+        }
+        final int FILE_SUPPORTS_SPARSE_FILES = 0x00000040;
+        return (fileSystemFlags.getValue() & FILE_SUPPORTS_SPARSE_FILES) != 0;
+    }
+
     /**
      * https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ni-winioctl-fsctl_set_sparse
      *
@@ -92,6 +113,11 @@ public class FileSystemHelper {
                 // results.
                 return false;
             }
+            final Boolean supportsSparseFiles = supportsSparseFiles(file);
+            LogController.CL().info("Sparse Files Supported:" + file + "|" + supportsSparseFiles);
+            if (Boolean.FALSE.equals(supportsSparseFiles)) {
+                return false;
+            }
             fileHandle = com.sun.jna.platform.win32.Kernel32.INSTANCE.CreateFile(file.getAbsolutePath(), WinNT.GENERIC_READ | WinNT.GENERIC_WRITE, 0, null, WinNT.OPEN_EXISTING, WinNT.FILE_ATTRIBUTE_NORMAL, null);
             if (fileHandle == null) {
                 throw new IOException("CreateFile:" + file + "|" + Kernel32Util.formatMessage(com.sun.jna.platform.win32.Kernel32.INSTANCE.GetLastError()));
@@ -106,7 +132,9 @@ public class FileSystemHelper {
             LogController.CL().log(e);
             return false;
         } finally {
-            Kernel32.INSTANCE.CloseHandle(fileHandle);
+            if (fileHandle != null) {
+                Kernel32.INSTANCE.CloseHandle(fileHandle);
+            }
         }
     }
 }

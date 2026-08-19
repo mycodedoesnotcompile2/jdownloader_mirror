@@ -41,6 +41,7 @@ import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -50,7 +51,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53077 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53159 $", interfaceVersion = 3, names = {}, urls = {})
 public class CivitaiCom extends PluginForHost {
     public CivitaiCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -291,6 +292,9 @@ public class CivitaiCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final Map<String, Object> response = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        if ("bad_auth_token".equals(response.get("code")) || "401".equals(StringUtils.valueOfOrNull(response.get("status")))) {
+            throw new AccountInvalidException("Auth token invalid");
+        }
         final List<Object> items = (List<Object>) response.get("items");
         if (items == null || items.isEmpty()) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -383,6 +387,12 @@ public class CivitaiCom extends PluginForHost {
             return;
         }
         br.followConnection(true);
+        if (StringUtils.containsIgnoreCase(con.getContentType(), "application/json")) {
+            final Map<String, Object> response = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            if ("bad_auth_token".equals(response.get("code")) || "401".equals(StringUtils.valueOfOrNull(response.get("status")))) {
+                throw new AccountInvalidException("Auth token invalid");
+            }
+        }
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (con.getURL().toExternalForm().matches("https?://[^/]+/login.*")) {
@@ -420,7 +430,18 @@ public class CivitaiCom extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
         login(account);
-        /* We can't check the API key yet */
+        // https://developer.civitai.com/site/reference/users
+        br.getPage("https://civitai.com/api/v1/me");
+        final Map<String, Object> response = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        if ("Unauthorized".equals(response.get("error"))) {
+            throw new AccountInvalidException("api key invalid!");
+        } else if ("banned".equals(response.get("status"))) {
+            throw new AccountInvalidException("account banned!");
+        }
+        final String email = (String) response.get("email");
+        if (email != null) {
+            account.setUser(email);
+        }
         ai.setUnlimitedTraffic();
         account.setType(AccountType.FREE);
         return ai;

@@ -28,7 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53159 $", interfaceVersion = 3, names = {}, urls = {})
 public class Up4everCom extends XFileSharingProBasic {
     public Up4everCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -108,6 +108,12 @@ public class Up4everCom extends XFileSharingProBasic {
 
     public static String[] getAnnotationNames() {
         return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    protected boolean requiresWWW() {
+        // avoid redirect from https://upload-4ever.com/?op=my_account to https://www.upload-4ever.com/?op=my_account
+        return true;
     }
 
     @Override

@@ -39,6 +39,7 @@ import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 
 import org.appwork.utils.DebugMode;
+import org.appwork.utils.Exceptions;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.httpconnection.IllegalSSLHostnameException;
 import org.appwork.utils.net.httpconnection.SSLSocketStreamFactory;
@@ -63,6 +64,7 @@ import org.bouncycastle.tls.TlsCredentials;
 import org.bouncycastle.tls.TlsExtensionsUtils;
 import org.bouncycastle.tls.TlsNoCloseNotifyException;
 import org.bouncycastle.tls.TlsServerCertificate;
+import org.bouncycastle.tls.TlsSession;
 import org.bouncycastle.tls.TlsUtils;
 import org.bouncycastle.tls.crypto.TlsCertificate;
 import org.bouncycastle.tls.crypto.impl.bc.BcTlsCrypto;
@@ -296,21 +298,6 @@ public class BCSSLSocketStreamFactory implements SSLSocketStreamFactory {
             // ignore, eg mega.co does not support renegotiation
         }
 
-        // public void notifyAlertRaised(short alertLevel, short alertDescription, String message, Throwable cause) {
-        // PrintStream out = (alertLevel == AlertLevel.fatal) ? System.err : System.out;
-        // out.println("TLS client raised alert: " + AlertLevel.getText(alertLevel) + ", " + AlertDescription.getText(alertDescription));
-        // if (message != null) {
-        // out.println("> " + message);
-        // }
-        // if (cause != null) {
-        // cause.printStackTrace(out);
-        // }
-        // }
-        //
-        // public void notifyAlertReceived(short alertLevel, short alertDescription) {
-        // PrintStream out = (alertLevel == AlertLevel.fatal) ? System.err : System.out;
-        // out.println("TLS client received alert: " + AlertLevel.getText(alertLevel) + ", " + AlertDescription.getText(alertDescription));
-        // }
         @Override
         public TlsAuthentication getAuthentication() throws IOException {
             final TlsAuthentication auth = new TlsAuthentication() {
@@ -320,18 +307,17 @@ public class BCSSLSocketStreamFactory implements SSLSocketStreamFactory {
 
                 @Override
                 public void notifyServerCertificate(TlsServerCertificate serverCertificate) throws IOException {
-                    checkTrust(serverCertificate, true);
+                    checkTrust(serverCertificate.getCertificate(), true);
                 }
             };
             return auth;
         }
 
-        protected TrustResult checkTrust(TlsServerCertificate certificate, boolean isServerCertificate) throws IOException {
+        protected TrustResult checkTrust(org.bouncycastle.tls.Certificate cert, boolean isServerCertificate) throws IOException {
             if (trustProvider == null) {
                 return null;
             }
             try {
-                final org.bouncycastle.tls.Certificate cert = certificate.getCertificate();
                 final int len = cert.getLength();
                 final X509Certificate[] chain = new X509Certificate[len];
                 final CertificateFactory cf = CertificateFactory.getInstance("X.509");
@@ -354,6 +340,22 @@ public class BCSSLSocketStreamFactory implements SSLSocketStreamFactory {
 
         private int getSelectedCipherSuite() {
             return selectedCipherSuite;
+        }
+
+        public TlsSession getSession() {
+            return context.getResumableSession();
+        }
+
+        @Override
+        public void notifySessionToResume(TlsSession paramTlsSession) {
+            if (paramTlsSession != null) {
+                try {
+                    // on resume, no new handshake is done, so we check the peer(server) certificate from session
+                    checkTrust(paramTlsSession.exportSessionParameters().getPeerCertificate(), true);
+                } catch (IOException e) {
+                    Exceptions.throwUncheckedException(e);
+                }
+            }
         }
 
         @Override
@@ -392,12 +394,13 @@ public class BCSSLSocketStreamFactory implements SSLSocketStreamFactory {
         public TlsClientProtocol getTlsClientProtocol();
 
         public BCTLSSocketStreamTlsClient getTlsClient();
+
+        public TlsSession getSession();
     }
 
     @Override
     public SSLSocketStreamInterface create(final SocketStreamInterface socketStream, final String hostName, final int port, final boolean autoclose, final SSLSocketStreamOptions options, final TrustProviderInterface trustProvider, final javax.net.ssl.KeyManager[] keyManagers) throws IOException {
         return create(socketStream, hostName, port, autoclose, options, new TrustCallback() {
-
             @Override
             public void onTrustResult(TrustProviderInterface provider, String authType, TrustResult result) {
             }
@@ -414,17 +417,31 @@ public class BCSSLSocketStreamFactory implements SSLSocketStreamFactory {
         });
     }
 
+    protected final AtomicReference<TlsSession> sessionToResume = new AtomicReference<TlsSession>();
+
+    public void setSessionToResume(TlsSession sessionToResume) {
+        this.sessionToResume.set(sessionToResume);
+    }
+
     @Override
     public SSLSocketStreamInterface create(final SocketStreamInterface socketStream, final String hostName, final int port, final boolean autoclose, final SSLSocketStreamOptions options, final TrustCallback trustCallback) throws IOException {
         final boolean sniEnabled = !StringUtils.isEmpty(hostName) && (options == null || options.isSNIEnabled());
+        final TlsSession session = BCSSLSocketStreamFactory.this.sessionToResume.getAndSet(null);
         final TlsClientProtocol protocol = new TlsClientProtocol(socketStream.getInputStream(), socketStream.getOutputStream());
         final TrustProviderInterface trustProvider = trustCallback.getTrustProvider();
         final AtomicReference<TrustResult> trustResult = new AtomicReference<TrustResult>();
         final BCTLSSocketStreamTlsClient client = new BCTLSSocketStreamTlsClient(hostName, sniEnabled, options, trustProvider) {
             @Override
-            protected TrustResult checkTrust(TlsServerCertificate certificate, boolean isServerCertificate) throws IOException {
-                final TrustResult ret = super.checkTrust(certificate, isServerCertificate);
-                trustResult.set(ret);
+            public TlsSession getSessionToResume() {
+                return session;
+            }
+
+            @Override
+            protected TrustResult checkTrust(org.bouncycastle.tls.Certificate cert, boolean isServerCertificate) throws IOException {
+                final TrustResult ret = super.checkTrust(cert, isServerCertificate);
+                if (isServerCertificate) {
+                    trustResult.set(ret);
+                }
                 trustCallback.onTrustResult(trustProvider, "RSA", ret);
                 return ret;
             }
@@ -436,45 +453,49 @@ public class BCSSLSocketStreamFactory implements SSLSocketStreamFactory {
         return new BCSSLSocketStreamInterface() {
             final KeyManager[] keyManager = trustCallback.getKeyManager();
             final InputStream  is         = new InputStream() {
-                final InputStream is = protocol.getInputStream();
+                                              final InputStream is = protocol.getInputStream();
 
-                @Override
-                public int read() throws IOException {
-                    final byte[] buf = new byte[1];
-                    final int ret = read(buf, 0, 1);
-                    return ret <= 0 ? -1 : buf[0] & 0xFF;
-                }
+                                              @Override
+                                              public int read() throws IOException {
+                                                  final byte[] buf = new byte[1];
+                                                  final int ret = read(buf, 0, 1);
+                                                  return ret <= 0 ? -1 : buf[0] & 0xFF;
+                                              }
 
-                private boolean eof = false;
+                                              private boolean eof = false;
 
-                @Override
-                public int read(byte[] buf, int off, int len) throws IOException {
-                    if (eof) {
-                        return -1;
-                    }
-                    try {
-                        return is.read(buf, off, len);
-                    } catch (TlsNoCloseNotifyException ignore) {
-                        LogController.CL().log(ignore);
-                        eof = true;
-                        return -1;
-                    }
-                }
+                                              @Override
+                                              public int read(byte[] buf, int off, int len) throws IOException {
+                                                  if (eof) {
+                                                      return -1;
+                                                  }
+                                                  try {
+                                                      return is.read(buf, off, len);
+                                                  } catch (TlsNoCloseNotifyException ignore) {
+                                                      LogController.CL().log(ignore);
+                                                      eof = true;
+                                                      return -1;
+                                                  }
+                                              }
 
-                @Override
-                public int available() throws IOException {
-                    return is.available();
-                }
+                                              @Override
+                                              public int available() throws IOException {
+                                                  return is.available();
+                                              }
 
-                @Override
-                public void close() throws IOException {
-                    is.close();
-                }
-            };
+                                              @Override
+                                              public void close() throws IOException {
+                                                  is.close();
+                                              }
+                                          };
 
             @Override
             public Socket getSocket() {
                 return getParentSocketStream().getSocket();
+            }
+
+            public TlsSession getSession() {
+                return client.getSession();
             }
 
             @Override
@@ -751,5 +772,4 @@ public class BCSSLSocketStreamFactory implements SSLSocketStreamFactory {
             throw new SSLException(e);
         }
     }
-
 }

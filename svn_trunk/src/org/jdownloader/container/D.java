@@ -27,6 +27,22 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
+import org.appwork.utils.Files;
+import org.appwork.utils.Hash;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.XML;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter.ExtensionsFilterInterface;
+import org.jdownloader.logging.LogController;
+import org.jdownloader.updatev2.UpdateController;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
+
 import jd.config.SubConfiguration;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.CrawledPackage;
@@ -46,29 +62,13 @@ import jd.utils.JDHexUtils;
 import jd.utils.JDUtilities;
 import jd.utils.locale.JDL;
 
-import org.appwork.utils.Files;
-import org.appwork.utils.Hash;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.XML;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter.ExtensionsFilterInterface;
-import org.jdownloader.logging.LogController;
-import org.jdownloader.updatev2.UpdateController;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-import org.xml.sax.InputSource;
-import org.xml.sax.SAXException;
-
 public class D extends PluginsC {
     private byte[]                  b3;
     private byte[]                  d;
     private HashMap<String, String> header;
 
     public D() {
-        super("DLC", "file:/.+\\.dlc$", "$Revision: 49240 $");
+        super("DLC", "file:/.+\\.dlc$", "$Revision: 53161 $");
         b3 = new byte[] { 77, 69, 84, 65, 45, 73, 78, 70, 47, 74, 68, 79, 87, 78, 76, 79, 65, 46, 68, 83, 65 };
         d = new byte[] { -44, 47, 74, 116, 56, -46, 20, 9, 17, -53, 0, 8, -47, 121, 1, 75 };
         // kk = (byte[]) SubConfiguration.getConfig(new String(new byte[] { 97,
@@ -705,7 +705,13 @@ public class D extends PluginsC {
                                 break;
                             }
                         } else if ("filename".equals(nodeName)) {
-                            n5.add(Encoding.Base64Decode(data.item(entry).getTextContent()));
+                            String filename = data.item(entry).getTextContent();
+                            filename = Encoding.Base64Decode(filename);
+                            if (StringUtils.isEmpty(filename) || ls2.contains(filename)) {
+                                n5.add(null);
+                            } else {
+                                n5.add(filename);
+                            }
                         }
                     }
                     while (ls2.size() > n5.size()) {
@@ -776,7 +782,11 @@ public class D extends PluginsC {
                         NodeList names = entries.item(entryCounter).getChildNodes();
                         String tribute = "";
                         for (int tributeCounter = 0; tributeCounter < names.getLength(); tributeCounter++) {
-                            tribute += Encoding.Base64Decode(names.item(tributeCounter).getTextContent());
+                            final String tributeItem = names.item(tributeCounter).getTextContent();
+                            if (StringUtils.isEmpty(tributeItem)) {
+                                continue;
+                            }
+                            tribute += Encoding.Base64Decode(tributeItem);
                             if (tributeCounter + 1 < names.getLength()) {
                                 tribute += ", ";
                             }

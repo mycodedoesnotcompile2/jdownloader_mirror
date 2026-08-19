@@ -2722,27 +2722,19 @@ public class YoutubeHelper {
             logger.info("buildAPI_Request:disabled");
             return null;
         }
-        final boolean tempWorkaround = true;
         final Map<String, Object> post = new LinkedHashMap<String, Object>();
         final Map<String, Object> client = new LinkedHashMap<String, Object>();
-        final int clientNameID;
-        if (tempWorkaround) {
-            // temp workaround
-            client.put("clientName", "ANDROID_VR");
-            // client.put("clientVersion", "1.71.26");
-            client.put("clientVersion", "1.65.10");
-            client.put("deviceMake", "'Oculus");
-            client.put("deviceModel", "'Quest 3");
-            client.put("androidSdkVersion", 32);
-            // client.put("userAgent",
-            // "com.google.android.apps.youtube.vr.oculus/1.71.26 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip");
-            client.put("userAgent", "com.google.android.apps.youtube.vr.oculus/1.65.10 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip");
-            client.put("osName", "Android");
-            client.put("osVersion", "12L");
-            clientNameID = 28;
-        } else {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
+        client.put("clientName", "VISIONOS");
+        client.put("clientVersion", "1.02");
+        client.put("deviceMake", "Apple");
+        client.put("deviceModel", "RealityDevice17,1");
+        client.put("androidSdkVersion", 32);
+        // client.put("userAgent",
+        // "com.google.android.apps.youtube.vr.oculus/1.71.26 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip");
+        client.put("userAgent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15");
+        client.put("osName", "visionOS");
+        client.put("osVersion", "26.5.23O471");
+        final int clientNameID = 101;
         client.put("hl", "en");
         client.put("timeZone", "UTC");
         client.put("utcOffsetMinutes", 0);
@@ -2771,7 +2763,7 @@ public class YoutubeHelper {
         final String domain = "https://www.youtube.com";
         request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, domain);
         final Account account = getAccountLoggedIn();
-        if (account != null && !tempWorkaround) {
+        if (account != null && false) {
             /* For logged in users: */
             final String sapisidhash = GoogleHelper.getSAPISidHash(br, domain);
             if (sapisidhash != null) {

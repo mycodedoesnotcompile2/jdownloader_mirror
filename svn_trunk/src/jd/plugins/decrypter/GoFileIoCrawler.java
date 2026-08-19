@@ -1,8 +1,17 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.Map.Entry;
+
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Hash;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.net.HTTPHeader;
+import org.appwork.utils.parser.UrlQuery;
 
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -21,16 +30,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.GofileIo;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Hash;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.net.HTTPHeader;
-import org.appwork.utils.parser.UrlQuery;
-
-@DecrypterPlugin(revision = "$Revision: 53157 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "https?://(?:www\\.)?gofile\\.io/(?:#download#|\\?c=|d/)([A-Za-z0-9\\-]+)" })
+@DecrypterPlugin(revision = "$Revision: 53159 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "https?://(?:www\\.)?gofile\\.io/(?:#download#|\\?c=|d/)([A-Za-z0-9\\-]+)" })
 public class GoFileIoCrawler extends PluginForDecrypt {
     @Override
     public void init() {
@@ -129,27 +129,44 @@ public class GoFileIoCrawler extends PluginForDecrypt {
         } else if (!Boolean.TRUE.equals(response_data.get("canAccess"))) {
             throw new AccountRequiredException("Private link");
         }
-        final Map<String, Map<String, Object>> children = (Map<String, Map<String, Object>>) response_data.get("children");
+        Map<String, Map<String, Object>> children = (Map<String, Map<String, Object>>) response_data.get("children");
+        if (children == null) {
+            children = new HashMap<String, Map<String, Object>>();
+        }
+        final boolean isSingleFile;
+        if ("file".equals(response_data.get("type"))) {
+            isSingleFile = true;
+            children.put((String) response_data.get("id"), response_data);
+        } else if ("folder".equals(response_data.get("type"))) {
+            isSingleFile = false;
+        } else {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         if (children.isEmpty()) {
             throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
         }
-        final String parentFolderShortID = response_data.get("code").toString();
-        String lastItemFilename = null;
+        final String parentFolderShortID = (String) response_data.get("code");
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         int numberofFiles = 0;
         int numberofFolders = 0;
-        for (final Entry<String, Map<String, Object>> item : children.entrySet()) {
+        for (final Map.Entry<String, Map<String, Object>> item : children.entrySet()) {
             final Map<String, Object> entry = item.getValue();
             final String type = (String) entry.get("type");
             if (type.equalsIgnoreCase("file")) {
-                final String fileID = item.getKey();
-                final String url = "https://" + getHost() + "/?c=" + folderID + "#file=" + fileID;
+                final String url;
+                if (isSingleFile) {
+                    url = "https://" + getHost() + "/?c=" + folderID + "#file=" + folderID;
+                } else {
+                    final String fileID = item.getKey();
+                    url = "https://" + getHost() + "/?c=" + folderID + "#file=" + fileID;
+                }
                 final DownloadLink file = new DownloadLink(hosterplugin, null, this.getHost(), url, true);
                 hosterplugin.parseFileInfo(file, account, entry);
-                file.setProperty(GofileIo.PROPERTY_PARENT_FOLDER_SHORT_ID, parentFolderShortID);
+                if (parentFolderShortID != null) {
+                    file.setProperty(GofileIo.PROPERTY_PARENT_FOLDER_SHORT_ID, parentFolderShortID);
+                }
                 file.setAvailable(true);
                 ret.add(file);
-                lastItemFilename = file.getName();
                 numberofFiles++;
             } else if (type.equalsIgnoreCase("folder")) {
                 /* Subfolder containing more files/folders */
@@ -163,7 +180,7 @@ public class GoFileIoCrawler extends PluginForDecrypt {
             }
         }
         final String folderDescription = (String) response_data.get("description");
-        String currentFolderName = response_data.get("name").toString();
+        String currentFolderName = isSingleFile ? null : (String) response_data.get("name");
         if (StringUtils.isEmpty(currentFolderName)) {
             /* Fallback which should never be needed */
             currentFolderName = folderID;

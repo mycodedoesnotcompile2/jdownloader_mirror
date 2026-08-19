@@ -1,5 +1,7 @@
 package org.jdownloader.jna.windows;
 
+import org.appwork.jna.windows.JNAOptions;
+
 //    jDownloader - Downloadmanager
 //    Copyright (C) 2009  JD-Team support@jdownloader.org
 //
@@ -16,7 +18,7 @@ package org.jdownloader.jna.windows;
 //    You should have received a copy of the GNU General Public License
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 public interface Kernel32 extends com.sun.jna.platform.win32.Kernel32 {
-    public static Kernel32 INSTANCE            = com.sun.jna.Native.load("kernel32", Kernel32.class);
+    public static Kernel32 INSTANCE            = com.sun.jna.Native.load("kernel32", Kernel32.class, JNAOptions.SYSTEM_DLLS_ONLY);
     int                    ES_DISPLAY_REQUIRED = 0x00000002;
     int                    ES_SYSTEM_REQUIRED  = 0x00000001;
     int                    ES_CONTINUOUS       = 0x80000000;

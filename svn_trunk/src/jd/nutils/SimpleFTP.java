@@ -67,16 +67,20 @@ import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.net.httpconnection.JavaSSLSocketStreamFactory;
 import org.appwork.utils.net.httpconnection.SSLSocketStreamFactory;
+import org.appwork.utils.net.httpconnection.SSLSocketStreamInterface;
+import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
 import org.appwork.utils.net.httpconnection.SocketStreamInterface;
 import org.appwork.utils.net.httpconnection.TrustResult;
 import org.appwork.utils.net.httpconnection.trust.TrustCallback;
 import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
 import org.appwork.utils.net.httpconnection.trust.TrustUtils;
+import org.bouncycastle.tls.TlsSession;
 import org.jdownloader.auth.AuthenticationController;
 import org.jdownloader.auth.AuthenticationInfo.Type;
 import org.jdownloader.auth.Login;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.net.BCSSLSocketStreamFactory;
+import org.jdownloader.net.BCSSLSocketStreamFactory.BCSSLSocketStreamInterface;
 
 import jd.plugins.Plugin;
 
@@ -273,7 +277,7 @@ public abstract class SimpleFTP {
     public boolean ascii() throws IOException {
         sendLine("TYPE A");
         try {
-            readLines(new int[] { 200 }, "could not enter ascii mode");
+            readLines(RESPONSE_CODE.codes(RESPONSE_CODE.OK_200), "could not enter ascii mode");
             if (binarymode) {
                 binarymode = false;
             }
@@ -293,7 +297,7 @@ public abstract class SimpleFTP {
     public boolean bin() throws IOException {
         sendLine("TYPE I");
         try {
-            readLines(new int[] { 200 }, "could not enter binary mode");
+            readLines(RESPONSE_CODE.codes(RESPONSE_CODE.OK_200), "could not enter binary mode");
             if (!binarymode) {
                 binarymode = true;
             }
@@ -374,8 +378,27 @@ public abstract class SimpleFTP {
         case EXPLICIT_OPTIONAL_CC_DC:
         case EXPLICIT_REQUIRED_CC_DC:
             try {
-                // TODO: add SSLSocketStream options support, caching + retry + trustAll
-                return getSSLSocketStreamFactory().create(ret, address.getAddress().getHostAddress(), address.getPort(), true, null, new TrustCallback() {
+                final SocketStreamInterface controlSocket = getControlSocket();
+                final String connectHost;
+                final int connectPort;
+                final SSLSocketStreamFactory factory;
+                // 425 Unable to build data connection: TLS session of data connection not resumed.
+                // https://issues.apache.org/jira/browse/NET-408
+                // https://github.com/bcgit/bc-java/issues/458
+                final boolean reuse_tls_session_flag = isFileZillaServer && Arrays.equals(controlSocket.getSocket().getInetAddress().getAddress(), ret.getSocket().getInetAddress().getAddress());
+                if (reuse_tls_session_flag && controlSocket instanceof BCSSLSocketStreamInterface) {
+                    final BCSSLSocketStreamInterface sslSocket = (BCSSLSocketStreamInterface) controlSocket;
+                    factory = sslSocket.getSSLSocketStreamFactory();
+                    final TlsSession session = sslSocket.getSession();
+                    ((BCSSLSocketStreamFactory) factory).setSessionToResume(session);
+                } else if (controlSocket instanceof SSLSocketStreamInterface) {
+                    factory = ((SSLSocketStreamInterface) controlSocket).getSSLSocketStreamFactory();
+                } else {
+                    factory = getSSLSocketStreamFactory();
+                }
+                connectHost = address.getAddress().getHostAddress();
+                connectPort = address.getPort();
+                return factory.create(ret, connectHost, connectPort, true, getSSLSocketStreamOptions(), new TrustCallback() {
                     @Override
                     public void onTrustResult(TrustProviderInterface provider, String authType, TrustResult result) {
                     }
@@ -418,7 +441,8 @@ public abstract class SimpleFTP {
         EXPLICIT_REQUIRED_CC_DC,
     }
 
-    private TLS_MODE tlsMode = TLS_MODE.NONE;
+    private TLS_MODE tlsMode           = TLS_MODE.NONE;
+    private boolean  isFileZillaServer = false;
 
     protected void setTLSMode(final TLS_MODE mode) {
         tlsMode = mode;
@@ -519,6 +543,7 @@ public abstract class SimpleFTP {
         this.port = port;
         socket.getSocket().setSoTimeout(getReadTimeout(STATE.CONNECTING));
         String response = readLines(new int[] { 220 }, "SimpleFTP received an unknown response when connecting to the FTP server: ");
+        this.isFileZillaServer = StringUtils.contains(response, "FileZilla");
         socket.getSocket().setSoTimeout(getReadTimeout(STATE.CONNECTED));
         switch (mode) {
         case EXPLICIT_REQUIRED_CC:
@@ -820,10 +845,20 @@ public abstract class SimpleFTP {
     }
 
     protected SSLSocketStreamFactory getSSLSocketStreamFactory() {
-        return getDefaultSSLSocketStreamFactory();
+        if (isFileZillaServer) {
+            // supports session resumption
+            // 425 Unable to build data connection: TLS session of data connection not resumed.
+            return new BCSSLSocketStreamFactory();
+        } else {
+            return getDefaultSSLSocketStreamFactory();
+        }
     }
 
     public static enum RESPONSE_CODE {
+        OK_DATA_OPEN_125,
+        OK_FILE_OPEN_150,
+        OK_200,
+        OK_FILE_STATUS_213,
         // 234 AUTH command OK. Initializing SSL connection.
         OK_234,
         // 334 [ADAT=base64data]
@@ -850,18 +885,34 @@ public abstract class SimpleFTP {
         // command is disabled.
         FAILED_534;
 
-        public int code() {
-            return Integer.parseInt(name().substring(name().indexOf("_") + 1));
+        public static int[] codes(RESPONSE_CODE... responseCodes) {
+            final int[] ret = new int[responseCodes.length];
+            int index = 0;
+            for (RESPONSE_CODE responseCode : responseCodes) {
+                ret[index++] = responseCode.code();
+            }
+            return ret;
         }
+
+        public int code() {
+            return Integer.parseInt(name().substring(name().lastIndexOf("_") + 1));
+        }
+    }
+
+    protected SSLSocketStreamOptions getSSLSocketStreamOptions() {
+        if (isFileZillaServer) {
+            // max TLS1.2 to support session resumption
+            return new SSLSocketStreamOptions(host + ":" + port);
+        }
+        return null;
     }
 
     // RFC 4217
     protected boolean AUTH_TLS_CC() throws IOException {
         sendLine("AUTH TLS");
-        final String response = readLines(new int[] { RESPONSE_CODE.OK_234.code(), RESPONSE_CODE.FAILED_500.code(), RESPONSE_CODE.FAILED_502.code(), RESPONSE_CODE.FAILED_504.code(), RESPONSE_CODE.FAILED_530.code(), RESPONSE_CODE.FAILED_534.code() }, "AUTH_TLS FAILED");
+        final String response = readLines(RESPONSE_CODE.codes(RESPONSE_CODE.OK_234, RESPONSE_CODE.FAILED_500, RESPONSE_CODE.FAILED_502, RESPONSE_CODE.FAILED_504, RESPONSE_CODE.FAILED_530, RESPONSE_CODE.FAILED_534), "AUTH_TLS FAILED");
         if (StringUtils.startsWithCaseInsensitive(response, "234")) {
-            // TODO: add SSLSocketStream options support, caching + retry + trustAll
-            socket = getSSLSocketStreamFactory().create(getControlSocket(), "", getPort(), true, null, new TrustCallback() {
+            socket = getSSLSocketStreamFactory().create(getControlSocket(), host, getPort(), true, getSSLSocketStreamOptions(), new TrustCallback() {
                 @Override
                 public void onTrustResult(TrustProviderInterface provider, String authType, TrustResult result) {
                 }
@@ -889,19 +940,19 @@ public abstract class SimpleFTP {
 
     protected boolean PBSZ(final int size) throws IOException {
         sendLine("PBSZ " + size);
-        final String response = readLines(new int[] { 200, 500, 502 }, "PBSZ " + size + " failed");
+        final String response = readLines(RESPONSE_CODE.codes(RESPONSE_CODE.OK_200, RESPONSE_CODE.FAILED_500, RESPONSE_CODE.FAILED_502), "PBSZ " + size + " failed");
         return StringUtils.startsWithCaseInsensitive(response, "200");
     }
 
     protected boolean PROT(final boolean privateFlag) throws IOException {
         sendLine(privateFlag ? "PROT P" : "PROT C");
-        final String response = readLines(new int[] { 200, 500, 502 }, privateFlag ? "PROT P" : "PROT C");
+        final String response = readLines(RESPONSE_CODE.codes(RESPONSE_CODE.OK_200, RESPONSE_CODE.FAILED_500, RESPONSE_CODE.FAILED_502), privateFlag ? "PROT P" : "PROT C");
         return StringUtils.startsWithCaseInsensitive(response, "200");
     }
 
     public boolean sendClientID(final String id) throws IOException {
         sendLine("CLNT " + id);
-        final String response = readLines(new int[] { 200, 500, 502 }, "CNLT failed");
+        final String response = readLines(RESPONSE_CODE.codes(RESPONSE_CODE.OK_200, RESPONSE_CODE.FAILED_500, RESPONSE_CODE.FAILED_502), "CNLT failed");
         return StringUtils.startsWithCaseInsensitive(response, "200");
     }
 
@@ -918,7 +969,7 @@ public abstract class SimpleFTP {
         } else {
             sendLine("OPTS UTF8 OFF");
         }
-        final String response = readLines(new int[] { 200, 500, 501, 502 }, "UTF8 not supported");
+        final String response = readLines(RESPONSE_CODE.codes(RESPONSE_CODE.OK_200, RESPONSE_CODE.FAILED_500, RESPONSE_CODE.FAILED_501, RESPONSE_CODE.FAILED_502), "UTF8 not supported");
         final boolean ret = StringUtils.startsWithCaseInsensitive(response, "200");
         isUTF8Enabled = ret && on;
         return ret;
@@ -969,7 +1020,7 @@ public abstract class SimpleFTP {
                 }
             }
             if (error && !multilineResponse) {
-                if (!errormsg.endsWith(" ")) {
+                if (errormsg != null && !errormsg.endsWith(" ")) {
                     sb.insert(0, ' ');
                 }
                 throw new IOException((errormsg != null ? errormsg : "revieved unexpected responsecode ") + sb.toString());
@@ -981,7 +1032,7 @@ public abstract class SimpleFTP {
         sendLine(getPathEncoding(), "SIZE " + filePath);
         String size = null;
         try {
-            size = readLines(new int[] { 200, 213 }, "SIZE failed");
+            size = readLines(RESPONSE_CODE.codes(RESPONSE_CODE.OK_200, RESPONSE_CODE.OK_FILE_STATUS_213), "SIZE failed");
         } catch (IOException e) {
             if (e.getMessage().contains("SIZE") || e.getMessage().contains("550")) {
                 // SIZE failed 550 /path.....: not a regular file
@@ -999,7 +1050,7 @@ public abstract class SimpleFTP {
         sendLine(getPathEncoding(), "MDTM " + filePath);
         String modTime = null;
         try {
-            modTime = readLines(new int[] { 213 }, "MDTM failed");
+            modTime = readLines(RESPONSE_CODE.codes(RESPONSE_CODE.OK_FILE_STATUS_213), "MDTM failed");
         } catch (IOException e) {
             if (e.getMessage().contains("MDTM") || e.getMessage().contains("550")) {
                 // 550 /path.....: not a regular file

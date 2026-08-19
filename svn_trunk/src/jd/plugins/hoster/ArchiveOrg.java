@@ -37,7 +37,6 @@ import javax.crypto.spec.SecretKeySpec;
 import javax.imageio.ImageIO;
 
 import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Hash;
 import org.appwork.utils.Regex;
@@ -65,6 +64,7 @@ import jd.http.Browser;
 import jd.http.Cookie;
 import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
+import jd.http.requests.PostRequest;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
@@ -81,7 +81,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.ArchiveOrgCrawler;
 
-@HostPlugin(revision = "$Revision: 53061 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
+@HostPlugin(revision = "$Revision: 53162 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
 public class ArchiveOrg extends PluginForHost {
     public ArchiveOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -827,20 +827,22 @@ public class ArchiveOrg extends PluginForHost {
                 br.clearCookies(null);
             }
             logger.info("Performing full login");
-            br.getPage("https://" + this.getHost() + "/account/login");
+            br.getPage("https://" + this.getHost() + "/login");
             /* Step 1: Obtain login token */
             final Browser brc = br.cloneBrowser();
-            brc.getPage("https://" + this.getHost() + "/services/account/login/");
+            brc.getPage("https://" + this.getHost() + "/services/csrf-token");
             final Map<String, Object> resp = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
             final Map<String, Object> resp_value = (Map<String, Object>) resp.get("value");
             final String logintoken = resp_value.get("token").toString();
-            Map<String, Object> data = new HashMap<String, Object>();
+            final Map<String, Object> data = new HashMap<String, Object>();
             data.put("username", account.getUser());
             data.put("password", account.getPass());
             data.put("remember", "true");
             data.put("t", logintoken);
             /* Step 2: Login */
-            brc.postPageRaw("/services/account/login/", JSonStorage.serializeToJson(data));
+            final PostRequest request = brc.createJSonPostRequest("/services/account/login/", data);
+            request.getHeaders().put("x-csrf-token", logintoken);
+            brc.getPage(request);
             final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
             if (!Boolean.TRUE.equals(entries.get("success"))) {
                 throw new AccountInvalidException((String) entries.get("error"));

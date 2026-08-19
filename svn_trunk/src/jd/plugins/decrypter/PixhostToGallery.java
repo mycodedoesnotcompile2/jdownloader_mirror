@@ -18,6 +18,7 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -28,8 +29,6 @@ import jd.parser.Regex;
 import jd.parser.html.HTMLParser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
-import jd.plugins.DecrypterRetryException;
-import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
@@ -39,7 +38,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.PixhostTo;
 
-@DecrypterPlugin(revision = "$Revision: 53042 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53159 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PixhostTo.class })
 public class PixhostToGallery extends PluginForDecrypt {
     public PixhostToGallery(PluginWrapper wrapper) {
@@ -86,13 +85,18 @@ public class PixhostToGallery extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String galleryID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
-        br.getPage("https://" + getHost() + "/gallery/" + galleryID);
+        String fullGalleryURL = "https://" + getHost() + "/gallery/" + galleryID;
+        br.getPage(fullGalleryURL);
+        if (PixhostToGallery.isCountryBlocked(br) && !StringUtils.containsIgnoreCase(fullGalleryURL, "/workingproxy.link/")) {
+            fullGalleryURL = fullGalleryURL.replaceFirst("(?i)(https://.*?/)", "https://workingproxy.link/");
+            br.getPage(fullGalleryURL);
+        }
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML(">\\s*Gallery doesn't exist")) {
+        } else if (br.containsHTML(">\\s*Picture doesn\\'t exist")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (isCountryBlocked(br)) {
-            throw new DecrypterRetryException(RetryReason.GEO);
+        } else if (PixhostToGallery.isCountryBlocked(br)) {
+            throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "GEO blocked");
         }
         String galleryTitle = br.getRegex("<h2>\\s*([^<]+)\\s*</h2>").getMatch(0);
         if (galleryTitle == null) {

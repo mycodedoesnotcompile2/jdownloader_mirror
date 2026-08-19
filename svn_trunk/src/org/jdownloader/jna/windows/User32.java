@@ -1,18 +1,11 @@
 package org.jdownloader.jna.windows;
 
-import java.util.HashMap;
+import org.appwork.jna.windows.JNAOptions;
 
 import com.sun.jna.Pointer;
-import com.sun.jna.win32.W32APIFunctionMapper;
-import com.sun.jna.win32.W32APITypeMapper;
 
 public interface User32 extends com.sun.jna.platform.win32.User32 {
-    public User32 INSTANCE = com.sun.jna.Native.load("user32", User32.class, new HashMap<String, Object>() {
-                               {
-                                   put(OPTION_TYPE_MAPPER, W32APITypeMapper.UNICODE);
-                                   put(OPTION_FUNCTION_MAPPER, W32APIFunctionMapper.UNICODE);
-                               }
-                           });
+    public User32 INSTANCE = com.sun.jna.Native.load("user32", User32.class, JNAOptions.SYSTEM_DLLS_ONLY);
 
     /**
      * Requires win 2000+

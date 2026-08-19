@@ -93,7 +93,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 53123 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53159 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -4772,6 +4772,10 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         // XFileSharingPro Version 4 has broken tag, <span class="text-body"Premium account expire</span>
         // filesfly.cc -> <td>Premium expiration</td><td>2025-XX-XX XX:XX:XX</td>
         expireStr = new Regex(getCorrectBR(br), "(?:>\\s*|<span[^>]*)Premium\\s*(?:account expire|until|expiration):?\\s*</(?:span|td)>\\s*[^>]*>([\\d]+-[\\w{2}]+-[\\d]+\\s[\\d:]+)</").getMatch(0);
+        if (expireStr == null) {
+            // upload-4ever.com -> <span>Premium until <b>2026-XX-XX XX:XX:XX</b></span>
+            expireStr = new Regex(getCorrectBR(br), "(?:>\\s*|<span[^>]*)Premium\\s*(?:account expire|until|expiration):?\\s*[^>]*>([\\d]+-[\\w{2}]+-[\\d]+\\s[\\d:]+)</").getMatch(0);
+        }
         if (expireStr != null) {
             /**
              * e.g. kenfiles.com

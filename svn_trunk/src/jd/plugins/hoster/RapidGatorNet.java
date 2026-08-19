@@ -87,7 +87,7 @@ import jd.plugins.PluginConfigPanelNG;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53114 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53165 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -903,13 +903,32 @@ public class RapidGatorNet extends PluginForHost {
         }
     }
 
+    /* Maps an account to the timestamp at which the website login was last disabled because of a captcha and/or 2fa requirement. */
+    protected static WeakHashMap<Account, Long> SKIP_WEBSITE_INFO_FOR_API      = new WeakHashMap<Account, Long>();
+    /* Duration for which the website login stays disabled after a captcha and/or 2fa requirement was encountered: 7 days. */
+    protected static final long                 SKIP_WEBSITE_INFO_FOR_API_TIME = 7 * 24 * 60 * 60 * 1000l;
+    private final ThreadLocal<Boolean>          fetchAccountInfoAPI            = new ThreadLocal<Boolean>();
+
     public AccountInfo fetchAccountInfoAPI(final Account account) throws Exception {
         synchronized (account) {
             final Map<String, Object> responsemap = loginAPI(account);
             final AccountInfo ai = parseAPIAccountInfo(account, responsemap, new AccountInfo());
+            synchronized (SKIP_WEBSITE_INFO_FOR_API) {
+                final Long skipTimestamp = SKIP_WEBSITE_INFO_FOR_API.get(account);
+                if (skipTimestamp != null) {
+                    final long elapsed = System.currentTimeMillis() - skipTimestamp.longValue();
+                    if (elapsed < SKIP_WEBSITE_INFO_FOR_API_TIME) {
+                        // skip fetchAccountInfoWebsite because a captcha and/or 2fa was required within the last 7 days
+                        final long remaining = SKIP_WEBSITE_INFO_FOR_API_TIME - elapsed;
+                        logger.info("Skipping fetchAccountInfoWebsite because a captcha and/or 2fa was required " + TimeFormatter.formatMilliSeconds(elapsed, 0) + " ago | Website login will remain skipped for " + TimeFormatter.formatMilliSeconds(remaining, 0));
+                        return ai;
+                    }
+                }
+            }
             /* Remember the account type the API determined as parseAPIAccountInfo/fetchAccountInfoWebsite change it as a side effect. */
             final AccountType accountTypeAPI = account.getType();
             try {
+                fetchAccountInfoAPI.set(true);
                 /*
                  * Solo subscriptions can only be found via website mode -> Additionally run the website account check so users get this
                  * information (e.g. solo subscription traffic/expire date) even when using API mode.
@@ -923,11 +942,24 @@ public class RapidGatorNet extends PluginForHost {
                     /* Both modes agree on the account type -> Prefer the website result as it contains additional information. */
                     return aiWebsite;
                 }
+            } catch (final PluginException e) {
+                if (e.getLinkStatus() == LinkStatus.ERROR_CAPTCHA) {
+                    synchronized (SKIP_WEBSITE_INFO_FOR_API) {
+                        // skip fetchAccountInfoWebsite for the next 7 days because a captcha and/or 2fa is required
+                        SKIP_WEBSITE_INFO_FOR_API.put(account, Long.valueOf(System.currentTimeMillis()));
+                    }
+                }
+                /* Website account check failed for whatever reason -> Fall back to the API-only result. */
+                logger.log(e);
+                account.setType(accountTypeAPI);
+                return ai;
             } catch (final Exception e) {
                 /* Website account check failed for whatever reason -> Fall back to the API-only result. */
                 logger.log(e);
                 account.setType(accountTypeAPI);
                 return ai;
+            } finally {
+                fetchAccountInfoAPI.set(false);
             }
         }
     }
@@ -1285,11 +1317,17 @@ public class RapidGatorNet extends PluginForHost {
                 loginform.put("LoginForm%5Bemail%5D", Encoding.urlEncode(account.getUser()));
                 loginform.put("LoginForm%5Bpassword%5D", Encoding.urlEncode(account.getPass()));
                 if (captcha_url != null) {
+                    if (Boolean.TRUE.equals(fetchAccountInfoAPI.get())) {
+                        throw new PluginException(LinkStatus.ERROR_CAPTCHA, "skip loginWebsite in fetchAccountInfoAPI");
+                    }
                     /* Old image based login-captcha */
                     final DownloadLink dummyLink = new DownloadLink(this, "Account", this.getHost(), "https://" + this.getHost(), true);
                     final String code = getCaptchaCode(captcha_url, dummyLink);
                     loginform.put(captcha_field_key, Encoding.urlEncode(code));
                 } else if (requiresLoginCaptchaCloudflareTurnstile) {
+                    if (Boolean.TRUE.equals(fetchAccountInfoAPI.get())) {
+                        throw new PluginException(LinkStatus.ERROR_CAPTCHA, "skip loginWebsite in fetchAccountInfoAPI");
+                    }
                     /* 2026-07: New interactive login captcha */
                     final String cfTurnstileResponse = new CaptchaHelperHostPluginCloudflareTurnstile(this, br).getToken();
                     loginform.put(captcha_field_key, Encoding.urlEncode(cfTurnstileResponse));
@@ -1297,6 +1335,9 @@ public class RapidGatorNet extends PluginForHost {
                 }
                 if (accountRequires2FALoginCode) {
                     logger.info("2FA code required");
+                    if (Boolean.TRUE.equals(fetchAccountInfoAPI.get())) {
+                        throw new PluginException(LinkStatus.ERROR_CAPTCHA, "skip loginWebsite in fetchAccountInfoAPI");
+                    }
                     final String twoFACode = this.getTwoFACode(account, "\\d{6}");
                     loginform.put(two_fa_login_field_key, twoFACode);
                 }
@@ -1339,6 +1380,9 @@ public class RapidGatorNet extends PluginForHost {
             if (!loginSuccess) {
                 /* Login failed -> Check why */
                 if (accountRequires2FALoginCode) {
+                    if (Boolean.TRUE.equals(fetchAccountInfoAPI.get())) {
+                        throw new PluginException(LinkStatus.ERROR_CAPTCHA, "skip loginWebsite in fetchAccountInfoAPI");
+                    }
                     /*
                      * 2FA login is only requested if credentials are valid -> Assume that we got valid login credentials but invalid 2FA
                      * code

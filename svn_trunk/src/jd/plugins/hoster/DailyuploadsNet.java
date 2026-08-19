@@ -18,6 +18,8 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.html.Form;
@@ -26,9 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 53152 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53165 $", interfaceVersion = 3, names = {}, urls = {})
 public class DailyuploadsNet extends XFileSharingProBasic {
     public DailyuploadsNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -45,8 +45,15 @@ public class DailyuploadsNet extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "dailyuploads.net", "dailyuploads.cc", "dailyuploads.im", "dailyuploads.in" });
+        ret.add(new String[] { "dailyuploads.net", "dailyuploads.cc", "dailyuploads.im", "dailyuploads.in", "dailyuploads.io" });
         return ret;
+    }
+
+    @Override
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("dailyuploads.in"); // 2026-08-12
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {
