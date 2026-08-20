@@ -18,6 +18,7 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
 import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
@@ -37,7 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.EmloadCom;
 
-@DecrypterPlugin(revision = "$Revision: 50881 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53175 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { EmloadCom.class })
 public class EmloadComFolder extends antiDDoSForDecrypt {
     public EmloadComFolder(PluginWrapper wrapper) {
@@ -47,6 +48,7 @@ public class EmloadComFolder extends antiDDoSForDecrypt {
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
+        br.setIPVersion(IPVERSION.IPV4_IPV6);// website IPv6 but download server is IPv4 -> 401 Unauthorized
         br.setFollowRedirects(true);
         return br;
     }

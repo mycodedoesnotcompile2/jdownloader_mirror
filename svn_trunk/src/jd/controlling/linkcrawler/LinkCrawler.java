@@ -763,16 +763,6 @@ public class LinkCrawler {
                 if ((innerTask = checkStartNotify(generation, task.getTaskID() + "|crawlTextPool")) != null) {
                     threadPool.execute(new LinkCrawlerRunnable(LinkCrawler.this, generation, innerTask) {
                         @Override
-                        public long getAverageRuntime() {
-                            final Long ret = getDefaultAverageRuntime();
-                            if (ret != null) {
-                                return ret;
-                            } else {
-                                return super.getAverageRuntime();
-                            }
-                        }
-
-                        @Override
                         void crawling() {
                             final java.util.List<CrawledLink> links = find(generation, null, text, url, allowDeep, true);
                             crawl(generation, links);
@@ -939,16 +929,6 @@ public class LinkCrawler {
                 final LinkCrawlerTask innerTask;
                 if ((innerTask = checkStartNotify(generation, task.getTaskID() + "|crawlLinksPool")) != null) {
                     threadPool.execute(new LinkCrawlerRunnable(LinkCrawler.this, generation, innerTask) {
-                        @Override
-                        public long getAverageRuntime() {
-                            final Long ret = getDefaultAverageRuntime();
-                            if (ret != null) {
-                                return ret;
-                            } else {
-                                return super.getAverageRuntime();
-                            }
-                        }
-
                         @Override
                         void crawling() {
                             distribute(generation, possibleCryptedLinks);
@@ -1904,10 +1884,9 @@ public class LinkCrawler {
                         public long getAverageRuntime() {
                             final Long ret = getDefaultAverageRuntime();
                             if (ret != null) {
-                                return ret;
-                            } else {
-                                return pluginForHost.getAverageParseRuntime();
+                                return ret.longValue();
                             }
+                            return pluginForHost.getAverageParseRuntime();
                         }
 
                         @Override
@@ -1996,10 +1975,9 @@ public class LinkCrawler {
                             public long getAverageRuntime() {
                                 final Long ret = getDefaultAverageRuntime();
                                 if (ret != null) {
-                                    return ret;
-                                } else {
-                                    return pDecrypt.getAverageCrawlRuntime();
+                                    return ret.longValue();
                                 }
+                                return pDecrypt.getAverageCrawlRuntime();
                             }
 
                             @Override
@@ -2089,16 +2067,6 @@ public class LinkCrawler {
                     }
                     threadPool.execute(new LinkCrawlerRunnable(LinkCrawler.this, generation, innerTask) {
                         @Override
-                        public long getAverageRuntime() {
-                            final Long ret = getDefaultAverageRuntime();
-                            if (ret != null) {
-                                return ret;
-                            } else {
-                                return super.getAverageRuntime();
-                            }
-                        }
-
-                        @Override
                         void crawling() {
                             container(generation, pluginC, decryptThis);
                         }
@@ -2134,16 +2102,6 @@ public class LinkCrawler {
                         return DISTRIBUTE.NEXT;
                     } else if ((innerTask = checkStartNotify(generation, "rewritePool:" + source.getURL() + "|" + rewritten.getURL())) != null) {
                         threadPool.execute(new LinkCrawlerRunnable(LinkCrawler.this, generation, innerTask) {
-                            @Override
-                            public long getAverageRuntime() {
-                                final Long ret = getDefaultAverageRuntime();
-                                if (ret != null) {
-                                    return ret;
-                                } else {
-                                    return super.getAverageRuntime();
-                                }
-                            }
-
                             @Override
                             void crawling() {
                                 distribute(generation, rewritten);
@@ -2182,16 +2140,6 @@ public class LinkCrawler {
                         return false;
                     }
                     threadPool.execute(new LinkCrawlerRunnable(LinkCrawler.this, generation, innerTask) {
-                        @Override
-                        public long getAverageRuntime() {
-                            final Long ret = getDefaultAverageRuntime();
-                            if (ret != null) {
-                                return ret;
-                            } else {
-                                return super.getAverageRuntime();
-                            }
-                        }
-
                         @Override
                         void crawling() {
                             crawlDeeperOrMatchingRule(generation, link);
@@ -3153,10 +3101,14 @@ public class LinkCrawler {
             next = current.getSourceLink();
             final String currentURL = cleanURL(current.getURL());
             if (currentURL != null) {
+                // The topmost link (no further source link) is the user-facing origin URL that the
+                // LinkCrawlerRule matched. Always keep it, so source based filter/packagizer rules can
+                // still match it even when a matching rule collapsed the intermediate redirect hops.
+                final boolean isOriginURL = next == null;
                 if (sources.size() == 0) {
                     sources.add(currentURL);
                 } else {
-                    if (current.getMatchingRule() == null || current.getMatchingRule() != previous.getMatchingRule()) {
+                    if (isOriginURL || current.getMatchingRule() == null || current.getMatchingRule() != previous.getMatchingRule()) {
                         final String previousURL = sources.get(sources.size() - 1);
                         if (!StringUtils.equals(currentURL, previousURL)) {
                             sources.add(0, currentURL);
@@ -3645,16 +3597,6 @@ public class LinkCrawler {
                         /* enqueue distributing of the links */
                         threadPool.execute(new LinkCrawlerRunnable(LinkCrawler.this, generation, innerTask) {
                             @Override
-                            public long getAverageRuntime() {
-                                final Long ret = getDefaultAverageRuntime();
-                                if (ret != null) {
-                                    return ret;
-                                } else {
-                                    return super.getAverageRuntime();
-                                }
-                            }
-
-                            @Override
                             void crawling() {
                                 LinkCrawler.this.distribute(generation, decryptedPossibleLinks);
                             }
@@ -3797,16 +3739,6 @@ public class LinkCrawler {
                                 /* enqueue distributing of the links */
                                 threadPool.execute(new LinkCrawlerRunnable(LinkCrawler.this, generation, innerTask) {
                                     @Override
-                                    public long getAverageRuntime() {
-                                        final Long ret = getDefaultAverageRuntime();
-                                        if (ret != null) {
-                                            return ret;
-                                        } else {
-                                            return super.getAverageRuntime();
-                                        }
-                                    }
-
-                                    @Override
                                     void crawling() {
                                         nextLinkCrawler.get().distribute(generation, linksToDistribute);
                                     }
@@ -3890,16 +3822,6 @@ public class LinkCrawler {
                             if ((innerTask = checkStartNotify(generation, task.getTaskID() + "|crawlPool(2)")) != null) {
                                 /* enqueue distributing of the links */
                                 threadPool.execute(new LinkCrawlerRunnable(LinkCrawler.this, generation, innerTask) {
-                                    @Override
-                                    public long getAverageRuntime() {
-                                        final Long ret = getDefaultAverageRuntime();
-                                        if (ret != null) {
-                                            return ret;
-                                        } else {
-                                            return super.getAverageRuntime();
-                                        }
-                                    }
-
                                     @Override
                                     void crawling() {
                                         nextLinkCrawler.get().distribute(generation, possibleCryptedLinks);
@@ -4032,8 +3954,11 @@ public class LinkCrawler {
 
     private String getContentURL(final CrawledLink link) {
         final DownloadLink downloadLink = link.getDownloadLink();
+        if (downloadLink == null) {
+            return null;
+        }
         final PluginForHost plugin = downloadLink.getDefaultPlugin();
-        if (downloadLink == null || plugin == null) {
+        if (plugin == null) {
             return null;
         }
         final String pluginURL = downloadLink.getPluginPatternMatcher();

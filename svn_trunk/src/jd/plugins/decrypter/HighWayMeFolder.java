@@ -35,7 +35,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.hoster.HighWayCore;
 import jd.plugins.hoster.HighWayMe2;
 
-@DecrypterPlugin(revision = "$Revision: 48920 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53170 $", interfaceVersion = 3, names = {}, urls = {})
 public class HighWayMeFolder extends GenericHTTPDirectoryIndexCrawler {
     public HighWayMeFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -151,34 +151,41 @@ public class HighWayMeFolder extends GenericHTTPDirectoryIndexCrawler {
         String path = super.getCurrentDirectoryPath(br);
         if (path == null) {
             return null;
-        } else {
-            /* Remove internal base path as it's not required for the user. */
-            final String removeThis1 = new Regex(path, "(?i)^(/torrent/([a-f0-9]{40}|[a-f0-9]{64}))/").getMatch(0);
-            if (removeThis1 != null) {
-                path = path.replaceFirst(Pattern.quote(removeThis1), "");
-            }
-            final String removeThis2 = new Regex(path, "(?i)^(/usenet/(incomplete/)?[^/]+)/").getMatch(0);
-            if (removeThis2 != null) {
-                path = path.replaceFirst(Pattern.quote(removeThis2), "");
-            }
-            final String rootFolderName;
-            if (betterRootFolderName != null) {
-                rootFolderName = betterRootFolderName;
-            } else {
-                rootFolderName = new Regex(br.getURL(), "/dl(?:u|t|[0-9]+)/([a-z0-9]+)").getMatch(0);
-            }
-            if (path.equals("/")) {
-                return rootFolderName;
-            }
-            if (rootFolderName != null && !path.startsWith(rootFolderName) && !path.startsWith("/" + rootFolderName)) {
-                if (path.startsWith("/")) {
-                    path = rootFolderName + path;
-                } else {
-                    path = rootFolderName + "/" + path;
-                }
-            }
-            return path;
         }
+        /* Remove internal base path as it's not required for the user. */
+        final String removeThis1 = new Regex(path, "(?i)^(/torrent/([a-f0-9]{40}|[a-f0-9]{64}))/").getMatch(0);
+        if (removeThis1 != null) {
+            path = path.replaceFirst(Pattern.quote(removeThis1), "");
+        }
+        final String removeThis2 = new Regex(path, "(?i)^(/usenet/(incomplete/)?[^/]+)/").getMatch(0);
+        if (removeThis2 != null) {
+            path = path.replaceFirst(Pattern.quote(removeThis2), "");
+        }
+        final String removeThis3 = new Regex(path, "(?i)^(/torrent/)").getMatch(0);
+        if (removeThis3 != null) {
+            path = path.replaceFirst(Pattern.quote(removeThis3), "");
+        }
+        final String removeThis4 = new Regex(path, "(?i)^(/usenet/)").getMatch(0);
+        if (removeThis4 != null) {
+            path = path.replaceFirst(Pattern.quote(removeThis4), "");
+        }
+        final String rootFolderName;
+        if (betterRootFolderName != null) {
+            rootFolderName = betterRootFolderName;
+        } else {
+            rootFolderName = new Regex(br.getURL(), "/dl(?:u|t|[0-9]+)/([a-z0-9]+)").getMatch(0);
+        }
+        if (path.equals("/")) {
+            return rootFolderName;
+        }
+        if (rootFolderName != null && !path.startsWith(rootFolderName) && !path.startsWith("/" + rootFolderName)) {
+            if (path.startsWith("/")) {
+                path = rootFolderName + path;
+            } else {
+                path = rootFolderName + "/" + path;
+            }
+        }
+        return path;
     }
 
     @Override

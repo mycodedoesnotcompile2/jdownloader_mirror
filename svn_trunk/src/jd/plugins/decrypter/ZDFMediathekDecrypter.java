@@ -68,7 +68,7 @@ import jd.plugins.hoster.ZdfDeMediathek;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface.SubtitleType;
 
-@DecrypterPlugin(revision = "$Revision: 53111 $", interfaceVersion = 3, names = { "zdf.de", "logo.de", "zdfheute.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?logo\\.de/.+", "https?://(?:www\\.)?zdfheute\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
+@DecrypterPlugin(revision = "$Revision: 53168 $", interfaceVersion = 3, names = { "zdf.de", "logo.de", "zdfheute.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?logo\\.de/.+", "https?://(?:www\\.)?zdfheute\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
 public class ZDFMediathekDecrypter extends PluginForDecrypt {
     private boolean                          fastlinkcheck             = false;
     private final String                     TYPE_ZDF                  = "(?i)https?://(?:www\\.)?(?:zdf\\.de|3sat\\.de)/.+";
@@ -764,7 +764,7 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         /* Persisted-query extensions are constant across all pages. */
         final Map<String, Object> persistedQuery = new HashMap<String, Object>();
         persistedQuery.put("version", 1);
-        persistedQuery.put("sha256Hash", "9412a0f4ac55dc37d46975d461ec64bfd14380d815df843a1492348f77b5c99a");
+        persistedQuery.put("sha256Hash", "81237cafa2f0176d351b21bff20cdcb5e5755092a0bd42d7271018c5440a4493");
         final Map<String, Object> extensions = new HashMap<String, Object>();
         extensions.put("persistedQuery", persistedQuery);
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
@@ -779,13 +779,14 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
             variables.put("seasonIndex", 0);
             variables.put("episodesPageSize", 24);
             variables.put("canonical", seriesSlug);
-            final Map<String, Object> filterBy = new HashMap<String, Object>();
-            filterBy.put("idIn", Arrays.asList(seasonID));
-            variables.put("filterBy", filterBy);
+            /* Variable names must match the current query: seasonFilterBy (which season) and episodesSortBy (episode order). */
+            final Map<String, Object> seasonFilterBy = new HashMap<String, Object>();
+            seasonFilterBy.put("idIn", Arrays.asList(seasonID));
+            variables.put("seasonFilterBy", seasonFilterBy);
             final Map<String, Object> sortEntry = new HashMap<String, Object>();
             sortEntry.put("field", "EPISODE_NUMBER");
             sortEntry.put("direction", "ASC");
-            variables.put("sortBy", Arrays.asList(sortEntry));
+            variables.put("episodesSortBy", Arrays.asList(sortEntry));
             if (episodesAfter != null) {
                 variables.put("episodesAfter", episodesAfter);
             }

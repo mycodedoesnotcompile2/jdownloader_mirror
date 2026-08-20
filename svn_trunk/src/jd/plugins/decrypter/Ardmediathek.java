@@ -75,7 +75,7 @@ import jd.plugins.components.MediathekHelper;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.ARDMediathek;
 
-@DecrypterPlugin(revision = "$Revision: 52577 $", interfaceVersion = 3, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "https?://(?:\\w+\\.)?ardmediathek\\.de/.+", "https?://(?:\\w+\\.)?daserste\\.de/.*?\\.html", "https?://(?:www\\.)?sandmann\\.de/.+", "https?://(?:\\w+\\.)?wdr\\.de/[^<>\"]+\\.html|https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js", "https?://(?:\\w+\\.)?sportschau\\.de/.*?\\.html", "https?://(?:\\w+\\.)?wdrmaus\\.de/.+", "https?://(?:\\w+\\.)?eurovision\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?sputnik\\.de/[^<>\"]+\\.html", "https?://(?:www\\.)?mdr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?ndr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?tagesschau\\.de/[^<>\"]+\\.html" })
+@DecrypterPlugin(revision = "$Revision: 53175 $", interfaceVersion = 3, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "https?://(?:\\w+\\.)?ardmediathek\\.de/.+", "https?://(?:\\w+\\.)?daserste\\.de/.*?\\.html", "https?://(?:www\\.)?sandmann\\.de/.+", "https?://(?:\\w+\\.)?wdr\\.de/[^<>\"]+\\.html|https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js", "https?://(?:\\w+\\.)?sportschau\\.de/.*?\\.html", "https?://(?:\\w+\\.)?wdrmaus\\.de/.+", "https?://(?:\\w+\\.)?eurovision\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?sputnik\\.de/[^<>\"]+\\.html", "https?://(?:www\\.)?mdr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?ndr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?tagesschau\\.de/[^<>\"]+\\.html" })
 public class Ardmediathek extends PluginForDecrypt {
     /* Constants */
     private static final String  type_embedded                          = "(?i)https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js";
@@ -651,9 +651,6 @@ public class Ardmediathek extends PluginForDecrypt {
                     continue;
                 }
                 VideoResolution resolution = null;
-                if (heightO != null && heightO.intValue() > maxHeightProgressive) {
-                    maxHeightProgressive = heightO.intValue();
-                }
                 if (widthO != null && heightO != null) {
                     resolution = VideoResolution.getByWidth(widthO.intValue());
                     if (resolution == null) {
@@ -662,10 +659,13 @@ public class Ardmediathek extends PluginForDecrypt {
                 }
                 if (resolution == null) {
                     resolution = VideoResolution.getByURL(url);
+                    if (resolution == null) {
+                        logger.warning("Skipping unknown resolution for URL: " + url);
+                        continue;
+                    }
                 }
-                if (resolution == null) {
-                    logger.warning("Skipping unknown resolution for URL: " + url);
-                    continue;
+                if (heightO != null && heightO.intValue() > maxHeightProgressive) {
+                    maxHeightProgressive = heightO.intValue();
                 }
                 final DownloadLink download = addQuality(param, metadata, foundQualitiesMap, url, null, -1, resolution, kind, audioLanguageCode);
                 results.add(download);
@@ -1883,7 +1883,8 @@ public class Ardmediathek extends PluginForDecrypt {
             }
         }
         final String qualityStringForQualitySelection = getQualityIdentifier(directurl, resolution, bitrate);
-        final DownloadLink link = createDownloadlink(directurl.replaceAll("https?://", getHost() + "decrypted://"));
+        final DownloadLink link = createDownloadlink(directurl.replaceAll("^(https?://|//)", getHost() + "decrypted://"));
+        System.out.println(link.getPluginPatternMatcher());
         final MediathekProperties data = link.bindData(MediathekProperties.class);
         data.setTitle(metadata.getTitle());
         data.setSourceHost(getHost());
@@ -2026,7 +2027,7 @@ public class Ardmediathek extends PluginForDecrypt {
             final Entry<String, DownloadLink> entry = it.next();
             final DownloadLink dl = entry.getValue();
             if (cfg.isGrabSubtitleEnabled() && !StringUtils.isEmpty(captionsURL)) {
-                final DownloadLink subtitle = createDownloadlink(captionsURL.replaceAll("https?://", getHost() + "decrypted://"));
+                final DownloadLink subtitle = createDownloadlink(captionsURL.replaceAll("^(https?://|//)", getHost() + "decrypted://"));
                 final MediathekProperties data_src = dl.bindData(MediathekProperties.class);
                 final MediathekProperties data_subtitle = subtitle.bindData(MediathekProperties.class);
                 data_subtitle.setStreamingType("subtitle_" + captionsExt);

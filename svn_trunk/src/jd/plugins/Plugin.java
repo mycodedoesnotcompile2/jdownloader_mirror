@@ -620,6 +620,10 @@ public abstract class Plugin implements ActionListener {
         }
     }
 
+    protected String fixUglyFilename(final String filenameArg, String newExtension) {
+        return filenameArg.replaceFirst("(?i)" + Pattern.quote(newExtension.replace(".", "")) + "$", "").trim();
+    }
+
     public String correctOrApplyFileNameExtension(final String filenameArg, String newExtension, URLConnectionAdapter connection) {
         final String newExtensionParam = newExtension;
         if (connection != null) {
@@ -645,7 +649,7 @@ public abstract class Plugin implements ActionListener {
         }
         final CompiledFiletypeExtension filetypeNew = CompiledFiletypeFilter.getExtensionsFilterInterface(newExtension);
         /* Fix ugly filenames that e.-g. end with " mp4" */
-        String filename = filenameArg.replaceFirst("(?i)" + Pattern.quote(newExtension.replace(".", "")) + "$", "").trim();
+        String filename = fixUglyFilename(filenameArg, newExtension);
         if (false && filename.equals(filenameArg) && filetypeNew != null) {
             // currently disabled to avoid any side effects
             for (int length = 4; length >= 1; length--) {
@@ -752,7 +756,7 @@ public abstract class Plugin implements ActionListener {
         }
         final CompiledFiletypeExtension filetypeNew = CompiledFiletypeFilter.getExtensionsFilterInterface(newExtension);
         /* Fix ugly filenames that e.-g. end with " mp4" */
-        String filename = filenameArg.replaceFirst("(?i)" + Pattern.quote(newExtension.replace(".", "")) + "$", "").trim();
+        String filename = fixUglyFilename(filenameArg, newExtension);
         if (false && filename.equals(filenameArg) && filetypeNew != null) {
             // currently disabled to avoid any side effects
             for (int length = 4; length >= 1; length--) {

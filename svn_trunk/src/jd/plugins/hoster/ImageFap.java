@@ -21,15 +21,16 @@ import java.net.URL;
 import java.text.DecimalFormat;
 import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
@@ -61,7 +62,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.ImageFapCrawler;
 
-@HostPlugin(revision = "$Revision: 53026 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53175 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { ImageFapCrawler.class })
 public class ImageFap extends PluginForHost {
     public ImageFap(final PluginWrapper wrapper) {
@@ -465,77 +466,33 @@ public class ImageFap extends PluginForHost {
              * .js,jquery.validate.js,tools.js,jquery.rating.js,jquery.tools.overlay.js,jquery.tools.toolbox.expose.js, 019ce
              * .js,gallerificPlus.js,gallery.js,tools.comments.js,adsmanager.js,facets.js,12403.js
              */
-            final int totalNumberofItems = Integer.parseInt(totalNumberofItemsStr);
-            final int idx = Integer.parseInt(idxStr);
-            final int imageOffset = idx % 8;
-            final String photoAlbumID = link.getStringProperty(PROPERTY_ALBUM_ID);
-            final int photoIndex = link.getIntegerProperty(PROPERTY_PHOTO_INDEX, -1);
-            final int startIndex = photoIndex - 16 - (photoIndex % 8);
-            int endIndex = startIndex + 23;
-            if (endIndex > totalNumberofItems) {
-                endIndex = totalNumberofItems;
-            }
             final String imageID = this.getContentID(link);
-            if (photoIndex < idx || photoIndex > endIndex) {
-                /*
-                 * The image we are looking for is out of bounds of what is in our current html -> Async load the page which contains the
-                 * items we want and grab the correct final URL by the images' index.
-                 */
+            {
+                List<String> fullImageLinksWithoutDuplicates = new ArrayList<String>(new LinkedHashSet<String>(Arrays.asList(br.getRegex("(https?://[^/]+/images/full/[^\"]+)").getColumn(0))));
+                for (final String fullImageLink : fullImageLinksWithoutDuplicates) {
+                    if (fullImageLink.contains(imageID)) {
+                        /* Safe hit */
+                        return fullImageLink;
+                    }
+                }
                 final UrlQuery query = new UrlQuery();
+                final String photoAlbumID = link.getStringProperty(PROPERTY_ALBUM_ID);
+                final int photoIndex = link.getIntegerProperty(PROPERTY_PHOTO_INDEX, -1);
+                final int startIndex = photoIndex - 16 - (photoIndex % 8);
                 query.add("gid", photoAlbumID);
                 query.add("idx", Integer.toString(startIndex));
                 query.add("partial", "true");
                 final String asyncloadurl = "/photo/" + imageID + "/?" + query.toString();
                 br.getPage(asyncloadurl);
-            }
-            final String[] fullImageLinks = br.getRegex("(https?://[^/]+/images/full/[^\"]+)").getColumn(0);
-            final ArrayList<String> fullImageLinksWithoutDuplicates = new ArrayList<String>();
-            String fullsizeUrl = null;
-            // final String thumbnailurl = br.getRegex("itemprop=\"contentUrl\"[^>]*>(https?://[^<]+)</span>").getMatch(0);
-            // final String thumbPart = new Regex(thumbnailurl, "frame-thumb/(\\d+/\\d+)").getMatch(0);
-            for (final String fullImageLink : fullImageLinks) {
-                if (!fullImageLinksWithoutDuplicates.contains(fullImageLink)) {
-                    fullImageLinksWithoutDuplicates.add(fullImageLink);
-                }
-            }
-            logger.info("Total number of fullsize image URLs: " + fullImageLinksWithoutDuplicates.size());
-            if (imageOffset <= fullImageLinksWithoutDuplicates.size()) {
-                fullsizeUrl = fullImageLinksWithoutDuplicates.get(imageOffset);
-            } else {
-                /* Fallback */
+                fullImageLinksWithoutDuplicates = new ArrayList<String>(new LinkedHashSet<String>(Arrays.asList(br.getRegex("(https?://[^/]+/images/full/[^\"]+)").getColumn(0))));
                 for (final String fullImageLink : fullImageLinksWithoutDuplicates) {
                     if (fullImageLink.contains(imageID)) {
                         /* Safe hit */
-                        fullsizeUrl = fullImageLink;
-                        break;
+                        return fullImageLink;
                     }
                 }
             }
-            final boolean allowOldFallbackWorkaround = false;
-            if (fullsizeUrl == null && allowOldFallbackWorkaround) {
-                // Deprecated since 2024-02-22
-                logger.info("Obtaining fullsize URL via offset: " + imageOffset);
-                final String thisFullsizeUrl = fullImageLinksWithoutDuplicates.get(imageOffset);
-                logger.warning("Knowingly downloading image with wrong ID | URL: " + thisFullsizeUrl);
-                final String actuallyFoundFullsizeImageID = new Regex(thisFullsizeUrl, "/full/\\d+/\\d+/(\\d+)").getMatch(0);
-                // imageLink = thisFullsizeUrl;
-                final boolean allowDownloadWrongServersideImage = true;
-                if (allowDownloadWrongServersideImage) {
-                    fullsizeUrl = thisFullsizeUrl;
-                } else if (actuallyFoundFullsizeImageID != null && !actuallyFoundFullsizeImageID.equals(imageID)) {
-                    final boolean devSetRealImagelinkAsComment = false;
-                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && devSetRealImagelinkAsComment) {
-                        link.setComment("https://www.imagefap.com/photo/" + actuallyFoundFullsizeImageID + "/");
-                    }
-                    throw new PluginException(LinkStatus.ERROR_FATAL, "Image ID mismatch: Expected ID: " + imageID + " | ID we got: " + actuallyFoundFullsizeImageID);
-                } else {
-                    throw new PluginException(LinkStatus.ERROR_FATAL, "Image ID mismatch");
-                }
-            }
-            if (fullsizeUrl == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            return fullsizeUrl;
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
     }
 

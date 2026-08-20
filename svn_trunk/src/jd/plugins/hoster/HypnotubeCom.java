@@ -15,16 +15,21 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
+import jd.http.requests.PostRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -41,7 +46,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51437 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53175 $", interfaceVersion = 3, names = {}, urls = {})
 public class HypnotubeCom extends PluginForHost {
     public HypnotubeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -140,6 +145,22 @@ public class HypnotubeCom extends PluginForHost {
         return requestFileInformation(link, null, false);
     }
 
+    private void handleAgeGate(Browser br) throws Exception {
+        if (StringUtils.contains(br.getURL(), "/age-gate")) {
+            final Map<String, Object> json = new HashMap<String, Object>();
+            json.put("timeZone", ZoneId.systemDefault().getId());
+            json.put("languages", new String[] { "en-US", "en" });
+            final PostRequest request = br.createJSonPostRequest(br.getURL(), json);
+            br.getPage(request);
+            final Map<String, Object> response = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            if (Boolean.TRUE.equals(response.get("blocked"))) {
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED);
+            }
+            final String redirect = response.get("redirect").toString();
+            br.getPage(redirect);
+        }
+    }
+
     private AvailableStatus requestFileInformation(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
         dllink = null;
         final String extDefault = ".mp4";
@@ -156,6 +177,7 @@ public class HypnotubeCom extends PluginForHost {
         if (new Regex(link.getPluginPatternMatcher(), PATTERN_EMBED).patternFind()) {
             /* Access normal video URL so we can find the video title */
             br.getPage("https://" + this.getHost() + "/video/-" + videoid + ".html");
+            handleAgeGate(br);
             final String normalURL = br.getRegex("(https?://[^/]+/video/[a-z0-9\\-]+-" + videoid + "\\.html)").getMatch(0);
             if (normalURL != null) {
                 /* Prepare our filename-fallback for later. */
@@ -163,6 +185,7 @@ public class HypnotubeCom extends PluginForHost {
             }
         } else {
             br.getPage(link.getPluginPatternMatcher());
+            handleAgeGate(br);
         }
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -217,6 +240,7 @@ public class HypnotubeCom extends PluginForHost {
                 } else {
                     br.getPage("https://www." + this.getHost() + "/");
                 }
+                handleAgeGate(br);
                 if (this.isLoggedin(br)) {
                     logger.info("Cookie login successful");
                     /* Refresh cookie timestamp */
@@ -230,6 +254,7 @@ public class HypnotubeCom extends PluginForHost {
             }
             logger.info("Performing full login");
             br.getPage("https://www." + this.getHost() + "/login");
+            handleAgeGate(br);
             Form loginform = br.getFormbyProperty("id", "formLogin"); // shesfreaky.com
             if (loginform == null) {
                 loginform = br.getFormbyProperty("id", "login-form"); // hypnotube.com

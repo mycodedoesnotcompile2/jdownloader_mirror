@@ -17,6 +17,7 @@ package jd.plugins.decrypter;
 
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -54,7 +55,7 @@ import jd.plugins.hoster.HighWayMe2;
  * It recursively walks the users' HIGHWAY cloud via the JSON API and returns all contained files. </br>
  * Docs: https://high-way.me/threads/highway-api.201/ (section "HIGHWAY DAV JSON API")
  */
-@DecrypterPlugin(revision = "$Revision: 53147 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53170 $", interfaceVersion = 3, names = {}, urls = {})
 public class HighWayMeFolder3 extends PluginForDecrypt {
     public HighWayMeFolder3(PluginWrapper wrapper) {
         super(wrapper);
@@ -139,6 +140,9 @@ public class HighWayMeFolder3 extends PluginForDecrypt {
         int numberofFolders = 0;
         int numberofFiles = 0;
         int numberofEmptyFolders = 0;
+        int numberofSkippedDueToStatus = 0;
+        /* Collects directory elements skipped because of a disallowed status, mapped by their status value. */
+        final Map<String, List<Map<String, Object>>> skippedDirectoriesByStatus = new HashMap<String, List<Map<String, Object>>>();
         folderQueue.add(startURL);
         crawledFolderURLs.add(startURL);
         do {
@@ -151,20 +155,40 @@ public class HighWayMeFolder3 extends PluginForDecrypt {
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             checkErrors(entries);
             final String currentPath = entries.get("path").toString();
+            final String currentPathForUser = currentPath.replaceFirst("(?i)^/cloud/(Torrent|TV|Usenet)/", "");
             final List<Map<String, Object>> items = (List<Map<String, Object>>) entries.get("entries");
             if (items.isEmpty()) {
                 logger.info("Found empty folder: " + folderURL);
                 numberofEmptyFolders++;
-                logger.info("Progress so far: Folders found: " + numberofFolders + " | Files found: " + numberofFiles + " | Empty folders: " + numberofEmptyFolders + " | Folders left in queue: " + folderQueue.size());
+                logger.info("Progress so far: Folders found: " + numberofFolders + " | Files found: " + numberofFiles + " | Empty folders: " + numberofEmptyFolders + " | Skipped (disallowed status): " + numberofSkippedDueToStatus + " | Folders left in queue: " + folderQueue.size());
                 continue;
             }
             final FilePackage fp = FilePackage.getInstance();
-            fp.setName(currentPath);
+            fp.setName(currentPathForUser);
             /* Stable package key so re-crawled items get merged into the existing package instead of creating duplicates. */
             fp.setPackageKey("highwaydav://" + currentPath);
             for (final Map<String, Object> item : items) {
                 final String type = item.get("type").toString();
                 if (StringUtils.equalsIgnoreCase(type, "directory")) {
+                    /* Only crawl directories whose status is in the allowed list. */
+                    final Object statusO = item.get("status");
+                    final String status = statusO != null ? statusO.toString() : null;
+                    if (status != null && !StringUtils.equalsIgnoreCase(status, "Archiviert") && !StringUtils.equalsIgnoreCase(status, "Completed")) {
+                        /**
+                         * Skip directory element with disallowed status and remember it. <br>
+                         * Only relevant for Usenet items, see https://sabnzbd.org/wiki/extra/queue-history-searching <br>
+                         * -> See all status strings in the linked docs + custom status "Archiviert".
+                         */
+                        logger.info("Skipping directory because of disallowed status: " + status + " | " + item.get("url"));
+                        List<Map<String, Object>> skippedForStatus = skippedDirectoriesByStatus.get(status);
+                        if (skippedForStatus == null) {
+                            skippedForStatus = new ArrayList<Map<String, Object>>();
+                            skippedDirectoriesByStatus.put(status, skippedForStatus);
+                        }
+                        skippedForStatus.add(item);
+                        numberofSkippedDueToStatus++;
+                        continue;
+                    }
                     /* Enqueue subfolder for the next JSON query. */
                     final String subfolderURL = resolveURL(folderURL, item.get("url").toString());
                     if (crawledFolderURLs.add(subfolderURL)) {
@@ -181,7 +205,7 @@ public class HighWayMeFolder3 extends PluginForDecrypt {
                     final DownloadLink link = this.createDownloadlink(canonicalURL);
                     link.setName(item.get("name").toString());
                     link.setVerifiedFileSize(((Number) item.get("size")).longValue());
-                    link.setRelativeDownloadFolderPath(currentPath);
+                    link.setRelativeDownloadFolderPath(currentPathForUser);
                     /* Set file hashes if available (both fields can be null). */
                     final List<HashInfo> hashInfos = new ArrayList<HashInfo>();
                     final String md5 = (String) item.get("md5");
@@ -199,14 +223,25 @@ public class HighWayMeFolder3 extends PluginForDecrypt {
                     link.setAvailable(true);
                     link._setFilePackage(fp);
                     ret.add(link);
+                    distribute(link);
                     numberofFiles++;
                 }
             }
-            logger.info("Progress so far: Folders found: " + numberofFolders + " | Files found: " + numberofFiles + " | Empty folders: " + numberofEmptyFolders + " | Folders left in queue: " + folderQueue.size());
+            logger.info("Progress so far: Folders found: " + numberofFolders + " | Files found: " + numberofFiles + " | Empty folders: " + numberofEmptyFolders + " | Skipped (disallowed status): " + numberofSkippedDueToStatus + " | Folders left in queue: " + folderQueue.size());
         } while (folderQueue.size() > 0);
         if (ret.isEmpty()) {
             if (numberofEmptyFolders > 0) {
                 throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
+            } else if (numberofSkippedDueToStatus > 0) {
+                /* Build a comma separated list of all distinct statuses that led to skipped directories. */
+                final StringBuilder skippedStatuses = new StringBuilder();
+                for (final String status : skippedDirectoriesByStatus.keySet()) {
+                    if (skippedStatuses.length() > 0) {
+                        skippedStatuses.append(", ");
+                    }
+                    skippedStatuses.append(status);
+                }
+                throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, "Skipped due to disallowed status: " + skippedStatuses.toString());
             }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }

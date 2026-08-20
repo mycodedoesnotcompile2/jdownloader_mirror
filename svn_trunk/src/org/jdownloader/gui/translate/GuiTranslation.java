@@ -1066,6 +1066,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "%s1!" })
     String settings_linkgrabber_filter_columns_if(String trim);
 
+    @Default(lngs = { "en" }, values = { "Inverted" })
+    String settings_linkgrabber_filter_columns_inverted();
+
     @Default(lngs = { "en" }, values = { "contains %s1" })
     String RegexFilter_toString_contains(String regex);
 

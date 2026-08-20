@@ -57,7 +57,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52647 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53170 $", interfaceVersion = 3, names = {}, urls = {})
 public class SerienStreamTo extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public SerienStreamTo(final PluginWrapper wrapper) {
@@ -456,7 +456,11 @@ public class SerienStreamTo extends PluginForDecrypt {
         findUserPreferredAndExistingLanguages: if (userLanguagePrioListStr != null) {
             /* Find existing languages and their internal IDs */
             final List<String> userAllowedLanguageTitles = new ArrayList<String>();
-            userAllowedLanguageTitles.addAll(Arrays.asList(userLanguagePrioListStr.split(",")));
+            final String[] userLanguagePrioListRaw = userLanguagePrioListStr.split(",");
+            for (String userLanguagePrio : userLanguagePrioListRaw) {
+                userLanguagePrio = userLanguagePrio.trim();
+                userAllowedLanguageTitles.add(userLanguagePrio);
+            }
             final String languageFlagsHTML = br.getRegex("<div class=\"changeLanguage\">(.*?)</div>").getMatch(0);
             if (languageFlagsHTML != null) {
                 /* Old website */
@@ -494,30 +498,33 @@ public class SerienStreamTo extends PluginForDecrypt {
             for (final String userPreferredLanguageTitle : userAllowedLanguageTitles) {
                 final String[] userPreferredLanguageTitleMatcher = userPreferredLanguageTitle.split("\\s+");
                 final Iterator<String> languageIdIterator = languageIdTitleMap.keySet().iterator();
-                while (languageIdIterator.hasNext()) {
+                iterate_language_ids: while (languageIdIterator.hasNext()) {
                     final String language_id = languageIdIterator.next();
-                    final String language_title_text = languageIdTitleMap.get(language_id);
-                    final String[] language_titles = language_title_text.split("/"); // Covers strings like "Deutsch/German"
-                    userPreferredLanguageTitleMatcherLoop: for (final String userPreferredLanguageTitleMatch : userPreferredLanguageTitleMatcher) {
-                        if (language_titles != null && language_titles.length > 1) {
-                            for (final String language_title : language_titles) {
-                                if (StringUtils.equalsIgnoreCase(language_title, userPreferredLanguageTitleMatch)) {
-                                    /* Precise match */
+                    final String language_title_from_website = languageIdTitleMap.get(language_id);
+                    if (StringUtils.equalsIgnoreCase(language_title_from_website, userPreferredLanguageTitle)) {
+                        /* Precise match */
+                        logger.info("Found precise language match: " + language_title_from_website);
+                        userLanguageIDsPrioList.add(language_id);
+                        continue iterate_language_ids;
+                    }
+                    /* Covers strings like "Deutsch/German" */
+                    final String[] language_title_variations = language_title_from_website.split("/");
+                    for (final String userPreferredLanguageTitleVague : userPreferredLanguageTitleMatcher) {
+                        if (language_title_variations != null && language_title_variations.length > 1) {
+                            for (final String language_title_variation : language_title_variations) {
+                                if (StringUtils.equalsIgnoreCase(language_title_variation, userPreferredLanguageTitleVague)) {
+                                    /* Precise match on a slash-separated variation */
                                     userLanguageIDsPrioList.add(language_id);
-                                    logger.info("Found precise language match: " + language_title);
-                                    break userPreferredLanguageTitleMatcherLoop;
+                                    logger.info("Found precise language match (variation): " + language_title_variation);
+                                    continue iterate_language_ids;
                                 }
                             }
                         }
-                        if (StringUtils.equalsIgnoreCase(language_title_text, userPreferredLanguageTitleMatch)) {
-                            /* Precise match */
-                            logger.info("Found precise language match: " + language_title_text);
-                            userLanguageIDsPrioList.add(language_id);
-                            break userPreferredLanguageTitleMatcherLoop;
-                        } else if (StringUtils.containsIgnoreCase(language_title_text, userPreferredLanguageTitleMatch)) {
+                        if (StringUtils.containsIgnoreCase(language_title_from_website, userPreferredLanguageTitleVague)) {
                             /* Collect greedy matches so we can use them as a fallback later. */
+                            logger.info("Found vague language match: " + userPreferredLanguageTitleVague);
                             userLanguageIDsPrioListGreedy.add(language_id);
-                            break userPreferredLanguageTitleMatcherLoop;
+                            continue iterate_language_ids;
                         }
                     }
                 }

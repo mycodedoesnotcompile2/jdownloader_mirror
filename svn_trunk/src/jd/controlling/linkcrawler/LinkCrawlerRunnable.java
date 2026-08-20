@@ -125,7 +125,12 @@ public abstract class LinkCrawlerRunnable implements Runnable {
     abstract void crawling();
 
     public long getAverageRuntime() {
-        return 0;
+        final Long ret = getLinkCrawler().getDefaultAverageRuntime();
+        if (ret != null) {
+            return ret.longValue();
+        } else {
+            return 0;
+        }
     }
 
     protected LinkCrawlerLock getLinkCrawlerLock() {

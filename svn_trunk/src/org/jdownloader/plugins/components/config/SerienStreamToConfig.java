@@ -58,7 +58,7 @@ public interface SerienStreamToConfig extends PluginConfigInterface {
         FIRST_SEASON_PRESENTED_IN_BROWSER {
             @Override
             public String getLabel() {
-                return "Die erste Staffel crawlen, die im Browser präsentiert wird";
+                return "Die erste Staffel crawlen, die auf der Webseite präsentiert wird";
             }
         };
     }

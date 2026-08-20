@@ -20,6 +20,13 @@ public class FilterTableModel extends ExtTableModel<Filter> {
      */
     private static final long serialVersionUID = 1749243877638799385L;
 
+    /**
+     * Width of the icon column. Wide enough to show a 16px view icon plus the small "inverted view" badge that
+     * {@link ExceptionFilter} places next to it (see ExceptionFilter#createInvertedIcon). Non-inverted views simply show
+     * their left-aligned icon with some empty space to the right.
+     */
+    private static final int ICON_COLUMN_WIDTH = 30;
+
     public FilterTableModel() {
         super("FilterTableModel");
 
@@ -40,7 +47,7 @@ public class FilterTableModel extends ExtTableModel<Filter> {
             // }
             @Override
             public int getMaxWidth() {
-                return 18;
+                return ICON_COLUMN_WIDTH;
             }
 
             @Override
