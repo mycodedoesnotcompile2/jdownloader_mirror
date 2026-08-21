@@ -1387,6 +1387,15 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Match names case insensitive" })
     String MergeSameNamedPackagesAction_Case_Insensitive();
 
+    @Default(lngs = { "en" }, values = { "Enabled" })
+    String MergeSameNamedPackagesAction_CaseInsensitiveMergeOptions_ENABLED();
+
+    @Default(lngs = { "en" }, values = { "Disabled" })
+    String MergeSameNamedPackagesAction_CaseInsensitiveMergeOptions_DISABLED();
+
+    @Default(lngs = { "en" }, values = { "use global (adv. config) settings: %s1" })
+    String MergeSameNamedPackagesAction_CaseInsensitiveMergeOptions_GLOBAL(String str);
+
     @Default(lngs = { "en" }, values = { "Merge all regardless of selection" })
     String MergeSameNamedPackagesAction_Merge_All();
 
@@ -2667,6 +2676,15 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Clipboard Monitoring" })
     String ClipBoardToggleAction_getNameWhenEnabled_();
+
+    @Default(lngs = { "en" }, values = { "Do not merge packages when moving them to downloadlist" })
+    String MergeSameNamedPackagesOnConfirmToggleAction_getNameWhenDisabled_();
+
+    @Default(lngs = { "en" }, values = { "Merge with existing same named packages in downloadlist" })
+    String MergeSameNamedPackagesOnConfirmToggleAction_getNameWhenEnabled_();
+
+    @Default(lngs = { "en" }, values = { "When moving links from linkgrabber to downloadlist, merge them into existing same named packages in the downloadlist" })
+    String MergeSameNamedPackagesOnConfirmToggleAction_tooltip();
 
     @Default(lngs = { "en" }, values = { "Premium Downloads" })
     String GlobalPremiumSwitchToggleAction_getNameWhenDisabled_();

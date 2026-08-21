@@ -61,7 +61,7 @@ import jd.plugins.decrypter.MediafireComFolder;
 import jd.plugins.download.HashInfo;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 52190 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53182 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { MediafireComFolder.class })
 public class MediafireCom extends PluginForHost {
     /** Settings stuff */
@@ -247,8 +247,12 @@ public class MediafireCom extends PluginForHost {
         final boolean isPremium = StringUtils.equalsIgnoreCase(isPremiumStr, "yes");
         final Object used_storage_sizeO = user_info.get("used_storage_size");
         final Object bandwidthO = user_info.get("bandwidth");
+        /* Prefer the UTC field and fall back to the old local-time "created" field. */
+        final String createDateUTC = (String) user_info.get("created_utc");
         final String createDate = (String) user_info.get("created");
-        if (createDate != null) {
+        if (createDateUTC != null) {
+            ai.setCreateTime(TimeFormatter.getMilliSeconds(createDateUTC, "yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.ENGLISH));
+        } else if (createDate != null) {
             ai.setCreateTime(TimeFormatter.getMilliSeconds(createDate, "yyyy-MM-dd", Locale.ENGLISH));
         }
         if (used_storage_sizeO != null && used_storage_sizeO.toString().matches("\\d+")) {
@@ -802,9 +806,10 @@ public class MediafireCom extends PluginForHost {
                 if (file_infos != null) {
                     for (final Map<String, Object> file_info : file_infos) {
                         final DownloadLink item = linkMap.remove(file_info.get("quickkey"));
-                        if (item != null) {
-                            parseFileInfo(item, file_info);
+                        if (item == null) {
+                            continue;
                         }
+                        parseFileInfo(item, file_info);
                     }
                 }
                 /* All items that API did not return in answer must be offline. */
@@ -824,13 +829,15 @@ public class MediafireCom extends PluginForHost {
         return true;
     }
 
-    public static void parseFileInfo(final DownloadLink link, final Map<String, Object> file_info) {
-        final String filename = (String) file_info.get("filename");
-        final Long size = JavaScriptEngineFactory.toLong(file_info.get("size"), -1);
-        final String hash = (String) file_info.get("hash");
-        final String privacy = (String) file_info.get("privacy");
-        final String pass = (String) file_info.get("password_protected");
-        final String delete_date = (String) file_info.get("delete_date");
+    public static void parseFileInfo(final DownloadLink link, final Map<String, Object> finfo) {
+        final String filename = (String) finfo.get("filename");
+        final Long size = JavaScriptEngineFactory.toLong(finfo.get("size"), -1);
+        final String hash = (String) finfo.get("hash");
+        final String privacy = (String) finfo.get("privacy");
+        final String password_protected = (String) finfo.get("password_protected"); // yes/no
+        final String delete_date = (String) finfo.get("delete_date");
+        final String created_date_utc = (String) finfo.get("created_utc");
+        final String created_date = (String) finfo.get("created");
         if (!StringUtils.isEmpty(filename)) {
             link.setFinalFileName(filename);
         }
@@ -847,7 +854,7 @@ public class MediafireCom extends PluginForHost {
             /* Possibly a private file */
             link.setProperty(PROPERTY_PRIVATE_FILE, true);
         }
-        if (!StringUtils.isEmpty(pass) && PluginJSonUtils.parseBoolean(pass)) {
+        if (!StringUtils.isEmpty(password_protected) && PluginJSonUtils.parseBoolean(password_protected)) {
             link.setPasswordProtected(true);
         } else {
             link.setPasswordProtected(false);
@@ -862,6 +869,15 @@ public class MediafireCom extends PluginForHost {
             link.setAvailableStatus(AvailableStatus.FALSE);
         } else {
             link.setAvailableStatus(AvailableStatus.TRUE);
+        }
+        /*
+         * This is more like the upload date of the file but it looks like we aren't able to get any date closer to the real last-modified
+         * date. Prefer the UTC field and fall back to the old local-time "created" field.
+         */
+        if (!StringUtils.isEmpty(created_date_utc)) {
+            link.setLastModifiedTimestamp(TimeFormatter.getMilliSeconds(created_date_utc, "yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.ENGLISH));
+        } else if (!StringUtils.isEmpty(created_date)) {
+            link.setLastModifiedTimestamp(TimeFormatter.getMilliSeconds(created_date, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH));
         }
     }
 

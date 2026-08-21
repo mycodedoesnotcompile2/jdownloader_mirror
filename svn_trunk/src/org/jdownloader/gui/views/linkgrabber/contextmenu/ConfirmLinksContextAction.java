@@ -241,6 +241,44 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
         public abstract boolean isEnabled();
     }
 
+    public static enum MergeSameNamedPackagesOptions implements LabelInterface {
+        GLOBAL {
+            @Override
+            public String getLabel() {
+                return _JDT.T.ConfirmLinksContextAction_MergeSameNamedPackagesOptions_GLOBAL(isEnabled() ? _JDT.T.ConfirmLinksContextAction_MergeSameNamedPackagesOptions_ENABLED() : _JDT.T.ConfirmLinksContextAction_MergeSameNamedPackagesOptions_DISABLED());
+            }
+
+            @Override
+            public boolean isEnabled() {
+                return CFG_LINKGRABBER.CFG.isMergeSameNamedPackagesInDownloadlistInExistingPackagesOnConfirmDefaultEnabled();
+            }
+        },
+        ENABLED {
+            @Override
+            public String getLabel() {
+                return _JDT.T.ConfirmLinksContextAction_MergeSameNamedPackagesOptions_ENABLED();
+            }
+
+            @Override
+            public boolean isEnabled() {
+                return true;
+            }
+        },
+        DISABLED {
+            @Override
+            public String getLabel() {
+                return _JDT.T.ConfirmLinksContextAction_MergeSameNamedPackagesOptions_DISABLED();
+            }
+
+            @Override
+            public boolean isEnabled() {
+                return false;
+            }
+        };
+
+        public abstract boolean isEnabled();
+    }
+
     public static enum PackageExpandBehavior implements LabelInterface {
         UNCHANGED {
             @Override
@@ -317,6 +355,7 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
     private PackageExpandBehavior        packageExpandBehavior                                 = PackageExpandBehavior.UNCHANGED;
     private OnOfflineLinksAction         handleOffline                                         = OnOfflineLinksAction.GLOBAL;
     private OnDupesLinksAction           handleDupes                                           = OnDupesLinksAction.GLOBAL;
+    private MergeSameNamedPackagesOptions mergeSameNamedPackages                               = MergeSameNamedPackagesOptions.GLOBAL;
     private AutoStartOptions             autoStart                                             = AutoStartOptions.AUTO;
     private boolean                      clearListAfterConfirm                                 = false;
     private SwitchToDownloadlistBehavior switchToDownloadlistBehavior                          = SwitchToDownloadlistBehavior.GLOBAL_DEFAULT;
@@ -735,7 +774,7 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
                 if (shouldSwitchToDownloadlist(settings, linkgrabberWillBeEmpty)) {
                     switchToDownloadTab();
                 }
-                if (Boolean.TRUE.equals(settings.isClearLinkgrabberlistOnConfirm())) {
+                if (settings.isClearLinkgrabberlistOnConfirm()) {
                     clearLinkgrabber();
                 }
             }
@@ -837,6 +876,24 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
         return this;
     }
 
+    public static String getTranslationForMergeSameNamedPackages() {
+        return _JDT.T.ConfirmLinksContextAction_getTranslationForMergeSameNamedPackages();
+    }
+
+    @Customizer(link = "#getTranslationForMergeSameNamedPackages")
+    @Order(12)
+    public MergeSameNamedPackagesOptions getMergeSameNamedPackages() {
+        return mergeSameNamedPackages;
+    }
+
+    public ConfirmLinksContextAction setMergeSameNamedPackages(MergeSameNamedPackagesOptions mergeSameNamedPackages) {
+        if (mergeSameNamedPackages == null) {
+            mergeSameNamedPackages = MergeSameNamedPackagesOptions.GLOBAL;
+        }
+        this.mergeSameNamedPackages = mergeSameNamedPackages;
+        return this;
+    }
+
     public ConfirmLinksContextAction() {
         super(false, true);
         GUIEventSender.getInstance().addListener(this, true);
@@ -858,6 +915,7 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
         cls.setForceDownloads(isForceDownloads());
         cls.setHandleOffline(getHandleOffline());
         cls.setHandleDupes(getHandleDupes());
+        cls.setMergeSameNamedPackagesInDownloadlistInExistingPackagesOnConfirm(getMergeSameNamedPackages().isEnabled());
         cls.setConfirmationDialogBehavior(this.getConfirmationDialogBehavior());
         cls.setConfirmationDialogThresholdMinPackages(getMinNumberofPackagesForMoveToDownloadlistConfirmDialog());
         cls.setConfirmationDialogThresholdMinLinks(getMinNumberofLinksForMoveToDownloadlistConfirmDialog());

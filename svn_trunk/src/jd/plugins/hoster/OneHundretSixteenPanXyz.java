@@ -46,7 +46,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52924 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53185 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneHundretSixteenPanXyz extends PluginForHost {
     public OneHundretSixteenPanXyz(PluginWrapper wrapper) {
         super(wrapper);
@@ -182,6 +182,9 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        if (br.getHttpConnection().getResponseCode() == 403) {
+            br.getPage(contenturl);
+        }
         if (new Regex(br.getURL(), PATTERN_OLD).patternFind()) {
             /**
              * Migrate old 116pan.com links to new 116pan.xyz links if possible. <br>
@@ -190,7 +193,7 @@ public class OneHundretSixteenPanXyz extends PluginForHost {
             if (br.containsHTML(">\\s*文件不存在或已删除")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            final String newLink = br.getRegex("window\\.location\\.href = '(https?://(www\\.)?116pan\\.xyz/f/[A-Za-z0-9]{6,})';").getMatch(0);
+            final String newLink = br.getRegex("window\\.location\\.href= '(https?://(www\\.)?116pan\\.xyz/f/[A-Za-z0-9]{6,})';").getMatch(0);
             if (newLink == null) {
                 throw new PluginException(LinkStatus.ERROR_FATAL, "Migration from 116pan.com to 116pan.xyz failed?");
             }

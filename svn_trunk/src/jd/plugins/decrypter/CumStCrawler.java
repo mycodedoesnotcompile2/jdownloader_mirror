@@ -55,7 +55,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.CumSt;
 
-@DecrypterPlugin(revision = "$Revision: 53174 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53176 $", interfaceVersion = 3, names = {}, urls = {})
 public class CumStCrawler extends PluginForDecrypt {
     public CumStCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -104,16 +104,20 @@ public class CumStCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(" + PATTERN_POST.pattern().substring(1) + "|" + PATTERN_PROFILE.pattern().substring(1) + ")");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(" + PATTERN_POST.pattern().substring(1) + "|" + PATTERN_DM.pattern().substring(1) + "|" + PATTERN_PROFILE.pattern().substring(1) + ")");
         }
         return ret.toArray(new String[0]);
     }
 
-    /* service = any platform key without slash (e.g. onlyfans, fansly); creator- and post-ids are numeric. */
-    private static final Pattern PATTERN_POST    = Pattern.compile("/creators/([^/]+)/(\\d+)/post/(\\d+)(?:\\?[^#]*)?$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern PATTERN_PROFILE = Pattern.compile("/creators/([^/]+)/(\\d+)(\\?[^#]*)?$", Pattern.CASE_INSENSITIVE);
-    private CumSt                hostPlugin      = null;
-    private CryptedLink          cl              = null;
+    /* service = any platform key without slash (e.g. onlyfans, fansly); creator- and post-ids are numeric, dm-ids are uuids. */
+    private static final Pattern PATTERN_POST      = Pattern.compile("/creators/([^/]+)/(\\d+)/post/(\\d+)(?:\\?[^#]*)?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_DM        = Pattern.compile("/creators/([^/]+)/(\\d+)/dm/([\\w\\-]+)(?:\\?[^#]*)?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_PROFILE   = Pattern.compile("/creators/([^/]+)/(\\d+)([a-f0-9-]+)", Pattern.CASE_INSENSITIVE);
+    /* API- and website path segment for the two supported content types. */
+    private static final String  CONTENT_TYPE_POST = "post";
+    private static final String  CONTENT_TYPE_DM   = "dm";
+    private CumSt                hostPlugin        = null;
+    private CryptedLink          cl                = null;
 
     private String getApiBase() {
         return "https://" + getHost() + "/api/v1";
@@ -131,6 +135,8 @@ public class CumStCrawler extends PluginForDecrypt {
         cl = param;
         if (new Regex(param.getCryptedUrl(), PATTERN_POST).patternFind()) {
             return this.crawlPost(param);
+        } else if (new Regex(param.getCryptedUrl(), PATTERN_DM).patternFind()) {
+            return this.crawlDM(param);
         } else if (new Regex(param.getCryptedUrl(), PATTERN_PROFILE).patternFind()) {
             return this.crawlProfile(param);
         } else {
@@ -206,7 +212,7 @@ public class CumStCrawler extends PluginForDecrypt {
             }
             for (final Map<String, Object> post : posts) {
                 final String postID = post.get("id").toString();
-                final ArrayList<DownloadLink> thisresults = crawlPostAPI(br, service, creatorID, creatorName, postID);
+                final ArrayList<DownloadLink> thisresults = crawlContentAPI(br, service, creatorID, creatorName, CONTENT_TYPE_POST, postID);
                 if (!perPostPackageEnabled) {
                     for (final DownloadLink thisresult : thisresults) {
                         thisresult._setFilePackage(profileFilePackage);
@@ -231,7 +237,7 @@ public class CumStCrawler extends PluginForDecrypt {
                 page++;
             }
         } while (!this.isAbort());
-        /* Advanced dupe check is applied per file inside crawlProcessPostAPI when enabled. */
+        /* Advanced dupe check is applied per file inside crawlProcessContentAPI when enabled. */
         if (useAdvancedDupecheck) {
             logger.info("Advanced dupe filtering was enabled");
         }
@@ -251,16 +257,16 @@ public class CumStCrawler extends PluginForDecrypt {
         return fp;
     }
 
-    private FilePackage getFilePackageForPostCrawler(final String service, final String creatorID, final String creatorName, final String postID) {
+    private FilePackage getFilePackageForContentCrawler(final String service, final String creatorID, final String creatorName, final String contentType, final String contentID) {
         final FilePackage fp = FilePackage.getInstance();
         if (creatorName != null) {
-            fp.setName(service + " - " + creatorName + " - " + postID);
+            fp.setName(service + " - " + creatorName + " - " + contentID);
         } else {
             /* Fallback */
-            fp.setName(service + " - " + creatorID + " - " + postID);
+            fp.setName(service + " - " + creatorID + " - " + contentID);
         }
         fp.setIgnoreVarious(true);
-        fp.setPackageKey(CumSt.UNIQUE_ID_PREFIX + "service/" + service + "/creator/" + creatorID + "/post/" + postID);
+        fp.setPackageKey(CumSt.UNIQUE_ID_PREFIX + "service/" + service + "/creator/" + creatorID + "/" + contentType + "/" + contentID);
         return fp;
     }
 
@@ -274,29 +280,48 @@ public class CumStCrawler extends PluginForDecrypt {
         final String creatorID = urlinfo.getMatch(1);
         final String postID = urlinfo.getMatch(2);
         final String creatorName = this.findCreatorName(service, creatorID);
-        return crawlPostAPI(br, service, creatorID, creatorName, postID);
+        return crawlContentAPI(br, service, creatorID, creatorName, CONTENT_TYPE_POST, postID);
     }
 
-    /** API docs: https://cum.st/api-docs */
-    private ArrayList<DownloadLink> crawlPostAPI(final Browser br, final String service, final String creatorID, final String creatorName, final String postID) throws Exception {
-        if (service == null || creatorID == null || postID == null) {
+    private ArrayList<DownloadLink> crawlDM(final CryptedLink param) throws Exception {
+        final Regex urlinfo = new Regex(param.getCryptedUrl(), PATTERN_DM);
+        if (!urlinfo.patternFind()) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        getPage(br, this.getApiBase() + "/" + service + "/user/" + Encoding.urlEncode(creatorID) + "/post/" + Encoding.urlEncode(postID));
-        final Map<String, Object> post = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final HashSet<String> dupes = new HashSet<String>();
-        return crawlProcessPostAPI(post, service, creatorID, creatorName, dupes, cfg.isEnableProfileCrawlerAdvancedDupeFiltering());
+        final String service = urlinfo.getMatch(0);
+        final String creatorID = urlinfo.getMatch(1);
+        final String dmID = urlinfo.getMatch(2);
+        final String creatorName = this.findCreatorName(service, creatorID);
+        return crawlContentAPI(br, service, creatorID, creatorName, CONTENT_TYPE_DM, dmID);
     }
 
     /**
-     * Processes a map of an API response containing information about a users' post.
+     * Fetches and processes a single post or dm via API. <br>
+     * API docs: https://cum.st/api-docs
+     *
+     * @param contentType
+     *            : either {@link #CONTENT_TYPE_POST} or {@link #CONTENT_TYPE_DM}.
+     */
+    private ArrayList<DownloadLink> crawlContentAPI(final Browser br, final String service, final String creatorID, final String creatorName, final String contentType, final String contentID) throws Exception {
+        if (service == null || creatorID == null || contentType == null || contentID == null) {
+            /* Developer mistake */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        getPage(br, this.getApiBase() + "/" + service + "/user/" + Encoding.urlEncode(creatorID) + "/" + contentType + "/" + Encoding.urlEncode(contentID));
+        final Map<String, Object> content = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final HashSet<String> dupes = new HashSet<String>();
+        return crawlProcessContentAPI(content, service, creatorID, creatorName, contentType, dupes, cfg.isEnableProfileCrawlerAdvancedDupeFiltering());
+    }
+
+    /**
+     * Processes a map of an API response containing information about a users' post or dm.
      *
      * @throws Exception
      */
-    private ArrayList<DownloadLink> crawlProcessPostAPI(final Map<String, Object> postmap, final String service, final String creatorID, final String creatorName, final HashSet<String> dupes, final boolean useAdvancedDupecheck) throws Exception {
+    private ArrayList<DownloadLink> crawlProcessContentAPI(final Map<String, Object> postmap, final String service, final String creatorID, final String creatorName, final String contentType, final HashSet<String> dupes, final boolean useAdvancedDupecheck) throws Exception {
         final String postID = postmap.get("id").toString();
-        final String posturl = "https://" + getHost() + "/creators/" + service + "/" + creatorID + "/post/" + postID;
+        final String posturl = "https://" + getHost() + "/creators/" + service + "/" + creatorID + "/" + contentType + "/" + postID;
         /* Every item has a "published" date (unix timestamp in seconds) */
         final String publishedDateStr = StringUtils.valueOfOrNull(postmap.get("published"));
         /* Raw caption text (may be null) */
@@ -322,7 +347,7 @@ public class CumStCrawler extends PluginForDecrypt {
         }
         logger.info("service: " + service + " | CreatorID: " + creatorID + " | PostID: " + postID + " | Attachment items in API response: " + numberofResultsSimpleCount + " | Number of unique file items: " + directResults.size());
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final FilePackage postFilePackage = getFilePackageForPostCrawler(service, creatorID, creatorName, postID);
+        final FilePackage postFilePackage = getFilePackageForContentCrawler(service, creatorID, creatorName, contentType, postID);
         if (!StringUtils.isEmpty(postTextContent)) {
             final TextCrawlMode mode = cfg.getTextCrawlMode();
             if (mode == TextCrawlMode.ALWAYS || (mode == TextCrawlMode.ONLY_IF_NO_MEDIA_ITEMS_ARE_FOUND && directResults.isEmpty())) {
@@ -390,6 +415,7 @@ public class CumStCrawler extends PluginForDecrypt {
                 result.setProperty(CumSt.PROPERTY_CREATOR_NAME, creatorName);
             }
             result.setProperty(CumSt.PROPERTY_POST_ID, postID);
+            result.setProperty(CumSt.PROPERTY_CONTENT_TYPE, contentType);
             result.setAvailable(true);
             ret.add(result);
         }

@@ -83,6 +83,20 @@ public interface LinkgrabberSettings extends ConfigInterface {
     void setAutoSwitchToDownloadTableOnConfirmDefaultEnabled(boolean b);
 
     @AboutConfig
+    @DefaultBooleanValue(false)
+    @DescriptionForConfigEntry("If true, packages moved from linkgrabber to downloadlist are merged into existing same named packages in the downloadlist. Only the freshly moved packages are merged into an existing one; other same named packages already in the downloadlist are not merged with each other. The merge target follows the 'add at top' setting: if 'add at top' is enabled, the moved package is merged into the first/topmost matching existing package; otherwise (default) it is merged into the last/bottom-most matching existing package.")
+    boolean isMergeSameNamedPackagesInDownloadlistInExistingPackagesOnConfirmDefaultEnabled();
+
+    void setMergeSameNamedPackagesInDownloadlistInExistingPackagesOnConfirmDefaultEnabled(boolean b);
+
+    @AboutConfig
+    @DefaultBooleanValue(true)
+    @DescriptionForConfigEntry("If true, merging same named packages into existing packages in the downloadlist matches package names case insensitively by default.")
+    boolean isMergeSameNamedPackagesInDownloadlistInExistingPackagesCaseInsensitiveDefaultEnabled();
+
+    void setMergeSameNamedPackagesInDownloadlistInExistingPackagesCaseInsensitiveDefaultEnabled(boolean b);
+
+    @AboutConfig
     @DefaultBooleanValue(true)
     @DescriptionForConfigEntry("If false, The 'Add Links' dialog in Linkgrabber works on the pasted text, and does not prefilter URLS anymore")
     boolean isAddLinksPreParserEnabled();

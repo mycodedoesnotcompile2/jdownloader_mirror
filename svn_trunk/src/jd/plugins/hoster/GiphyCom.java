@@ -19,6 +19,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+
 import jd.PluginWrapper;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -29,23 +32,19 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53176 $", interfaceVersion = 3, names = {}, urls = {})
 public class GiphyCom extends PluginForHost {
     public GiphyCom(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     /* Connection stuff */
-    private static final boolean free_resume       = true;
-    private static final int     free_maxchunks    = 1;
-    private static final int     free_maxdownloads = -1;
-    private String               dllink            = null;
-    private boolean              server_issues     = false;
-    private final String         PATTERN_NORMAL    = "https?://[^/]+/gifs/([A-Za-z0-9\\-]+-)?([A-Za-z0-9]+)";
-    private final String         PATTERN_DIRECT    = "https?://media\\d*\\.giphy\\.com/media/([A-Za-z0-9]+)";
+    private static final boolean free_resume    = true;
+    private static final int     free_maxchunks = 1;
+    private String               dllink         = null;
+    private boolean              server_issues  = false;
+    private final String         PATTERN_NORMAL = "https?://[^/]+/gifs/([A-Za-z0-9\\-]+-)?([A-Za-z0-9]+)";
+    private final String         PATTERN_DIRECT = "https?://media\\d*\\.giphy\\.com/media/([A-Za-z0-9]+)";
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -73,7 +72,7 @@ public class GiphyCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://support.giphy.com/hc/en-us/articles/360020027752-GIPHY-Terms-of-Service";
+        return "https://support." + getHost() + "/hc/en-us/articles/360020027752-GIPHY-Terms-of-Service";
     }
 
     @Override
@@ -97,13 +96,15 @@ public class GiphyCom extends PluginForHost {
     }
 
     @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        return this.getFID(link) + ".mp4";
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         final String fid = getFID(link);
-        if (!link.isNameSet()) {
-            link.setName(this.getFID(link) + ".mp4");
-        }
         if (link.getPluginPatternMatcher().matches("(?i).*/media/.+")) {
             // rewrite direct/media urls to normal url format
             br.getPage("https://" + this.getHost() + "/gifs/" + fid);
@@ -121,7 +122,7 @@ public class GiphyCom extends PluginForHost {
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             this.dllink = (String) entries.get("url");
             final String titleTmp = (String) entries.get("title");
             if (!StringUtils.isEmpty(titleTmp)) {
@@ -173,18 +174,6 @@ public class GiphyCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
+        return Integer.MAX_VALUE;
     }
 }

@@ -84,4 +84,12 @@ public class CFG_LINKGRABBER {
      * correct packages.
      **/
     public static final BooleanKeyHandler                   AUTO_PACKAGE_MATCHING_CORRECTION_ENABLED                     = SH.getKeyHandler("AutoPackageMatchingCorrectionEnabled", BooleanKeyHandler.class);
+    /**
+     * If true, packages moved from linkgrabber to downloadlist are merged with existing same named packages in the downloadlist.
+     **/
+    public static final BooleanKeyHandler                   MERGE_SAME_NAMED_PACKAGES_IN_DOWNLOADLIST_IN_EXISTING_PACKAGES_ON_CONFIRM_DEFAULT_ENABLED        = SH.getKeyHandler("MergeSameNamedPackagesInDownloadlistInExistingPackagesOnConfirmDefaultEnabled", BooleanKeyHandler.class);
+    /**
+     * If true, merging same named packages into existing packages in the downloadlist matches package names case insensitively by default.
+     **/
+    public static final BooleanKeyHandler                   MERGE_SAME_NAMED_PACKAGES_IN_DOWNLOADLIST_IN_EXISTING_PACKAGES_CASE_INSENSITIVE_DEFAULT_ENABLED  = SH.getKeyHandler("MergeSameNamedPackagesInDownloadlistInExistingPackagesCaseInsensitiveDefaultEnabled", BooleanKeyHandler.class);
 }

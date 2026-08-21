@@ -27,7 +27,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52604 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53185 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidcloudCc extends XFileSharingProBasic {
     public RapidcloudCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -94,6 +94,11 @@ public class RapidcloudCc extends XFileSharingProBasic {
     @Override
     public int getMaxSimultaneousFreeAnonymousDownloads() {
         return -1;
+    }
+
+    @Override
+    protected String[] supportsPreciseExpireDate() {
+        return null;
     }
 
     @Override

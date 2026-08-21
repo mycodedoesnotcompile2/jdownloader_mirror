@@ -9,6 +9,25 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import org.appwork.exceptions.WTFException;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.Application;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.parser.UrlQuery;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.config.ProleechLinkConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -29,25 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.Application;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.os.CrossSystem;
-import org.appwork.utils.parser.UrlQuery;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.config.ProleechLinkConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 53154 $", interfaceVersion = 3, names = { "proleech.link" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53181 $", interfaceVersion = 3, names = { "proleech.link" }, urls = { "" })
 public class ProLeechLink extends PluginForHost {
     public ProLeechLink(PluginWrapper wrapper) {
         super(wrapper);
@@ -260,6 +261,7 @@ public class ProLeechLink extends PluginForHost {
         /* Host specific traffic limits would be here: http://proleech.link/dl/debrid/deb_api.php?limits */
         br.getPage(API_BASE + "?hosts");
         final String[] supportedhostsAPI = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.STRING_ARRAY);
+        /* 2026-08-12: This can be null */
         if (supportedhostsAPI != null) {
             for (final String filehost_premium_online : supportedhostsAPI) {
                 if (filehost_premium_online.contains("/")) {
@@ -284,7 +286,7 @@ public class ProLeechLink extends PluginForHost {
         final String saved_apikey = account.getStringProperty(PROPERTY_ACCOUNT_apikey);
         String apiuser = null;
         String apikey = null;
-        if (!this.looksLikeValidAPIKey(account.getPass()) && !this.looksLikeValidAPIKey(saved_apikey) && !this.looksLikeValidAPIKey(account.getPass())) {
+        if (!this.looksLikeValidAPIKey(account.getPass()) && !this.looksLikeValidAPIKey(saved_apikey)) {
             this.apiInvalidApikey(account);
             /* This code should never be reached */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -757,69 +759,70 @@ public class ProLeechLink extends PluginForHost {
                         filename_entries_to_delete.add(filenameToCheck);
                     }
                 }
-                if (cloudDownloadRows != null && cloudDownloadRows.length > 0) {
-                    logger.info("Found " + cloudDownloadRows.length + " possible download_ids in history to delete");
-                    String postData = "delete=Delete+selected";
-                    int numberofDownloadIdsToDelete = 0;
-                    for (final String cloudDownloadRow : cloudDownloadRows) {
-                        final String download_id = new Regex(cloudDownloadRow, "id=\"checkbox\\[\\]\" value=\"(\\d+)\"").getMatch(0);
-                        if (download_id == null) {
-                            /* Skip invalid entries */
-                            continue;
-                        }
-                        final String date_when_entry_was_addedStr = new Regex(cloudDownloadRow, ">\\s*(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})\\s*<").getMatch(0);
-                        final long delete_after_x_days = 1;
-                        boolean isOldEntry = false;
-                        final boolean isStillDownloadingToCloud = new Regex(cloudDownloadRow, "Transfering \\d{1,3}\\.\\d{1,2} ").matches();
-                        boolean deletionAllowedByFilename = false;
-                        String filename_of_current_entry = null;
-                        for (final String deletionAllowedFilename : deleteDownloadHistoryFilenameWhitelist) {
-                            if (cloudDownloadRow.contains(deletionAllowedFilename)) {
-                                deletionAllowedByFilename = true;
-                                filename_of_current_entry = deletionAllowedFilename;
-                                filename_entries_to_delete.add(deletionAllowedFilename);
-                                break;
-                            }
-                        }
-                        if (date_when_entry_was_addedStr != null) {
-                            final long current_time = getCurrentServerTime(br, System.currentTimeMillis());
-                            final long date_when_entry_was_added = TimeFormatter.getMilliSeconds(date_when_entry_was_addedStr, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
-                            final long time_passed = current_time - date_when_entry_was_added;
-                            if (time_passed > delete_after_x_days * 24 * 60 * 60 * 1000l) {
-                                isOldEntry = true;
-                            }
-                        }
-                        if (isStillDownloadingToCloud) {
-                            logger.info("NOT deleting the following download_id because cloud download is still in progress: " + download_id);
-                            continue;
-                        } else if (!deletionAllowedByFilename && !isOldEntry) {
-                            logger.info("NOT deleting the following download_id because its' filename is not allowed for deletion and it is not old enough: " + download_id);
-                            continue;
-                        }
-                        if (isOldEntry) {
-                            logger.info("Deleting the following entry as it is older than " + delete_after_x_days + " days: " + download_id);
-                        } else {
-                            logger.info("Deleting the following entry as deletion is allowed by filename: " + download_id + " | " + filename_of_current_entry);
-                        }
-                        postData += "&checkbox%5B%5D=" + download_id;
-                        numberofDownloadIdsToDelete++;
+                if (cloudDownloadRows == null || cloudDownloadRows.length == 0) {
+                    return;
+                }
+                logger.info("Found " + cloudDownloadRows.length + " possible download_ids in history to delete");
+                String postData = "delete=Delete+selected";
+                int numberofDownloadIdsToDelete = 0;
+                for (final String cloudDownloadRow : cloudDownloadRows) {
+                    final String download_id = new Regex(cloudDownloadRow, "id=\"checkbox\\[\\]\" value=\"(\\d+)\"").getMatch(0);
+                    if (download_id == null) {
+                        /* Skip invalid entries */
+                        continue;
                     }
-                    if (numberofDownloadIdsToDelete == 0) {
-                        /* This is unlikely but possible! */
-                        logger.info("Found no download_ids to delete --> Probably all existing download_ids are download_ids with serverside cloud download in progress or they were added via website or via another JD instance and are not yet old enough to get deleted");
+                    final String date_when_entry_was_addedStr = new Regex(cloudDownloadRow, ">\\s*(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})\\s*<").getMatch(0);
+                    final long delete_after_x_days = 1;
+                    boolean isOldEntry = false;
+                    final boolean isStillDownloadingToCloud = new Regex(cloudDownloadRow, "Transfering \\d{1,3}\\.\\d{1,2} ").matches();
+                    boolean deletionAllowedByFilename = false;
+                    String filename_of_current_entry = null;
+                    for (final String deletionAllowedFilename : deleteDownloadHistoryFilenameWhitelist) {
+                        if (cloudDownloadRow.contains(deletionAllowedFilename)) {
+                            deletionAllowedByFilename = true;
+                            filename_of_current_entry = deletionAllowedFilename;
+                            filename_entries_to_delete.add(deletionAllowedFilename);
+                            break;
+                        }
+                    }
+                    if (date_when_entry_was_addedStr != null) {
+                        final long current_time = getCurrentServerTime(br, System.currentTimeMillis());
+                        final long date_when_entry_was_added = TimeFormatter.getMilliSeconds(date_when_entry_was_addedStr, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
+                        final long time_passed = current_time - date_when_entry_was_added;
+                        if (time_passed > delete_after_x_days * 24 * 60 * 60 * 1000l) {
+                            isOldEntry = true;
+                        }
+                    }
+                    if (isStillDownloadingToCloud) {
+                        logger.info("NOT deleting the following download_id because cloud download is still in progress: " + download_id);
+                        continue;
+                    } else if (!deletionAllowedByFilename && !isOldEntry) {
+                        logger.info("NOT deleting the following download_id because its' filename is not allowed for deletion and it is not old enough: " + download_id);
+                        continue;
+                    }
+                    if (isOldEntry) {
+                        logger.info("Deleting the following entry as it is older than " + delete_after_x_days + " days: " + download_id);
                     } else {
-                        logger.info("Deleting " + numberofDownloadIdsToDelete + " of " + cloudDownloadRows.length + " download_ids");
-                        br.postPage(br.getURL(), postData);
-                        logger.info("Successfully cleared download history");
+                        logger.info("Deleting the following entry as deletion is allowed by filename: " + download_id + " | " + filename_of_current_entry);
                     }
-                    /*
-                     * Cleanup deleteDownloadHistoryFilenameWhitelist - remove supposedly deleted elements from that list. And also elements
-                     * which do not exist at all in the website list e.g. automatically deleted or deleted by other user in case people
-                     * share accounts and download the same files.
-                     */
-                    for (final String deleted_filename : filename_entries_to_delete) {
-                        deleteDownloadHistoryFilenameWhitelist.remove(deleted_filename);
-                    }
+                    postData += "&checkbox%5B%5D=" + download_id;
+                    numberofDownloadIdsToDelete++;
+                }
+                if (numberofDownloadIdsToDelete == 0) {
+                    /* This is unlikely but possible! */
+                    logger.info("Found no download_ids to delete --> Probably all existing download_ids are download_ids with serverside cloud download in progress or they were added via website or via another JD instance and are not yet old enough to get deleted");
+                } else {
+                    logger.info("Deleting " + numberofDownloadIdsToDelete + " of " + cloudDownloadRows.length + " download_ids");
+                    br.postPage(br.getURL(), postData);
+                    logger.info("Successfully cleared download history");
+                }
+                /*
+                 * Cleanup deleteDownloadHistoryFilenameWhitelist - remove supposedly deleted elements from that list. And also elements
+                 * which do not exist at all in the website list e.g. automatically deleted or deleted by other user in case people share
+                 * accounts and download the same files.
+                 */
+                for (final String deleted_filename : filename_entries_to_delete) {
+                    deleteDownloadHistoryFilenameWhitelist.remove(deleted_filename);
                 }
             } catch (final Throwable e) {
                 logger.log(e);
@@ -963,7 +966,7 @@ public class ProLeechLink extends PluginForHost {
                 return null;
             }
             for (final String downloadHistoryRow : downloadHistoryRows) {
-                if (!downloadHistoryRow.contains(internal_filename)) {
+                if (internal_filename == null || !downloadHistoryRow.contains(internal_filename)) {
                     continue;
                 }
                 logger.info("Looks like we found the row containing our cloud-download");
@@ -1057,10 +1060,18 @@ public class ProLeechLink extends PluginForHost {
                 break;
             case 4:
                 /* {"error":4,"message":" No account is working. Try repost later. "} */
+                if (link == null) {
+                    /* Account error */
+                    throw new AccountUnavailableException(message, 5 * 60 * 1000l);
+                }
                 mhm.handleErrorGeneric(account, link, message, 5);
+                /* Unreachable code */
+                throw new WTFException();
             case -10:
                 /* 2020-05-06: According to admin: -10 Account is invalid. */
                 apiAccountInvalid(account);
+                /* Unreachable code */
+                throw new WTFException();
             case -9:
                 /* 2020-05-06: According to admin: -9 Your account is locked due to sharing account. */
                 throw new AccountInvalidException(message);
@@ -1069,6 +1080,8 @@ public class ProLeechLink extends PluginForHost {
                 throw new AccountInvalidException(message);
             case -6:
                 apiAccountInvalid(account);
+                /* Unreachable code */
+                throw new WTFException();
             case -5:
                 throw new AccountInvalidException("Free accounts are not supported");
             case -4:
@@ -1080,10 +1093,18 @@ public class ProLeechLink extends PluginForHost {
             case -1:
                 /* {"error":-1,"message":"API key is invalid. Please update new API key https:\/\/proleech.link\/jdownloader."} */
                 apiAccountInvalid(account);
+                /* Unreachable code */
+                throw new WTFException();
             case 1:
                 /* 2020-06-04: Rare error I guess? */
                 /* {"error":1,"message":"Link not supported or empty link."} */
+                if (link == null) {
+                    /* Account error */
+                    throw new AccountUnavailableException(message, 5 * 60 * 1000l);
+                }
                 mhm.handleErrorGeneric(account, link, message, 5);
+                /* Unreachable code */
+                throw new WTFException();
             default:
                 /* Handle all other errors */
                 /**

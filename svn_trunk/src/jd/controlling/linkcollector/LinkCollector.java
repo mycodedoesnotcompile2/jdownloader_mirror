@@ -37,45 +37,6 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
-import jd.config.Property;
-import jd.controlling.TaskQueue;
-import jd.controlling.downloadcontroller.DownloadController;
-import jd.controlling.downloadcontroller.DownloadSession;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.DownloadWatchDogJob;
-import jd.controlling.linkchecker.LinkChecker;
-import jd.controlling.linkchecker.LinkCheckerHandler;
-import jd.controlling.linkcollector.autostart.AutoStartManager;
-import jd.controlling.linkcrawler.CheckableLink;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledLinkModifier;
-import jd.controlling.linkcrawler.CrawledLinkProperty;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.linkcrawler.CrawledPackage.TYPE;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
-import jd.controlling.linkcrawler.LinkCrawlerFilter;
-import jd.controlling.linkcrawler.LinkCrawlerHandler;
-import jd.controlling.linkcrawler.LinkCrawlerRule;
-import jd.controlling.linkcrawler.LinkCrawlerRule.RULE;
-import jd.controlling.linkcrawler.PackageInfo;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.packagecontroller.AbstractPackageChildrenNodeFilter;
-import jd.controlling.packagecontroller.PackageController;
-import jd.controlling.packagecontroller.PackageControllerQueue.ReadOnlyQueueAction;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.WarnLevel;
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.parser.Regex;
-import jd.plugins.CrawledLinkStorable;
-import jd.plugins.CrawledPackageStorable;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import jd.plugins.Plugin;
-import jd.plugins.PluginForHost;
-import jd.utils.JDUtilities;
-
 import org.appwork.controlling.SingleReachableState;
 import org.appwork.exceptions.WTFException;
 import org.appwork.scheduler.DelayedRunnable;
@@ -86,9 +47,9 @@ import org.appwork.shutdown.ShutdownVetoException;
 import org.appwork.shutdown.ShutdownVetoListener;
 import org.appwork.storage.SimpleMapper;
 import org.appwork.storage.TypeRef;
-import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
+import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.uio.UIOManager;
@@ -152,6 +113,45 @@ import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.settings.staticreferences.CFG_LINKCOLLECTOR;
 import org.jdownloader.settings.staticreferences.CFG_LINKGRABBER;
 import org.jdownloader.translate._JDT;
+
+import jd.config.Property;
+import jd.controlling.TaskQueue;
+import jd.controlling.downloadcontroller.DownloadController;
+import jd.controlling.downloadcontroller.DownloadSession;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.downloadcontroller.DownloadWatchDogJob;
+import jd.controlling.linkchecker.LinkChecker;
+import jd.controlling.linkchecker.LinkCheckerHandler;
+import jd.controlling.linkcollector.autostart.AutoStartManager;
+import jd.controlling.linkcrawler.CheckableLink;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledLinkModifier;
+import jd.controlling.linkcrawler.CrawledLinkProperty;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.linkcrawler.CrawledPackage.TYPE;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
+import jd.controlling.linkcrawler.LinkCrawlerFilter;
+import jd.controlling.linkcrawler.LinkCrawlerHandler;
+import jd.controlling.linkcrawler.LinkCrawlerRule;
+import jd.controlling.linkcrawler.LinkCrawlerRule.RULE;
+import jd.controlling.linkcrawler.PackageInfo;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNodeFilter;
+import jd.controlling.packagecontroller.PackageController;
+import jd.controlling.packagecontroller.PackageControllerQueue.ReadOnlyQueueAction;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.WarnLevel;
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.parser.Regex;
+import jd.plugins.CrawledLinkStorable;
+import jd.plugins.CrawledPackageStorable;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import jd.plugins.Plugin;
+import jd.plugins.PluginForHost;
+import jd.utils.JDUtilities;
 
 public class LinkCollector extends PackageController<CrawledPackage, CrawledLink> implements LinkCheckerHandler<CrawledLink>, LinkCrawlerHandler, ShutdownVetoListener {
     public static final String                        SOURCE_VARIANT_ID = "SOURCE_VARIANT_ID";
@@ -1478,9 +1478,9 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
 
     /*
      * converts a CrawledPackage into a FilePackage
-     * 
+     *
      * if plinks is not set, then the original children of the CrawledPackage will get added to the FilePackage
-     * 
+     *
      * if plinks is set, then only plinks will get added to the FilePackage
      */
     private FilePackage createFilePackage(final CrawledPackage pkg, List<CrawledLink> plinks) {
@@ -2182,7 +2182,6 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
         try {
             fis = new FileInputStream(file);
             zis = new ZipInputStream(new BufferedInputStream(fis, 1 * 1024 * 1024));
-
             final List<CrawledLink> loadedCrawledLinks = new ArrayList<CrawledLink>();
             /* lets restore the CrawledPackages from Json */
             final HashMap<Integer, LoadedPackage> packageMap = new HashMap<Integer, LoadedPackage>();
@@ -2745,10 +2744,11 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
     }
 
     /**
-     * This class describes, how a "move links to downloadlist" action shall behave. </br> Examples of what it can influence: </br> - define
-     * specific properties that should be set on the items to move e.g. set highest priority </br> - define what should happen afterwards
-     * such as "force download-start of added items" </br> - define what happens in linkgrabber afterwards such as
-     * "clean all remaining items in linkgrabber"
+     * This class describes, how a "move links to downloadlist" action shall behave. </br>
+     * Examples of what it can influence: </br>
+     * - define specific properties that should be set on the items to move e.g. set highest priority </br>
+     * - define what should happen afterwards such as "force download-start of added items" </br>
+     * - define what happens in linkgrabber afterwards such as "clean all remaining items in linkgrabber"
      */
     public final static class ConfirmLinksSettings {
         public static enum SwitchToDownloadlistBehavior implements LabelInterface {
@@ -2783,36 +2783,20 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
         }
 
         public final boolean getAutoStartDownloads() {
-            final Boolean ret = autoStartDownloads;
-            if (ret != null) {
-                return ret.booleanValue();
-            }
-            return defaultAutoStartDownloads;
+            return autoStartDownloads;
         }
 
-        public final ConfirmLinksSettings setAutoStartDownloads(Boolean autoStartDownloads) {
-            if (autoStartDownloads == null || autoStartDownloads.booleanValue() == defaultAutoStartDownloads) {
-                this.autoStartDownloads = null;
-            } else {
-                this.autoStartDownloads = autoStartDownloads;
-            }
+        public final ConfirmLinksSettings setAutoStartDownloads(boolean autoStartDownloads) {
+            this.autoStartDownloads = autoStartDownloads;
             return this;
         }
 
         public final boolean isForceDownloads() {
-            final Boolean ret = forceDownloads;
-            if (ret != null) {
-                return ret.booleanValue();
-            }
-            return defaultForceDownloads;
+            return forceDownloads;
         }
 
-        public final ConfirmLinksSettings setForceDownloads(Boolean forceDownloads) {
-            if (forceDownloads == null || forceDownloads.booleanValue() == defaultForceDownloads) {
-                this.forceDownloads = null;
-            } else {
-                this.forceDownloads = forceDownloads;
-            }
+        public final ConfirmLinksSettings setForceDownloads(boolean forceDownloads) {
+            this.forceDownloads = forceDownloads;
             return this;
         }
 
@@ -2834,25 +2818,17 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
         }
 
         public final boolean isClearLinkgrabberlistOnConfirm() {
-            final Boolean ret = clearLinkgrabberlistOnConfirm;
-            if (ret != null) {
-                return ret.booleanValue();
-            }
-            return defaultClearLinkgrabberlistOnConfirm;
+            return clearLinkgrabberlistOnConfirm;
         }
 
-        public final ConfirmLinksSettings setClearLinkgrabberlistOnConfirm(Boolean clearLinkgrabberlistOnConfirm) {
-            if (clearLinkgrabberlistOnConfirm == null || clearLinkgrabberlistOnConfirm.booleanValue() == defaultClearLinkgrabberlistOnConfirm) {
-                this.clearLinkgrabberlistOnConfirm = null;
-            } else {
-                this.clearLinkgrabberlistOnConfirm = clearLinkgrabberlistOnConfirm;
-            }
+        public final ConfirmLinksSettings setClearLinkgrabberlistOnConfirm(boolean clearLinkgrabberlistOnConfirm) {
+            this.clearLinkgrabberlistOnConfirm = clearLinkgrabberlistOnConfirm;
             return this;
         }
 
         /**
-         * Never returns GLOBAL_DEFAULT - resolves it to whatever {@link #getDefaultSwitchToDownloadlistBehavior()} currently computes
-         * (i.e. the global default config), same as every other getter here resolving unset values to their default.
+         * Never returns GLOBAL_DEFAULT - resolves it to whatever {@link #getDefaultSwitchToDownloadlistBehavior()} currently computes (i.e.
+         * the global default config), same as every other getter here resolving unset values to their default.
          */
         public final SwitchToDownloadlistBehavior getSwitchToDownloadlistBehavior() {
             final SwitchToDownloadlistBehavior ret = switchToDownloadlistBehavior;
@@ -2976,39 +2952,40 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
             return this;
         }
 
-        public boolean isMergeSameNamedPackagesOnConfirm() {
-            if (mergeSameNamedPackagesOnConfirm == null) {
-                return defaultMergeSameNamedPackagesOnConfirm;
-            } else {
-                return mergeSameNamedPackagesOnConfirm.booleanValue();
-            }
+        public boolean isMergeSameNamedPackagesInDownloadlistInExistingPackagesOnConfirm() {
+            return mergeSameNamedPackagesInDownloadlistInExistingPackagesOnConfirm;
         }
 
-        private final MoveLinksMode              moveLinksMode;
-        private final boolean                    defaultAutoStartDownloads                     = getDefaultAutoStartDownloads();
-        private Boolean                          autoStartDownloads                            = null;
-        private final boolean                    defaultForceDownloads                         = getDefaultForceDownloads();
-        private Boolean                          forceDownloads                                = null;
-        private final boolean                    defaultClearLinkgrabberlistOnConfirm          = getDefaultClearLinkgrabberlistOnConfirm();
-        private Boolean                          clearLinkgrabberlistOnConfirm                 = null;
-        private final Priority                   defaultPriority                               = getDefaultPriority();
-        private Priority                         priority                                      = null;
-        private final SwitchToDownloadlistBehavior defaultSwitchToDownloadlistBehavior         = getDefaultSwitchToDownloadlistBehavior();
-        private SwitchToDownloadlistBehavior     switchToDownloadlistBehavior                  = null;
-        private final OnOfflineLinksAction       defaultHandleOffline                          = getDefaultHandleOffline();
-        private OnOfflineLinksAction             handleOffline                                 = null;
-        private final OnDupesLinksAction         defaultHandleDupes                            = getDefaultHandleDupes();
-        private OnDupesLinksAction               handleDupes                                   = null;
-        private final PackageExpandBehavior      defaultPackageExpandBehavior                  = getDefaultPackageExpandBehavior();
-        private PackageExpandBehavior            packageExpandBehavior                         = null;
-        private final ConfirmationDialogBehavior defaultConfirmationDialogBehavior             = getDefaultConfirmationDialogBehavior();
-        private ConfirmationDialogBehavior       confirmationDialogBehavior                    = null;
-        private final int                        defaultConfirmationDialogThresholdMinPackages = getDefaultcConfirmationDialogThresholdMinPackages();
-        private Integer                          confirmationDialogThresholdMinPackages        = 1;
-        private final int                        defaultConfirmationDialogThresholdMinLinks    = getDefaultConfirmationDialogThresholdMinLinks();
-        private Integer                          confirmationDialogThresholdMinLinks           = null;
-        private final boolean                    defaultMergeSameNamedPackagesOnConfirm        = false;
-        private Boolean                          mergeSameNamedPackagesOnConfirm               = null;
+        public final ConfirmLinksSettings setMergeSameNamedPackagesInDownloadlistInExistingPackagesOnConfirm(boolean mergeSameNamedPackagesInDownloadlistInExistingPackagesOnConfirm) {
+            this.mergeSameNamedPackagesInDownloadlistInExistingPackagesOnConfirm = mergeSameNamedPackagesInDownloadlistInExistingPackagesOnConfirm;
+            return this;
+        }
+
+        private final MoveLinksMode                moveLinksMode;
+        private final boolean                      defaultAutoStartDownloads                                              = getDefaultAutoStartDownloads();
+        private boolean                            autoStartDownloads                                                     = defaultAutoStartDownloads;
+        private final boolean                      defaultForceDownloads                                                  = getDefaultForceDownloads();
+        private boolean                            forceDownloads                                                         = defaultForceDownloads;
+        private final boolean                      defaultClearLinkgrabberlistOnConfirm                                   = getDefaultClearLinkgrabberlistOnConfirm();
+        private boolean                            clearLinkgrabberlistOnConfirm                                          = defaultClearLinkgrabberlistOnConfirm;
+        private final Priority                     defaultPriority                                                        = getDefaultPriority();
+        private Priority                           priority                                                               = null;
+        private final SwitchToDownloadlistBehavior defaultSwitchToDownloadlistBehavior                                    = getDefaultSwitchToDownloadlistBehavior();
+        private SwitchToDownloadlistBehavior       switchToDownloadlistBehavior                                           = null;
+        private final OnOfflineLinksAction         defaultHandleOffline                                                   = getDefaultHandleOffline();
+        private OnOfflineLinksAction               handleOffline                                                          = null;
+        private final OnDupesLinksAction           defaultHandleDupes                                                     = getDefaultHandleDupes();
+        private OnDupesLinksAction                 handleDupes                                                            = null;
+        private final PackageExpandBehavior        defaultPackageExpandBehavior                                           = getDefaultPackageExpandBehavior();
+        private PackageExpandBehavior              packageExpandBehavior                                                  = null;
+        private final ConfirmationDialogBehavior   defaultConfirmationDialogBehavior                                      = getDefaultConfirmationDialogBehavior();
+        private ConfirmationDialogBehavior         confirmationDialogBehavior                                             = null;
+        private final int                          defaultConfirmationDialogThresholdMinPackages                          = getDefaultcConfirmationDialogThresholdMinPackages();
+        private Integer                            confirmationDialogThresholdMinPackages                                 = 1;
+        private final int                          defaultConfirmationDialogThresholdMinLinks                             = getDefaultConfirmationDialogThresholdMinLinks();
+        private Integer                            confirmationDialogThresholdMinLinks                                    = null;
+        private final boolean                      defaultMergeSameNamedPackagesInDownloadlistInExistingPackagesOnConfirm = getDefaultMergeSameNamedPackagesInDownloadlistInExistingPackagesOnConfirm();
+        private boolean                            mergeSameNamedPackagesInDownloadlistInExistingPackagesOnConfirm        = defaultMergeSameNamedPackagesInDownloadlistInExistingPackagesOnConfirm;
 
         public ConfirmLinksSettings(final MoveLinksMode mode) {
             this.moveLinksMode = mode != null ? mode : MoveLinksMode.AUTO;
@@ -3091,12 +3068,16 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
             }
             return false;
         }
+
+        private boolean getDefaultMergeSameNamedPackagesInDownloadlistInExistingPackagesOnConfirm() {
+            return CFG_LINKGRABBER.CFG.isMergeSameNamedPackagesInDownloadlistInExistingPackagesOnConfirmDefaultEnabled();
+        }
     }
 
     public void moveLinksToDownloadList(final SelectionInfo<CrawledPackage, CrawledLink> selection, final ConfirmLinksSettings moveLinksSettings) {
         final List<FilePackage> filePackagesToAdd = new ArrayList<FilePackage>();
         final List<DownloadLink> force = new ArrayList<DownloadLink>();
-        final boolean forcedAutoStart = Boolean.TRUE.equals(moveLinksSettings.isForceDownloads());
+        final boolean forcedAutoStart = moveLinksSettings.isForceDownloads();
         final boolean autoMode = MoveLinksMode.AUTO.equals(moveLinksSettings.getMoveLinksMode());
         boolean autoStartLinks = false;
         /* convert all selected CrawledLinks to FilePackages */
@@ -3105,7 +3086,7 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
             final List<FilePackage> convertedLinks = LinkCollector.getInstance().convert(links, true);
             for (final CrawledLink cl : links) {
                 autoStartLinks |= cl.isAutoStartEnabled();
-                if ((autoMode && cl.isForcedAutoStartEnabled()) || forcedAutoStart) {
+                if (forcedAutoStart || (autoMode && cl.isForcedAutoStartEnabled())) {
                     force.add(cl.getDownloadLink());
                 }
                 if (Priority.DEFAULT.equals(cl.getPriority()) && moveLinksSettings.getPriority() != null) {
@@ -3132,17 +3113,20 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
          * addBottom = negative number -> add at the end
          */
         final boolean finalAutoStart;
-        final Boolean autoStart = moveLinksSettings.getAutoStartDownloads();
         if (autoMode) {
-            finalAutoStart = autoStartLinks || Boolean.TRUE.equals(autoStart);
+            finalAutoStart = autoStartLinks || moveLinksSettings.getAutoStartDownloads();
         } else {
-            if (autoStart != null) {
-                finalAutoStart = autoStart.booleanValue();
-            } else {
-                finalAutoStart = autoStartLinks;
-            }
+            finalAutoStart = moveLinksSettings.getAutoStartDownloads();
         }
         DownloadController.getInstance().addAllAt(filePackagesToAdd, addTop ? 0 : -(filePackagesToAdd.size() + 10));
+        if (moveLinksSettings.isMergeSameNamedPackagesInDownloadlistInExistingPackagesOnConfirm() && filePackagesToAdd.size() > 0) {
+            /*
+             * Fold each freshly added package into an existing same named package in the downloadlist. The merge target follows the insert
+             * position: with "add at top" the topmost existing package is used, otherwise the bottom-most one. Runs on the same
+             * DownloadController queue as addAllAt above, so the added packages are already present when this runs.
+             */
+            DownloadController.getInstance().mergeAddedPackagesIntoExistingSameNamedPackages(filePackagesToAdd, addTop);
+        }
         DownloadController.getInstance().getQueue().add(new QueueAction<Void, RuntimeException>() {
             @Override
             protected Void run() throws RuntimeException {

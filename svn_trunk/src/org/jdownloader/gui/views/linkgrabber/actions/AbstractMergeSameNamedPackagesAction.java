@@ -4,6 +4,7 @@ import java.awt.event.ActionEvent;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.utils.event.queue.QueueAction;
 import org.jdownloader.controlling.contextmenu.ActionContext;
 import org.jdownloader.controlling.contextmenu.CustomizableTableContextAppAction;
@@ -13,6 +14,7 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.SelectionInfo.PackageView;
 import org.jdownloader.plugins.config.Order;
+import org.jdownloader.settings.staticreferences.CFG_LINKGRABBER;
 
 import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
 import jd.controlling.packagecontroller.AbstractPackageNode;
@@ -20,8 +22,46 @@ import jd.controlling.packagecontroller.PackageController;
 import jd.controlling.packagecontroller.PackageController.PackageSettings;
 
 public abstract class AbstractMergeSameNamedPackagesAction<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> extends CustomizableTableContextAppAction<PackageType, ChildrenType> implements ActionContext {
-    private boolean caseInsensitive = true;
-    private boolean mergeAll        = false;
+    public static enum CaseInsensitiveMergeOptions implements LabelInterface {
+        GLOBAL {
+            @Override
+            public String getLabel() {
+                return _GUI.T.MergeSameNamedPackagesAction_CaseInsensitiveMergeOptions_GLOBAL(isEnabled() ? _GUI.T.MergeSameNamedPackagesAction_CaseInsensitiveMergeOptions_ENABLED() : _GUI.T.MergeSameNamedPackagesAction_CaseInsensitiveMergeOptions_DISABLED());
+            }
+
+            @Override
+            public boolean isEnabled() {
+                return CFG_LINKGRABBER.CFG.isMergeSameNamedPackagesInDownloadlistInExistingPackagesCaseInsensitiveDefaultEnabled();
+            }
+        },
+        ENABLED {
+            @Override
+            public String getLabel() {
+                return _GUI.T.MergeSameNamedPackagesAction_CaseInsensitiveMergeOptions_ENABLED();
+            }
+
+            @Override
+            public boolean isEnabled() {
+                return true;
+            }
+        },
+        DISABLED {
+            @Override
+            public String getLabel() {
+                return _GUI.T.MergeSameNamedPackagesAction_CaseInsensitiveMergeOptions_DISABLED();
+            }
+
+            @Override
+            public boolean isEnabled() {
+                return false;
+            }
+        };
+
+        public abstract boolean isEnabled();
+    }
+
+    private CaseInsensitiveMergeOptions caseInsensitive = CaseInsensitiveMergeOptions.GLOBAL;
+    private boolean                     mergeAll        = false;
 
     public static String getTranslationForMatchPackageNamesCaseInsensitive() {
         return _GUI.T.MergeSameNamedPackagesAction_Case_Insensitive();
@@ -29,11 +69,14 @@ public abstract class AbstractMergeSameNamedPackagesAction<PackageType extends A
 
     @Customizer(link = "#getTranslationForMatchPackageNamesCaseInsensitive")
     @Order(100)
-    public boolean isMatchPackageNamesCaseInsensitive() {
+    public CaseInsensitiveMergeOptions getMatchPackageNamesCaseInsensitive() {
         return caseInsensitive;
     }
 
-    public void setMatchPackageNamesCaseInsensitive(boolean val) {
+    public void setMatchPackageNamesCaseInsensitive(CaseInsensitiveMergeOptions val) {
+        if (val == null) {
+            val = CaseInsensitiveMergeOptions.GLOBAL;
+        }
         this.caseInsensitive = val;
     }
 
@@ -76,8 +119,8 @@ public abstract class AbstractMergeSameNamedPackagesAction<PackageType extends A
             @Override
             protected Void run() throws RuntimeException {
                 final PackageSettings settings = new PackageSettings();
-                settings.setMergeSameNamedPackages(Boolean.TRUE);
-                settings.setMergeSameNamedPackagesCaseInsensitive(isMatchPackageNamesCaseInsensitive());
+                settings.setMergeSameNamedPackages(true);
+                settings.setMergeSameNamedPackagesCaseInsensitive(getMatchPackageNamesCaseInsensitive().isEnabled());
                 /* If user has selected package(s), only collect duplicates within selection. */
                 final List<PackageView<PackageType, ChildrenType>> selPackageViews = sel.getPackageViews();
                 if (isMergeAll() || selPackageViews == null || selPackageViews.size() == 0) {

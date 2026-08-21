@@ -88,7 +88,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 53076 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53185 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -1687,10 +1687,11 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
                             logger.warning("Failed to decrypt URL: " + cryptedDllinkTmp);
                             continue;
                         }
-                        if (!addQualityURL(this.getDownloadLink(), qualityMap, dllinkTmp)) {
+                        if (addQualityURL(br, this.getDownloadLink(), qualityMap, dllinkTmp) == -1) {
                             uncryptedUrlWithoutQualityIndicator = dllinkTmp;
                             continue;
                         }
+                        foundQualities++;
                     }
                 }
                 logger.info("Found " + foundQualities + " crypted qualities #2");
@@ -1729,7 +1730,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
                     /* Skip duplicates */
                     continue;
                 }
-                if (!addQualityURL(this.getDownloadLink(), qualityMap, dllinkTmp)) {
+                if (addQualityURL(br, this.getDownloadLink(), qualityMap, dllinkTmp) == -1) {
                     if (uncryptedUrlWithoutQualityIndicator == null) {
                         uncryptedUrlWithoutQualityIndicator = dllinkTmp;
                     }
@@ -1745,27 +1746,19 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
             final String[] sources = br.getRegex("<source[^>]*?src=\"(https?://[^<>\"]*?)\"[^>]*?type=(\"|')video/[a-z0-9]+\\2[^>]+>").getColumn(-1);
             for (final String source : sources) {
                 final String dllinkTmp = new Regex(source, "src=\"(https?://[^<>\"]+)\"").getMatch(0);
-                String qualityTempStr = new Regex(source, "title=\"(\\d+)p\"").getMatch(0);
-                if (qualityTempStr == null) {
-                    /* 2020-01-29: More open RegEx e.g. pornhat.com */
-                    qualityTempStr = new Regex(source, "(\\d+)p").getMatch(0);
-                }
-                if (dllinkTmp == null && qualityTempStr == null) {
-                    /* Skip invalid items */
-                    continue;
-                } else if (!isValidDirectURL(dllinkTmp)) {
+                if (!isValidDirectURL(dllinkTmp)) {
                     logger.info("Skipping invalid video URL: " + dllinkTmp);
                     continue;
+                } else if (qualityMap.containsValue(dllinkTmp)) {
+                    continue;
                 }
-                if (qualityTempStr == null) {
+                if (addQualityURL(br, this.getDownloadLink(), qualityMap, dllinkTmp) == -1) {
                     logger.info("Found item without quality indicator: " + dllinkTmp);
                     if (uncryptedUrlWithoutQualityIndicator == null) {
                         uncryptedUrlWithoutQualityIndicator = dllinkTmp;
                     }
                     continue;
                 }
-                final int qualityTmp = Integer.parseInt(qualityTempStr);
-                qualityMap.put(qualityTmp, dllinkTmp);
                 foundQualities++;
             }
             logger.info("Found " + foundQualities + " qualities in stage 2");
@@ -2014,25 +2007,39 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         return finalURL;
     }
 
-    private boolean addQualityURL(final DownloadLink link, final Map<Integer, String> qualityMap, final String url) {
+    private int addQualityURL(final Browser br, final DownloadLink link, final Map<Integer, String> qualityMap, final String url) {
+        /* Sometimes, found "quality" == fuid --> == no quality indicator at all */
+        final String fuid = this.getFUID(link);
         String qualityTmpStr = new Regex(url, "(?i)(\\d+)(p|m)\\.mp4").getMatch(0);
         if (qualityTmpStr == null) {
             /* Wider approach */
             qualityTmpStr = new Regex(url, "(?i)(\\d+)\\.mp4").getMatch(0);
         }
-        /* Sometimes, found "quality" == fuid --> == no quality indicator at all */
-        final String fuid = this.getFUID(link);
+        if (StringUtils.equals(qualityTmpStr, fuid)) {
+            qualityTmpStr = null;
+        }
+        if (qualityTmpStr == null) {
+            // fapnado.com
+            final String title = br.getRegex(Pattern.quote(url) + "('|\")\\s*\\s*type\\s*=\\s*\\1video/[a-z0-9]+\\1\\s*title\\s*=\\s*\\1(.*?)\\1").getMatch(1);
+            if ("Standard".equalsIgnoreCase(qualityTmpStr)) {
+                qualityTmpStr = "360";
+            } else if ("SD".equalsIgnoreCase(qualityTmpStr)) {
+                qualityTmpStr = "480";
+            } else if ("HD".equalsIgnoreCase(title)) {
+                qualityTmpStr = "720";
+            } else if ("FHD".equalsIgnoreCase(title)) {
+                qualityTmpStr = "1080";
+            }
+        }
         if (qualityTmpStr == null) {
             logger.info("Failed to find quality identifier for URL: " + url);
-            return false;
-        } else if (StringUtils.equals(qualityTmpStr, fuid)) {
-            /* Sometimes, found "quality" == fuid --> == no quality indicator at all */
-            logger.info("Failed to find quality identifier for URL: " + url);
-            return false;
+            return -1;
         } else {
             final int qualityTmp = Integer.parseInt(qualityTmpStr);
-            qualityMap.put(qualityTmp, url);
-            return true;
+            if (qualityMap != null) {
+                qualityMap.put(qualityTmp, url);
+            }
+            return qualityTmp;
         }
     }
 
@@ -2154,7 +2161,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         } else if (StringUtils.endsWithCaseInsensitive(url, "jpg/")) {
             // logger.info("Skipping invalid video URL (= picture): " + url);
             return false;
-        } else if (StringUtils.containsIgnoreCase(url, "_preview.mp4")) {
+        } else if (StringUtils.containsIgnoreCase(url, "_preview.mp4") || StringUtils.containsIgnoreCase(url, "_preview_big.mp4")) {
             /* E.g. a lot of websites! */
             // logger.info("Skipping invalid video URL (= preview): " + url);
             return false;

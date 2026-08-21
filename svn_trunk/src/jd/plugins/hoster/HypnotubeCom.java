@@ -46,7 +46,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53175 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53176 $", interfaceVersion = 3, names = {}, urls = {})
 public class HypnotubeCom extends PluginForHost {
     public HypnotubeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -146,7 +146,7 @@ public class HypnotubeCom extends PluginForHost {
     }
 
     private void handleAgeGate(Browser br) throws Exception {
-        if (StringUtils.contains(br.getURL(), "/age-gate")) {
+        if (StringUtils.containsIgnoreCase(br.getURL(), "/age-gate")) {
             final Map<String, Object> json = new HashMap<String, Object>();
             json.put("timeZone", ZoneId.systemDefault().getId());
             json.put("languages", new String[] { "en-US", "en" });

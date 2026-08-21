@@ -367,6 +367,8 @@ public abstract class PackageControllerTableTransferHandler<PackageType extends 
                     @Override
                     protected Void run() throws RuntimeException {
                         final PackageSettings mergesettings = new PackageSettings();
+                        /* Drag&drop onto a package only moves the dropped items into it; it must not trigger same-name merging. */
+                        mergesettings.setMergeSameNamedPackages(false);
                         if (((PackageType) element).getCurrentSorter() == null) {
                             if (org.jdownloader.settings.staticreferences.CFG_LINKCOLLECTOR.DO_MERGE_TOP_BOTTOM.isEnabled()) {
                                 mergesettings.setPackagePosition(MergePosition.BOTTOM);

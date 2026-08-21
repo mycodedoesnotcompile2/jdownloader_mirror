@@ -1047,6 +1047,18 @@ public interface JdownloaderTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "if the selection contains duplicate links..." })
     String ConfirmLinksContextAction_getTranslationForHandleDupes();
 
+    @Default(lngs = { "en" }, values = { "Merge with existing same named packages in downloadlist" })
+    String ConfirmLinksContextAction_getTranslationForMergeSameNamedPackages();
+
+    @Default(lngs = { "en" }, values = { "Enabled" })
+    String ConfirmLinksContextAction_MergeSameNamedPackagesOptions_ENABLED();
+
+    @Default(lngs = { "en" }, values = { "Disabled" })
+    String ConfirmLinksContextAction_MergeSameNamedPackagesOptions_DISABLED();
+
+    @Default(lngs = { "en" }, values = { "use global (adv. config) settings: %s1" })
+    String ConfirmLinksContextAction_MergeSameNamedPackagesOptions_GLOBAL(String str);
+
     @Default(lngs = { "en" }, values = { "Affected Links: Finished Package" })
     String GenericDeleteFromDownloadlistAction_getTranslationForDeleteFinishedPackage();
 

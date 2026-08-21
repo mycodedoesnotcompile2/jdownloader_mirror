@@ -54,6 +54,7 @@ import jd.gui.swing.jdgui.components.toolbar.actions.AutoReconnectToggleAction;
 import jd.gui.swing.jdgui.components.toolbar.actions.ClipBoardToggleAction;
 import jd.gui.swing.jdgui.components.toolbar.actions.ExitToolbarAction;
 import jd.gui.swing.jdgui.components.toolbar.actions.GlobalPremiumSwitchToggleAction;
+import jd.gui.swing.jdgui.components.toolbar.actions.MergeSameNamedPackagesOnConfirmToggleAction;
 import jd.gui.swing.jdgui.components.toolbar.actions.MyJDownloaderStatusAction;
 import jd.gui.swing.jdgui.components.toolbar.actions.OpenDefaultDownloadFolderAction;
 import jd.gui.swing.jdgui.components.toolbar.actions.PauseDownloadsAction;
@@ -131,6 +132,7 @@ public class MenuManagerMainToolbar extends ContextMenuManager<FilePackage, Down
         mr.add(new MenuItemData(new ActionData(MoveDownAction.class)));
         mr.add(new MenuItemData(new ActionData(MoveToBottomAction.class)));
         mr.add(new SeparatorData());
+        mr.add(MergeSameNamedPackagesOnConfirmToggleAction.class);
         mr.add(ClipBoardToggleAction.class);
         mr.add(AutoReconnectToggleAction.class);
         mr.add(GlobalPremiumSwitchToggleAction.class);

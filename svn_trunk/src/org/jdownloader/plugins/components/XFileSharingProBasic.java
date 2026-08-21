@@ -93,7 +93,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 53159 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53185 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -4776,6 +4776,10 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             // upload-4ever.com -> <span>Premium until <b>2026-XX-XX XX:XX:XX</b></span>
             expireStr = new Regex(getCorrectBR(br), "(?:>\\s*|<span[^>]*)Premium\\s*(?:account expire|until|expiration):?\\s*[^>]*>([\\d]+-[\\w{2}]+-[\\d]+\\s[\\d:]+)</").getMatch(0);
         }
+        if (expireStr == null) {
+            // rapidcloud.cc/XFS update August/2026 -> <span class="fw-semibold">2026-09-30 09:13:19</span>
+            expireStr = new Regex(getCorrectBR(br), "<span[^>]*>\\s*([\\d]+-[\\w{2}]+-[\\d]+\\s[\\d:]+)\\s*</span>").getMatch(0);
+        }
         if (expireStr != null) {
             /**
              * e.g. kenfiles.com
@@ -4806,6 +4810,10 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (StringUtils.isEmpty(expireSecond)) {
             /* e.g. kenfiles.com */
             expireSecond = new Regex(preciseExpireHTML, Pattern.compile(">\\s*Your premium expires?\\s*:\\s*(\\d+ years?, )?(\\d+ days?, )?(\\d+ hours?, )?(\\d+ minutes?, )?\\d+ seconds\\s*<", Pattern.CASE_INSENSITIVE)).getMatch(-1);
+        }
+        if (StringUtils.isEmpty(expireSecond)) {
+            // rapidcloud.cc/XFS Update August/2026 -> <small>Premium account active until 2027-01-06 (139 days remaining)
+            expireSecond = new Regex(preciseExpireHTML, Pattern.compile(">Premium account active until [^>]*(\\d+ days?)\\s*remaining", Pattern.CASE_INSENSITIVE)).getMatch(-1);
         }
         if (StringUtils.isEmpty(expireSecond)) {
             /**
@@ -5020,6 +5028,10 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             if (StringUtils.isEmpty(availabletraffic)) {
                 /* 2019-02-11: For newer XFS versions */
                 availabletraffic = new Regex(src, ">\\s*(?:Remaining traffic|Traffic available)(?:\\s*today)?\\s*</div>\\s*<div class=\"txt\\d+\">\\s*([^<>\"]+)\\s*<").getMatch(0);
+            }
+            if (StringUtils.isEmpty(availabletraffic)) {
+                /* August 2026: rapidcloud.cc, newer XFS versions? */
+                availabletraffic = new Regex(src, ">\\s*(?:Remaining traffic|Traffic available)(?:\\s*today)?\\s*</div>\\s*<div[^>]*name\\s*=\\s*\"traffic_left\"[^>]*>\\s*([^<>\"]+)\\s*<").getMatch(0);
             }
             if (StringUtils.isEmpty(availabletraffic)) {
                 // wrzucajpliki.pl
@@ -6067,7 +6079,9 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                      */
                     final Map<String, Object> result = this.checkErrorsAPI(brc, null, account);
                     final String msg = (String) result.get("msg");
-                    if (StringUtils.equalsIgnoreCase(msg, "uploading") && "200".equals(StringUtils.valueOfOrNull(result.get("status")))) {
+                    if (StringUtils.equalsIgnoreCase(msg, "This function not allowed in API")) {
+                        apiDownloadsPossible = Boolean.FALSE;
+                    } else if (StringUtils.equalsIgnoreCase(msg, "uploading") && "200".equals(StringUtils.valueOfOrNull(result.get("status")))) {
                         /* 2024-05-27: */
                         apiDownloadsPossible = Boolean.TRUE;
                     } else {

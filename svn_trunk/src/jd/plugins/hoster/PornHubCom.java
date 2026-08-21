@@ -37,6 +37,23 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.httpconnection.HTTPConnection;
+import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
+import org.appwork.utils.net.httpconnection.SSLSocketStreamOptionsModifier;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.logging.LogController;
+import org.jdownloader.net.BCSSLSocketStreamFactory;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -69,24 +86,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PornHubComVideoCrawler;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.ReflectionUtils;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.httpconnection.HTTPConnection;
-import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
-import org.appwork.utils.net.httpconnection.SSLSocketStreamOptionsModifier;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.logging.LogController;
-import org.jdownloader.net.BCSSLSocketStreamFactory;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 52614 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53185 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornHubComVideoCrawler.class })
 public class PornHubCom extends PluginForHost {
     /* Connection stuff */
@@ -104,15 +104,15 @@ public class PornHubCom extends PluginForHost {
     /* Note: Video bitrates and resolutions are not exact, they can vary. */
     /* Quality, { videoCodec, videoBitrate, videoResolution, audioCodec, audioBitrate } */
     public static LinkedHashMap<String, String[]> formats                                            = new LinkedHashMap<String, String[]>(new LinkedHashMap<String, String[]>() {
-        {
-            put("240", new String[] { "AVC", "400", "420x240", "AAC LC", "54" });
-            put("480", new String[] { "AVC", "600", "850x480", "AAC LC", "54" });
-            put("720", new String[] { "AVC", "1500", "1280x720", "AAC LC", "54" });
-            put("1080", new String[] { "AVC", "4000", "1920x1080", "AAC LC", "96" });
-            put("1440", new String[] { "AVC", "6000", " 2560x1440", "AAC LC", "96" });
-            put("2160", new String[] { "AVC", "8000", "3840x2160", "AAC LC", "128" });
-        }
-    });
+                                                                                                         {
+                                                                                                             put("240", new String[] { "AVC", "400", "420x240", "AAC LC", "54" });
+                                                                                                             put("480", new String[] { "AVC", "600", "850x480", "AAC LC", "54" });
+                                                                                                             put("720", new String[] { "AVC", "1500", "1280x720", "AAC LC", "54" });
+                                                                                                             put("1080", new String[] { "AVC", "4000", "1920x1080", "AAC LC", "96" });
+                                                                                                             put("1440", new String[] { "AVC", "6000", " 2560x1440", "AAC LC", "96" });
+                                                                                                             put("2160", new String[] { "AVC", "8000", "3840x2160", "AAC LC", "128" });
+                                                                                                         }
+                                                                                                     });
     /* Plugin settings */
     public static final String                    BEST_ONLY                                          = "BEST_ONLY";
     public static final boolean                   default_BEST_ONLY                                  = false;
@@ -1277,8 +1277,9 @@ public class PornHubCom extends PluginForHost {
 
     /**
      * Performs a full login via website to obtain fresh cookies. There are minor differences between login for free domain/account and
-     * premium (pornhubpremium.com). </br> Free login: https://www.pornhub.org/login </br> Premium login:
-     * https://www.pornhubpremium.com/premium/login
+     * premium (pornhubpremium.com). </br>
+     * Free login: https://www.pornhub.org/login </br>
+     * Premium login: https://www.pornhubpremium.com/premium/login
      */
     private void performFullLogin(final Browser br, final Account account, final String domain, final String path) throws Exception {
         logger.info("Performing full login");
@@ -1289,7 +1290,6 @@ public class PornHubCom extends PluginForHost {
         if (loginform == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        String token1 = null;
         loginform.put("email", Encoding.urlEncode(account.getUser()));
         loginform.put("password", Encoding.urlEncode(account.getPass()));
         loginform.put("remember_me", "on");
@@ -1304,13 +1304,17 @@ public class PornHubCom extends PluginForHost {
             final String authyId = (String) entries.get("authyId");
             final String authyIdHashed = (String) entries.get("authyIdHashed");
             final String token2 = (String) entries.get("autoLoginParameter");
-            final String phoneNumber = (String) entries.get("phoneNumber");
-            if (StringUtils.isEmpty(authyId) || StringUtils.isEmpty(token2) || StringUtils.isEmpty(phoneNumber)) {
+            if (StringUtils.isEmpty(authyId) || StringUtils.isEmpty(token2)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             logger.info("2FA code required");
-            /* 2021-03-08: I also got 7-digit codes... */
-            final String twoFACode = this.getTwoFACode(account, "^\\d{4,}$");
+            final String twoFACode;
+            if ("google2fa".equals(entries.get("twoStepVerificationType"))) {
+                twoFACode = this.getTwoFACode(account, "^\\d{6}$");
+            } else {
+                /* 2021-03-08: I also got 7-digit codes... */
+                twoFACode = this.getTwoFACode(account, "^\\d{4,}$");
+            }
             final Form loginform2 = new Form();
             loginform2.setAction(br.getURL());
             loginform2.setMethod(MethodType.POST);
@@ -1319,9 +1323,6 @@ public class PornHubCom extends PluginForHost {
             loginform2.put("verification_modal", "1");
             loginform2.put("authyId", authyId);
             loginform2.put("authyIdHashed", StringUtils.valueOrEmpty(authyIdHashed));
-            if (token1 != null) {
-                loginform2.put("token", Encoding.urlEncode(token1));
-            }
             loginform2.put("verification_code", twoFACode);
             br.submitForm(loginform2);
             entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
@@ -1376,7 +1377,8 @@ public class PornHubCom extends PluginForHost {
     }
 
     /**
-     * Checks login and sets account-type. </br> Expects browser instance to be logged in already (cookies need to be there).
+     * Checks login and sets account-type. </br>
+     * Expects browser instance to be logged in already (cookies need to be there).
      *
      * @throws Exception
      */

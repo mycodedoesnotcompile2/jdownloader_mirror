@@ -30,6 +30,7 @@ import org.jdownloader.gui.views.components.packagetable.LinkTreeUtils;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerSelectionInfo;
 import org.jdownloader.gui.views.components.packagetable.dragdrop.MergePosition;
 import org.jdownloader.logging.LogController;
+import org.jdownloader.settings.staticreferences.CFG_LINKGRABBER;
 
 import jd.controlling.packagecontroller.PackageControllerQueue.ReadOnlyQueueAction;
 
@@ -171,28 +172,7 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
 
     protected boolean _sortPackageChildren(final PackageType pkg, final PackageControllerComparator<AbstractNode> comparator) {
         final boolean sort = pkg.size() > 1 && comparator != null && !comparator.equals(pkg.getCurrentSorter());
-        if (sort) {
-            final ArrayList<ChildType> children = getChildrenCopy(pkg);
-            try {
-                Collections.sort(children, comparator);
-            } catch (final Throwable e) {
-                LogController.CL(true).log(e);
-            }
-            pkg.getModifyLock().writeLock();
-            try {
-                pkg.setCurrentSorter(comparator);
-                for (final ChildType child : children) {
-                    /* this resets getPreviousParentNodeID */
-                    child.setParentNode(pkg);
-                }
-                pkg.getChildren().clear();
-                pkg.getChildren().addAll(children);
-            } finally {
-                pkg.getModifyLock().writeUnlock();
-                pkg.nodeUpdated(pkg, NOTIFY.STRUCTURE_CHANGE, null);
-            }
-            return true;
-        } else {
+        if (!sort) {
             pkg.getModifyLock().writeLock();
             try {
                 pkg.setCurrentSorter(comparator);
@@ -205,6 +185,26 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
             }
             return false;
         }
+        final ArrayList<ChildType> children = getChildrenCopy(pkg);
+        try {
+            Collections.sort(children, comparator);
+        } catch (final Throwable e) {
+            LogController.CL(true).log(e);
+        }
+        pkg.getModifyLock().writeLock();
+        try {
+            pkg.setCurrentSorter(comparator);
+            for (final ChildType child : children) {
+                /* this resets getPreviousParentNodeID */
+                child.setParentNode(pkg);
+            }
+            pkg.getChildren().clear();
+            pkg.getChildren().addAll(children);
+        } finally {
+            pkg.getModifyLock().writeUnlock();
+            pkg.nodeUpdated(pkg, NOTIFY.STRUCTURE_CHANGE, null);
+        }
+        return true;
     }
 
     public void sortPackageChildren(final PackageType pkg, final PackageControllerComparator<AbstractNode> comparator) {
@@ -393,39 +393,39 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                     logger.log(new Throwable("NO CONTROLLER!!!"));
                     return null;
                 }
-                if (pkg.getControlledBy() != null) {
-                    if (PackageController.this != pkg.getControlledBy()) {
-                        /* this should never happen */
-                        logger.log(new Throwable("removing a package which is not controlled by this controller?!?!?"));
-                    }
-                    pkg.setControlledBy(null);
-                    writeLock();
-                    try {
-                        removed = controller.getPackages().remove(pkg);
-                    } finally {
-                        writeUnlock();
-                    }
+                if (PackageController.this != controller) {
+                    /* this should never happen */
+                    logger.log(new Throwable("removing a package which is not controlled by this controller?!?!?"));
                 }
-                if (removed) {
-                    final List<ChildType> remove = getChildrenCopy(pkg);
-                    getMapLock().writeLock();
-                    try {
-                        uniqueAlltimeIDPackageMap.remove(pkg.getUniqueID());
-                        for (final ChildType child : remove) {
-                            uniqueAlltimeIDChildrenMap.remove(child.getUniqueID());
-                        }
-                    } finally {
-                        getMapLock().writeUnlock();
-                    }
-                    final long version = backendChanged.incrementAndGet();
-                    if (remove.size() > 0) {
-                        childrenChanged.set(version);
-                        controller._controllerParentlessLinks(pkg, remove, this.getQueuePrio());
-                    }
-                    controller.structureChanged.set(version);
-                    controller._controllerPackageNodeRemoved(pkg, this.getQueuePrio());
-                    _controllerStructureChanged(this.getQueuePrio());
+                writeLock();
+                try {
+                    removed = controller.getPackages().remove(pkg);
+                } finally {
+                    writeUnlock();
                 }
+                if (!removed) {
+                    return null;
+                }
+                /* Detach only after the package was actually removed from the list. */
+                pkg.setControlledBy(null);
+                final List<ChildType> remove = getChildrenCopy(pkg);
+                getMapLock().writeLock();
+                try {
+                    uniqueAlltimeIDPackageMap.remove(pkg.getUniqueID());
+                    for (final ChildType child : remove) {
+                        uniqueAlltimeIDChildrenMap.remove(child.getUniqueID());
+                    }
+                } finally {
+                    getMapLock().writeUnlock();
+                }
+                final long version = backendChanged.incrementAndGet();
+                if (remove.size() > 0) {
+                    childrenChanged.set(version);
+                    controller._controllerParentlessLinks(pkg, remove, this.getQueuePrio());
+                }
+                controller.structureChanged.set(version);
+                controller._controllerPackageNodeRemoved(pkg, this.getQueuePrio());
+                _controllerStructureChanged(this.getQueuePrio());
                 return null;
             }
         });
@@ -567,12 +567,21 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
     public final static class PackageSettings {
         private int     packageposition                       = -1;
         private boolean mergePackageComments                  = true;
-        private boolean mergeSameNamedPackages                = false;
+        private boolean mergeSameNamedPackages                = CFG_LINKGRABBER.CFG.isMergeSameNamedPackagesInDownloadlistInExistingPackagesOnConfirmDefaultEnabled();
         private boolean expandPackage                         = false;
-        private boolean mergeSameNamedPackagesCaseInsensitive = false;
+        private boolean mergeSameNamedPackagesCaseInsensitive = CFG_LINKGRABBER.CFG.isMergeSameNamedPackagesInDownloadlistInExistingPackagesCaseInsensitiveDefaultEnabled();
 
         public PackageSettings() {
             setPackagePosition(null);
+        }
+
+        /** Copy constructor. */
+        public PackageSettings(final PackageSettings other) {
+            this.packageposition = other.packageposition;
+            this.mergePackageComments = other.mergePackageComments;
+            this.mergeSameNamedPackages = other.mergeSameNamedPackages;
+            this.expandPackage = other.expandPackage;
+            this.mergeSameNamedPackagesCaseInsensitive = other.mergeSameNamedPackagesCaseInsensitive;
         }
 
         public int getPackagePosition() {
@@ -591,7 +600,6 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
             } else {
                 switch (position) {
                 case BOTTOM:
-                    // positionMerge = dest.getChildren().size();
                     packageposition = Integer.MAX_VALUE;
                     break;
                 case TOP:
@@ -608,8 +616,8 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
             return mergePackageComments;
         }
 
-        public PackageSettings setMergePackageComments(Boolean mergePackageComments) {
-            this.mergePackageComments = mergePackageComments == null ? true : mergePackageComments.booleanValue();
+        public PackageSettings setMergePackageComments(boolean mergePackageComments) {
+            this.mergePackageComments = mergePackageComments;
             return this;
         }
 
@@ -617,8 +625,8 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
             return mergeSameNamedPackages;
         }
 
-        public PackageSettings setMergeSameNamedPackages(Boolean mergeSameNamedPackages) {
-            this.mergeSameNamedPackages = mergeSameNamedPackages == null ? false : mergeSameNamedPackages.booleanValue();
+        public PackageSettings setMergeSameNamedPackages(boolean mergeSameNamedPackages) {
+            this.mergeSameNamedPackages = mergeSameNamedPackages;
             return this;
         }
 
@@ -626,8 +634,8 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
             return expandPackage;
         }
 
-        public PackageSettings setExpandPackage(Boolean expandPackage) {
-            this.expandPackage = expandPackage == null ? false : expandPackage.booleanValue();
+        public PackageSettings setExpandPackage(boolean expandPackage) {
+            this.expandPackage = expandPackage;
             return this;
         }
 
@@ -635,8 +643,8 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
             return mergeSameNamedPackagesCaseInsensitive;
         }
 
-        public PackageSettings setMergeSameNamedPackagesCaseInsensitive(Boolean mergeSameNamedPackagesCaseInsensitive) {
-            this.mergeSameNamedPackagesCaseInsensitive = mergeSameNamedPackagesCaseInsensitive == null ? false : mergeSameNamedPackagesCaseInsensitive.booleanValue();
+        public PackageSettings setMergeSameNamedPackagesCaseInsensitive(boolean mergeSameNamedPackagesCaseInsensitive) {
+            this.mergeSameNamedPackagesCaseInsensitive = mergeSameNamedPackagesCaseInsensitive;
             return this;
         }
     }
@@ -661,17 +669,6 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
             @Override
             protected Void run() throws RuntimeException {
                 int positionMerge = mergesettings.getPackagePosition();
-                // switch (mergesettings.getMergePosition()) {
-                // case BOTTOM:
-                // positionMerge = dest.getChildren().size();
-                // break;
-                // case TOP:
-                // positionMerge = 0;
-                // break;
-                // default:
-                // positionMerge = -1;
-                // }
-                // TODO: Comment merging to dest does not yet work as expected
                 /* Prepare destination-package */
                 if (dest != null) {
                     dest.setExpanded(mergesettings.getExpandPackage());
@@ -710,8 +707,8 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                     /*
                      * Same-name merging re-enters merge(...) below, which schedules another QueueAction on the same QUEUE. Adding to the
                      * QUEUE from within a running QueueAction is intentional here: the nested actions are appended and processed in order
-                     * by the same queue thread, so this does not deadlock. The mergeSameNamedPackages flag is disabled before recursing to
-                     * prevent an endless loop.
+                     * by the same queue thread, so this does not deadlock. The recursive calls receive a copy of the settings with
+                     * mergeSameNamedPackages disabled to prevent an endless loop.
                      */
                     final Map<String, List<PackageType>> dupes;
                     if (dest != null) {
@@ -725,8 +722,11 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                         /* Zero results -> Do nothing */
                         return null;
                     }
-                    /* Avoid endless loop as we call this function again. */
-                    mergesettings.setMergeSameNamedPackages(false);
+                    /*
+                     * Copy the settings and disable same-name merging for the recursive calls. This avoids an endless loop without mutating
+                     * the caller's settings object.
+                     */
+                    final PackageSettings recursionSettings = new PackageSettings(mergesettings).setMergeSameNamedPackages(false);
                     final Iterator<Entry<String, List<PackageType>>> dupes_iterator = dupes.entrySet().iterator();
                     while (dupes_iterator.hasNext()) {
                         final Entry<String, List<PackageType>> entry = dupes_iterator.next();
@@ -756,16 +756,72 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                             }
                             thisdupes.clear();
                             thisdupes.add(firstForeignDupe);
-                            merge(dest, null, thisdupes, mergesettings);
+                            merge(dest, null, thisdupes, recursionSettings);
                             /* We are done (though dupes_iterator sizer should be 1 either way). */
                             break;
                         } else {
                             /* No dest is given -> Merge either all duplicates in whole list or duplicates within selection */
                             final PackageType target = thisdupes.remove(0);
-                            merge(target, null, thisdupes, mergesettings);
+                            merge(target, null, thisdupes, recursionSettings);
                         }
                     }
                     /* End */
+                }
+                return null;
+            }
+        });
+    }
+
+    /**
+     * Merges each of the freshly added packages into an existing same named package already controlled by this PackageController (if such a
+     * package exists). </br>
+     * Only the given packages are moved; pre-existing same named packages merely serve as merge targets and are never merged among each
+     * other. This is the "fold new packages into existing ones" behavior and differs from {@link #merge} with mergeSameNamedPackages=true,
+     * which consolidates ALL same named packages of a group into one. </br>
+     * Same-name matching uses the case-insensitivity default of {@link PackageSettings}.
+     *
+     * @param addedPackages
+     *            the freshly added packages that should be folded into existing same named packages.
+     * @param mergeIntoTopmostExistingPackage
+     *            if true, each package is merged into the first/topmost matching existing package; otherwise into the last/bottom-most
+     *            matching existing package.
+     */
+    public void mergeAddedPackagesIntoExistingSameNamedPackages(final List<PackageType> addedPackages, final boolean mergeIntoTopmostExistingPackage) {
+        if (addedPackages == null || addedPackages.isEmpty()) {
+            return;
+        }
+        QUEUE.add(new QueueAction<Void, RuntimeException>() {
+            @Override
+            protected Void run() throws RuntimeException {
+                final PackageSettings mergeSettings = new PackageSettings();
+                /* We do the same-name matching ourselves here, so merge(...) must not run its own recursive same-name pass. */
+                mergeSettings.setMergeSameNamedPackages(false);
+                final Set<PackageType> added = new HashSet<PackageType>(addedPackages);
+                /* Groups are in list order (top to bottom) and contain both the freshly added and the pre-existing same named packages. */
+                final Map<String, List<PackageType>> sameNamed = getPackagesWithSameName(addedPackages, mergeSettings);
+                final Iterator<Entry<String, List<PackageType>>> it = sameNamed.entrySet().iterator();
+                while (it.hasNext()) {
+                    final List<PackageType> group = it.next().getValue();
+                    PackageType target = null;
+                    final List<PackageType> toMerge = new ArrayList<PackageType>();
+                    for (final PackageType pkg : group) {
+                        if (added.contains(pkg)) {
+                            toMerge.add(pkg);
+                        } else if (mergeIntoTopmostExistingPackage) {
+                            if (target == null) {
+                                /* First/topmost existing package. */
+                                target = pkg;
+                            }
+                        } else {
+                            /* Keep the last one seen -> last/bottom-most existing package. */
+                            target = pkg;
+                        }
+                    }
+                    if (target == null || toMerge.isEmpty()) {
+                        /* No pre-existing same named target, or nothing freshly added -> leave this group untouched. */
+                        continue;
+                    }
+                    merge(target, null, toMerge, mergeSettings);
                 }
                 return null;
             }
@@ -861,9 +917,9 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                 }
                 boolean newChildren = false;
                 if (pkgIndex == -1 && moveChildrenindex == -1 && containsOnlyNewChildren(moveChildren)) {
+                    newChildren = true;
+                    pkg.getModifyLock().writeLock();
                     try {
-                        newChildren = true;
-                        pkg.getModifyLock().writeLock();
                         final PackageControllerComparator<AbstractNode> sorter = pkg.getCurrentSorter();
                         final List<ChildType> pkgChildren = pkg.getChildren();
                         final int maxIndex = moveChildren.size();
@@ -974,8 +1030,8 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                             logger.log(e);
                         }
                     }
+                    pkg.getModifyLock().writeLock();
                     try {
-                        pkg.getModifyLock().writeLock();
                         for (final ChildType child : elementsToMove) {
                             child.setParentNode(pkg);
                         }
@@ -1069,24 +1125,25 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                         pkg.nodeUpdated(pkg, NOTIFY.STRUCTURE_CHANGE, null);
                     }
                 }
-                if (links.size() > 0) {
-                    final long version = backendChanged.incrementAndGet();
-                    controller.structureChanged.set(version);
-                    if (doNotifyParentlessLinks) {
-                        getMapLock().writeLock();
-                        childrenChanged.set(version);
-                        try {
-                            for (final ChildType child : links) {
-                                uniqueAlltimeIDChildrenMap.remove(child.getUniqueID());
-                            }
-                        } finally {
-                            getMapLock().writeUnlock();
+                if (links.size() == 0) {
+                    return null;
+                }
+                final long version = backendChanged.incrementAndGet();
+                controller.structureChanged.set(version);
+                if (doNotifyParentlessLinks) {
+                    childrenChanged.set(version);
+                    getMapLock().writeLock();
+                    try {
+                        for (final ChildType child : links) {
+                            uniqueAlltimeIDChildrenMap.remove(child.getUniqueID());
                         }
-                        controller._controllerParentlessLinks(pkg, links, this.getQueuePrio());
+                    } finally {
+                        getMapLock().writeUnlock();
                     }
-                    if (pkg.getChildren().size() == 0) {
-                        controller.removePackage(pkg);
-                    }
+                    controller._controllerParentlessLinks(pkg, links, this.getQueuePrio());
+                }
+                if (pkg.getChildren().size() == 0) {
+                    controller.removePackage(pkg);
                 }
                 return null;
             }
@@ -1377,11 +1434,7 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
         final UniqueAlltimeID packageId = new UniqueAlltimeID(longID);
         final boolean readL = getMapLock().readLock();
         try {
-            final PackageType pkg = uniqueAlltimeIDPackageMap.get(packageId);
-            if (pkg != null) {
-                return pkg;
-            }
-            return null;
+            return uniqueAlltimeIDPackageMap.get(packageId);
         } finally {
             getMapLock().readUnlock(readL);
         }
@@ -1408,11 +1461,7 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
         final UniqueAlltimeID childID = new UniqueAlltimeID(longID);
         final boolean readL = getMapLock().readLock();
         try {
-            final ChildType child = uniqueAlltimeIDChildrenMap.get(childID);
-            if (child != null) {
-                return child;
-            }
-            return null;
+            return uniqueAlltimeIDChildrenMap.get(childID);
         } finally {
             getMapLock().readUnlock(readL);
         }

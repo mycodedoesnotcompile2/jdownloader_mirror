@@ -43,7 +43,7 @@ import jd.plugins.decrypter.CumStCrawler;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 
-@HostPlugin(revision = "$Revision: 53174 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53176 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { CumStCrawler.class })
 public class CumSt extends PluginForHost {
     public CumSt(PluginWrapper wrapper) {
@@ -59,6 +59,8 @@ public class CumSt extends PluginForHost {
     public static final String   PROPERTY_CREATOR_ID         = "creator_id";
     public static final String   PROPERTY_CREATOR_NAME       = "creator_name";
     public static final String   PROPERTY_POST_ID            = "post_id";
+    /* Content type of the item: "post" or "dm" */
+    public static final String   PROPERTY_CONTENT_TYPE       = "content_type";
     /* Published date as unix timestamp in seconds */
     public static final String   PROPERTY_DATE               = "date";
     public static final String   PROPERTY_POST_CONTENT_INDEX = "postContentIndex";
@@ -91,7 +93,7 @@ public class CumSt extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/creators/([^/]+)/(\\d+)/post/(\\d+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/creators/([^/]+)/(\\d+)/(?:post/(\\d+)|dm/([\\w\\-]+))");
         }
         return ret.toArray(new String[0]);
     }
@@ -108,8 +110,9 @@ public class CumSt extends PluginForHost {
             final String service = link.getStringProperty(PROPERTY_SERVICE);
             final String creatorID = link.getStringProperty(PROPERTY_CREATOR_ID);
             final String postID = link.getStringProperty(PROPERTY_POST_ID);
+            final String contentType = link.getStringProperty(PROPERTY_CONTENT_TYPE, "post");
             if (this.isTextFile(link)) {
-                fid = UNIQUE_ID_PREFIX + "textfile/service/" + service + "/creator/" + creatorID + "/post/" + postID;
+                fid = UNIQUE_ID_PREFIX + "textfile/service/" + service + "/creator/" + creatorID + "/" + contentType + "/" + postID;
             } else {
                 final String path = new URL(link.getPluginPatternMatcher()).getPath();
                 final String sha256Hash = getSha256HashFromPath(path);
@@ -135,13 +138,14 @@ public class CumSt extends PluginForHost {
         final String service = link.getStringProperty(PROPERTY_SERVICE);
         final String creatorID = link.getStringProperty(PROPERTY_CREATOR_ID);
         final String postID = link.getStringProperty(PROPERTY_POST_ID);
+        final String contentType = link.getStringProperty(PROPERTY_CONTENT_TYPE, "post");
         final int index = link.getIntegerProperty(PROPERTY_POST_CONTENT_INDEX, -1);
         if (service != null && creatorID != null && postID != null && index != -1) {
             /* Media/Files */
-            return service + "_" + creatorID + "_" + postID + "_index_" + index;
+            return service + "_" + creatorID + "_" + contentType + "_" + postID + "_index_" + index;
         } else if (service != null && creatorID != null && postID != null) {
             /* Raw text content */
-            return service + "_" + creatorID + "_" + postID;
+            return service + "_" + creatorID + "_" + contentType + "_" + postID;
         } else {
             return null;
         }

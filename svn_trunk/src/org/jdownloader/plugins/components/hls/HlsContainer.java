@@ -3,22 +3,23 @@ package org.jdownloader.plugins.components.hls;
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA.TYPE;
+
 import jd.http.Browser;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.hoster.GenericM3u8;
-
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA.TYPE;
 
 public class HlsContainer {
     public static class MEDIA {
@@ -77,14 +78,15 @@ public class HlsContainer {
             return uri;
         }
 
-        protected final String  groupID;
-        protected final String  language;
-        protected final String  name;
-        protected final Boolean autoSelect;
-        protected final Boolean defaultSelect;
-        protected final Boolean forced;
-        protected final String  uri;
-        protected URL           absoluteURL = null;
+        protected final String       groupID;
+        protected final String       language;
+        protected final String       name;
+        protected final Boolean      autoSelect;
+        protected final Boolean      defaultSelect;
+        protected final Boolean      forced;
+        protected final String       uri;
+        protected final List<String> characteristics;
+        protected URL                absoluteURL = null;
 
         public URL getAbsoluteURL() {
             return absoluteURL;
@@ -103,7 +105,11 @@ public class HlsContainer {
             return M3U8Playlist.loadM3U8(getAbsoluteURL().toExternalForm(), br);
         }
 
-        public MEDIA(TYPE type, String groupID, String language, String name, Boolean autoSelect, Boolean defaultSelect, Boolean forced, String uri) {
+        public boolean hasCharacteristics(final String lookup) {
+            return lookup != null && characteristics != null && characteristics.contains(lookup);
+        }
+
+        public MEDIA(TYPE type, String groupID, String language, String name, String characteristics, Boolean autoSelect, Boolean defaultSelect, Boolean forced, String uri) {
             super();
             this.type = type;
             this.groupID = groupID;
@@ -113,6 +119,19 @@ public class HlsContainer {
             this.defaultSelect = defaultSelect;
             this.forced = forced;
             this.uri = uri;
+            this.characteristics = parseCharacteristics(characteristics);
+        }
+
+        protected List<String> parseCharacteristics(final String characteristics) {
+            if (characteristics == null) {
+                return null;
+            }
+            final String characteristicElem[] = characteristics.split(",");
+            return Arrays.asList(characteristicElem);
+        }
+
+        public List<String> getCharacteristics() {
+            return characteristics;
         }
 
         public String buildExtXMediaLine() {
@@ -138,6 +157,10 @@ public class HlsContainer {
             }
             sb.append(",AUTOSELECT=").append(Boolean.TRUE.equals(getAutoSelect()) ? "YES" : "NO");
             sb.append(",DEFAULT=").append(Boolean.TRUE.equals(getDefaultSelect()) ? "YES" : "NO");
+            final List<String> characteristics = getCharacteristics();
+            if (characteristics != null) {
+                sb.append(",CHARACTERISTICS=\"").append(StringUtils.join(characteristics, ",")).append("\"");
+            }
             final Boolean forced = getForced();
             if (forced != null) {
                 sb.append(",FORCED=").append(Boolean.TRUE.equals(forced) ? "YES" : "NO");
@@ -318,10 +341,11 @@ public class HlsContainer {
             }
             final String language = new Regex(entry, "(?:,|^)\\s*LANGUAGE\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
             final String name = new Regex(entry, "(?:,|^)\\s*NAME\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
+            final String characteristics = new Regex(entry, "(?:,|^)\\s*CHARACTERISTICS\\s*=\\s*\"([^<>\"]+)\"").getMatch(0);
             final String autoSelect = new Regex(entry, "(?:,|^)\\s*AUTOSELECT\\s*=\\s*(YES|NO)").getMatch(0);
             final String defaultSelect = new Regex(entry, "(?:,|^)\\s*DEFAULT\\s*=\\s*(YES|NO)").getMatch(0);
             final String forced = new Regex(entry, "(?:,|^)\\s*FORCED\\s*=\\s*(YES|NO)").getMatch(0);
-            final MEDIA media = new MEDIA(mediaType, groupID, language, name, (autoSelect == null ? null : "YES".equals(autoSelect)), (defaultSelect == null ? null : "YES".equals(defaultSelect)), (forced == null ? null : "YES".equals(forced)), uri);
+            final MEDIA media = new MEDIA(mediaType, groupID, language, name, characteristics, (autoSelect == null ? null : "YES".equals(autoSelect)), (defaultSelect == null ? null : "YES".equals(defaultSelect)), (forced == null ? null : "YES".equals(forced)), uri);
             if (uri != null) {
                 media.setAbsoluteURL(br.getURL(uri));
             }
