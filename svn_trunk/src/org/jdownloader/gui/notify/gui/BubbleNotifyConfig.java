@@ -269,6 +269,12 @@ public interface BubbleNotifyConfig extends ConfigInterface {
 
     @AboutConfig()
     @DefaultBooleanValue(true)
+    public boolean isCrawlerBubbleContentDupeCountVisible();
+
+    public void setCrawlerBubbleContentDupeCountVisible(boolean b);
+
+    @AboutConfig()
+    @DefaultBooleanValue(true)
     public boolean isCrawlerBubbleContentStatusVisible();
 
     public void setCrawlerBubbleContentStatusVisible(boolean b);

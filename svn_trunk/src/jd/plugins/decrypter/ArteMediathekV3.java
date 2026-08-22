@@ -38,10 +38,9 @@ import org.jdownloader.plugins.components.config.ArteMediathekConfig.QualitySele
 import org.jdownloader.plugins.components.config.ArteMediathekConfig.QualitySelectionMode;
 import org.jdownloader.plugins.components.config.ArteMediathekConfig.ThumbnailFilenameMode;
 import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.components.hls.HlsContainer.CODEC;
 import org.jdownloader.plugins.components.hls.HlsContainer.CODEC_TYPE;
 import org.jdownloader.plugins.components.hls.HlsContainer.StreamCodec;
-import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.components.hls.HlsContainerStorable;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
@@ -59,7 +58,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.ArteTv;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 53186 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53198 $", interfaceVersion = 4, names = {}, urls = {})
 public class ArteMediathekV3 extends PluginForDecrypt {
     public ArteMediathekV3(PluginWrapper wrapper) {
         super(wrapper);
@@ -125,6 +124,7 @@ public class ArteMediathekV3 extends PluginForDecrypt {
     private final String         PROPERTY_WIDTH                   = "width";
     private final String         PROPERTY_HEIGHT                  = "height";
     private final String         PROPERTY_BITRATE                 = "bitrate";
+    private final String         PROPERTY_VIDEO_CODEC             = "video_codec";
     private final String         PROPERTY_PLATFORM                = "platform";
     private final String         PROPERTY_TYPE                    = "type";
     private final String         TYPE_NORMAL                      = "https?://[^/]+/([a-z]{2})/videos/(\\d+-\\d+-[A-Z]+)(/([a-z0-9\\-]+)/?)?";
@@ -141,7 +141,7 @@ public class ArteMediathekV3 extends PluginForDecrypt {
 
     private ArrayList<DownloadLink> crawlPrograms(final CryptedLink param) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final ArteMediathekConfig cfg = PluginJsonConfig.get(this.getConfigInterface());
+        final ArteMediathekConfig cfg = get(this.getConfigInterface());
         final List<Integer> selectedQualitiesHeight = getSelectedHTTPQualities();
         if (selectedQualitiesHeight.isEmpty() && cfg.getQualitySelectionFallbackMode() == QualitySelectionFallbackMode.NONE) {
             logger.info("User has deselected all qualities and set QualitySelectionFallbackMode to QualitySelectionFallbackMode.NONE --> Doing nothing");
@@ -242,10 +242,11 @@ public class ArteMediathekV3 extends PluginForDecrypt {
          * https://board.jdownloader.org/showthread.php?t=96449
          */
         final boolean allowUseAPIV3 = false;
-        boolean usingAPIV2 = false;
+        final boolean usingAPIV2;
         if (!StringUtils.isEmpty(videoStreamsAPIV3URL) && allowUseAPIV3) {
             prepBRAPI(br);
             br.getPage(videoStreamsAPIV3URL);
+            usingAPIV2 = false;
         } else {
             /* APIv2: This gives us only progressive streams and only up to 720p */
             final String videoStreamsAPIV2URL = String.format("https://www.arte.tv/hbbtvv2/services/web/index.php/OPA/v3/streams/%s/%s/%s", programId, kind.toUpperCase(Locale.ENGLISH), language);
@@ -258,117 +259,126 @@ public class ArteMediathekV3 extends PluginForDecrypt {
             /* This should never happen */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        final Browser brc = createNewBrowserInstance();
+        brc.getHeaders().remove("Authorization");
+        final String playerConfigURL = String.format("https://api.arte.tv/api/player/v2/config/%s/%s", language, programId);
+        brc.getPage(playerConfigURL);
+        final Map<String, Object> player = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+        String originalVersionAudioLanguage = null;
+        final List<Map<String, Object>> streams = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(player, "data/attributes/streams");
+        for (final Map<String, Object> stream : streams) {
+            final List<Map<String, Object>> versions = (List<Map<String, Object>>) stream.get("versions");
+            originalVersionAudioLanguage: if (versions != null && originalVersionAudioLanguage == null) {
+                // find audio language for Original version
+                for (final Map<String, Object> version : versions) {
+                    if (VersionType.parse(StringUtils.valueOfOrNull(version.get("code"))) == VersionType.ORIGINAL) {
+                        originalVersionAudioLanguage = StringUtils.toUpperCaseOrNull((String) version.get("audioLanguage"), Locale.ROOT);
+                        break originalVersionAudioLanguage;
+                    }
+                }
+            }
+            final String url = stream.get("url").toString();
+            final Browser hls = brc.cloneBrowser();
+            hls.getPage(url);
+            List<HlsContainer> qualities = HlsContainer.getHlsQualities(hls);
+            for (HlsContainer quality : qualities) {
+                final StreamCodec streamCodec = quality.getCodecType(CODEC_TYPE.VIDEO);
+                if (streamCodec == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                switch (streamCodec.getCodec()) {
+                case AVC:
+                case HEVC:
+                    break;
+                default:
+                    continue;
+                }
+                for (HlsContainer.MEDIA media : quality.getMedia()) {
+                    if (!HlsContainer.MEDIA.TYPE.AUDIO.equals(media._getType())) {
+                        continue;
+                    }
+                    if (media.getCharacteristics() == null) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                    final Map<String, Object> videoStream = new HashMap<String, Object>();
+                    videoStream.put("programID", programId);
+                    videoStream.put("url", url);
+                    switch (streamCodec.getCodec()) {
+                    case AVC:
+                        videoStream.put(PROPERTY_VIDEO_CODEC, "H264");
+                    case HEVC:
+                        videoStream.put(PROPERTY_VIDEO_CODEC, "H265");
+                        break;
+                    default:
+                        continue;
+                    }
+                    videoStream.put("width", quality.getWidth() != -1 ? quality.getWidth() : "");
+                    videoStream.put("height", quality.getHeight() != -1 ? quality.getHeight() : "");
+                    videoStream.put("audioLabel", media.getName());
+                    final int bandwidth = Math.max(quality.getBandwidth(), quality.getAverageBandwidth());
+                    if (bandwidth > 0) {
+                        videoStream.put("bitrate", bandwidth);
+                    }
+                    if (url.contains("XQ+")) {
+                        // this is NOT depending on resolution but a quality indicator
+                        videoStream.put("quality", "XQ");
+                    } else {
+                        // TODO
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                    // TODO: no subtitles yet
+                    String audioCode = null;
+                    String audioShortLabel = null;
+                    for (String characteristic : media.getCharacteristics()) {
+                        if (characteristic.startsWith("tv.arte.audio.version.")) {
+                            final String version = characteristic.substring("tv.arte.audio.version.".length());
+                            if ("VF-FRA".equalsIgnoreCase(version)) {
+                                audioCode = "VF";
+                                audioShortLabel = "FR";
+                            } else if ("VFAUD-FRA".equalsIgnoreCase(version)) {
+                                audioCode = "VFAUD";
+                                audioShortLabel = "AD (frz.)";
+                            } else if ("VA-DEU".equalsIgnoreCase(version)) {
+                                audioCode = "VA";
+                                audioShortLabel = "DE";
+                            } else if ("VAAUD-DEU".equalsIgnoreCase(version)) {
+                                audioCode = "VAAUD";
+                                audioShortLabel = "AD (frz.)";
+                            } else if ("VO-ENG".equalsIgnoreCase(version)) {
+                                audioCode = "VOEU";
+                                audioShortLabel = "O";
+                            } else if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported:" + characteristic);
+                            }
+                            break;
+                        }
+                    }
+                    if (audioCode == null) {
+                        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                        } else {
+                            continue;
+                        }
+                    }
+                    videoStream.put("audioCode", audioCode);
+                    videoStream.put("audioShortLabel", audioShortLabel);
+                    videoStream.put("hlsRef", quality);
+                    videoStream.put("mediaRef", media);
+                    videoStreams.add(videoStream);
+                }
+            }
+        }
         /* First put each language + audio version in separate lists. */
         final Map<String, List<Map<String, Object>>> languagePacks = new HashMap<String, List<Map<String, Object>>>();
-        boolean hasOriginalVersion = false;
         for (final Map<String, Object> videoStream : videoStreams) {
             final String audioCode = videoStream.get("audioCode").toString();
-            if (VersionType.parse(audioCode) == VersionType.ORIGINAL) {
-                hasOriginalVersion = true;
-            }
             if (!languagePacks.containsKey(audioCode)) {
                 languagePacks.put(audioCode, new ArrayList<Map<String, Object>>());
             }
             languagePacks.get(audioCode).add(videoStream);
         }
-        String originalVersionAudioLanguage = null;
-        final boolean parseHLS = DebugMode.TRUE_IN_IDE_ELSE_FALSE;
-        if (hasOriginalVersion || parseHLS) {
-            // find audio language for Original version
-            final Browser brc = createNewBrowserInstance();
-            brc.getHeaders().remove("Authorization");
-            final String playerConfigURL = String.format("https://api.arte.tv/api/player/v2/config/%s/%s", language, programId);
-            brc.getPage(playerConfigURL);
-            final Map<String, Object> player = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-            final List<Map<String, Object>> streams = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(player, "data/attributes/streams");
-            streams: for (final Map<String, Object> stream : streams) {
-                final List<Map<String, Object>> versions = (List<Map<String, Object>>) stream.get("versions");
-                originalVersionAudioLanguage: if (versions != null && originalVersionAudioLanguage == null) {
-                    for (final Map<String, Object> version : versions) {
-                        if (VersionType.parse(StringUtils.valueOfOrNull(version.get("code"))) == VersionType.ORIGINAL) {
-                            originalVersionAudioLanguage = StringUtils.toUpperCaseOrNull((String) version.get("audioLanguage"), Locale.ROOT);
-                            break originalVersionAudioLanguage;
-                        }
-                    }
-                }
-                final String url = stream.get("url").toString();
-                final Browser hls = brc.cloneBrowser();
-                hls.getPage(url);
-                List<HlsContainer> qualities = HlsContainer.getHlsQualities(hls);
-                for (HlsContainer quality : qualities) {
-                    final StreamCodec streamCodec = quality.getCodecType(CODEC_TYPE.VIDEO);
-                    if (streamCodec == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    if (!CODEC.AVC.equals(streamCodec.getCodec())) {
-                        // only h264 for the moment
-                        continue;
-                    }
-                    for (HlsContainer.MEDIA media : quality.getMedia()) {
-                        if (!HlsContainer.MEDIA.TYPE.AUDIO.equals(media.getType())) {
-                            continue;
-                        }
-                        if (media.getCharacteristics() == null) {
-                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                        }
-                        final Map<String, Object> videoStream = new HashMap<String, Object>();
-                        videoStream.put("programID", programId);
-                        videoStream.put("url", url);
-                        videoStream.put("width", quality.getWidth() != -1 ? quality.getWidth() : "");
-                        videoStream.put("height", quality.getHeight() != -1 ? quality.getHeight() : "");
-                        videoStream.put("audioLabel", media.getName());
-                        final int bandwidth = Math.max(quality.getBandwidth(), quality.getAverageBandwidth());
-                        if (bandwidth > 0) {
-                            videoStream.put("bitrate", bandwidth);
-                        }
-                        if (url.contains("XQ+")) {
-                            // this is NOT depending on resolution but a quality indicator
-                            videoStream.put("quality", "XQ");
-                        } else {
-                            // TODO
-                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                        }
-                        String audioCode = null;
-                        String audioShortLabel = null;
-                        for (String characteristic : media.getCharacteristics()) {
-                            if (characteristic.startsWith("tv.arte.audio.version.")) {
-                                final String version = characteristic.substring("tv.arte.audio.version.".length());
-                                if ("VF-FRA".equalsIgnoreCase(version)) {
-                                    audioCode = "VF";
-                                    audioShortLabel = "FR";
-                                } else if ("VFAUD-FRA".equalsIgnoreCase(version)) {
-                                    audioCode = "VFAUD";
-                                    audioShortLabel = "AD (frz.)";
-                                } else if ("VA-DEU".equalsIgnoreCase(version)) {
-                                    audioCode = "VA";
-                                    audioShortLabel = "DE";
-                                } else if ("VAAUD-DEU".equalsIgnoreCase(version)) {
-                                    audioCode = "VAAUD";
-                                    audioShortLabel = "AD (frz.)";
-                                } else if ("VO-ENG".equalsIgnoreCase(version)) {
-                                    audioCode = "VOEU";
-                                    audioShortLabel = "O";
-                                }
-                                break;
-                            }
-                        }
-                        if (audioCode == null) {
-                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                        }
-                        videoStream.put("audioCode", audioCode);
-                        videoStream.put("audioShortLabel", audioShortLabel);
-                        videoStream.put("hlsRef", quality);
-                        videoStream.put("mediaRef", media);
-                        if (!languagePacks.containsKey(audioCode)) {
-                            languagePacks.put(audioCode, new ArrayList<Map<String, Object>>());
-                        }
-                        languagePacks.get(audioCode).add(videoStream);
-                    }
-                }
-            }
-            logger.info("Original version has audio language:" + originalVersionAudioLanguage);
-        }
-        final ArteMediathekConfig cfg = PluginJsonConfig.get(this.getConfigInterface());
+        logger.info("Original version has audio language:" + originalVersionAudioLanguage);
+        final ArteMediathekConfig cfg = get(this.getConfigInterface());
         /* Build package name */
         final PackagenameSchemeType schemeType = cfg.getPackagenameSchemeType();
         final String customPackagenameScheme = cfg.getPackagenameScheme();
@@ -493,6 +503,10 @@ public class ArteMediathekV3 extends PluginForDecrypt {
                 link.setProperty(PROPERTY_WIDTH, videoStream.get("width"));
                 link.setProperty(PROPERTY_HEIGHT, height);
                 link.setProperty(PROPERTY_BITRATE, bitrate);
+                final Object videoCodec = videoStream.get(PROPERTY_VIDEO_CODEC);
+                if (videoCodec != null) {
+                    link.setProperty(PROPERTY_VIDEO_CODEC, videoCodec);
+                }
                 link.setProperty(PROPERTY_AUDIO_CODE, audioCode);
                 link.setProperty(PROPERTY_AUDIO_SHORT_LABEL, videoStream.get("audioShortLabel"));
                 link.setProperty(PROPERTY_AUDIO_LABEL, videoStream.get("audioLabel"));
@@ -668,7 +682,7 @@ public class ArteMediathekV3 extends PluginForDecrypt {
 
     private String getAndSetFilename(final DownloadLink link) {
         String filename;
-        final ArteMediathekConfig cfg = PluginJsonConfig.get(this.getConfigInterface());
+        final ArteMediathekConfig cfg = get(this.getConfigInterface());
         final FilenameSchemeType schemeType = cfg.getFilenameSchemeTypeV2();
         String customFilenameScheme = cfg.getFilenameScheme();
         if (schemeType == FilenameSchemeType.CUSTOM && !StringUtils.isEmpty(customFilenameScheme)) {
@@ -698,7 +712,18 @@ public class ArteMediathekV3 extends PluginForDecrypt {
         filename = filename.replace("*width*", width);
         filename = filename.replace("*height*", height);
         filename = filename.replace("*resolution*", width + "x" + height);
-        filename = filename.replace("*bitrate*", link.getStringProperty(PROPERTY_BITRATE));
+        final Object bitRate = link.getProperty(PROPERTY_BITRATE);
+        if (bitRate instanceof Number) {
+            if (link.hasCompressedProperty(HlsContainerStorable.DOWNLOADLINK_PROPERTY)) {
+                filename = filename.replace("*bitrate*", String.valueOf(((Number) bitRate).intValue() / 1024));
+            } else {
+                filename = filename.replace("*bitrate*", bitRate.toString());
+            }
+        } else {
+            filename = filename.replace("*bitrate*", "");
+        }
+        filename = filename.replace("*video_codec*", link.getStringProperty(PROPERTY_VIDEO_CODEC, ""));
+        filename = filename.replace("*stream_type*", link.hasCompressedProperty(HlsContainerStorable.DOWNLOADLINK_PROPERTY) ? "HLS" : "MP4");
         filename = filename.replace("*original_filename*", link.getStringProperty(PROPERTY_ORIGINAL_FILENAME));
         filename = filename.replace("*ext*", ".mp4");
         filename = filename.replace("*title*", link.getStringProperty(PROPERTY_TITLE));
@@ -711,7 +736,7 @@ public class ArteMediathekV3 extends PluginForDecrypt {
     private final List<Integer> knownQualitiesHeight = Arrays.asList(new Integer[] { 1080, 720, 480, 360, 240 });
 
     private List<Integer> getSelectedHTTPQualities() {
-        final ArteMediathekConfig cfg = PluginJsonConfig.get(this.getConfigInterface());
+        final ArteMediathekConfig cfg = get(this.getConfigInterface());
         final List<Integer> selectedQualitiesHeight = new ArrayList<Integer>();
         if (cfg.isCrawlHTTP1080p()) {
             selectedQualitiesHeight.add(knownQualitiesHeight.get(0));

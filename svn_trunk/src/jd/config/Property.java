@@ -46,7 +46,6 @@ import org.appwork.utils.net.CharSequenceInputStream;
  */
 public class Property {
     private final static WeakHashMap<String, WeakReference<String>> DEDUPEMAP = new WeakHashMap<String, WeakReference<String>>();
-
     // private final static WeakStringCache DEDUPECACHE = new WeakStringCache();
 
     public static String dedupeString(String string) {
@@ -476,6 +475,10 @@ public class Property {
         } catch (IOException e) {
             throw new WTFException(e);
         }
+    }
+
+    public boolean hasCompressedProperty(final String key) {
+        return hasProperty(key + ".gz");
     }
 
     public <T> T getCompressedProperty(final String key, TypeRef<T> typeRef) {

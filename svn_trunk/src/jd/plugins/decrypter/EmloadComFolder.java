@@ -38,7 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.EmloadCom;
 
-@DecrypterPlugin(revision = "$Revision: 53175 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53196 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { EmloadCom.class })
 public class EmloadComFolder extends antiDDoSForDecrypt {
     public EmloadComFolder(PluginWrapper wrapper) {
@@ -89,6 +89,8 @@ public class EmloadComFolder extends antiDDoSForDecrypt {
         /* Keep this errorhandling although, if an account is available, we should be logged in at this stage! */
         if (br.containsHTML(">\\s*This link only for premium")) {
             throw new AccountRequiredException();
+        } else if (br.containsHTML(">\\s*You don't have sufficient funds")) {
+            throw new AccountRequiredException("You don't have sufficient funds in your account to cover this purchase");
         } else if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("file-remove-|is empty...<")) {

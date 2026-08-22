@@ -35,6 +35,7 @@ public class CFG_BUBBLE {
     public static final BooleanKeyHandler                  DOWNLOAD_STARTED_BUBBLE_CONTENT_SAVE_TO_VISIBLE         = SH.getKeyHandler("DownloadStartedBubbleContentSaveToVisible", BooleanKeyHandler.class);
     public static final BooleanKeyHandler                  CRAWLER_BUBBLE_CONTENT_LINK_COUNT_VISIBLE               = SH.getKeyHandler("CrawlerBubbleContentLinkCountVisible", BooleanKeyHandler.class);
     public static final BooleanKeyHandler                  CRAWLER_BUBBLE_CONTENT_ONLINE_COUNT_VISIBLE             = SH.getKeyHandler("CrawlerBubbleContentOnlineCountVisible", BooleanKeyHandler.class);
+    public static final BooleanKeyHandler                  CRAWLER_BUBBLE_CONTENT_DUPE_COUNT_VISIBLE               = SH.getKeyHandler("CrawlerBubbleContentDupeCountVisible", BooleanKeyHandler.class);
     public static final BooleanKeyHandler                  CRAWLER_BUBBLE_CONTENT_LIST_QUEUE_VISIBLE               = SH.getKeyHandler("CrawlerBubbleContentListQueueVisible", BooleanKeyHandler.class);
     public static final BooleanKeyHandler                  CRAWLER_BUBBLE_CONTENT_CHECK_QUEUE_VISIBLE              = SH.getKeyHandler("CrawlerBubbleContentCheckQueueVisible", BooleanKeyHandler.class);
     /**

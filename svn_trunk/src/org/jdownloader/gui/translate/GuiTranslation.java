@@ -3985,6 +3985,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Online" })
     String LinkCrawlerBubbleContent_LinkCrawlerBubbleContent_foundonline();
 
+    @Default(lngs = { "en" }, values = { "Duplicate(s)" })
+    String LinkCrawlerBubbleContent_LinkCrawlerBubbleContent_foundduplicates();
+
     @Default(lngs = { "en" }, values = { "Click to open the Panel's Settings" })
     String AbstractPanelHeader_AbstractPanelHeader_settings_tt();
 

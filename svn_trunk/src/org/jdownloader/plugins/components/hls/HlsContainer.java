@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.exceptions.WTFException;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.downloader.hls.M3U8Playlist;
@@ -22,7 +23,25 @@ import jd.plugins.PluginException;
 import jd.plugins.hoster.GenericM3u8;
 
 public class HlsContainer {
-    public static class MEDIA {
+    public static interface MEDIAInterface {
+        public TYPE _getType();
+
+        public URL _getAbsoluteURL() throws IOException;
+
+        public String getGroupID();
+
+        public String getLanguage();
+
+        public String getName();
+
+        public String getUri();
+
+        public boolean hasCharacteristics(final String lookup);
+
+        List<String> getCharacteristics();
+    }
+
+    public static class MEDIA implements MEDIAInterface {
         public static enum TYPE {
             VIDEO,
             AUDIO,
@@ -46,7 +65,7 @@ public class HlsContainer {
 
         protected final TYPE type;
 
-        public TYPE getType() {
+        public TYPE _getType() {
             return type;
         }
 
@@ -88,7 +107,7 @@ public class HlsContainer {
         protected final List<String> characteristics;
         protected URL                absoluteURL = null;
 
-        public URL getAbsoluteURL() {
+        public URL _getAbsoluteURL() {
             return absoluteURL;
         }
 
@@ -97,12 +116,12 @@ public class HlsContainer {
         }
 
         public List<M3U8Playlist> loadM3U8(final Browser br) throws IOException {
-            final URL url = getAbsoluteURL();
+            final URL url = _getAbsoluteURL();
             if (url == null) {
                 // no url does mean the media is embedded into main stream
                 return null;
             }
-            return M3U8Playlist.loadM3U8(getAbsoluteURL().toExternalForm(), br);
+            return M3U8Playlist.loadM3U8(url.toExternalForm(), br);
         }
 
         public boolean hasCharacteristics(final String lookup) {
@@ -137,13 +156,17 @@ public class HlsContainer {
         public String buildExtXMediaLine() {
             final StringBuilder sb = new StringBuilder();
             sb.append("#EXT-X-MEDIA:");
-            switch (getType()) {
+            switch (_getType()) {
             case AUDIO:
+            case VIDEO:
             case SUBTITLES:
-                sb.append("TYPE=").append(getType().name());
+                sb.append("TYPE=").append(_getType().name());
+                break;
+            case CLOSEDCAPTIONS:
+                sb.append("TYPE=CLOSED-CAPTIONS");
                 break;
             default:
-                sb.append("TYPE=FIXME");
+                sb.append("TYPE=FIXME:" + _getType().name());
                 break;
             }
             sb.append(",GROUP-ID=\"").append(getGroupID()).append("\"");
@@ -246,38 +269,41 @@ public class HlsContainer {
     }
 
     public static HlsContainer find(final Browser br, final List<HlsContainer> hlsContainer, DownloadLink link) throws IOException, PluginException {
+        return find(br, hlsContainer, HlsContainerStorable.restoreFrom(link));
+    }
+
+    public static HlsContainer find(final Browser br, final List<HlsContainer> hlsContainer, final HlsContainerStorable searchFor) throws IOException, PluginException {
         final List<HlsContainer> search = new ArrayList<HlsContainer>(hlsContainer);
-        final HlsContainerStorable storable = link.getCompressedProperty(HlsContainerStorable.DOWNLOADLINK_PROPERTY, HlsContainerStorable.TYPE_REF);
         final Iterator<HlsContainer> it = search.iterator();
         while (it.hasNext()) {
             final HlsContainer next = it.next();
-            final int width = storable.getWidth();
+            final int width = searchFor.getWidth();
             if (width > 0 && next.getWidth() != width) {
                 it.remove();
                 continue;
             }
-            final int height = storable.getHeight();
+            final int height = searchFor.getHeight();
             if (height > 0 && next.getHeight() != height) {
                 it.remove();
                 continue;
             }
-            final int frameRate = storable.getFramerate();
+            final int frameRate = searchFor.getFramerate();
             if (frameRate > 0 && next.getFramerate() != frameRate) {
                 it.remove();
                 continue;
             }
-            final int bandWidth = storable.getBandwidth();
+            final int bandWidth = searchFor.getBandwidth();
             if (bandWidth > 0 && next.getBandwidth() != bandWidth) {
                 it.remove();
                 continue;
             }
-            final String audioGroup = storable.getAudioGroup();
+            final String audioGroup = searchFor.getAudioGroup();
             if (audioGroup != null && !StringUtils.equals(audioGroup, next.getAudioGroupID())) {
                 it.remove();
                 continue;
             }
             {
-                final List<HlsContainerMediaStorable> storableMedias = storable.getMedia(TYPE.AUDIO, audioGroup);
+                final List<HlsContainerMediaStorable> storableMedias = searchFor.getMedia(TYPE.AUDIO, audioGroup);
                 final List<MEDIA> availableMedias = next.getMedia(TYPE.AUDIO, audioGroup);
                 if (availableMedias.size() < storableMedias.size()) {
                     it.remove();
@@ -354,13 +380,13 @@ public class HlsContainer {
         return ret;
     }
 
-    private static List<MEDIA> filterMedia(List<MEDIA> media, TYPE type, final String groupID) {
-        final List<MEDIA> ret = new ArrayList<MEDIA>();
+    private static <T extends MEDIAInterface> List<T> filterMedia(List<T> media, TYPE type, final String groupID) {
+        final List<T> ret = new ArrayList<T>();
         if (media == null || media.size() == 0) {
             return ret;
         }
-        for (MEDIA entry : media) {
-            if (type != null && !type.equals(entry.getType())) {
+        for (T entry : media) {
+            if (type != null && !type.equals(entry._getType())) {
                 continue;
             }
             if (groupID != null && !groupID.equals(entry.getGroupID())) {
@@ -468,6 +494,32 @@ public class HlsContainer {
 
     public List<MEDIA> getMedia() {
         return media;
+    }
+
+    public MEDIA findMEDIA(final MEDIAInterface media) {
+        final List<MEDIA> ret = getMedia(media._getType(), media.getGroupID());
+        final Iterator<MEDIA> it = ret.iterator();
+        while (it.hasNext()) {
+            final MEDIA next = it.next();
+            if (next == media) {
+                return next;
+            }
+            if (!StringUtils.equals(media.getLanguage(), next.getLanguage())) {
+                it.remove();
+                continue;
+            }
+            if (!StringUtils.equals(media.getName(), next.getName())) {
+                it.remove();
+                continue;
+            }
+        }
+        if (ret.size() == 0) {
+            return null;
+        } else if (ret.size() == 1) {
+            return ret.get(0);
+        } else {
+            throw new WTFException();
+        }
     }
 
     public List<MEDIA> getMedia(TYPE type, String groupID) {
@@ -829,7 +881,7 @@ public class HlsContainer {
         return getFileExtension(".mp4");
     }
 
-    public void setPropertiesOnDownloadLink(final DownloadLink link) {
+    public void setPropertiesOnDownloadLink(final DownloadLink link) throws IOException {
         final List<HlsContainer.MEDIA> media = getMedia();
         final HlsContainer.MEDIA mediaList[];
         if (media != null) {
@@ -840,7 +892,7 @@ public class HlsContainer {
         setPropertiesOnDownloadLink(link, mediaList);
     }
 
-    public void setPropertiesOnDownloadLink(final DownloadLink link, final HlsContainer.MEDIA... mediaList) {
+    public void setPropertiesOnDownloadLink(final DownloadLink link, final HlsContainer.MEDIA... mediaList) throws IOException {
         oldVariant: {// old variant to store information
             if (this.getWidth() > 0) {
                 link.setProperty(GenericM3u8.PROPERTY_WIDTH, this.getWidth());
@@ -869,7 +921,7 @@ public class HlsContainer {
                 }
                 containerStorable.getMedia().add(new HlsContainerMediaStorable(mediaEntry));
             }
-            link.setCompressedProperty(HlsContainerStorable.DOWNLOADLINK_PROPERTY, containerStorable);
+            containerStorable.writeTo(link);
         }
     }
 }

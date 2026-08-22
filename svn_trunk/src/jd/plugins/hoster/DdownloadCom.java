@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 52948 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53187 $", interfaceVersion = 3, names = {}, urls = {})
 public class DdownloadCom extends XFileSharingProBasic {
     public DdownloadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -627,5 +627,13 @@ public class DdownloadCom extends XFileSharingProBasic {
     @Override
     protected boolean supportsShortURLs() {
         return true;
+    }
+
+    @Override
+    public ArrayList<String> getCleanupHTMLRegexes() {
+        final ArrayList<String> regexStuff = super.getCleanupHTMLRegexes();
+        /* 2026-08-21 */
+        regexStuff.add("(= 'You have to wait \\{t\\} till the next download';)");
+        return regexStuff;
     }
 }

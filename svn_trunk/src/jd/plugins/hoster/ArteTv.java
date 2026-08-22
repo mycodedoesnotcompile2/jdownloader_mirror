@@ -16,7 +16,18 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
+
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSContent;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA;
+import org.jdownloader.plugins.components.hls.HlsContainerStorable;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -28,11 +39,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 52840 $", interfaceVersion = 3, names = { "arte.tv" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53194 $", interfaceVersion = 3, names = { "arte.tv" }, urls = { "" })
 public class ArteTv extends PluginForHost {
     @SuppressWarnings("deprecation")
     public ArteTv(PluginWrapper wrapper) {
@@ -68,19 +75,15 @@ public class ArteTv extends PluginForHost {
         br.setFollowRedirects(true);
         final String directurl = this.getDirectURL(link);
         if (!StringUtils.isEmpty(directurl) && !isDownload && !this.isHLS(link)) {
-            URLConnectionAdapter con = null;
+            final URLConnectionAdapter con = br.openHeadConnection(directurl);
             try {
-                con = br.openHeadConnection(directurl);
                 handleConnectionErrors(br, con);
                 if (con.getCompleteContentLength() > 0) {
                     link.setVerifiedFileSize(con.getCompleteContentLength());
                 }
                 findAndSetMd5Hash(link, con);
             } finally {
-                try {
-                    con.disconnect();
-                } catch (final Throwable e) {
-                }
+                con.disconnect();
             }
         }
         return AvailableStatus.TRUE;
@@ -97,8 +100,8 @@ public class ArteTv extends PluginForHost {
             // HTTP/1.0 408 Request Time-out
             // Server: AkamaiGHost
             /**
-             * <TITLE>Request Timeout</TITLE> </HEAD><BODY> <H1>Request Timeout</H1> The server timed out while waiting for the browser's
-             * request.
+             * <TITLE>Request Timeout</TITLE> </HEAD><BODY>
+             * <H1>Request Timeout</H1> The server timed out while waiting for the browser's request.
              * <P>
              */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Request Time-out", TimeUnit.MINUTES.toMillis(15));
@@ -118,6 +121,9 @@ public class ArteTv extends PluginForHost {
     }
 
     private boolean isHLS(final DownloadLink link) {
+        if (link.hasCompressedProperty(HlsContainerStorable.DOWNLOADLINK_PROPERTY)) {
+            return true;
+        }
         /* TODO: Remove this backward compatibility in 01-2023 */
         final String legacy_quality_intern = link.getStringProperty("quality_intern");
         if (StringUtils.contains(legacy_quality_intern, "hls_")) {
@@ -137,6 +143,32 @@ public class ArteTv extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
         requestFileInformation(link, true);
+        final HlsContainerStorable linkContainer = HlsContainerStorable.restoreFrom(link);
+        if (linkContainer != null) {
+            checkFFmpeg(link, "Download a HLS Stream");
+            br.getPage(linkContainer.getM3u8URL());
+            final List<HlsContainer> allContainer = HlsContainer.getHlsQualities(br);
+            final HlsContainer found = HlsContainer.find(br, allContainer, linkContainer);
+            if (found == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final List<M3U8Playlist> m3u8 = found.getM3U8(br.cloneBrowser());
+            if (m3u8.size() != 1) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final HLSContent hlsContent = new HLSContent(m3u8.get(0));
+            final MEDIA media = found.findMEDIA(linkContainer.getMedia().get(0));
+            final List<M3U8Playlist> audioM3U8 = media.loadM3U8(br.cloneBrowser());
+            if (audioM3U8 == null || audioM3U8.size() != 1) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            hlsContent.addAudioTrack(audioM3U8.get(0));
+            final List<HLSContent> hlsContents = new ArrayList<HLSContent>();
+            hlsContents.add(hlsContent);
+            dl = new HLSDownloader(link, br, hlsContents);
+            dl.startDownload();
+            return;
+        }
         final String directurl = this.getDirectURL(link);
         if (directurl == null) {
             /* This should never happen! */

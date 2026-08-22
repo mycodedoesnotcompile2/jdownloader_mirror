@@ -121,6 +121,7 @@ public class LinkCrawler {
     private java.util.List<CrawledLink>                                   unhandledLinks              = new ArrayList<CrawledLink>();
     private final AtomicInteger                                           unhandledLinksCounter       = new AtomicInteger(0);
     private final AtomicInteger                                           processedLinksCounter       = new AtomicInteger(0);
+    private final AtomicInteger                                           duplicateLinksCounter       = new AtomicInteger(0);
     private final List<LinkCrawlerTask>                                   tasks                       = new ArrayList<LinkCrawlerTask>();
     private final static Set<LinkCrawler>                                 CRAWLER                     = new HashSet<LinkCrawler>();
     private final Map<String, Object>                                     duplicateFinderContainer;
@@ -4173,6 +4174,18 @@ public class LinkCrawler {
     }
 
     protected void onCrawledLinkDuplicate(CrawledLink link, DUPLICATE duplicate) {
+        switch (duplicate) {
+        case FINAL:
+            /* only count final collector duplicates, e.g. links that were not added because they already exist */
+            duplicateLinksCounter.incrementAndGet();
+            break;
+        default:
+            break;
+        }
+    }
+
+    public int getDuplicateLinksFoundCounter() {
+        return duplicateLinksCounter.get();
     }
 
     public int getCrawledLinksFoundCounter() {

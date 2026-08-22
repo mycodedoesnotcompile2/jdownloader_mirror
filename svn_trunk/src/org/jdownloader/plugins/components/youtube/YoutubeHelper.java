@@ -3880,6 +3880,9 @@ public class YoutubeHelper {
                                 // enforce srv1 for YoutubeSRTConverter
                                 // available formats json3,srv1,srv2,srv3,ttml,srt,vtt
                                 url = url.replaceFirst("fmt=\\w+", "fmt=srt");
+                                if (!url.contains("fmt=srt")) {
+                                    url = url + "&fmt=srt";
+                                }
                                 url = br.getURL(url).toString();
                             }
                             final String name;

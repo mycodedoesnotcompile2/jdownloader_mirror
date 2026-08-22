@@ -7,11 +7,11 @@ import org.appwork.storage.Storable;
 import org.appwork.storage.TypeRef;
 import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA.TYPE;
 
+import jd.plugins.DownloadLink;
+
 public class HlsContainerStorable implements Storable {
-
     public static final TypeRef<HlsContainerStorable> TYPE_REF              = new TypeRef<HlsContainerStorable>() {
-    };
-
+                                                                            };
     public static final String                        DOWNLOADLINK_PROPERTY = "hlsContainerStorable";
 
     public int getWidth() {
@@ -109,13 +109,21 @@ public class HlsContainerStorable implements Storable {
         return filterMedia(getMedia(), type, groupID);
     }
 
+    public void writeTo(DownloadLink link) {
+        link.setCompressedProperty(HlsContainerStorable.DOWNLOADLINK_PROPERTY, this);
+    }
+
+    public static HlsContainerStorable restoreFrom(DownloadLink link) {
+        return link.getCompressedProperty(HlsContainerStorable.DOWNLOADLINK_PROPERTY, TYPE_REF);
+    }
+
     private static List<HlsContainerMediaStorable> filterMedia(List<HlsContainerMediaStorable> media, TYPE type, final String groupID) {
         final List<HlsContainerMediaStorable> ret = new ArrayList<HlsContainerMediaStorable>();
         if (media == null || media.size() == 0) {
             return ret;
         }
         for (HlsContainerMediaStorable entry : media) {
-            if (type != null && !type.equals(entry.getType())) {
+            if (type != null && !type.equals(entry._getType())) {
                 continue;
             }
             if (groupID != null && !groupID.equals(entry.getGroupID())) {

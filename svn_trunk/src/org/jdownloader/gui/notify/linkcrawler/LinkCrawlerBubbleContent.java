@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
+import jd.controlling.linkcollector.LinkCollector;
 import jd.controlling.linkcollector.LinkCollector.JobLinkCrawler;
 import jd.controlling.linkcollector.LinkCollectorCrawler;
 import jd.controlling.linkcollector.LinkOrigin;
@@ -38,6 +39,7 @@ public class LinkCrawlerBubbleContent extends AbstractBubbleContentPanel {
     private Pair                 listQueue;
     private Pair                 packages;
     private Pair                 online;
+    private Pair                 duplicates;
     private ExtButton            cancel;
     private final int            CLOSETIMEOUT = JsonConfig.create(BubbleNotifyConfig.class).getBubbleNotifyOnNewLinkgrabberLinksEndNotifyDelay();
     private final LinkOrigin     origin;
@@ -113,6 +115,9 @@ public class LinkCrawlerBubbleContent extends AbstractBubbleContentPanel {
         if (CFG_BUBBLE.CRAWLER_BUBBLE_CONTENT_ONLINE_COUNT_VISIBLE.isEnabled()) {
             online = addPair(online, _GUI.T.LinkCrawlerBubbleContent_LinkCrawlerBubbleContent_foundonline(), IconKey.ICON_OK);
         }
+        if (CFG_BUBBLE.CRAWLER_BUBBLE_CONTENT_DUPE_COUNT_VISIBLE.isEnabled() && LinkCollector.getInstance().isDupeManagerEnabled()) {
+            duplicates = addPair(duplicates, _GUI.T.LinkCrawlerBubbleContent_LinkCrawlerBubbleContent_foundduplicates(), IconKey.ICON_COPY);
+        }
         if (CFG_BUBBLE.CRAWLER_BUBBLE_CONTENT_CHECK_QUEUE_VISIBLE.isEnabled()) {
             statusQueue = addPair(statusQueue, _GUI.T.LinkCrawlerBubbleContent_LinkCrawlerBubbleContent_linkcheck_queue() + ":", IconKey.ICON_QUESTION);
         }
@@ -141,6 +146,7 @@ public class LinkCrawlerBubbleContent extends AbstractBubbleContentPanel {
     private int              offlineCount        = -1;
     private int              linksCount          = -1;
     private int              onlineCount         = -1;
+    private int              duplicatesCount     = -1;
     private final AtomicLong lastChange          = new AtomicLong(-1);
     private int              lastMaxStringLength = -1;
 
@@ -180,14 +186,17 @@ public class LinkCrawlerBubbleContent extends AbstractBubbleContentPanel {
         }
         boolean changes = false;
         final int linksCnt = jlc.getCrawledLinksFoundCounter();
+        final int duplicatesCnt = jlc.getDuplicateLinksFoundCounter();
         changes |= onlineCount != onlineCnt;
         changes |= offlineCount != offlineCnt;
         changes |= joblessCount != jobless;
         changes |= linksCount != linksCnt;
+        changes |= duplicatesCount != duplicatesCnt;
         this.offlineCount = offlineCnt;
         this.onlineCount = onlineCnt;
         this.joblessCount = jobless;
         this.linksCount = linksCnt;
+        this.duplicatesCount = duplicatesCnt;
         final long lastChange;
         if (changes) {
             lastChange = System.currentTimeMillis();
@@ -202,6 +211,11 @@ public class LinkCrawlerBubbleContent extends AbstractBubbleContentPanel {
                 if (online != null) {
                     final String string = String.valueOf(onlineCount);
                     online.setText(string);
+                    maxStringLength = Math.max(maxStringLength, string.length());
+                }
+                if (duplicates != null) {
+                    final String string = String.valueOf(duplicatesCount);
+                    duplicates.setText(string);
                     maxStringLength = Math.max(maxStringLength, string.length());
                 }
                 if (offlineCount > 0) {
@@ -338,6 +352,7 @@ public class LinkCrawlerBubbleContent extends AbstractBubbleContentPanel {
         elements.add(new Element(CFG_BUBBLE.CRAWLER_BUBBLE_CONTENT_LIST_QUEUE_VISIBLE, _GUI.T.LinkCrawlerBubbleContent_LinkCrawlerBubbleContent_list_queue(), IconKey.ICON_BATCH));
         elements.add(new Element(CFG_BUBBLE.CRAWLER_BUBBLE_CONTENT_CHECK_QUEUE_VISIBLE, _GUI.T.LinkCrawlerBubbleContent_LinkCrawlerBubbleContent_linkcheck_queue(), IconKey.ICON_QUESTION));
         elements.add(new Element(CFG_BUBBLE.CRAWLER_BUBBLE_CONTENT_ONLINE_COUNT_VISIBLE, _GUI.T.LinkCrawlerBubbleContent_LinkCrawlerBubbleContent_foundonline(), IconKey.ICON_OK));
+        elements.add(new Element(CFG_BUBBLE.CRAWLER_BUBBLE_CONTENT_DUPE_COUNT_VISIBLE, _GUI.T.LinkCrawlerBubbleContent_LinkCrawlerBubbleContent_foundduplicates(), IconKey.ICON_COPY));
         elements.add(new Element(CFG_BUBBLE.CRAWLER_BUBBLE_CONTENT_STATUS_VISIBLE, _GUI.T.LinkCrawlerBubbleContent_LinkCrawlerBubbleContent_status(), IconKey.ICON_RUN));
         elements.add(new Element(CFG_BUBBLE.CRAWLER_BUBBLE_CONTENT_ANIMATED_ICON_VISIBLE, _GUI.T.LinkCrawlerBubbleContent_LinkCrawlerBubbleContent_icon(), IconKey.ICON_FIND));
     }

@@ -12,14 +12,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 
-import jd.controlling.downloadcontroller.IfFileExistsDialogInterface;
-import net.lingala.zip4j.ZipFile;
-import net.lingala.zip4j.exception.ZipException;
-import net.lingala.zip4j.io.inputstream.ZipInputStream;
-import net.lingala.zip4j.model.ExtraDataRecord;
-import net.lingala.zip4j.model.FileHeader;
-import net.sf.sevenzipjbinding.SevenZipException;
-
 import org.appwork.utils.Files;
 import org.appwork.utils.Hash;
 import org.appwork.utils.Regex;
@@ -46,6 +38,14 @@ import org.jdownloader.extensions.extraction.content.ContentView;
 import org.jdownloader.extensions.extraction.content.PackedFile;
 import org.jdownloader.extensions.extraction.gui.iffileexistsdialog.IfFileExistsDialog;
 import org.jdownloader.settings.IfFileExistsAction;
+
+import jd.controlling.downloadcontroller.IfFileExistsDialogInterface;
+import net.lingala.zip4j.ZipFile;
+import net.lingala.zip4j.exception.ZipException;
+import net.lingala.zip4j.io.inputstream.ZipInputStream;
+import net.lingala.zip4j.model.ExtraDataRecord;
+import net.lingala.zip4j.model.FileHeader;
+import net.sf.sevenzipjbinding.SevenZipException;
 
 public class Zip4J extends IExtraction {
     private volatile int              crack                   = 0;
@@ -305,11 +305,11 @@ public class Zip4J extends IExtraction {
                         try {
                             final long fileNameCRC32 = Hash.getCRC32(fileHeader.getFileName().getBytes("ISO_8859_1"));
                             final long fileNameCheckCRC32 = Integer.toUnsignedLong(ByteBuffer.wrap(Arrays.copyOfRange(data, 1, 5)).order(ByteOrder.LITTLE_ENDIAN).getInt());
-                            final String ret = new String(data, 5, data.length - 5, "UTF-8");
-                            if (fileNameCheckCRC32 == fileNameCRC32) {
-                                return ret;
+                            final String fileNameFromExtraDataRecord = new String(data, 5, data.length - 5, "UTF-8");
+                            if (fileNameCheckCRC32 == fileNameCRC32 || fileNameFromExtraDataRecord.equals(fileHeader.getFileName())) {
+                                return fileNameFromExtraDataRecord;
                             }
-                            throw new IOException("CRC32 Missmatch for: " + fileHeader.getFileName() + "<->" + ret);
+                            throw new IOException("Don't use filename from ExtraDataRecord: " + fileHeader.getFileName() + "(" + fileNameCheckCRC32 + ")<->" + fileNameFromExtraDataRecord + "(" + fileNameCheckCRC32 + ")");
                         } catch (IOException e) {
                             Log.log(e);
                         }
