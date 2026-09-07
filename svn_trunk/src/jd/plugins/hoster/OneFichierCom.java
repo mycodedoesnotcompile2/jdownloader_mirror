@@ -102,7 +102,7 @@ import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 53290 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53334 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     /* Account properties */
     private final String        PROPERTY_ACCOUNT_USE_CDN_CREDITS                                  = "use_cdn_credits";
@@ -1914,7 +1914,7 @@ public class OneFichierCom extends PluginForHost {
     }
 
     public static boolean looksLikeValidAPIKeySTATIC(final String str) {
-        if (str != null && str.matches("[A-Za-z0-9\\-_=]{32}")) {
+        if (str != null && str.matches("([A-Za-z0-9\\-_=]{32}|[A-Za-z0-9\\-_=]{40})")) {
             return true;
         } else {
             return false;
