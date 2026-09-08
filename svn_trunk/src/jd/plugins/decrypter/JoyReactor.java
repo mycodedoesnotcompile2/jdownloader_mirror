@@ -10,6 +10,7 @@ import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -19,7 +20,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52513 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53349 $", interfaceVersion = 2, names = {}, urls = {})
 public class JoyReactor extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -65,6 +66,10 @@ public class JoyReactor extends PluginForDecrypt {
         br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        if (br.containsHTML(">\\s*Контент только для зарегистрированных пользователей")) {
+            /* Content only for registered users */
+            throw new AccountRequiredException();
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         Set<String> directURLs = new HashSet<String>();

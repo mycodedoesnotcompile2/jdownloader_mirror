@@ -34,27 +34,26 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 53308 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53347 $", interfaceVersion = 3, names = {}, urls = {})
 public class DramaCoolVideo extends PluginForDecrypt {
     public DramaCoolVideo(PluginWrapper wrapper) {
         super(wrapper);
     }
 
-    public static final String DRAMACOOL_MAIN_DOMAIN = "asianc.sh";
+    public static final String DRAMACOOL_MAIN_DOMAIN = "asianctv.site";
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { DRAMACOOL_MAIN_DOMAIN, "dramacool.pa", "dramacool.cr", "dramacool.ch", "dramacool.bz", "dramacool.video", "dramacool.movie", "dramacool.so", "dramacool.link", "dramacool.vc", "dramacool.fo", "asianctv.com", "asianctv.net" });
+        ret.add(new String[] { DRAMACOOL_MAIN_DOMAIN, "asianc.sh", "dramacool.pa", "dramacool.cr", "dramacool.ch", "dramacool.bz", "dramacool.video", "dramacool.movie", "dramacool.so", "dramacool.link", "dramacool.vc", "dramacool.fo", "asianctv.com", "asianctv.net" });
         /* 2026-01-12: Website is slightly different than other dramacool domains, thus I placed it in a separate array. */
         ret.add(new String[] { "dramacool9.com.ro" });
-        ret.add(new String[] { "gogoanime3.co", "gogoanime3.net", "gogoanime.tel", "gogoanime.tv", "gogoanime.io", "gogoanime.vc", "gogoanime.sh", "gogoanime.gg", "gogoanime.run" });
         ret.add(new String[] { "kisskh.com.ro" }); // 2026-01-12
         return ret;
     }
 
     private static String[] getDeadDomains() {
-        return new String[] { "dramacool.link", "gogoanime.io", "gogoanime.sh" };
+        return new String[] { "dramacool.link", "asianc.sh" };
     }
 
     public static String[] getAnnotationNames() {
@@ -138,60 +137,67 @@ public class DramaCoolVideo extends PluginForDecrypt {
                 return ret;
             }
         }
-        String[] links = br.getRegex("data-src=\"(https?[^\"]+)\"").getColumn(0); // 2026-09-03: dramacool9.com.ro
-        if (links == null || links.length == 0) {
-            links = br.getRegex("<li>\\s*<a href=\"([^\"]+)\" class=\"img\">\\s*<span class=\"type[^\"]*\">").getColumn(0);
-        }
-        if (links == null || links.length == 0) {
-            links = br.getRegex("data-video=\"([^\"]+)\"\\s*>").getColumn(0);
-        }
-        if (links != null && links.length > 0) {
-            for (String link : links) {
-                if (link.startsWith("/")) {
-                    link = br.getURL(link).toExternalForm();
+        {
+            /* 2026-09-07 */
+            final String[] data_video = br.getRegex("data-video=\"(http[^\"]+)\"\\s*>").getColumn(0);
+            if (data_video != null && data_video.length > 0) {
+                for (final String url : data_video) {
+                    ret.add(createDownloadlink(url));
                 }
-                // link = Encoding.htmlDecode(link);
-                ret.add(createDownloadlink(link));
-            }
-        }
-        final String[] iframelinks = br.getRegex("<iframe[^<]*src=\"(https?://[^\"]+)\"").getColumn(0);
-        if (iframelinks != null && iframelinks.length > 0) {
-            for (String link : iframelinks) {
-                if (link.startsWith("/")) {
-                    link = br.getURL(link).toExternalForm();
-                }
-                ret.add(createDownloadlink(link));
             }
         }
         if (ret.isEmpty()) {
-            final String cover_url = br.getRegex("property=\"og:image\" content=\"(https?://[^\"]+)\"").getMatch(0);
-            if (cover_url != null) {
-                logger.info("Found no stream-results -> Adding cover_url");
-                final DownloadLink cover = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(cover_url));
-                cover.setAvailable(true);
-                ret.add(cover);
-            } else {
-                logger.warning("Failed to find cover -> Link offline?");
+            String[] links = br.getRegex("data-src=\"(https?[^\"]+)\"").getColumn(0); // 2026-09-03: dramacool9.com.ro
+            if (links == null || links.length == 0) {
+                links = br.getRegex("<li>\\s*<a href=\"([^\"]+)\" class=\"img\">\\s*<span class=\"type[^\"]*\">").getColumn(0);
             }
-        }
-        if (ret.isEmpty()) {
-            /* Check for special offline cases */
-            final String html = br.getRequest().getHtmlCode();
-            if (StringUtils.isEmpty(html)) {
-                /* Blank page */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (html.startsWith("{")) {
-                /* json response */
-                /* e.g. https://dramacool9.com.ro/wp-json */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (html.contains("<title>Index of")) {
-                /* e.g. https://dramacool9.com.ro/wp-includes/ */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (br._getURL().getPath().startsWith("/wp-")) {
-                /* e.g. https://dramacool9.com.ro/wp-admin */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            if (links != null && links.length > 0) {
+                for (String link : links) {
+                    if (link.startsWith("/")) {
+                        link = br.getURL(link).toExternalForm();
+                    }
+                    ret.add(createDownloadlink(link));
+                }
             }
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            final String[] iframelinks = br.getRegex("<iframe[^<]*src=\"(https?://[^\"]+)\"").getColumn(0);
+            if (iframelinks != null && iframelinks.length > 0) {
+                for (String link : iframelinks) {
+                    if (link.startsWith("/")) {
+                        link = br.getURL(link).toExternalForm();
+                    }
+                    ret.add(createDownloadlink(link));
+                }
+            }
+            if (ret.isEmpty()) {
+                final String cover_url = br.getRegex("property=\"og:image\" content=\"(https?://[^\"]+)\"").getMatch(0);
+                if (cover_url != null) {
+                    logger.info("Found no stream-results -> Adding cover_url");
+                    final DownloadLink cover = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(cover_url));
+                    cover.setAvailable(true);
+                    ret.add(cover);
+                } else {
+                    logger.warning("Failed to find cover -> Link offline?");
+                }
+            }
+            if (ret.isEmpty()) {
+                /* Check for special offline cases */
+                final String html = br.getRequest().getHtmlCode();
+                if (StringUtils.isEmpty(html)) {
+                    /* Blank page */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                } else if (html.startsWith("{")) {
+                    /* json response */
+                    /* e.g. https://dramacool9.com.ro/wp-json */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                } else if (html.contains("<title>Index of")) {
+                    /* e.g. https://dramacool9.com.ro/wp-includes/ */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                } else if (br._getURL().getPath().startsWith("/wp-")) {
+                    /* e.g. https://dramacool9.com.ro/wp-admin */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
         }
         final FilePackage fp = FilePackage.getInstance();
         if (title != null) {

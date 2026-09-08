@@ -35,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53306 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53336 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileDitchCom extends PluginForHost {
     public FileDitchCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -180,7 +180,7 @@ public class FileDitchCom extends PluginForHost {
         int round = 0;
         while (br.containsHTML("name\\s*=\\s*\"pow_challenge\"")) {
             if (round++ >= 3) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Failed to solve anti-bot challenge");
+                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Failed to solve anti-bot challenge");
             }
             if (this.isAbort()) {
                 throw new InterruptedException();

@@ -545,8 +545,8 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
             @Override
             public void onStateChange(StateEvent event) {
                 /*
-                 * recalculate the effective speed manager limit on every state change so that entering/leaving pause
-                 * (through any path: pause toggle, stop, start) applies/removes the pause throttling
+                 * recalculate the effective speed manager limit on every state change so that entering/leaving pause (through any path:
+                 * pause toggle, stop, start) applies/removes the pause throttling
                  */
                 updateDownloadSpeedManagerLimit();
                 if (event.getNewState() == RUNNING_STATE) {
@@ -813,13 +813,11 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                 if (cachedValidationResult == null) {
                     validateDestination(new File(destination));
                     validationOk = true;
+                } else if (cachedValidationResult.booleanValue() == true) {
+                    validationOk = true;
                 } else {
-                    if (cachedValidationResult.booleanValue() == true) {
-                        validationOk = true;
-                    } else {
-                        for (final DownloadLinkCandidate candidate : nextCandidates) {
-                            selector.addExcluded(candidate, new DownloadLinkCandidateResult(SkipReason.INVALID_DESTINATION, null, null));
-                        }
+                    for (final DownloadLinkCandidate candidate : nextCandidates) {
+                        selector.addExcluded(candidate, new DownloadLinkCandidateResult(SkipReason.INVALID_DESTINATION, null, null));
                     }
                 }
             } catch (PathTooLongException e) {
@@ -915,28 +913,31 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
             while (it2.hasNext()) {
                 final Entry<String, ArrayList<DownloadLinkCandidate>> next2 = it2.next();
                 final ArrayList<DownloadLinkCandidate> list = next2.getValue();
-                if (list.size() > 1) {
-                    final ArrayList<DownloadLinkCandidate> newList = new ArrayList<DownloadLinkCandidate>();
-                    try {
-                        final ArrayList<Account> accList = new ArrayList<Account>();
-                        final LinkedHashMap<Account, DownloadLinkCandidate> accMap = new LinkedHashMap<Account, DownloadLinkCandidate>();
-                        for (final DownloadLinkCandidate candidate : list) {
-                            accMap.put(candidate.getCachedAccount().getAccount(), candidate);
-                            accList.add(candidate.getCachedAccount().getAccount());
-                        }
-                        for (Account account : list.get(0).getCachedAccount().getPlugin().sortAccounts(downloadLink, accList)) {
-                            final DownloadLinkCandidate candidate = accMap.remove(account);
-                            if (candidate != null) {
-                                newList.add(candidate);
-                            }
-                        }
-                    } catch (final Throwable e) {
-                        logger.log(e);
+                if (list.size() <= 1) {
+                    /* nothing to sort */
+                    candidates.addAll(list);
+                    continue;
+                }
+                final ArrayList<DownloadLinkCandidate> newList = new ArrayList<DownloadLinkCandidate>();
+                try {
+                    final ArrayList<Account> accList = new ArrayList<Account>();
+                    final LinkedHashMap<Account, DownloadLinkCandidate> accMap = new LinkedHashMap<Account, DownloadLinkCandidate>();
+                    for (final DownloadLinkCandidate candidate : list) {
+                        accMap.put(candidate.getCachedAccount().getAccount(), candidate);
+                        accList.add(candidate.getCachedAccount().getAccount());
                     }
-                    if (newList.size() == list.size()) {
-                        candidates.addAll(newList);
-                        continue;
+                    for (Account account : list.get(0).getCachedAccount().getPlugin().sortAccounts(downloadLink, accList)) {
+                        final DownloadLinkCandidate candidate = accMap.remove(account);
+                        if (candidate != null) {
+                            newList.add(candidate);
+                        }
                     }
+                } catch (final Throwable e) {
+                    logger.log(e);
+                }
+                if (newList.size() == list.size()) {
+                    candidates.addAll(newList);
+                    continue;
                 }
                 candidates.addAll(list);
             }
@@ -948,78 +949,82 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
             if (bestCandidate == null) {
                 /* no bestCandidate yet */
                 bestCandidates.put(candidateLink, nextCandidate);
-            } else if (!bestCandidate.isCustomizedAccount()) {
-                /* we have a bestCandidate, check if nextCandidate would be better */
-                final boolean bestHasCaptcha = bestCandidate.getCachedAccount().hasCaptcha(candidateLink);
-                final boolean nextHasCaptcha = nextCandidate.getCachedAccount().hasCaptcha(candidateLink);
-                switch (bestCandidate.getCachedAccount().getType()) {
-                case MULTI:
-                    /* our bestCandidate is a multihost one */
-                    switch (nextCandidate.getCachedAccount().getType()) {
-                    case ORIGINAL:
-                        if (nextHasCaptcha == false) {
-                            /* we always prefer originalAccount if it does not have a captcha */
-                            bestCandidates.put(candidateLink, nextCandidate);
-                        }
-                        break;
-                    case MULTI:
-                        if (bestHasCaptcha && nextHasCaptcha == false) {
-                            /* we replace our bestCandidate because nextCandidate does not have a captcha */
-                            bestCandidates.put(candidateLink, nextCandidate);
-                        }
-                        break;
-                    case NONE:
-                        if (false && bestHasCaptcha && nextHasCaptcha == false) {
-                            /* TODO */
-                            /* disabled because needs to be discussed if we prefer captchaless none over captcha original/multihost */
-                            /* we replace our bestCandidate with NONE because nextCandidate does not have a captcha */
-                            bestCandidates.put(candidateLink, nextCandidate);
-                        }
-                        break;
+                continue;
+            }
+            if (bestCandidate.isCustomizedAccount()) {
+                /* a customized account always wins, keep it */
+                continue;
+            }
+            /* we have a bestCandidate, check if nextCandidate would be better */
+            final boolean bestHasCaptcha = bestCandidate.getCachedAccount().hasCaptcha(candidateLink);
+            final boolean nextHasCaptcha = nextCandidate.getCachedAccount().hasCaptcha(candidateLink);
+            switch (bestCandidate.getCachedAccount().getType()) {
+            case MULTI:
+                /* our bestCandidate is a multihost one */
+                switch (nextCandidate.getCachedAccount().getType()) {
+                case ORIGINAL:
+                    if (nextHasCaptcha == false) {
+                        /* we always prefer originalAccount if it does not have a captcha */
+                        bestCandidates.put(candidateLink, nextCandidate);
                     }
                     break;
-                case ORIGINAL:
-                    /* our bestCandidate is an original one */
-                    switch (nextCandidate.getCachedAccount().getType()) {
-                    case MULTI:
-                    case ORIGINAL:
-                        if (bestHasCaptcha && nextHasCaptcha == false) {
-                            /* we only replace originalAccount in case bestCandidate does have a captcha and nextCandidate does not */
-                            bestCandidates.put(candidateLink, nextCandidate);
-                        }
-                        break;
-                    case NONE:
-                        if (false && bestHasCaptcha && nextHasCaptcha == false) {
-                            /* TODO */
-                            /* disabled because needs to be discussed if we prefer captchaless none over captcha original/multihost */
-                            /* we replace our bestCandidate with NONE because nextCandidate does not have a captcha */
-                            bestCandidates.put(candidateLink, nextCandidate);
-                        }
-                        break;
+                case MULTI:
+                    if (bestHasCaptcha && nextHasCaptcha == false) {
+                        /* we replace our bestCandidate because nextCandidate does not have a captcha */
+                        bestCandidates.put(candidateLink, nextCandidate);
                     }
                     break;
                 case NONE:
-                    /* our bestCandidate is without an account */
-                    switch (nextCandidate.getCachedAccount().getType()) {
-                    case NONE:
-                        if (bestHasCaptcha && nextHasCaptcha == false) {
-                            /* we replace our bestCandidate because nextCandidate does not have a captcha */
-                            bestCandidates.put(candidateLink, nextCandidate);
-                        }
-                        break;
-                    case MULTI:
-                    case ORIGINAL:
-                        if (nextHasCaptcha == false) {
-                            /* we replace our bestCandidate because nextCandidate does not have a captcha */
-                            bestCandidates.put(candidateLink, nextCandidate);
-                        } else {
-                            /* we replace our bestCandidate because nextCandidate is original/multihost */
-                            bestCandidates.put(candidateLink, nextCandidate);
-                        }
-                        break;
+                    if (false && bestHasCaptcha && nextHasCaptcha == false) {
+                        /* TODO */
+                        /* disabled because needs to be discussed if we prefer captchaless none over captcha original/multihost */
+                        /* we replace our bestCandidate with NONE because nextCandidate does not have a captcha */
+                        bestCandidates.put(candidateLink, nextCandidate);
                     }
                     break;
                 }
+                break;
+            case ORIGINAL:
+                /* our bestCandidate is an original one */
+                switch (nextCandidate.getCachedAccount().getType()) {
+                case MULTI:
+                case ORIGINAL:
+                    if (bestHasCaptcha && nextHasCaptcha == false) {
+                        /* we only replace originalAccount in case bestCandidate does have a captcha and nextCandidate does not */
+                        bestCandidates.put(candidateLink, nextCandidate);
+                    }
+                    break;
+                case NONE:
+                    if (false && bestHasCaptcha && nextHasCaptcha == false) {
+                        /* TODO */
+                        /* disabled because needs to be discussed if we prefer captchaless none over captcha original/multihost */
+                        /* we replace our bestCandidate with NONE because nextCandidate does not have a captcha */
+                        bestCandidates.put(candidateLink, nextCandidate);
+                    }
+                    break;
+                }
+                break;
+            case NONE:
+                /* our bestCandidate is without an account */
+                switch (nextCandidate.getCachedAccount().getType()) {
+                case NONE:
+                    if (bestHasCaptcha && nextHasCaptcha == false) {
+                        /* we replace our bestCandidate because nextCandidate does not have a captcha */
+                        bestCandidates.put(candidateLink, nextCandidate);
+                    }
+                    break;
+                case MULTI:
+                case ORIGINAL:
+                    if (nextHasCaptcha == false) {
+                        /* we replace our bestCandidate because nextCandidate does not have a captcha */
+                        bestCandidates.put(candidateLink, nextCandidate);
+                    } else {
+                        /* we replace our bestCandidate because nextCandidate is original/multihost */
+                        bestCandidates.put(candidateLink, nextCandidate);
+                    }
+                    break;
+                }
+                break;
             }
         }
         ArrayList<DownloadLinkCandidate> finalCandidates = new ArrayList<DownloadLinkCandidate>(bestCandidates.values());
@@ -1548,73 +1553,74 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                     }
                 }
             }
-            if (checkNextCandidatesStage1.size() > 0) {
-                /**
-                 * find all possible proxySelectors
-                 */
-                final List<DownloadLinkCandidate> checkNextCandidatesStage2 = new ArrayList<DownloadLinkCandidate>();
-                final boolean[][] flags = new boolean[][] { { false, false }, { true, false }, { true, true } };
-                for (boolean[] flag : flags) {
-                    final Iterator<DownloadLinkCandidate> it = checkNextCandidatesStage1.iterator();
-                    while (it.hasNext()) {
-                        final DownloadLinkCandidate candidate = it.next();
-                        final List<AbstractProxySelectorImpl> proxySelectors = selector.getProxies(candidate, flag[0], flag[1]);
-                        if (proxySelectors.size() > 0) {
-                            it.remove();
-                            for (AbstractProxySelectorImpl proxySelector : proxySelectors) {
-                                checkNextCandidatesStage2.add(new DownloadLinkCandidate(candidate, proxySelector));
-                            }
-                        }
-                    }
-                    if (checkNextCandidatesStage2.size() > 0) {
-                        /**
-                         * skip next flagset because we have already found possible proxySelectors
-                         */
-                        break;
-                    }
-                }
-                /**
-                 * handle all candidates without a proxySelector
-                 */
-                for (final DownloadLinkCandidate notPossibleCandidate : checkNextCandidatesStage1) {
-                    try {
-                        if (selector.validateDownloadLinkCandidate(notPossibleCandidate)) {
-                            selector.addExcluded(notPossibleCandidate, new DownloadLinkCandidateResult(SkipReason.CONNECTION_UNAVAILABLE, null, null));
-                        }
-                    } catch (final Throwable e) {
-                        logger.log(e);
-                        selector.addExcluded(notPossibleCandidate, new DownloadLinkCandidateResult(RESULT.PLUGIN_DEFECT, null, null));
-                    }
-                }
-                final List<DownloadLinkCandidate> nextCandidates = new ArrayList<DownloadLinkCandidate>();
-                final Iterator<DownloadLinkCandidate> it = checkNextCandidatesStage2.iterator();
+            if (checkNextCandidatesStage1.size() == 0) {
+                continue;
+            }
+            /**
+             * find all possible proxySelectors
+             */
+            final List<DownloadLinkCandidate> checkNextCandidatesStage2 = new ArrayList<DownloadLinkCandidate>();
+            final boolean[][] flags = new boolean[][] { { false, false }, { true, false }, { true, true } };
+            for (boolean[] flag : flags) {
+                final Iterator<DownloadLinkCandidate> it = checkNextCandidatesStage1.iterator();
                 while (it.hasNext()) {
                     final DownloadLinkCandidate candidate = it.next();
-                    try {
-                        final DownloadLinkCandidatePermission permission = selector.getDownloadLinkCandidatePermission(candidate);
-                        switch (permission) {
-                        case OK:
-                        case OK_FORCED:
-                        case OK_SPEED_EXTENSION:
-                            if (selector.validateDownloadLinkCandidate(candidate)) {
-                                nextCandidates.add(candidate);
-                            }
-                            break;
-                        case CONCURRENCY_FORBIDDEN:
-                        case CONCURRENCY_LIMIT:
-                            if (selector.validateDownloadLinkCandidate(candidate)) {
-                                selector.addExcluded(candidate, new DownloadLinkCandidateResult(RESULT.CONNECTION_TEMP_UNAVAILABLE, null, null));
-                            }
-                            break;
+                    final List<AbstractProxySelectorImpl> proxySelectors = selector.getProxies(candidate, flag[0], flag[1]);
+                    if (proxySelectors.size() > 0) {
+                        it.remove();
+                        for (AbstractProxySelectorImpl proxySelector : proxySelectors) {
+                            checkNextCandidatesStage2.add(new DownloadLinkCandidate(candidate, proxySelector));
                         }
-                    } catch (final Throwable e) {
-                        logger.log(e);
-                        selector.addExcluded(candidate, new DownloadLinkCandidateResult(RESULT.PLUGIN_DEFECT, null, null));
                     }
                 }
-                if (nextCandidates.size() > 0) {
-                    return nextCandidates;
+                if (checkNextCandidatesStage2.size() > 0) {
+                    /**
+                     * skip next flagset because we have already found possible proxySelectors
+                     */
+                    break;
                 }
+            }
+            /**
+             * handle all candidates without a proxySelector
+             */
+            for (final DownloadLinkCandidate notPossibleCandidate : checkNextCandidatesStage1) {
+                try {
+                    if (selector.validateDownloadLinkCandidate(notPossibleCandidate)) {
+                        selector.addExcluded(notPossibleCandidate, new DownloadLinkCandidateResult(SkipReason.CONNECTION_UNAVAILABLE, null, null));
+                    }
+                } catch (final Throwable e) {
+                    logger.log(e);
+                    selector.addExcluded(notPossibleCandidate, new DownloadLinkCandidateResult(RESULT.PLUGIN_DEFECT, null, null));
+                }
+            }
+            final List<DownloadLinkCandidate> nextCandidates = new ArrayList<DownloadLinkCandidate>();
+            final Iterator<DownloadLinkCandidate> it = checkNextCandidatesStage2.iterator();
+            while (it.hasNext()) {
+                final DownloadLinkCandidate candidate = it.next();
+                try {
+                    final DownloadLinkCandidatePermission permission = selector.getDownloadLinkCandidatePermission(candidate);
+                    switch (permission) {
+                    case OK:
+                    case OK_FORCED:
+                    case OK_SPEED_EXTENSION:
+                        if (selector.validateDownloadLinkCandidate(candidate)) {
+                            nextCandidates.add(candidate);
+                        }
+                        break;
+                    case CONCURRENCY_FORBIDDEN:
+                    case CONCURRENCY_LIMIT:
+                        if (selector.validateDownloadLinkCandidate(candidate)) {
+                            selector.addExcluded(candidate, new DownloadLinkCandidateResult(RESULT.CONNECTION_TEMP_UNAVAILABLE, null, null));
+                        }
+                        break;
+                    }
+                } catch (final Throwable e) {
+                    logger.log(e);
+                    selector.addExcluded(candidate, new DownloadLinkCandidateResult(RESULT.PLUGIN_DEFECT, null, null));
+                }
+            }
+            if (nextCandidates.size() > 0) {
+                return nextCandidates;
             }
         }
         return null;
@@ -1812,10 +1818,10 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
     /**
      * Updates the effective limit of the {@link DownloadSpeedManager}.
      *
-     * While paused, the download speed is throttled to the (pause) speed limit even though the persistent
-     * DownloadSpeedLimitEnabled flag is NOT set: pause mode must never enable the speed limit in the config, otherwise a
-     * crash/restart while paused would leave the user with an active speed limit they never enabled. The pause throttling
-     * is therefore derived from the pause state here instead of from the enabled flag.
+     * While paused, the download speed is throttled to the (pause) speed limit even though the persistent DownloadSpeedLimitEnabled flag is
+     * NOT set: pause mode must never enable the speed limit in the config, otherwise a crash/restart while paused would leave the user with
+     * an active speed limit they never enabled. The pause throttling is therefore derived from the pause state here instead of from the
+     * enabled flag.
      */
     protected void updateDownloadSpeedManagerLimit() {
         /* stateMachine is initialized later in the constructor than the speed limit listeners, so guard against null */
@@ -1823,9 +1829,9 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
         final int limit;
         if (paused) {
             /*
-             * While paused we throttle to the (separate) pause speed. Pause mode never touches the persistent download
-             * speed limit config (neither value nor enabled flag), so a crash/restart while paused can not leave any
-             * speed limit behind, and a regular limit changed during pause (e.g. via advanced settings) is preserved.
+             * While paused we throttle to the (separate) pause speed. Pause mode never touches the persistent download speed limit config
+             * (neither value nor enabled flag), so a crash/restart while paused can not leave any speed limit behind, and a regular limit
+             * changed during pause (e.g. via advanced settings) is preserved.
              */
             limit = config.getPauseSpeed();
         } else if (config.isDownloadSpeedLimitEnabled()) {
@@ -1846,10 +1852,10 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                 }
                 if (value) {
                     /*
-                     * Pause mode is a pure runtime state: it does NOT touch the persistent download speed limit config
-                     * (neither the value nor the enabled flag). The pause throttling is derived from the pause state in
-                     * updateDownloadSpeedManagerLimit (throttling to the separate pause speed). This way a crash/restart
-                     * while paused can not leave any speed limit behind, and a regular limit changed during pause is kept.
+                     * Pause mode is a pure runtime state: it does NOT touch the persistent download speed limit config (neither the value
+                     * nor the enabled flag). The pause throttling is derived from the pause state in updateDownloadSpeedManagerLimit
+                     * (throttling to the separate pause speed). This way a crash/restart while paused can not leave any speed limit behind,
+                     * and a regular limit changed during pause is kept.
                      */
                     logger.info("Pause enabled: Reducing downloadspeed to " + config.getPauseSpeed() + " KiB/s");
                     /* pause downloads */
@@ -4525,11 +4531,18 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                 throw new SkipReasonException(SkipReason.INVALID_DESTINATION, e);
             }
             /* Shorten filename and try again */
-            final DownloadSession currentSession = getSession();
+            final DownloadSession currentSession = session;
             IfFilenameTooLongAction action = currentSession.getOnFilenameTooLongAction(downloadLink.getFilePackage());
-            if (action == IfFilenameTooLongAction.SKIP_FILE) {
+            if (action == null) {
+                /* No remembered decision yet -> we will ask the user (see below). */
+                action = IfFilenameTooLongAction.ASK_FOR_EACH_FILE;
+            }
+            switch (action) {
+            case SKIP_FILE:
                 /* User wants us to skip too long filenames. */
                 throw e;
+            default:
+                break;
             }
             final String autoShortenedFilename = LinknameCleaner.shortenFilename(pfname, maxFilenameLength);
             String shortenedFilename = autoShortenedFilename;
@@ -4537,7 +4550,8 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                 logger.info("Shortening this filename is not possible");
                 throw e;
             }
-            if (action == null || action == IfFilenameTooLongAction.ASK_FOR_EACH_FILE) {
+            switch (action) {
+            case ASK_FOR_EACH_FILE: {
                 final IfFilenameTooLongDialogInterface io = new IfFilenameTooLongDialog(downloadLink, pfname, shortenedFilename).show();
                 if (io.getCloseReason() == CloseReason.OK) {
                     action = io.getAction();
@@ -4548,15 +4562,31 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                 if (io.isDontShowAgainSelected()) {
                     currentSession.setOnFileFilenameTooLongAction(downloadLink.getFilePackage(), action);
                 } else {
-                    currentSession.setOnFileExistsAction(downloadLink.getFilePackage(), null);
+                    currentSession.setOnFileFilenameTooLongAction(downloadLink.getFilePackage(), null);
                 }
                 /* TODO: Remove non-allowed chars from this string. */
                 shortenedFilename = io.getNewFilename();
+                break;
             }
-            if (IfFilenameTooLongAction.RENAME_FILE != action) {
+            default:
+                break;
+            }
+            if (action == null) {
+                /* No decision available (e.g. dialog returned no action) -> do not rename. */
+                throw e;
+            }
+            if (shortenedFilename == null) {
+                /* This shouldn't happen. */
+                throw e;
+            }
+            switch (action) {
+            case RENAME_FILE:
+                break;
+            default:
                 /* No rename wished -> Dead end */
                 throw e;
-            } else if (shortenedFilename.length() > maxFilenameLength) {
+            }
+            if (shortenedFilename.length() > maxFilenameLength) {
                 /* E.g. user has entered too long file name in dialog */
                 logger.info("Shortened filename is still too long");
                 throw e;

@@ -552,19 +552,22 @@ public class LinkGrabberTable extends PackageControllerTable<CrawledPackage, Cra
         }
         final PackageControllerTableModelData<CrawledPackage, CrawledLink> tableData = model.getTableData();
         final int total = tableData == null ? 0 : tableData.getInvisibleChildren().size();
-        if (total <= 0) {
-            // linkgrabber is genuinely empty (no links loaded), not a filtering issue
-            return;
-        }
         final String message;
-        if (model.isFilteredView()) {
+        if (total > 0 && model.isFilteredView()) {
             /* a non-view filter (i.e. the search field) is active -> search wins over views in case both is making all items disappear. */
             message = _GUI.T.LinkGrabberTable_allLinksHiddenBySearch(Integer.toString(total));
-        } else if (hasActiveViewFilter(model)) {
+        } else if (total > 0 && hasActiveViewFilter(model)) {
             message = _GUI.T.LinkGrabberTable_allLinksHiddenByViews(Integer.toString(total));
         } else {
-            // empty for some other reason (should not happen), don't paint a misleading hint
-            return;
+            // No loaded links are hidden by a table filter. Check for links that were rejected by the link filter rules during
+            // crawling: those are not part of the linkgrabber but can be brought back via the restore button. getfilteredStuffSize()
+            // is a size() on a CopyOnWriteArrayList (O(1), no locking/allocation), so it is safe to call from within paint.
+            final int restorable = LinkCollector.getInstance().getfilteredStuffSize();
+            if (restorable <= 0) {
+                // linkgrabber is genuinely empty (nothing loaded, nothing restorable), not a filtering issue
+                return;
+            }
+            message = _GUI.T.LinkGrabberTable_filteredLinksRestorable(Integer.toString(restorable));
         }
         drawCenteredWarning((Graphics2D) g, message);
     }

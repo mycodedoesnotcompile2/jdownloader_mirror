@@ -5633,6 +5633,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "All %s1 links are hidden by the current search" })
     String LinkGrabberTable_allLinksHiddenBySearch(String count);
 
+    @Default(lngs = { "en" }, values = { "%s1 filtered links are hidden. You can restore them with the restore button." })
+    String LinkGrabberTable_filteredLinksRestorable(String count);
+
     @Default(lngs = { "en" }, values = { "Duplicates" })
     String lit_duplicates_links();
 

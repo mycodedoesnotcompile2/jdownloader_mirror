@@ -55,8 +55,15 @@ import jd.plugins.hoster.HighWayMe2;
  * It recursively walks the users' HIGHWAY cloud via the JSON API and returns all contained files. </br>
  * Docs: https://high-way.me/threads/highway-api.201/ (section "HIGHWAY DAV JSON API")
  */
-@DecrypterPlugin(revision = "$Revision: 53170 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53337 $", interfaceVersion = 3, names = {}, urls = {})
 public class HighWayMeFolder3 extends PluginForDecrypt {
+    /**
+     * If true, items whose status does not allow downloading (see {@link HighWayCore#isDavItemDownloadable(String)}) are skipped and not
+     * added at all. </br>
+     * If false, such items are added anyway but get a "Status_<status>_" filename prefix so they are easy to recognize.
+     */
+    private final boolean skipUnDownloadableItems = false;
+
     public HighWayMeFolder3(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -170,10 +177,10 @@ public class HighWayMeFolder3 extends PluginForDecrypt {
             for (final Map<String, Object> item : items) {
                 final String type = item.get("type").toString();
                 if (StringUtils.equalsIgnoreCase(type, "directory")) {
-                    /* Only crawl directories whose status is in the allowed list. */
+                    /* Only crawl directories whose status allows downloading. */
                     final Object statusO = item.get("status");
                     final String status = statusO != null ? statusO.toString() : null;
-                    if (status != null && !StringUtils.equalsIgnoreCase(status, "Archiviert") && !StringUtils.equalsIgnoreCase(status, "Completed")) {
+                    if (skipUnDownloadableItems && !HighWayCore.isDavItemDownloadable(status)) {
                         /**
                          * Skip directory element with disallowed status and remember it. <br>
                          * Only relevant for Usenet items, see https://sabnzbd.org/wiki/extra/queue-history-searching <br>
@@ -196,6 +203,15 @@ public class HighWayMeFolder3 extends PluginForDecrypt {
                         numberofFolders++;
                     }
                 } else if (StringUtils.equalsIgnoreCase(type, "file")) {
+                    final Object statusO = item.get("status");
+                    final String status = statusO != null ? statusO.toString() : null;
+                    final boolean downloadable = HighWayCore.isDavItemDownloadable(status);
+                    if (skipUnDownloadableItems && !downloadable) {
+                        /* Skip file element with disallowed status. */
+                        logger.info("Skipping file because of disallowed status: " + status + " | " + item.get("path"));
+                        numberofSkippedDueToStatus++;
+                        continue;
+                    }
                     final String path = item.get("path").toString();
                     /*
                      * Stable canonical URL used as identifier only. The real (fresh, expiring) download URL is fetched by the host plugin
@@ -203,7 +219,12 @@ public class HighWayMeFolder3 extends PluginForDecrypt {
                      */
                     final String canonicalURL = added.getProtocol() + "://" + added.getHost() + path.replace(" ", "%20");
                     final DownloadLink link = this.createDownloadlink(canonicalURL);
-                    link.setName(item.get("name").toString());
+                    String filename = item.get("name").toString();
+                    if (!downloadable) {
+                        /* Prefix the filename so non-downloadable items are easy to recognize. */
+                        filename = "Status_" + status + "_" + filename;
+                    }
+                    link.setName(filename);
                     link.setVerifiedFileSize(((Number) item.get("size")).longValue());
                     link.setRelativeDownloadFolderPath(currentPathForUser);
                     /* Set file hashes if available (both fields can be null). */

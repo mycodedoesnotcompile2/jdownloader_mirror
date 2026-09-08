@@ -24,6 +24,7 @@ import org.jdownloader.plugins.components.XFileSharingProBasic;
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountUnavailableException;
@@ -32,7 +33,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51778 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53345 $", interfaceVersion = 3, names = {}, urls = {})
 public class SavefilesCom extends XFileSharingProBasic {
     public SavefilesCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -137,10 +138,29 @@ public class SavefilesCom extends XFileSharingProBasic {
     }
 
     @Override
+    protected boolean isVideohoster_enforce_video_filename() {
+        return true;
+    }
+
+    @Override
     public String[] scanInfo(final String html, final String[] fileInfo) {
         super.scanInfo(html, fileInfo);
         /* 2025-10-30: Remove filesize since it's most likely wrong RE forum 97468 */
         fileInfo[1] = null;
         return fileInfo;
+    }
+
+    @Override
+    protected Form findFormDownload2Free(final Browser br) {
+        // 2026-09-07
+        final Form ret = br.getFormbyProperty("id", "F1");
+        if (ret == null) {
+            return super.findFormDownload2Free(br);
+        }
+        if (ret.hasInputFieldByName("file_code")) {
+            /* Website does this via js so we need to do this manually. */
+            ret.put("file_code", this.getFUIDFromURL(getDownloadLink()));
+        }
+        return ret;
     }
 }

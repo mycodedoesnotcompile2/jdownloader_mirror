@@ -66,11 +66,16 @@ public class DeleteAction extends AbstractAction {
      * @see com.rapidshare.utils.event.Event.ActionListener#actionPerformed(com. rapidshare.utils.event.Event.ActionEvent)
      */
     public void actionPerformed(final ActionEvent e) {
+        if (!this.text.isEditable() || !this.text.isEnabled()) {
+            /* Never modify non-editable/disabled (read-only) fields, e.g. plain JTextFields that do not guard replaceSelection themselves. */
+            return;
+        }
         this.text.replaceSelection(null);
     }
 
     @Override
     public boolean isEnabled() {
-        return this.text.isEnabled() && this.text.getSelectedText() != null;
+        /* Only allow deleting text in editable fields, otherwise read-only fields could be modified via the context menu. */
+        return this.text.isEditable() && this.text.isEnabled() && this.text.getSelectedText() != null;
     }
 }

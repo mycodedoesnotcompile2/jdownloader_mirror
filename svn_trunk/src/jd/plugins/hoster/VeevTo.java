@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
@@ -41,7 +42,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50829 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53337 $", interfaceVersion = 3, names = {}, urls = {})
 public class VeevTo extends XFileSharingProBasic {
     public VeevTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -195,6 +196,158 @@ public class VeevTo extends XFileSharingProBasic {
             logger.info("Successfully found dllink via official video download");
         }
         return dllink;
+    }
+
+    /**
+     * 2025-09-04: Resolves the streaming direct-URL from the embed page (/e/<fuid>). <br>
+     * The player obfuscates both the API token and the source URL with an LZW variant (see {@link #lzwDecode(String)}). Flow: <br>
+     * 1. Load /e/<fuid> and grab the real, LZW-encoded "fc" token (there are multiple ASCII decoy "fc" values; the real one is set via a
+     * bracket-assignment on window._vvto and contains non-ASCII codepoints). <br>
+     * 2. LZW-decode "fc" -> signed "ch" token. <br>
+     * 3. GET /dl?op=player_api&cmd=gi&...&ch=<ch> -> JSON containing file.dv[0] with obfuscated source fields (this endpoint needs neither
+     * captcha nor adscore token). <br>
+     * 4. Decode file.dv[0].s (fallback t/sz) -> direct .mp4 URL (see {@link #decodeVeevSource(String)}).
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    protected String getEmbedDllink(final Browser br, final String embedURL, final DownloadLink link, final Account account) throws Exception, PluginException {
+        final Browser brc = br.cloneBrowser();
+        getPage(brc, embedURL);
+        final String encodedFc = brc.getRegex("window\\._vvto\\s*\\[\\s*\\w+\\s*\\]\\s*=\\s*\"([^\"]+)\"").getMatch(0);
+        if (encodedFc == null) {
+            logger.info("Failed to find encoded player 'fc' token -> Falling back to default embed handling");
+            return super.getEmbedDllink(br, embedURL, link, account);
+        }
+        final String fileCode = new Regex(embedURL, "(?i)/e/([A-Za-z0-9]+)").getMatch(0);
+        /* Decode the API token. */
+        final String ch = lzwDecode(encodedFc);
+        /* Ask the player API for the sources. brc is still on the embed page so the Referer is set correctly. */
+        final Browser brc2 = brc.cloneBrowser();
+        brc2.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+        getPage(brc2, "/dl?op=player_api&cmd=gi&file_code=" + fileCode + "&r=&ch=" + Encoding.urlEncode(ch) + "&ie=1");
+        final Map<String, Object> entries = restoreFromString(brc2.getRequest().getHtmlCode(), TypeRef.MAP);
+        if (!"success".equals(entries.get("status"))) {
+            logger.info("player_api 'gi' did not return status 'success' -> Falling back to default embed handling");
+            return super.getEmbedDllink(br, embedURL, link, account);
+        }
+        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            /* TODO: 2026-09-07: Code down below does not work */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final Map<String, Object> file = (Map<String, Object>) entries.get("file");
+        final List<Map<String, Object>> dv = (List<Map<String, Object>>) file.get("dv");
+        final Map<String, Object> dv0 = dv.get(0);
+        /*
+         * The direct video URL is normally in field "s"; "t"/"sz" carry timeslide/sprite metadata. Try all known fields so a response that
+         * ever moves the URL still works.
+         */
+        final String[] fieldOrder = new String[] { "s", "t", "sz" };
+        String directurl = null;
+        for (final String field : fieldOrder) {
+            final Object encodedSource = dv0.get(field);
+            if (encodedSource == null) {
+                continue;
+            }
+            directurl = decodeVeevSource(encodedSource.toString());
+            if (directurl != null) {
+                break;
+            }
+        }
+        if (directurl == null) {
+            /* Unexpected format -> signals a site change. */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        logger.info("Successfully resolved streaming direct-URL via player API");
+        return directurl;
+    }
+
+    /**
+     * Decodes one LZW-encoded player-API source field (file.dv[].s|t|sz) to a plain URL, or null if it does not contain one. <br>
+     * Pipeline: LZW-decompress -> (optionally reverse) -> hex-decode, repeatedly stripping the constant "dXRmOA==" (Base64 of "utf8")
+     * marker that prefixes each nested layer, until a plain http(s) URL appears. Both the number of nested hex layers and the orientation
+     * (forward/reversed) vary per response.
+     */
+    private final String decodeVeevSource(final String encoded) throws PluginException {
+        final String lzw = lzwDecode(encoded);
+        String url = veevMarkerLoop(lzw);
+        if (url == null) {
+            url = veevMarkerLoop(new StringBuilder(lzw).reverse().toString());
+        }
+        return url;
+    }
+
+    /**
+     * Hex-decodes {@code start} layer by layer, stripping the leading "dXRmOA==" marker each round, and returns the first plain http(s)
+     * URL.
+     */
+    private final String veevMarkerLoop(final String start) {
+        final String marker = "dXRmOA==";
+        String t = hexDecode(start);
+        int guard = 0;
+        while (t != null) {
+            if (t.startsWith(marker)) {
+                t = t.substring(marker.length());
+            }
+            if (t.startsWith("https://") || t.startsWith("http://")) {
+                return t;
+            }
+            t = hexDecode(t);
+            if (++guard > 20) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /** Decompresses a classic LZW stream where each entry is a single UTF-16 codepoint (literals 0-255, dictionary entries 256+). */
+    private final String lzwDecode(final String data) throws PluginException {
+        if (data == null || data.length() == 0) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final ArrayList<String> dict = new ArrayList<String>();
+        for (int i = 0; i < 256; i++) {
+            dict.add(String.valueOf((char) i));
+        }
+        String prev = dict.get(data.charAt(0));
+        final StringBuilder out = new StringBuilder();
+        out.append(prev);
+        for (int i = 1; i < data.length(); i++) {
+            final int code = data.charAt(i);
+            final String entry;
+            if (code < dict.size()) {
+                entry = dict.get(code);
+            } else if (code == dict.size()) {
+                entry = prev + prev.charAt(0);
+            } else {
+                /* Malformed LZW stream. */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            out.append(entry);
+            dict.add(prev + entry.charAt(0));
+            prev = entry;
+        }
+        return out.toString();
+    }
+
+    /**
+     * Decodes a hex string into the string built from the resulting bytes (one char per byte); returns null on odd length or non-hex input.
+     */
+    private final String hexDecode(final String hex) {
+        if (hex == null || (hex.length() % 2) != 0) {
+            return null;
+        }
+        final StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < hex.length(); i += 2) {
+            final char c1 = hex.charAt(i);
+            final char c2 = hex.charAt(i + 1);
+            final int hi = Character.digit(c1, 16);
+            final int lo = Character.digit(c2, 16);
+            if (hi < 0 || lo < 0) {
+                return null;
+            }
+            sb.append((char) ((hi << 4) | lo));
+        }
+        return sb.toString();
     }
 
     @Override

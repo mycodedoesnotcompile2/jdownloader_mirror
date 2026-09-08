@@ -226,6 +226,10 @@ public class ExtTextField extends JTextField implements CaretListener, FocusList
 
     @Override
     public void replaceSelection(final String content) {
+        if (!this.isEditable()) {
+            /* Do not modify non-editable (read-only) fields, e.g. via the context menu delete/cut/paste actions. */
+            return;
+        }
         if (this.isHelperEnabled() && super.getText().equals(this.helpText) && StringUtils.isNotEmpty(content)) {
             super.setText("");
         }

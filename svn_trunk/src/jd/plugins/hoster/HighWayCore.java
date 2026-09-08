@@ -69,7 +69,7 @@ import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 53271 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53337 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     /* Cloud/DAV file links added by crawler HighWayMeFolder3. */
@@ -294,6 +294,25 @@ public abstract class HighWayCore extends UseNet {
     }
 
     /**
+     * Returns true if a cloud/DAV item with the given status is allowed to be downloaded. </br>
+     * The status is only present for Usenet items, see https://sabnzbd.org/wiki/extra/queue-history-searching </br>
+     * A null status (e.g. for Torrent/TV items) is treated as downloadable.
+     */
+    public static boolean isDavItemDownloadable(final String status) {
+        if (status == null) {
+            /* Unknown/missing status -> treat as downloadable. */
+            return true;
+        } else if (StringUtils.equalsIgnoreCase(status, "Archiviert")) {
+            return true;
+        } else if (StringUtils.equalsIgnoreCase(status, "Completed")) {
+            return true;
+        } else if (StringUtils.equalsIgnoreCase(status, "Seeden")) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
      * Availability check for cloud/DAV file links added by crawler HighWayMeFolder3. </br>
      * We re-query the parent directory via the DAV JSON API which also gives us a fresh direct download URL. </br>
      * API docs: https://high-way.me/threads/highway-api.201/ (section "HIGHWAY DAV JSON API")
@@ -324,6 +343,12 @@ public abstract class HighWayCore extends UseNet {
         if (!"file".equalsIgnoreCase(targetFile.get("type").toString())) {
             /* This should never happen: the URL we stored for a file now points to something that is not a file. */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        /* Block download of items whose status does not allow downloading. */
+        final Object statusO = targetFile.get("status");
+        final String status = statusO != null ? statusO.toString() : null;
+        if (!isDavItemDownloadable(status)) {
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Status " + status + " | Download not possible");
         }
         link.setFinalFileName(targetFile.get("name").toString());
         link.setVerifiedFileSize(((Number) targetFile.get("size")).longValue());

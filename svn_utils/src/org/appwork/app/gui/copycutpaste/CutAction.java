@@ -84,6 +84,7 @@ public class CutAction extends AbstractAction {
         if (text == null) {
             return true;
         }
-        return !(text instanceof JPasswordField) && text.isEnabled() && text.getSelectedText() != null;
+        /* Only allow cutting text out of editable fields, otherwise read-only fields could be modified via the context menu. */
+        return !(text instanceof JPasswordField) && text.isEditable() && text.isEnabled() && text.getSelectedText() != null;
     }
 }

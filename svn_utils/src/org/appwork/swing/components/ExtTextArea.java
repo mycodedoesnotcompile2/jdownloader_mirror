@@ -118,6 +118,10 @@ public class ExtTextArea extends JTextArea implements FocusListener, DocumentLis
     }
 
     public void replaceSelection(final String content) {
+        if (!isEditable()) {
+            /* Do not modify non-editable (read-only) fields, e.g. via the context menu delete/cut/paste actions. */
+            return;
+        }
         if (super.getText().equals(helpText) && StringUtils.isNotEmpty(content)) {
             super.setText("");
         }
