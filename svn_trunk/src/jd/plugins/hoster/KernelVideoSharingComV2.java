@@ -55,8 +55,6 @@ import org.jdownloader.plugins.components.config.KVSConfig;
 import org.jdownloader.plugins.components.config.KVSConfig.PreferredStreamQuality;
 import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.components.kvs.Script;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
@@ -88,7 +86,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 53286 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53356 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -2015,23 +2013,52 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
             throw new IllegalArgumentException("qualityMap must not be null");
         }
         /* Sometimes, found "quality" == fuid --> == no quality indicator at all */
-        final String fuid = this.getFUID(link);
-        String qualityTmpStr = new Regex(url, "(?i)(\\d+)(p|m)\\.mp4").getMatch(0);
-        if (qualityTmpStr == null) {
+        Integer quality = null;
+        quality: {
+            final String fuid = this.getFUID(link);
+            String qualityTmpStr = new Regex(url, "(?i)(\\d+)(p|m)\\.mp4").getMatch(0);
+            if (qualityTmpStr != null && !StringUtils.equals(qualityTmpStr, fuid)) {
+                quality = Integer.parseInt(qualityTmpStr);
+                break quality;
+            }
+            final String label = br.getRegex(Pattern.quote(url) + "('|\")\\s*\\s*type\\s*=\\s*\\1video/[a-z0-9]+\\1\\s*title\\s*=\\s*\\1(.*?)\\1").getMatch(1);
+            quality = labelToHeight(label);
+            if (quality != null) {
+                break quality;
+            }
             /* Wider approach */
-            qualityTmpStr = new Regex(url, "(?i)(\\d+)\\.mp4").getMatch(0);
+            qualityTmpStr = new Regex(url, "(?i)(?:_|-)(\\d+)\\.mp4").getMatch(0);
+            if (qualityTmpStr != null && !StringUtils.equals(qualityTmpStr, fuid)) {
+                quality = Integer.parseInt(qualityTmpStr);
+                break quality;
+            }
         }
-        if (StringUtils.equals(qualityTmpStr, fuid)) {
-            logger.info("Failed to find valid quality identifier for URL: " + url);
-            return -1;
-        }
-        if (qualityTmpStr == null) {
+        if (quality == null) {
             logger.info("Failed to find quality identifier for URL: " + url);
             return -1;
         }
-        final int qualityTmp = Integer.valueOf(qualityTmpStr);
-        qualityMap.put(qualityTmp, url);
-        return qualityTmp;
+        qualityMap.put(quality, url);
+        return quality.intValue();
+    }
+
+    protected Integer labelToHeight(final String label) {
+        if (StringUtils.isEmpty(label)) {
+            return null;
+        }
+        final String heightStr = new Regex(label, "(\\d+)p").getMatch(0);
+        if (heightStr != null) {
+            return Integer.parseInt(heightStr);
+        } else if ("Standard".equalsIgnoreCase(label)) {
+            return 360;
+        } else if ("SD".equalsIgnoreCase(label)) {
+            return 480;
+        } else if ("HD".equalsIgnoreCase(label)) {
+            return 720;
+        } else if ("FHD".equalsIgnoreCase(label)) {
+            return 1080;
+        } else {
+            return null;
+        }
     }
 
     /** Returns user preferred quality inside given quality map. Returns best, if user selection is not present in map. */
@@ -2443,10 +2470,6 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
     @Override
     public Class<? extends KVSConfig> getConfigInterface() {
         return null;
-    }
-
-    public <T extends PluginConfigInterface> T get(Class<T> configInterface) {
-        return PluginJsonConfig.get(getLazyP(), configInterface);
     }
 
     @Override

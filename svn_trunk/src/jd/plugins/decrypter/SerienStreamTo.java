@@ -57,7 +57,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 53251 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53364 $", interfaceVersion = 3, names = {}, urls = {})
 public class SerienStreamTo extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public SerienStreamTo(final PluginWrapper wrapper) {
@@ -86,7 +86,7 @@ public class SerienStreamTo extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "s.to", "serienstream.sx", "serienstream.to", "serienstream.ch", "serienstream.stream", "serienstream.cloud", "serien.sx", "serien.domains", "186.2.175.5" });
+        ret.add(new String[] { "serienstream.to", "serienstream.sx", "s.to", "serienstream.ch", "serienstream.stream", "serienstream.cloud", "serien.sx", "serien.domains", "186.2.175.5" });
         ret.add(new String[] { "aniworld.to" });
         return ret;
     }
@@ -95,6 +95,13 @@ public class SerienStreamTo extends PluginForDecrypt {
         final ArrayList<String> deadDomains = new ArrayList<String>();
         deadDomains.add("s.to");
         deadDomains.add("serienstream.sx");
+        deadDomains.add("serien.sx");
+        /**
+         * 2026-09-09: This is a scam/ad website with aggressive NordVPN ads that looks like the original. <br>
+         * Because they use the same URLs as the original, we can swap the domains and get to the expected content.
+         */
+        deadDomains.add("serienstream.cloud");
+        deadDomains.add("serienstream.ch"); // also scam, redirects to .cloud domain
         return deadDomains;
     }
 
@@ -126,7 +133,11 @@ public class SerienStreamTo extends PluginForDecrypt {
 
     @SuppressWarnings("deprecation")
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, final ProgressController progress) throws Exception {
-        final String contenturl = param.getCryptedUrl();
+        String contenturl = param.getCryptedUrl();
+        final String addedLinkDomain = Browser.getHost(contenturl, true);
+        if (getDeadDomains().contains(addedLinkDomain)) {
+            contenturl = contenturl.replaceFirst(Pattern.quote(addedLinkDomain), this.getHost());
+        }
         if (new Regex(param.getCryptedUrl(), TYPE_SINGLE_REDIRECT_OLD).patternFind() || new Regex(param.getCryptedUrl(), TYPE_SINGLE_REDIRECT_NEW).patternFind()) {
             final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
             ret.add(this.crawlSingleRedirect(br, contenturl));
@@ -217,6 +228,10 @@ public class SerienStreamTo extends PluginForDecrypt {
         }
         if (episodeTitle != null) {
             episodeTitle = Encoding.htmlDecode(episodeTitle).trim();
+            /* Remove newline within string */
+            episodeTitle = episodeTitle.replaceAll("\\\n", "");
+            /* Remove spaces in a row */
+            episodeTitle = episodeTitle.replace("   ", "");
         }
         /* The order of these patterns is important!! */
         final Regex urlinfo_movies = new Regex(br._getURL().getPath(), MOVIES_REGEX.pattern() + "$");

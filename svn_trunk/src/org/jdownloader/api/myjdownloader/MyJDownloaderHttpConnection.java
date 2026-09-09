@@ -53,7 +53,6 @@ import org.jdownloader.myjdownloader.client.exceptions.TokenException;
 import org.jdownloader.myjdownloader.client.json.SessionInfoResponse;
 
 public class MyJDownloaderHttpConnection extends HttpServerConnection {
-
     protected final MyJDownloaderAPI                                        api;
     private final LogSource                                                 logger;
     private final SocketStreamInterface                                     socketStream;
@@ -87,6 +86,10 @@ public class MyJDownloaderHttpConnection extends HttpServerConnection {
         synchronized (CONNECTIONS) {
             return CONNECTIONS.get(connectToken);
         }
+    }
+
+    @Override
+    protected void handleDraining() {
     }
 
     protected SessionInfoResponse getSessionInfo(final String queryToken) {
@@ -350,10 +353,7 @@ public class MyJDownloaderHttpConnection extends HttpServerConnection {
                     this.openOutputStream();
                     this.os = new OutputStream() {
                         private ChunkedOutputStream chunkedOS = new ChunkedOutputStream(new BufferedOutputStream(getRawOutputStream(), 16384));
-                        Base64OutputStream          b64os     = new Base64OutputStream(chunkedOS) {
-                            // public void close() throws IOException {
-                            // };
-                        };
+                        final Base64OutputStream    b64os     = new Base64OutputStream(chunkedOS);
                         OutputStream                outos     = new CipherOutputStream(b64os, cipher);
                         {
                             if (useDeChunkingOutputStream) {

@@ -62,6 +62,7 @@ import org.appwork.storage.JsonKeyValueStorage;
 import org.appwork.storage.SimpleMapper;
 import org.appwork.storage.Storage;
 import org.appwork.storage.StorageException;
+import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.ConfigInterface;
 import org.appwork.storage.config.InterfaceParseException;
 import org.appwork.storage.config.annotations.CryptedStorage;
@@ -632,6 +633,22 @@ public class StorageHandler<T extends ConfigInterface> implements InvocationHand
      */
     @SuppressWarnings("unchecked")
     public <E extends KeyHandler<?>> E getKeyHandler(final String key, final Class<E> class1) {
+        final String keyHandlerKey = key.toLowerCase(Locale.ENGLISH);
+        final KeyHandler<?> ret = key2KeyHandlerMap.get(keyHandlerKey);
+        if (ret != null) {
+            return (E) ret;
+        }
+        try {
+            throw new NullPointerException("No KeyHandler: " + key + " in " + getConfigInterface());
+        } catch (NullPointerException e) {
+            if (DebugMode.throwInIDEElse(e)) {
+                LogV3.log(e);
+            }
+            return null;
+        }
+    }
+
+    public <E extends KeyHandler<?>> E getKeyHandler(final String key, final TypeRef<E> typeRef) {
         final String keyHandlerKey = key.toLowerCase(Locale.ENGLISH);
         final KeyHandler<?> ret = key2KeyHandlerMap.get(keyHandlerKey);
         if (ret != null) {

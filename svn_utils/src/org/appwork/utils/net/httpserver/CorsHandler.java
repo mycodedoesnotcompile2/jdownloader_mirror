@@ -37,7 +37,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -264,8 +263,8 @@ public class CorsHandler {
         this.validate();
     }
 
-    public final void setAllowMethods(RequestMethod... methods) {
-        setAllowMethods(new HashSet<RequestMethod>(Arrays.asList(methods)));
+    public void setAllowedOrigins(final OriginRule... allowedOrigins) {
+        setAllowedOrigins(allowedOrigins == null ? null : Arrays.asList(allowedOrigins));
     }
 
     /**
@@ -355,6 +354,10 @@ public class CorsHandler {
         } else {
             this.allowMethods = null;
         }
+    }
+
+    public void setAllowMethods(final RequestMethod... allowMethods) {
+        setAllowMethods(allowMethods == null ? null : EnumSet.copyOf(Arrays.asList(allowMethods)));
     }
 
     /**

@@ -35,7 +35,6 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -55,7 +54,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51180 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53362 $", interfaceVersion = 3, names = {}, urls = {})
 public class OtrDatenkellerNet extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -91,8 +90,9 @@ public class OtrDatenkellerNet extends PluginForHost {
         return buildSupportedNames(getPluginDomains());
     }
 
-    private static final Pattern PATTERN_OLD = Pattern.compile("/\\?(?:file|getFile)=(.+\\.otrkey)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern PATTERN_NEW = Pattern.compile("/queueForFile/(.+\\.otrkey)", Pattern.CASE_INSENSITIVE);
+    private static final String  EXTENSION_SUFFIX = "\\.(?:otrkey|otr2)";
+    private static final Pattern PATTERN_OLD      = Pattern.compile("/\\?(?:file|getFile)=(.+" + EXTENSION_SUFFIX + ")", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_NEW      = Pattern.compile("/queueForFile/(.+" + EXTENSION_SUFFIX + ")", Pattern.CASE_INSENSITIVE);
 
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
@@ -273,6 +273,11 @@ public class OtrDatenkellerNet extends PluginForHost {
     }
 
     @Override
+    public Class<OtrDatenKellerInterface> getConfigInterface() {
+        return OtrDatenKellerInterface.class;
+    }
+
+    @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
         /*
@@ -291,7 +296,7 @@ public class OtrDatenkellerNet extends PluginForHost {
             // final String jscounturl = br.getRegex("(https?://[^\"]+/countMe\\.js\\?\\d+)").getMatch(0);
             // br2.getPage("http://staticaws.lastverteiler.net/otrfuncs/countMe.js");
             link.getLinkStatus().setStatusText("Waiting for ticket...");
-            final int userDefinedMaxWaitMinutes = PluginJsonConfig.get(OtrDatenKellerInterface.class).getMaxWaitMinutesForTicket();
+            final int userDefinedMaxWaitMinutes = get(getConfigInterface()).getMaxWaitMinutesForTicket();
             int loops = 0;
             final long timeStart = Time.systemIndependentCurrentJVMTimeMillis();
             String queueID = null;
@@ -538,10 +543,9 @@ public class OtrDatenkellerNet extends PluginForHost {
     final String getFilenameFromURL(final DownloadLink link) {
         final String url = link.getPluginPatternMatcher();
         String filename = new Regex(url, PATTERN_NEW).getMatch(0);
-        if (filename != null) {
-            return filename;
+        if (filename == null) {
+            filename = new Regex(url, PATTERN_OLD).getMatch(0);
         }
-        filename = new Regex(url, PATTERN_OLD).getMatch(0);
         return filename;
     }
 

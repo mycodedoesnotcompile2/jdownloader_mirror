@@ -40,6 +40,8 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * @author daniel
@@ -51,35 +53,101 @@ public class HTTPProxyUtils {
     }
 
     public static List<InetAddress> getLocalIPs(final boolean allowLoopback) {
+        return getLocalIPs(allowLoopback, -1);
+    }
+
+    public static List<InetAddress> getLocalIPs(final boolean allowLoopback, int timeout) {
         final LinkedHashSet<InetAddress> ret = new LinkedHashSet<InetAddress>();
+        final AtomicBoolean collectingFlag = new AtomicBoolean(true);
         try {
             final Enumeration<NetworkInterface> networkInterfaces = NetworkInterface.getNetworkInterfaces();
             while (networkInterfaces.hasMoreElements()) {
                 /* find all network interfaces and their addresses */
                 final NetworkInterface networkInterface = networkInterfaces.nextElement();
-                if (networkInterface == null || !networkInterface.isUp()) {
-                    continue;
-                }
-                if (networkInterface.isLoopback() && allowLoopback == false) {
-                    continue;
-                }
-                Enumeration<InetAddress> inetAddresses = networkInterface.getInetAddresses();
-                while (inetAddresses.hasMoreElements()) {
-                    final InetAddress inetAddress = inetAddresses.nextElement();
-                    if (inetAddress != null) {
-                        ret.add(inetAddress);
-                    }
-                }
-                final Enumeration<NetworkInterface> subNetworkInterfaces = networkInterface.getSubInterfaces();
-                while (subNetworkInterfaces.hasMoreElements()) {
-                    final NetworkInterface subNetworkInterface = subNetworkInterfaces.nextElement();
-                    if (subNetworkInterface != null) {
-                        inetAddresses = subNetworkInterface.getInetAddresses();
-                        while (inetAddresses.hasMoreElements()) {
-                            final InetAddress inetAddress = inetAddresses.nextElement();
-                            if (inetAddress != null) {
-                                ret.add(inetAddress);
+                final Callable<Void> callable = new Callable<Void>() {
+
+                    @Override
+                    public Void call() throws Exception {
+                        collecting: {
+                            if (networkInterface == null || !networkInterface.isUp()) {
+                                break collecting;
                             }
+                            if (networkInterface.isLoopback() && allowLoopback == false) {
+                                break collecting;
+                            }
+                            Enumeration<InetAddress> inetAddresses = networkInterface.getInetAddresses();
+                            while (inetAddresses.hasMoreElements()) {
+                                if (!collectingFlag.get()) {
+                                    break collecting;
+                                }
+                                final InetAddress inetAddress = inetAddresses.nextElement();
+                                if (inetAddress != null) {
+                                    synchronized (ret) {
+                                        ret.add(inetAddress);
+                                    }
+                                }
+                            }
+                            final Enumeration<NetworkInterface> subNetworkInterfaces = networkInterface.getSubInterfaces();
+                            while (subNetworkInterfaces.hasMoreElements()) {
+                                if (!collectingFlag.get()) {
+                                    break collecting;
+                                }
+                                final NetworkInterface subNetworkInterface = subNetworkInterfaces.nextElement();
+                                if (subNetworkInterface != null) {
+                                    inetAddresses = subNetworkInterface.getInetAddresses();
+                                    while (inetAddresses.hasMoreElements()) {
+                                        if (!collectingFlag.get()) {
+                                            break collecting;
+                                        }
+                                        final InetAddress inetAddress = inetAddresses.nextElement();
+                                        if (inetAddress != null) {
+                                            synchronized (ret) {
+                                                ret.add(inetAddress);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        return null;
+                    }
+                };
+                if (timeout <= 0) {
+                    callable.call();
+                } else {
+                    final List<Thread> threads = new ArrayList<Thread>();
+                    final Thread thread = new Thread("getLocalIPs:query:" + networkInterface.getDisplayName()) {
+                        {
+                            setDaemon(true);
+                        }
+
+                        @Override
+                        public void run() {
+                            try {
+                                callable.call();
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            } finally {
+                                threads.remove(this);
+                                synchronized (threads) {
+                                    if (threads.size() == 0) {
+                                        threads.notifyAll();
+                                    }
+                                }
+                            }
+                        }
+
+                    };
+                    threads.add(thread);
+                    for (Thread t : threads) {
+                        t.start();
+                    }
+                    synchronized (threads) {
+                        try {
+                            if (threads.size() > 0) {
+                                threads.wait(Math.max(0, timeout));
+                            }
+                        } catch (InterruptedException e) {
                         }
                     }
                 }
@@ -87,6 +155,9 @@ public class HTTPProxyUtils {
         } catch (final Throwable e) {
             e.printStackTrace();
         }
-        return Collections.unmodifiableList(new ArrayList<InetAddress>(ret));
+        synchronized (ret) {
+            collectingFlag.set(false);
+            return Collections.unmodifiableList(new ArrayList<InetAddress>(ret));
+        }
     }
 }

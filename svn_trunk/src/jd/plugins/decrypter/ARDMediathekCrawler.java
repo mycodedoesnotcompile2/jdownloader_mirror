@@ -47,7 +47,6 @@ import org.jdownloader.plugins.components.config.SputnikDeConfig;
 import org.jdownloader.plugins.components.config.TagesschauDeConfig;
 import org.jdownloader.plugins.components.config.WDRMausConfig;
 import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
@@ -74,7 +73,7 @@ import jd.plugins.components.MediathekHelper;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.ARDMediathek;
 
-@DecrypterPlugin(revision = "$Revision: 53244 $", interfaceVersion = 3, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "https?://(?:\\w+\\.)?ardmediathek\\.de/.+", "https?://(?:\\w+\\.)?daserste\\.de/.*?\\.html", "https?://(?:www\\.)?sandmann\\.de/.+", "https?://(?:\\w+\\.)?sportschau\\.de/.*?\\.html", "https?://(?:\\w+\\.)?wdrmaus\\.de/.+", "https?://(?:\\w+\\.)?eurovision\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?sputnik\\.de/[^<>\"]+\\.html", "https?://(?:www\\.)?mdr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?ndr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?tagesschau\\.de/[^<>\"]+\\.html" })
+@DecrypterPlugin(revision = "$Revision: 53356 $", interfaceVersion = 3, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "https?://(?:\\w+\\.)?ardmediathek\\.de/.+", "https?://(?:\\w+\\.)?daserste\\.de/.*?\\.html", "https?://(?:www\\.)?sandmann\\.de/.+", "https?://(?:\\w+\\.)?sportschau\\.de/.*?\\.html", "https?://(?:\\w+\\.)?wdrmaus\\.de/.+", "https?://(?:\\w+\\.)?eurovision\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?sputnik\\.de/[^<>\"]+\\.html", "https?://(?:www\\.)?mdr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?ndr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?tagesschau\\.de/[^<>\"]+\\.html" })
 public class ARDMediathekCrawler extends PluginForDecrypt {
     /* Constants */
     private static final String  type_embedded                          = "(?i)https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js";
@@ -248,7 +247,7 @@ public class ARDMediathekCrawler extends PluginForDecrypt {
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, final ProgressController progress) throws Exception {
         br.setFollowRedirects(true);
-        cfg = PluginJsonConfig.get(getConfigInterface());
+        cfg = get(getConfigInterface());
         initSelectedQualities();
         initKnownQualities();
         initAudioLanguageSelection();
@@ -616,24 +615,6 @@ public class ARDMediathekCrawler extends PluginForDecrypt {
                 final Map<String, Object> audio = audios.get(0);
                 final Kind kind = Kind.parse(audio.get("kind").toString());
                 final String audioLanguageCode = audio.get("languageCode").toString();
-                if (preferNormalVersion) {
-                    if (hasNormalVersion && (!Kind.NORMAL.equals(kind) && !Kind.UNKNOWN.equals(kind))) {
-                        logger.info("Skipping NON-normal stream: " + url + "|kind=" + kind);
-                        continue;
-                    }
-                }
-                if (cfg.isPreferAudioDescription()) {
-                    if (hasAudiodescription && !Kind.AUDIO_DESCRIPTION.equals(kind)) {
-                        logger.info("Skipping NON-audio-description stream: " + url + "|kind=" + kind);
-                        continue;
-                    }
-                }
-                if (cfg.isPreferSpeechOptimized()) {
-                    if (hasSpeechOptimized && !Kind.SPEECH_OPTIMIZED.equals(kind)) {
-                        logger.info("Skipping NON-speech-optimized stream: " + url + "|kind=" + kind);
-                        continue;
-                    }
-                }
                 if (mimeType.equalsIgnoreCase("application/vnd.apple.mpegurl")) {
                     /* E.g. skip HLS items here and handle them later: Only collect HLS master URLs here */
                     List<Map<String, Object>> list = audioLangToHlsMasterURLs.get(audioLanguageCode);
@@ -666,6 +647,30 @@ public class ARDMediathekCrawler extends PluginForDecrypt {
                 }
                 final DownloadLink download = addQuality(param, metadata, foundQualitiesMap, url, null, -1, resolution, kind, audioLanguageCode);
                 results.add(download);
+            }
+            {
+                final Iterator<DownloadLink> it = results.iterator();
+                while (it.hasNext()) {
+                    final DownloadLink next = it.next();
+                    final MediathekProperties data = next.bindData(MediathekProperties.class);
+                    final Kind kind;
+                    if (data.getAudioDescription()) {
+                        kind = Kind.AUDIO_DESCRIPTION;
+                    } else if (data.getSpeechOptimized()) {
+                        kind = Kind.SPEECH_OPTIMIZED;
+                    } else {
+                        kind = Kind.NORMAL;
+                    }
+                    if (cfg.isPreferAudioDescription() && Kind.AUDIO_DESCRIPTION.equals(kind)) {
+                        continue;
+                    } else if (cfg.isPreferSpeechOptimized() && Kind.SPEECH_OPTIMIZED.equals(kind)) {
+                        continue;
+                    } else if (preferNormalVersion && Kind.NORMAL.equals(kind)) {
+                        continue;
+                    }
+                    logger.info("Skipping stream: " + next.getPluginPatternMatcher() + "|kind=" + kind);
+                    it.remove();
+                }
             }
             if (isSignLanguage && this.cfg.isPreferAudioDescription()) {
                 logger.info("Stopping in order to only return sign language items");
@@ -1881,7 +1886,6 @@ public class ARDMediathekCrawler extends PluginForDecrypt {
         }
         final String qualityStringForQualitySelection = getQualityIdentifier(directurl, resolution, bitrate);
         final DownloadLink link = createDownloadlink(directurl.replaceAll("^(https?://|//)", getHost() + "decrypted://"));
-        System.out.println(link.getPluginPatternMatcher());
         final MediathekProperties data = link.bindData(MediathekProperties.class);
         data.setTitle(metadata.getTitle());
         data.setSourceHost(getHost());

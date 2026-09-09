@@ -29,7 +29,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 53246 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53356 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2FapnadoXxx extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2FapnadoXxx(final PluginWrapper wrapper) {
         super(wrapper);
@@ -128,38 +128,17 @@ public class KernelVideoSharingComV2FapnadoXxx extends KernelVideoSharingComV2 {
 
     @Override
     protected int addQualityURL(Browser br, DownloadLink link, Map<Integer, String> qualityMap, String url) {
-        final String title;
-        if (!cryptedMapping.containsKey(url)) {
-            title = br.getRegex(Pattern.quote(url) + "('|\")\\s*\\s*type\\s*=\\s*\\1video/[a-z0-9]+\\1\\s*title\\s*=\\s*\\1(.*?)\\1").getMatch(1);
-        } else {
-            final String orgUrl = cryptedMapping.get(url);
-            title = br.getRegex(Pattern.quote(orgUrl) + "\"\\)\\);o.setAttribute\\(\"type\",\"video/mp4\"\\);o.setAttribute\\('title',\"(.*?)\"\\)").getMatch(0);
+        final int ret = super.addQualityURL(br, link, qualityMap, url);
+        if (ret != -1 || !cryptedMapping.containsKey(url)) {
+            return ret;
         }
-        title: if (title != null) {
-            final Integer height = labelToHeight(title);
-            if (height == null) {
-                break title;
-            }
-            qualityMap.put(height, url);
-            return height.intValue();
+        final String orgUrl = cryptedMapping.get(url);
+        final String label = br.getRegex(Pattern.quote(orgUrl) + "\"\\)\\);o.setAttribute\\(\"type\",\"video/mp4\"\\);o.setAttribute\\('title',\"(.*?)\"\\)").getMatch(0);
+        final Integer height = labelToHeight(label);
+        if (height == null) {
+            return -1;
         }
-        return super.addQualityURL(br, link, qualityMap, url);
-    }
-
-    private Integer labelToHeight(final String label) {
-        final String heightStr = new Regex(label, "(\\d+)p").getMatch(0);
-        if (heightStr != null) {
-            return Integer.parseInt(heightStr);
-        } else if ("Standard".equalsIgnoreCase(label)) {
-            return 360;
-        } else if ("SD".equalsIgnoreCase(label)) {
-            return 480;
-        } else if ("HD".equalsIgnoreCase(label)) {
-            return 720;
-        } else if ("FHD".equalsIgnoreCase(label)) {
-            return 1080;
-        } else {
-            return null;
-        }
+        qualityMap.put(height, url);
+        return height.intValue();
     }
 }

@@ -135,7 +135,7 @@ public class HttpServerCorsBasicTest extends HttpServerTestBase {
         LogV3.info("Test 1: Cross-origin request from foreign domain blocked");
         // Ensure CORS is disabled (CorsHandler with allowedOrigins=null rejects all origins)
         final CorsHandler corsHandler = new CorsHandler();
-        corsHandler.setAllowedOrigins(null);
+        corsHandler.setAllowedOrigins((List<OriginRule>) null);
         httpServer.setCorsHandler(corsHandler);
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
         this.lastServerException = null;
@@ -156,7 +156,7 @@ public class HttpServerCorsBasicTest extends HttpServerTestBase {
         LogV3.info("Test 2: Direct browser navigation (no Origin) allowed");
         // CORS disabled (CorsHandler with allowedOrigins=null rejects all origins)
         final CorsHandler corsHandler = new CorsHandler();
-        corsHandler.setAllowedOrigins(null);
+        corsHandler.setAllowedOrigins((List<OriginRule>) null);
         httpServer.setCorsHandler(corsHandler);
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
         // Don't set Origin header - should be allowed
@@ -176,7 +176,7 @@ public class HttpServerCorsBasicTest extends HttpServerTestBase {
         LogV3.info("Test 3: Localhost Origin blocked (CORS disabled)");
         // CORS disabled (CorsHandler with allowedOrigins=null rejects all origins)
         final CorsHandler corsHandler = new CorsHandler();
-        corsHandler.setAllowedOrigins(null);
+        corsHandler.setAllowedOrigins((List<OriginRule>) null);
         httpServer.setCorsHandler(corsHandler);
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
         this.lastServerException = null;
@@ -213,7 +213,7 @@ public class HttpServerCorsBasicTest extends HttpServerTestBase {
         LogV3.info("Test: " + label + " blocked (CORS disabled)");
         // CORS disabled (CorsHandler with allowedOrigins=null rejects all origins)
         final CorsHandler corsHandler = new CorsHandler();
-        corsHandler.setAllowedOrigins(null);
+        corsHandler.setAllowedOrigins((List<OriginRule>) null);
         httpServer.setCorsHandler(corsHandler);
         final String url = "http://localhost:" + this.serverPort + "/test/echo?message=test";
         this.lastServerException = null;
@@ -474,7 +474,7 @@ public class HttpServerCorsBasicTest extends HttpServerTestBase {
         LogV3.info("Test 14: allowedOrigins=null rejects all Origin requests");
         // Create and configure CORS handler for this test
         final CorsHandler corsHandler = new CorsHandler();
-        corsHandler.setAllowedOrigins(null);
+        corsHandler.setAllowedOrigins((List<OriginRule>) null);
         corsHandler.setAllowMethods(EnumSet.of(RequestMethod.OPTIONS, RequestMethod.GET, RequestMethod.POST));
         corsHandler.setMaxAge(TimeUnit.SECONDS.toMillis(30));
         corsHandler.setAllowHeadersFromRequest(true);
@@ -496,7 +496,7 @@ public class HttpServerCorsBasicTest extends HttpServerTestBase {
         LogV3.info("Test 15: allowedOrigins=null allows no-Origin requests");
         // Create and configure CORS handler for this test
         final CorsHandler corsHandler = new CorsHandler();
-        corsHandler.setAllowedOrigins(null);
+        corsHandler.setAllowedOrigins((List<OriginRule>) null);
         corsHandler.setAllowMethods(EnumSet.of(RequestMethod.OPTIONS, RequestMethod.GET, RequestMethod.POST));
         corsHandler.setMaxAge(TimeUnit.SECONDS.toMillis(30));
         corsHandler.setAllowHeadersFromRequest(true);
@@ -517,7 +517,7 @@ public class HttpServerCorsBasicTest extends HttpServerTestBase {
     private void testCorsAllowSameOriginWithNullAllowedOrigins() throws Exception {
         LogV3.info("Test: allowSameOrigin with allowedOrigins=null");
         final CorsHandler corsHandler = new CorsHandler();
-        corsHandler.setAllowedOrigins(null);
+        corsHandler.setAllowedOrigins((List<OriginRule>) null);
         corsHandler.setAllowSameOrigin(true);
         corsHandler.setAllowMethods(EnumSet.of(RequestMethod.OPTIONS, RequestMethod.GET, RequestMethod.POST));
         corsHandler.setMaxAge(TimeUnit.SECONDS.toMillis(30));

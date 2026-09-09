@@ -16,15 +16,6 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextPane;
 import javax.swing.event.DocumentEvent;
 
-import jd.controlling.reconnect.ReconnectException;
-import jd.controlling.reconnect.ReconnectInvoker;
-import jd.controlling.reconnect.RouterPlugin;
-import jd.controlling.reconnect.pluginsinc.extern.translate.T;
-import jd.gui.UserIO;
-import jd.gui.swing.components.ComboBrowseFile;
-import jd.utils.JDUtilities;
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.Storage;
 import org.appwork.utils.Application;
@@ -35,20 +26,29 @@ import org.jdownloader.controlling.FileCreationManager;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.images.AbstractIcon;
 
+import jd.controlling.reconnect.ReconnectException;
+import jd.controlling.reconnect.ReconnectInvoker;
+import jd.controlling.reconnect.RouterPlugin;
+import jd.controlling.reconnect.pluginsinc.extern.translate.T;
+import jd.gui.UserIO;
+import jd.gui.swing.components.ComboBrowseFile;
+import jd.utils.JDUtilities;
+import net.miginfocom.swing.MigLayout;
+
 /**
  * Plugin to use an extern tool for reconnection
  */
 public class ExternReconnectPlugin extends RouterPlugin implements ActionListener {
-    private static final String COMMAND                 = "COMMAND";
-    private static final String DUMMY_BATCH_ENABLED     = "DUMMY_BATCH_ENABLED";
-    private static final String WAIT_FOR_RETURN_SECONDS = "WAIT_FOR_RETURN_SECONDS";
-    private static final String PARAMETER               = "PARAMETER";
-    public static final String  ID                      = "ExternReconnect";
-    private JTextPane           txtParameter;
-    private JCheckBox           chbDummyBatch;
-    private ComboBrowseFile     browse;
-    private Icon                icon;
-    private ReconnectInvoker    invoker;
+    private static final String    COMMAND                 = "COMMAND";
+    private static final String    DUMMY_BATCH_ENABLED     = "DUMMY_BATCH_ENABLED";
+    private static final String    WAIT_FOR_RETURN_SECONDS = "WAIT_FOR_RETURN_SECONDS";
+    private static final String    PARAMETER               = "PARAMETER";
+    public static final String     ID                      = "ExternReconnect";
+    private JTextPane              txtParameter;
+    private JCheckBox              chbDummyBatch;
+    private ComboBrowseFile        browse;
+    private final Icon             icon;
+    private final ReconnectInvoker invoker;
 
     public ExternReconnectPlugin() {
         super();

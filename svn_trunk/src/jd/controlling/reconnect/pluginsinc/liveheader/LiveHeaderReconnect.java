@@ -12,19 +12,6 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 
-import jd.controlling.reconnect.ProcessCallBack;
-import jd.controlling.reconnect.ReconnectConfig;
-import jd.controlling.reconnect.ReconnectInvoker;
-import jd.controlling.reconnect.ReconnectPluginController;
-import jd.controlling.reconnect.ReconnectResult;
-import jd.controlling.reconnect.RouterPlugin;
-import jd.controlling.reconnect.ipcheck.IP;
-import jd.controlling.reconnect.pluginsinc.liveheader.recorder.Gui;
-import jd.controlling.reconnect.pluginsinc.liveheader.remotecall.RouterData;
-import jd.controlling.reconnect.pluginsinc.liveheader.translate.T;
-import jd.gui.UserIO;
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.ConfigEventListener;
@@ -49,13 +36,24 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.logging.LogController;
-import org.jdownloader.settings.advanced.AdvancedConfigManager;
+import org.jdownloader.settings.staticreferences.CFG_RECONNECT;
+
+import jd.controlling.reconnect.ProcessCallBack;
+import jd.controlling.reconnect.ReconnectConfig;
+import jd.controlling.reconnect.ReconnectInvoker;
+import jd.controlling.reconnect.ReconnectPluginController;
+import jd.controlling.reconnect.ReconnectResult;
+import jd.controlling.reconnect.RouterPlugin;
+import jd.controlling.reconnect.ipcheck.IP;
+import jd.controlling.reconnect.pluginsinc.liveheader.recorder.Gui;
+import jd.controlling.reconnect.pluginsinc.liveheader.remotecall.RouterData;
+import jd.controlling.reconnect.pluginsinc.liveheader.translate.T;
+import jd.gui.UserIO;
+import net.miginfocom.swing.MigLayout;
 
 public class LiveHeaderReconnect extends RouterPlugin implements ConfigEventListener {
-
     private ExtTextField     txtUser;
     private ExtPasswordField txtPassword;
-
     private ExtTextField     txtIP;
 
     @Override
@@ -65,34 +63,27 @@ public class LiveHeaderReconnect extends RouterPlugin implements ConfigEventList
 
     private ExtTextField                txtName;
     private Icon                        icon;
-
     private LiveHeaderReconnectSettings settings;
-
     public static final String          ID = "httpliveheader";
 
     public LiveHeaderReconnect() {
         super();
         this.icon = new AbstractIcon(IconKey.ICON_MODEM, 16);
-
         // only listen to system to autosend script
         // Send routerscript if there were 3 successful recoinnects in a row
-        JsonConfig.create(ReconnectConfig.class)._getStorageHandler().getEventSender().addListener(this);
+        CFG_RECONNECT.CFG._getStorageHandler().getEventSender().addListener(this);
         settings = JsonConfig.create(LiveHeaderReconnectSettings.class);
         settings._getStorageHandler().getEventSender().addListener(this);
-        AdvancedConfigManager.getInstance().register(JsonConfig.create(LiveHeaderReconnectSettings.class));
     }
 
     void editScript(final boolean wait) {
-
         // final InputDialog dialog = new InputDialog(Dialog.STYLE_LARGE | Dialog.STYLE_HIDE_ICON, "Script Editor",
         // "Please enter a Liveheader script below.", settings.getScript(), new AbstractIcon(IconKey.ICON_EDIT, 18),
         // T.T.jd_controlling_reconnect_plugins_liveheader_LiveHeaderReconnect_actionPerformed_save(), null);
         // dialog.setPreferredSize(new Dimension(700, 400));
-
         RouterData editing = settings.getRouterData();
         if (editing == null) {
             editing = new RouterData();
-
         }
         final RouterData rd = editing;
         editing.setScript(settings.getScript());
@@ -121,10 +112,8 @@ public class LiveHeaderReconnect extends RouterPlugin implements ConfigEventList
             public void run() {
                 try {
                     UIOManager.I().show(OKCancelCloseUserIODefinition.class, d).throwCloseExceptions();
-
                     validateAndSet(rd);
                     // settings.setScript(rd.getScript());
-
                 } catch (DialogClosedException e) {
                     e.printStackTrace();
                 } catch (DialogCanceledException e) {
@@ -155,11 +144,9 @@ public class LiveHeaderReconnect extends RouterPlugin implements ConfigEventList
         p.setOpaque(false);
         // auto search is not ready yet
         // this.btnAuto.setEnabled(false);
-
         this.txtUser = new ExtTextField();
         txtUser.setHelpText(T.T.LiveHeaderReconnect_getGUI_help_user());
         txtUser.addFocusListener(new FocusListener() {
-
             public void focusLost(FocusEvent e) {
                 settings.setUserName(LiveHeaderReconnect.this.txtUser.getText());
             }
@@ -167,7 +154,6 @@ public class LiveHeaderReconnect extends RouterPlugin implements ConfigEventList
             public void focusGained(FocusEvent e) {
             }
         });
-
         this.txtPassword = new ExtPasswordField() {
             public void onChanged() {
                 settings.setPassword(new String(LiveHeaderReconnect.this.txtPassword.getPassword()));
@@ -176,9 +162,7 @@ public class LiveHeaderReconnect extends RouterPlugin implements ConfigEventList
         txtPassword.setHelpText(T.T.LiveHeaderReconnect_getGUI_help_password());
         this.txtIP = new ExtTextField();
         txtIP.setHelpText(T.T.LiveHeaderReconnect_getGUI_help_ip());
-
         txtIP.addFocusListener(new FocusListener() {
-
             public void focusLost(FocusEvent e) {
                 settings.setRouterIP(LiveHeaderReconnect.this.txtIP.getText());
             }
@@ -186,14 +170,11 @@ public class LiveHeaderReconnect extends RouterPlugin implements ConfigEventList
             public void focusGained(FocusEvent e) {
             }
         });
-
         this.txtName = new ExtTextField();
         txtName.setEditable(false);
         txtName.setBorder(null);
         SwingUtils.setOpaque(txtName, false);
-
         //
-
         p.add(createButton(new RouterSendAction(this)), "sg buttons,aligny top,newline");
         p.add(new JLabel(T.T.literally_router_model()), "");
         p.add(this.txtName, "spanx");
@@ -236,7 +217,6 @@ public class LiveHeaderReconnect extends RouterPlugin implements ConfigEventList
     }
 
     public void routerRecord() {
-
         if (JsonConfig.create(ReconnectConfig.class).isIPCheckGloballyDisabled()) {
             UserIO.getInstance().requestMessageDialog(UserIO.ICON_WARNING, T.T.jd_gui_swing_jdgui_settings_panels_downloadandnetwork_advanced_ipcheckdisable_warning_title(), T.T.jd_gui_swing_jdgui_settings_panels_downloadandnetwork_advanced_ipcheckdisable_warning_message());
         } else {
@@ -247,25 +227,19 @@ public class LiveHeaderReconnect extends RouterPlugin implements ConfigEventList
                     if (StringUtils.isEmpty(text) || !IP.isValidRouterIP(text)) {
                         new GetIPAction(LiveHeaderReconnect.this).actionPerformed(null);
                     }
-
                     new EDTHelper<Object>() {
-
                         @Override
                         public Object edtRun() {
-
                             final Gui jd = new Gui(settings.getRouterIP());
                             try {
                                 UIOManager.I().show(null, jd).throwCloseExceptions();
-
                                 if (jd.saved) {
                                     settings.setRouterIP(jd.ip);
-
                                     if (jd.user != null) {
                                         settings.setUserName(jd.user);
                                     }
                                     if (jd.pass != null) {
                                         settings.setPassword(jd.pass);
-
                                     }
                                     // changed script.reset router sender state
                                     if ((jd.methode != null && jd.methode.equals(settings.getScript()))) {
@@ -273,19 +247,15 @@ public class LiveHeaderReconnect extends RouterPlugin implements ConfigEventList
                                     }
                                     settings.setScript(jd.methode);
                                     setName("Router Recorder Custom Script");
-
                                 }
                             } catch (DialogClosedException e) {
                                 e.printStackTrace();
                             } catch (DialogCanceledException e) {
                                 e.printStackTrace();
                             }
-
                             return null;
                         }
-
                     }.start();
-
                 }
             }.start();
         }
@@ -309,7 +279,6 @@ public class LiveHeaderReconnect extends RouterPlugin implements ConfigEventList
                 protected void runInEDT() {
                     try {
                         String str = getRouterName();
-
                         if (settings.getRouterData().getManufactor() != null && settings.getRouterData().getManufactor().length() > 0) {
                             if (str.length() > 0) {
                                 str += " - ";
@@ -339,9 +308,7 @@ public class LiveHeaderReconnect extends RouterPlugin implements ConfigEventList
                         // throws an Throwable if the caller
                         // is a changelistener of this field's document
                     }
-
                 }
-
             };
         }
     }
@@ -367,15 +334,11 @@ public class LiveHeaderReconnect extends RouterPlugin implements ConfigEventList
                     if (!settings.isAlreadySendToCollectServer3() && ReconnectPluginController.getInstance().getActivePlugin() == this) {
                         if (JsonConfig.create(ReconnectConfig.class).getSuccessCounter() > 3) {
                             if (CloseReason.OK == UIOManager.I().show(ConfirmDialogInterface.class, new ConfirmDialog(UIOManager.LOGIC_DONT_SHOW_AGAIN_IGNORES_OK | Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN | UIOManager.LOGIC_COUNTDOWN, T.T.LiveHeaderReconnect_onConfigValueModified_ask_title(), T.T.LiveHeaderReconnect_onConfigValueModified_ask_msg(), icon, null, null) {
-
                                 {
                                     setTimeout(5 * 60 * 1000);
                                 }
-
                             }).getCloseReason()) {
-
                                 action.actionPerformed(null);
-
                             }
                             settings.setAlreadySendToCollectServer3(true);
                         }
@@ -399,7 +362,6 @@ public class LiveHeaderReconnect extends RouterPlugin implements ConfigEventList
             if (i.getScript() != null && i.getScript().equals(liveHeaderReconnectSettings.getScript())) {
                 liveHeaderReconnectSettings.setAlreadySendToCollectServer3(false);
             }
-
             settings.setScript(i.getScript());
             final ReconnectConfig reconnectConfig = JsonConfig.create(ReconnectConfig.class);
             reconnectConfig.setSecondsBeforeFirstIPCheck((int) reconnectResult.getOfflineDuration() / 1000);
@@ -428,18 +390,15 @@ public class LiveHeaderReconnect extends RouterPlugin implements ConfigEventList
             }
         }
         return ret;
-
     }
 
     protected String getRouterName() {
-
         final RouterData routerData = settings.getRouterData();
         if (routerData != null) {
             final String ret = routerData.getRouterName();
             if (StringUtils.isNotEmpty(ret)) {
                 return ret;
             }
-
         }
         return "<unknown router>";
     }

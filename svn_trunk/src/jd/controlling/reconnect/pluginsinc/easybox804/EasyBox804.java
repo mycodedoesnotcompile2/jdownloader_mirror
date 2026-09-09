@@ -8,17 +8,6 @@ import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 
-import jd.controlling.proxy.NoProxySelector;
-import jd.controlling.reconnect.ReconnectException;
-import jd.controlling.reconnect.ReconnectInvoker;
-import jd.controlling.reconnect.RouterPlugin;
-import jd.controlling.reconnect.ipcheck.IP;
-import jd.controlling.reconnect.ipcheck.IPCheckException;
-import jd.controlling.reconnect.ipcheck.IPCheckProvider;
-import jd.controlling.reconnect.ipcheck.InvalidIPException;
-import jd.http.Browser;
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.swing.components.ExtPasswordField;
 import org.appwork.swing.components.ExtTextField;
@@ -31,14 +20,25 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 
+import jd.controlling.proxy.NoProxySelector;
+import jd.controlling.reconnect.ReconnectException;
+import jd.controlling.reconnect.ReconnectInvoker;
+import jd.controlling.reconnect.RouterPlugin;
+import jd.controlling.reconnect.ipcheck.IP;
+import jd.controlling.reconnect.ipcheck.IPCheckException;
+import jd.controlling.reconnect.ipcheck.IPCheckProvider;
+import jd.controlling.reconnect.ipcheck.InvalidIPException;
+import jd.http.Browser;
+import net.miginfocom.swing.MigLayout;
+
 public class EasyBox804 extends RouterPlugin implements IPCheckProvider {
-    public static final String        ID = "EasyBox804";
-    private Icon                      icon;
-    private ReconnectInvoker          invoker;
-    private ExtPasswordField          txtPassword;
-    private EasyBox804ReconnectConfig config;
-    private ExtTextField              txtIP;
-    private Browser                   br;
+    public static final String              ID = "EasyBox804";
+    private final Icon                      icon;
+    private final ReconnectInvoker          invoker;
+    private ExtPasswordField                txtPassword;
+    private final EasyBox804ReconnectConfig config;
+    private ExtTextField                    txtIP;
+    private Browser                         br;
 
     // @Override
     public int getIpCheckInterval() {

@@ -69,7 +69,6 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.translate._JDT;
 
 import jd.PluginWrapper;
-import jd.config.SubConfiguration;
 import jd.controlling.ProgressController;
 import jd.controlling.captcha.CaptchaSettings;
 import jd.controlling.captcha.SkipException;
@@ -108,11 +107,6 @@ public abstract class PluginForDecrypt extends Plugin {
      */
     public LinkCrawlerDistributer getDistributer() {
         return distributer;
-    }
-
-    @Override
-    public SubConfiguration getPluginConfig() {
-        return SubConfiguration.getConfig(lazyC.getDisplayName());
     }
 
     @Override
@@ -249,8 +243,8 @@ public abstract class PluginForDecrypt extends Plugin {
      * @return
      * @since JD2
      * @author raztoki
-     * @deprecated Do not create offline placeholder links. Throw
-     *             <code>new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND)</code> instead to signal that the content is offline.
+     * @deprecated Do not create offline placeholder links. Throw <code>new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND)</code> instead
+     *             to signal that the content is offline.
      */
     @Deprecated
     protected DownloadLink createOfflinelink(final String link) {
@@ -265,8 +259,8 @@ public abstract class PluginForDecrypt extends Plugin {
      * @return
      * @since JD2
      * @author raztoki
-     * @deprecated Do not create offline placeholder links. Throw
-     *             <code>new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND)</code> instead to signal that the content is offline.
+     * @deprecated Do not create offline placeholder links. Throw <code>new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND)</code> instead
+     *             to signal that the content is offline.
      */
     @Deprecated
     protected DownloadLink createOfflinelink(final String link, final String message) {
@@ -281,8 +275,8 @@ public abstract class PluginForDecrypt extends Plugin {
      * @param message
      * @since JD2
      * @author raztoki
-     * @deprecated Do not create offline placeholder links. Throw
-     *             <code>new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND)</code> instead to signal that the content is offline.
+     * @deprecated Do not create offline placeholder links. Throw <code>new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND)</code> instead
+     *             to signal that the content is offline.
      */
     @Deprecated
     protected DownloadLink createOfflinelink(final String link, final String filename, final String message) {

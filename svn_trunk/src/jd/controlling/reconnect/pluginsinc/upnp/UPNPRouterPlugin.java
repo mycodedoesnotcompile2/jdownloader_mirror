@@ -12,22 +12,6 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 
-import jd.controlling.reconnect.ProcessCallBack;
-import jd.controlling.reconnect.ReconnectConfig;
-import jd.controlling.reconnect.ReconnectException;
-import jd.controlling.reconnect.ReconnectInvoker;
-import jd.controlling.reconnect.ReconnectResult;
-import jd.controlling.reconnect.RouterPlugin;
-import jd.controlling.reconnect.ipcheck.IP;
-import jd.controlling.reconnect.ipcheck.IPCheckException;
-import jd.controlling.reconnect.ipcheck.IPCheckProvider;
-import jd.controlling.reconnect.ipcheck.InvalidIPRangeException;
-import jd.controlling.reconnect.ipcheck.InvalidProviderException;
-import jd.controlling.reconnect.pluginsinc.upnp.cling.UPNPDeviceScanner;
-import jd.controlling.reconnect.pluginsinc.upnp.cling.UpnpRouterDevice;
-import jd.controlling.reconnect.pluginsinc.upnp.translate.T;
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.swing.components.ExtButton;
 import org.appwork.swing.components.ExtTextField;
@@ -46,28 +30,37 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.logging.LogController;
-import org.jdownloader.settings.advanced.AdvancedConfigManager;
 import org.jdownloader.settings.staticreferences.CFG_RECONNECT;
 
+import jd.controlling.reconnect.ProcessCallBack;
+import jd.controlling.reconnect.ReconnectConfig;
+import jd.controlling.reconnect.ReconnectException;
+import jd.controlling.reconnect.ReconnectInvoker;
+import jd.controlling.reconnect.ReconnectResult;
+import jd.controlling.reconnect.RouterPlugin;
+import jd.controlling.reconnect.ipcheck.IP;
+import jd.controlling.reconnect.ipcheck.IPCheckException;
+import jd.controlling.reconnect.ipcheck.IPCheckProvider;
+import jd.controlling.reconnect.ipcheck.InvalidIPRangeException;
+import jd.controlling.reconnect.ipcheck.InvalidProviderException;
+import jd.controlling.reconnect.pluginsinc.upnp.cling.UPNPDeviceScanner;
+import jd.controlling.reconnect.pluginsinc.upnp.cling.UpnpRouterDevice;
+import jd.controlling.reconnect.pluginsinc.upnp.translate.T;
+import net.miginfocom.swing.MigLayout;
+
 public class UPNPRouterPlugin extends RouterPlugin implements IPCheckProvider {
-
     public static final String                 ID      = "SIMPLEUPNP";
-
     private ExtTextField                       serviceTypeTxt;
     private ExtTextField                       controlURLTxt;
     private JLabel                             wanType;
-
     protected java.util.List<UpnpRouterDevice> devices = null;
-
-    private Icon                               icon;
-
-    private UPUPReconnectSettings              settings;
+    private final Icon                         icon;
+    private final UPUPReconnectSettings        settings;
 
     public UPNPRouterPlugin() {
         super();
         icon = new AbstractIcon(IconKey.ICON_LOGO_UPNP, 16);
         settings = JsonConfig.create(UPUPReconnectSettings.class);
-        AdvancedConfigManager.getInstance().register(settings);
     }
 
     /**
@@ -87,7 +80,6 @@ public class UPNPRouterPlugin extends RouterPlugin implements IPCheckProvider {
                 if (Thread.currentThread().isInterrupted()) {
                     throw new InterruptedException();
                 }
-
                 ReconnectResult res;
                 try {
                     processCallBack.setStatusString(this, T.T.try_reconnect(device.getModelname()));
@@ -119,28 +111,22 @@ public class UPNPRouterPlugin extends RouterPlugin implements IPCheckProvider {
                         ret.add(res);
                         processCallBack.setStatus(this, ret);
                         if (i < devices.size() - 1) {
-
                             if (ret.size() == 1) {
                                 Dialog.getInstance().showConfirmDialog(0, _GUI.T.LiveHeaderDetectionWizard_testList_firstSuccess_title(), _GUI.T.LiveHeaderDetectionWizard_testList_firstsuccess_msg(TimeFormatter.formatMilliSeconds(res.getSuccessDuration(), 0)), new AbstractIcon(IconKey.ICON_OK, 32), _GUI.T.LiveHeaderDetectionWizard_testList_ok(), _GUI.T.LiveHeaderDetectionWizard_testList_use());
                             }
-
                         }
                     }
-
                 } catch (ReconnectException e) {
                     e.printStackTrace();
                 } catch (DialogClosedException e) {
-
                 } catch (DialogCanceledException e) {
                     return ret;
                 }
-
             }
             return ret;
         } finally {
             logger.close();
         }
-
     }
 
     public IP getExternalIP() throws IPCheckException {
@@ -151,7 +137,6 @@ public class UPNPRouterPlugin extends RouterPlugin implements IPCheckProvider {
             logger.clear();
         } catch (final Exception e) {
             this.setCanCheckIP(false);
-
             throw new InvalidProviderException("UPNP Command Error");
         } finally {
             logger.close();
@@ -165,7 +150,6 @@ public class UPNPRouterPlugin extends RouterPlugin implements IPCheckProvider {
             throw new InvalidProviderException(e2);
         }
         this.setCanCheckIP(false);
-
         throw new InvalidProviderException("Unknown UPNP Response Error");
     }
 
@@ -180,7 +164,6 @@ public class UPNPRouterPlugin extends RouterPlugin implements IPCheckProvider {
         settings.setControlURL(i.getControlURL());
         settings.setModelName(i.getName());
         settings.setServiceType(i.getServiceType());
-
         JsonConfig.create(ReconnectConfig.class).setSecondsBeforeFirstIPCheck((int) reconnectResult.getOfflineDuration() / 1000);
         JsonConfig.create(ReconnectConfig.class).setSecondsToWaitForIPChange((int) (reconnectResult.getMaxSuccessDuration()) / 1000);
         JsonConfig.create(ReconnectConfig.class).setSecondsToWaitForOffline((int) reconnectResult.getMaxOfflineDuration() / 1000);
@@ -196,7 +179,6 @@ public class UPNPRouterPlugin extends RouterPlugin implements IPCheckProvider {
         JButton auto = new ExtButton(new AutoDetectUpnpAction(this)).setTooltipsEnabled(true);
         auto.setHorizontalAlignment(SwingConstants.LEFT);
         this.serviceTypeTxt = new ExtTextField() {
-
             @Override
             public void onChanged() {
                 final String serviceType = UPNPRouterPlugin.this.serviceTypeTxt.getText();
@@ -208,10 +190,8 @@ public class UPNPRouterPlugin extends RouterPlugin implements IPCheckProvider {
                 } catch (final Throwable e) {
                 }
             }
-
         };
         this.controlURLTxt = new ExtTextField() {
-
             @Override
             public void onChanged() {
                 final String controlURL = UPNPRouterPlugin.this.controlURLTxt.getText();
@@ -223,11 +203,9 @@ public class UPNPRouterPlugin extends RouterPlugin implements IPCheckProvider {
                 } catch (final Throwable e) {
                 }
             }
-
         };
         serviceTypeTxt.setHelpText(T.T.servicetype_help());
         controlURLTxt.setHelpText(T.T.controlURLTxt_help());
-
         this.wanType = new JLabel();
         p.add(auto, "aligny top,gapright 15,sg buttons");
         p.add(new JLabel(T.T.literally_router()), "");
@@ -237,10 +215,8 @@ public class UPNPRouterPlugin extends RouterPlugin implements IPCheckProvider {
         p.add(this.serviceTypeTxt);
         p.add(new JLabel(T.T.literally_control_url()), "newline,skip");
         p.add(this.controlURLTxt);
-
         // p.add(Box.createGlue(), "pushy,growy");
         this.updateGUI();
-
         return p;
     }
 
@@ -277,7 +253,6 @@ public class UPNPRouterPlugin extends RouterPlugin implements IPCheckProvider {
 
     public void setCanCheckIP(final boolean b) {
         settings.setIPCheckEnabled(b);
-
     }
 
     void setDevice(final UpnpRouterDevice upnpRouterDevice) {
@@ -300,7 +275,6 @@ public class UPNPRouterPlugin extends RouterPlugin implements IPCheckProvider {
 
     private void updateGUI() {
         new EDTRunner() {
-
             @Override
             protected void runInEDT() {
                 if (UPNPRouterPlugin.this.wanType != null) {
@@ -316,10 +290,8 @@ public class UPNPRouterPlugin extends RouterPlugin implements IPCheckProvider {
                         UPNPRouterPlugin.this.controlURLTxt.setText(settings.getControlURL());
                     } catch (final Throwable e) {
                     }
-
                 }
             }
-
         };
     }
 
@@ -329,12 +301,10 @@ public class UPNPRouterPlugin extends RouterPlugin implements IPCheckProvider {
     }
 
     public synchronized java.util.List<UpnpRouterDevice> getCachedDevices() throws InterruptedException {
-
         return devices;
     }
 
     public synchronized java.util.List<UpnpRouterDevice> getDevices() throws InterruptedException {
-
         devices = new UPNPDeviceScanner().scan();
         return devices;
     }

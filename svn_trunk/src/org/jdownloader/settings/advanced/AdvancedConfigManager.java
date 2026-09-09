@@ -7,11 +7,6 @@ import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 
-import jd.controlling.downloadcontroller.DownloadControllerConfig;
-import jd.controlling.faviconcontroller.FavIconsConfig;
-import jd.controlling.linkchecker.LinkCheckerConfig;
-import jd.controlling.linkcrawler.LinkCrawlerConfig;
-
 import org.appwork.storage.StorableValidatorIgnoresMissingSetter;
 import org.appwork.storage.config.ConfigInterface;
 import org.appwork.storage.config.JsonConfig;
@@ -55,6 +50,15 @@ import org.jdownloader.updatev2.LastChanceSettings;
 import org.jdownloader.updatev2.UpdateSettings;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
+import jd.controlling.downloadcontroller.DownloadControllerConfig;
+import jd.controlling.faviconcontroller.FavIconsConfig;
+import jd.controlling.linkchecker.LinkCheckerConfig;
+import jd.controlling.linkcrawler.LinkCrawlerConfig;
+import jd.controlling.reconnect.pluginsinc.easybox804.EasyBox804ReconnectConfig;
+import jd.controlling.reconnect.pluginsinc.liveheader.LiveHeaderReconnectSettings;
+import jd.controlling.reconnect.pluginsinc.speedporthybrid.SpeedPortHybridReconnectConfig;
+import jd.controlling.reconnect.pluginsinc.upnp.UPUPReconnectSettings;
+
 public class AdvancedConfigManager {
     private static final AdvancedConfigManager INSTANCE;
     static {
@@ -86,6 +90,10 @@ public class AdvancedConfigManager {
         register(CFG_LINKGRABBER.CFG);
         register(CFG_LINKCOLLECTOR.CFG);
         register(CFG_RECONNECT.CFG);
+        register(JsonConfig.create(UPUPReconnectSettings.class));
+        register(JsonConfig.create(LiveHeaderReconnectSettings.class));
+        register(JsonConfig.create(SpeedPortHybridReconnectConfig.class));
+        register(JsonConfig.create(EasyBox804ReconnectConfig.class));
         register(CFG_API.CFG);
         register(CFG_PACKAGIZER.CFG);
         register(JsonConfig.create(FFmpegSetup.class));

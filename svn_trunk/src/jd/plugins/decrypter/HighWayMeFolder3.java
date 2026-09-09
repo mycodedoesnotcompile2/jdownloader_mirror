@@ -27,6 +27,8 @@ import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.config.HighWayMeHosterConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -55,15 +57,8 @@ import jd.plugins.hoster.HighWayMe2;
  * It recursively walks the users' HIGHWAY cloud via the JSON API and returns all contained files. </br>
  * Docs: https://high-way.me/threads/highway-api.201/ (section "HIGHWAY DAV JSON API")
  */
-@DecrypterPlugin(revision = "$Revision: 53337 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53361 $", interfaceVersion = 3, names = {}, urls = {})
 public class HighWayMeFolder3 extends PluginForDecrypt {
-    /**
-     * If true, items whose status does not allow downloading (see {@link HighWayCore#isDavItemDownloadable(String)}) are skipped and not
-     * added at all. </br>
-     * If false, such items are added anyway but get a "Status_<status>_" filename prefix so they are easy to recognize.
-     */
-    private final boolean skipUnDownloadableItems = false;
-
     public HighWayMeFolder3(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -129,6 +124,12 @@ public class HighWayMeFolder3 extends PluginForDecrypt {
         }
         br.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Basic " + Encoding.Base64Encode(usenetUsername + ":" + usenetPassword));
         br.getHeaders().put("Accept", "application/json");
+        /**
+         * If true, items whose status does not allow downloading (see {@link HighWayCore#isDavItemDownloadable(String)}) are skipped and not
+         * added at all. </br>
+         * If false, such items are added anyway but get a "Status_<status>_" filename prefix so they are easy to recognize.
+         */
+        final boolean skipUnDownloadableItems = PluginJsonConfig.get(HighWayMeHosterConfig.class).isCloudCrawlerAddOnlyDownloadableItems();
         /*
          * Normalize the added URL.
          */

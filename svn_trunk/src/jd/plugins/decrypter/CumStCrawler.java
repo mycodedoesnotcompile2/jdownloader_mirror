@@ -18,6 +18,8 @@ package jd.plugins.decrypter;
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -55,7 +57,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.CumSt;
 
-@DecrypterPlugin(revision = "$Revision: 53327 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53362 $", interfaceVersion = 3, names = {}, urls = {})
 public class CumStCrawler extends PluginForDecrypt {
     public CumStCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -455,6 +457,10 @@ public class CumStCrawler extends PluginForDecrypt {
                 result.setProperty(CumSt.PROPERTY_POST_TEXT, postTextContent);
             }
             if (publishedDateStr != null) {
+                if (publishedDateStr.matches("^\\d+$")) {
+                    final String isoDate = Instant.ofEpochSecond(Long.parseLong(publishedDateStr)).atZone(ZoneId.of("UTC")).toLocalDateTime().toString();
+                    result.setProperty(CumSt.PROPERTY_DATE, isoDate);
+                }
                 result.setProperty(CumSt.PROPERTY_DATE, publishedDateStr);
             }
             result.setProperty(CumSt.PROPERTY_SERVICE, service);

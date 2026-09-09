@@ -20,7 +20,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 53349 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53356 $", interfaceVersion = 2, names = {}, urls = {})
 public class JoyReactor extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -73,7 +73,7 @@ public class JoyReactor extends PluginForDecrypt {
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         Set<String> directURLs = new HashSet<String>();
-        String urls[] = br.getRegex("((https?:)?//[^/\"]+/pics/post/(?:full/)?.*?(jpe?g|png|gif|webp))").getColumn(0);
+        String urls[] = br.getRegex("((https?:)?//[^/\"]+/pics/post/(?:full/)?[^\"']*?\\.(jpe?g|png|gif|webp|webm))").getColumn(0);
         if (urls != null) {
             directURLs.addAll(Arrays.asList(urls));
         }
@@ -83,6 +83,14 @@ public class JoyReactor extends PluginForDecrypt {
             directURLs.addAll(Arrays.asList(urls));
         }
         if (directURLs.size() == 0) {
+            String iframe = br.getRegex("<iframe[^>]*role\\s*=\\s*\"img\"[^>]*src=\"(.*?)\"").getMatch(0);
+            if (iframe != null) {
+                iframe = Encoding.htmlOnlyDecode(iframe);
+                if (findNextLazyCrawlerPlugins(iframe).size() > 0 || findNextLazyHostPlugins(iframe).size() > 0) {
+                    ret.add(createDownloadlink(iframe));
+                    return ret;
+                }
+            }
             // Unsafe content - only for registered users (google translate)
             if (br.containsHTML("Небезопасный контент - только для зарегистрированных пользователей|joyreactor\\.cc/images/unsafe_ru\\.gif")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

@@ -6,43 +6,50 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.appwork.storage.config.annotations.LabelInterface;
+import org.jdownloader.translate._JDT;
 
 public class BadFilePathException extends IOException {
     public static enum PathFailureReason implements LabelInterface {
         PATH_SEGMENT_TOO_LONG {
             @Override
             public String getLabel() {
-                return "A segment of path is too long to be used [in the current OS]";
+                return _JDT.T.BadFilePathException_PathFailureReason_PATH_SEGMENT_TOO_LONG();
             }
         },
         PATH_TOO_LONG {
             @Override
             public String getLabel() {
-                return "Total length of path is too long";
+                return _JDT.T.BadFilePathException_PathFailureReason_PATH_TOO_LONG();
             }
         },
-        PERMISSION_PROBLEM {
+        PERMISSION_PROBLEM_FILE {
             @Override
             public String getLabel() {
-                return "Permission to write to path is not given";
+                return _JDT.T.BadFilePathException_PathFailureReason_PERMISSION_PROBLEM_FILE();
+            }
+        },
+        PERMISSION_PROBLEM_FOLDER {
+            @Override
+            public String getLabel() {
+                return _JDT.T.BadFilePathException_PathFailureReason_PERMISSION_PROBLEM_FOLDER();
             }
         },
         FILE_ALREADY_EXISTS {
             @Override
             public String getLabel() {
-                return "File already exists";
+                return _JDT.T.BadFilePathException_PathFailureReason_FILE_ALREADY_EXISTS();
             }
         },
         FILE_ALREADY_EXISTS_AS_FOLDER {
             @Override
             public String getLabel() {
-                return "File can't be created because a directory with the same name already exists";
+                return _JDT.T.BadFilePathException_PathFailureReason_FILE_ALREADY_EXISTS_AS_FOLDER();
             }
         },
         INVALID_DESTINATION {
             @Override
             public String getLabel() {
-                return "This path cannot be used for unknown reasons";
+                return _JDT.T.BadFilePathException_PathFailureReason_INVALID_DESTINATION();
             }
         };
     }
@@ -60,8 +67,7 @@ public class BadFilePathException extends IOException {
     }
 
     public BadFilePathException(final File file, final PathFailureReason reason, final int index) {
-        // super(file);
-        init(file, reason, index);
+        this.init(file, reason, index);
     }
 
     private void init(File file, final PathFailureReason reason, final int index) {
@@ -88,7 +94,6 @@ public class BadFilePathException extends IOException {
      * This will never return null.
      */
     public File getProblematicPathSegment() {
-        /* TODO: Decide what this should return if no problematic path segment is known */
         if (this.index == -1) {
             return this.file;
         }

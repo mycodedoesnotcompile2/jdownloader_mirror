@@ -33,6 +33,7 @@ import org.jdownloader.gui.translate._GUI;
 import com.sun.jna.platform.win32.KnownFolders;
 
 import jd.controlling.downloadcontroller.DownloadLinkCandidateSelector;
+import jd.controlling.downloadcontroller.IfFilenameTooLongDialog.IfFilenameTooLongAction;
 import jd.controlling.linkcollector.LinknameCleaner.ReplaceMapValidator;
 
 public interface GeneralSettings extends ConfigInterface {
@@ -259,6 +260,13 @@ public interface GeneralSettings extends ConfigInterface {
     @AboutConfig
     @DefaultEnumValue("ASK_FOR_EACH_FILE")
     IfFileExistsAction getIfFileExistsAction();
+
+    @AboutConfig
+    @DefaultEnumValue("ASK_FOR_EACH_FILE")
+    @DescriptionForConfigEntry("Defines what happens when a filename is too long to be saved on the filesystem")
+    IfFilenameTooLongAction getIfFilenameTooLongAction();
+
+    void setIfFilenameTooLongAction(IfFilenameTooLongAction action);
 
     @AboutConfig
     @DefaultBooleanValue(false)

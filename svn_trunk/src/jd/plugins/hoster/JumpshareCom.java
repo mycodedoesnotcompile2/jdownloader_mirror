@@ -37,7 +37,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.JumpshareComCrawler;
 
-@HostPlugin(revision = "$Revision: 53333 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53356 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { JumpshareComCrawler.class })
 public class JumpshareCom extends PluginForHost {
     public JumpshareCom(PluginWrapper wrapper) {
@@ -61,7 +61,7 @@ public class JumpshareCom extends PluginForHost {
         return buildAnnotationUrls(getPluginDomains());
     }
 
-    private static final Pattern PATTERN_FILE = Pattern.compile("/(?:share|v)/([A-Za-z0-9]+)(\\?b=.+)?");
+    private static final Pattern PATTERN_FILE = Pattern.compile("/(?:share|s|v)/([A-Za-z0-9]+)(\\?b=.+)?");
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();

@@ -1,7 +1,6 @@
 package jd.controlling.reconnect.pluginsinc.speedporthybrid;
 
 import java.awt.Component;
-import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 
@@ -12,26 +11,12 @@ import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 
-import jd.controlling.proxy.NoProxySelector;
-import jd.controlling.reconnect.ReconnectException;
-import jd.controlling.reconnect.ReconnectInvoker;
-import jd.controlling.reconnect.RouterPlugin;
-import jd.controlling.reconnect.ipcheck.IP;
-import jd.controlling.reconnect.ipcheck.IPCheckException;
-import jd.controlling.reconnect.ipcheck.IPCheckProvider;
-import jd.controlling.reconnect.ipcheck.InvalidIPException;
-import jd.http.Browser;
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.exceptions.WTFException;
-import org.appwork.storage.StorageException;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.swing.components.ExtPasswordField;
 import org.appwork.swing.components.ExtTextField;
 import org.appwork.uio.UIOManager;
-import org.appwork.utils.Application;
 import org.appwork.utils.Hash;
-import org.appwork.utils.IO;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.HexFormatter;
@@ -48,28 +33,31 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 
+import jd.controlling.proxy.NoProxySelector;
+import jd.controlling.reconnect.ReconnectException;
+import jd.controlling.reconnect.ReconnectInvoker;
+import jd.controlling.reconnect.RouterPlugin;
+import jd.controlling.reconnect.ipcheck.IP;
+import jd.controlling.reconnect.ipcheck.IPCheckException;
+import jd.controlling.reconnect.ipcheck.IPCheckProvider;
+import jd.controlling.reconnect.ipcheck.InvalidIPException;
+import jd.http.Browser;
+import net.miginfocom.swing.MigLayout;
+
 /**
  * Plugin to use an extern tool for reconnection
  */
 public class SpeedPortHybrid extends RouterPlugin implements IPCheckProvider {
-    public static final String             ID = "SpeedPortHybrid";
-    private Icon                           icon;
-    private ReconnectInvoker               invoker;
-    private ExtPasswordField               txtPassword;
-    private SpeedPortHybridReconnectConfig config;
-    private ExtTextField                   txtIP;
-    private Browser                        br;
-    private String                         derivedk;
-    private String                         csrf;
-    private String                         challengev;
-
-    public static void main(String[] args) throws StorageException, IOException {
-        File file = new File("C:\\Users\\Thomas\\Desktop\\interfaces.json");
-        Application.setApplication(".appwork");
-        // 'IPv4_address':'87.162.215.207',
-        String[] lte_tunnel = new Regex(IO.readFileToString(file), "\\'IPv4_address\\'\\s*\\:\\s*\\'([^']*)").getColumn(0);
-        System.out.println(lte_tunnel);
-    }
+    public static final String                   ID = "SpeedPortHybrid";
+    private final Icon                           icon;
+    private final ReconnectInvoker               invoker;
+    private ExtPasswordField                     txtPassword;
+    private final SpeedPortHybridReconnectConfig config;
+    private ExtTextField                         txtIP;
+    private Browser                              br;
+    private String                               derivedk;
+    private String                               csrf;
+    private String                               challengev;
 
     private String PBKDF2Key(String password, String salt) throws Exception {
         final PBEKeySpec spec = new PBEKeySpec(Hash.getSHA256(password).toCharArray(), salt.getBytes("UTF-8"), 1000, 16 * 8);

@@ -7,13 +7,12 @@ import java.net.InetAddress;
 import java.security.KeyPair;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-
-import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
-import jd.controlling.reconnect.ipcheck.IP;
 
 import org.appwork.remoteapi.RemoteAPIRequest;
 import org.appwork.storage.config.JsonConfig;
+import org.appwork.utils.Time;
 import org.appwork.utils.formatter.HexFormatter;
 import org.appwork.utils.net.Base64OutputStream;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
@@ -26,6 +25,9 @@ import org.jdownloader.api.myjdownloader.MyJDownloaderSettings;
 import org.jdownloader.api.myjdownloader.MyJDownloaderSettings.DIRECTMODE;
 import org.jdownloader.myjdownloader.client.json.DirectConnectionInfo;
 import org.jdownloader.myjdownloader.client.json.DirectConnectionInfos;
+
+import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
+import jd.controlling.reconnect.ipcheck.IP;
 
 public class DeviceAPIImpl implements DeviceAPI {
     private static final InetAddress[] lookup(final String hostName) throws IOException {
@@ -77,6 +79,9 @@ public class DeviceAPIImpl implements DeviceAPI {
         }
     }
 
+    private static AtomicLong        CACHE_TIMESTAMP = new AtomicLong(0);
+    private static List<InetAddress> CACHE           = null;
+
     @Override
     public DirectConnectionInfos getDirectConnectionInfos(final RemoteAPIRequest request) {
         final DirectConnectionInfos ret = new DirectConnectionInfos();
@@ -94,7 +99,15 @@ public class DeviceAPIImpl implements DeviceAPI {
         final int wanPort = directServer.getRemotePort();
         ret.setMode(directServer.getConnectMode().name());
         final List<DirectConnectionInfo> infos = new ArrayList<DirectConnectionInfo>();
-        final List<InetAddress> localIPs = HTTPProxyUtils.getLocalIPs(true);
+        final List<InetAddress> localIPs;
+        synchronized (CACHE_TIMESTAMP) {
+            if (Time.systemIndependentCurrentJVMTimeMillis() - CACHE_TIMESTAMP.get() > 60000) {
+                localIPs = CACHE = HTTPProxyUtils.getLocalIPs(true, 0);
+                CACHE_TIMESTAMP.set(Time.systemIndependentCurrentJVMTimeMillis());
+            } else {
+                localIPs = CACHE;
+            }
+        }
         if (localIPs != null) {
             try {
                 // check dns rebind protection

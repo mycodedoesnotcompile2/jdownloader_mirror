@@ -46,7 +46,7 @@ import org.appwork.utils.DebugMode;
  * @author Thomas
  *
  */
-public class EnumListHandler extends ListHandler<Enum<?>[]> {
+public class EnumListHandler<T extends Enum<T>> extends ListHandler<T[]> {
     /**
      * @param storageHandler
      * @param key
@@ -60,7 +60,7 @@ public class EnumListHandler extends ListHandler<Enum<?>[]> {
     protected void initDefaults() throws Throwable {
         final DefaultEnumArrayValue ann = this.getAnnotation(DefaultEnumArrayValue.class);
         if (ann != null) {
-            final List<Enum<?>> ret = new ArrayList<Enum<?>>();
+            final List<T> ret = new ArrayList<T>();
             for (final String value : ann.value()) {
                 try {
                     final int index = value.lastIndexOf(".");
@@ -69,23 +69,24 @@ public class EnumListHandler extends ListHandler<Enum<?>[]> {
                     if (index == -1) {
                         name = value;
                         final ParameterizedType type = (ParameterizedType) getRawType();
-                        clazz = ((Class) type.getActualTypeArguments()[0]).getName();
+                        clazz = ((Class<T>) type.getActualTypeArguments()[0]).getName();
                     } else {
                         name = value.substring(index + 1);
                         clazz = value.substring(0, index);
                     }
-                    ret.add(Enum.valueOf((Class<Enum>) Class.forName(clazz), name));
+                    ret.add(Enum.valueOf((Class<T>) Class.forName(clazz), name));
                 } catch (Exception e) {
                     DebugMode.debugger(e);
                 }
             }
-            this.setDefaultValue(ret.toArray(new Enum[0]));
+            T[] emptyArray = (T[]) java.lang.reflect.Array.newInstance(getRawClass(), 0);
+            this.setDefaultValue(ret.toArray(emptyArray));
             return;
         }
         if (getAnnotation(DefaultOnNull.class) != null) {
             final ParameterizedType type = (ParameterizedType) getRawType();
-            final Class enumClass = (Class) type.getActualTypeArguments()[0];
-            final Enum[] defaultValue = (Enum[]) enumClass.getEnumConstants();
+            final Class<T> enumClass = (Class<T>) type.getActualTypeArguments()[0];
+            final T[] defaultValue = enumClass.getEnumConstants();
             this.setDefaultValue(defaultValue);
             return;
         }

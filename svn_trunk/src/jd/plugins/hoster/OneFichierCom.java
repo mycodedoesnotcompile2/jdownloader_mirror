@@ -102,7 +102,7 @@ import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 53334 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53356 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     /* Account properties */
     private final String        PROPERTY_ACCOUNT_USE_CDN_CREDITS                                  = "use_cdn_credits";
@@ -839,6 +839,7 @@ public class OneFichierCom extends PluginForHost {
         is_ip_blocked |= br.containsHTML("Without Premium, you can only download one file at a time");
         is_ip_blocked |= br.containsHTML("Without Premium, you must wait between downloads");
         is_ip_blocked |= br.containsHTML("Warning ! Without subscription, you can only download one file at|<span style=\"color:red\">Warning\\s*!\\s*</span>\\s*<br/>Without subscription, you can only download one file at a time\\.\\.\\.");
+        is_ip_blocked |= br.containsHTML("<[^>]*>\\s*Warning\\s*!?\\s*</[^>]*>\\s*(?:<[^>]*>)?\\s*Without subscription, you can only download one file at a time");
         is_ip_blocked |= br.containsHTML(">\\s*Votre adresse IP ouvre trop de connexions vers le serveur");
         if (is_ip_blocked) {
             final String msg = "Your must wait between downloads";

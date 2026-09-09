@@ -44,7 +44,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 53277 $", interfaceVersion = 3, names = { "4shared.com" }, urls = { "https?://(?:www\\.)?(?:4shared(?:-china)?\\.com|4s\\.io)/(?:dir|folder|minifolder)/[A-Za-z0-9\\-_]+/(?:\\d+/)?[A-Za-z0-9\\-_]+" })
+@DecrypterPlugin(revision = "$Revision: 53356 $", interfaceVersion = 3, names = { "4shared.com" }, urls = { "https?://(?:www\\.)?(?:4shared(?:-china)?\\.com|4s\\.io)/(?:dir|folder|minifolder)/[A-Za-z0-9\\-_]+(/(?:\\d+/)?(?:[A-Za-z0-9\\-_]+)?)?" })
 public class FourSharedComFolder extends PluginForDecrypt {
     public FourSharedComFolder(final PluginWrapper wrapper) {
         super(wrapper);
@@ -94,6 +94,12 @@ public class FourSharedComFolder extends PluginForDecrypt {
         } else if (br.containsHTML("class=\"emptyFolderPlaceholder\"")) {
             throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
         }
+        if (foldername == null) {
+            foldername = br.getRegex("<input[^>]*class\\s*=\\s*\"jsFolderName\"[^>]*value\\s*=\\s*\"([^\"]*)\"/>").getMatch(0);
+            if (foldername == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+        }
         /* Important: Make sure this check is language independent! */
         if (folderNeedsPassword()) {
             /*
@@ -105,9 +111,6 @@ public class FourSharedComFolder extends PluginForDecrypt {
                 form = new Form();
                 form.setMethod(MethodType.POST);
                 form.put("dirId", folderID);
-            }
-            if (form == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             pass = this.getPluginConfig().getStringProperty("lastusedpassword");
             for (int retry = 5; retry > 0; retry--) {

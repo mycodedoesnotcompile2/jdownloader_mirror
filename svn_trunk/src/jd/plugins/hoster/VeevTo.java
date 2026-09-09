@@ -18,12 +18,13 @@ package jd.plugins.hoster;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
@@ -42,7 +43,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 53337 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53356 $", interfaceVersion = 3, names = {}, urls = {})
 public class VeevTo extends XFileSharingProBasic {
     public VeevTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -198,16 +199,32 @@ public class VeevTo extends XFileSharingProBasic {
         return dllink;
     }
 
-    /**
-     * 2025-09-04: Resolves the streaming direct-URL from the embed page (/e/<fuid>). <br>
-     * The player obfuscates both the API token and the source URL with an LZW variant (see {@link #lzwDecode(String)}). Flow: <br>
-     * 1. Load /e/<fuid> and grab the real, LZW-encoded "fc" token (there are multiple ASCII decoy "fc" values; the real one is set via a
-     * bracket-assignment on window._vvto and contains non-ASCII codepoints). <br>
-     * 2. LZW-decode "fc" -> signed "ch" token. <br>
-     * 3. GET /dl?op=player_api&cmd=gi&...&ch=<ch> -> JSON containing file.dv[0] with obfuscated source fields (this endpoint needs neither
-     * captcha nor adscore token). <br>
-     * 4. Decode file.dv[0].s (fallback t/sz) -> direct .mp4 URL (see {@link #decodeVeevSource(String)}).
-     */
+    private static int jsInt(char ch) {
+        return Character.getNumericValue(ch);
+    }
+
+    public static List<List<Integer>> buildArray(String encodedString) {
+        final List<List<Integer>> d = new ArrayList<List<Integer>>();
+        // LinkedList erlaubt effizientes FIFO-Verhalten (pop(0) / removeFirst)
+        final LinkedList<Character> c = new LinkedList<Character>();
+        for (char ch : encodedString.toCharArray()) {
+            c.add(ch);
+        }
+        int count = jsInt(c.removeFirst());
+        while (count > 0) {
+            List<Integer> currentArray = new ArrayList<Integer>();
+            for (int i = 0; i < count; i++) {
+                // insert(0, ...) schiebt Elemente an den Anfang der Liste
+                currentArray.add(0, jsInt(c.removeFirst()));
+            }
+            d.add(currentArray);
+            count = jsInt(c.removeFirst());
+        }
+        return d;
+    }
+
+    // https://github.com/skoruppa/docchi-players/blob/main/veev.py
+    // https://static.veevcdn.co/assets/videoplayer/434b479.js?v4
     @SuppressWarnings("unchecked")
     @Override
     protected String getEmbedDllink(final Browser br, final String embedURL, final DownloadLink link, final Account account) throws Exception, PluginException {
@@ -220,7 +237,8 @@ public class VeevTo extends XFileSharingProBasic {
         }
         final String fileCode = new Regex(embedURL, "(?i)/e/([A-Za-z0-9]+)").getMatch(0);
         /* Decode the API token. */
-        final String ch = lzwDecode(encodedFc);
+        final String ch = R(encodedFc);
+        List<List<Integer>> arr = buildArray(ch);
         /* Ask the player API for the sources. brc is still on the embed page so the Referer is set correctly. */
         final Browser brc2 = brc.cloneBrowser();
         brc2.getHeaders().put("X-Requested-With", "XMLHttpRequest");
@@ -230,108 +248,19 @@ public class VeevTo extends XFileSharingProBasic {
             logger.info("player_api 'gi' did not return status 'success' -> Falling back to default embed handling");
             return super.getEmbedDllink(br, embedURL, link, account);
         }
-        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            /* TODO: 2026-09-07: Code down below does not work */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
         final Map<String, Object> file = (Map<String, Object>) entries.get("file");
         final List<Map<String, Object>> dv = (List<Map<String, Object>>) file.get("dv");
         final Map<String, Object> dv0 = dv.get(0);
-        /*
-         * The direct video URL is normally in field "s"; "t"/"sz" carry timeslide/sprite metadata. Try all known fields so a response that
-         * ever moves the URL still works.
-         */
-        final String[] fieldOrder = new String[] { "s", "t", "sz" };
-        String directurl = null;
-        for (final String field : fieldOrder) {
-            final Object encodedSource = dv0.get(field);
-            if (encodedSource == null) {
-                continue;
-            }
-            directurl = decodeVeevSource(encodedSource.toString());
-            if (directurl != null) {
-                break;
-            }
-        }
-        if (directurl == null) {
+        final String source = L(R(dv0.get("s").toString()), arr.get(0));
+        // final String resolution = L(R(dv0.get("sz").toString()), arr.get(2));
+        if (source == null) {
             /* Unexpected format -> signals a site change. */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         logger.info("Successfully resolved streaming direct-URL via player API");
-        return directurl;
+        return source;
     }
 
-    /**
-     * Decodes one LZW-encoded player-API source field (file.dv[].s|t|sz) to a plain URL, or null if it does not contain one. <br>
-     * Pipeline: LZW-decompress -> (optionally reverse) -> hex-decode, repeatedly stripping the constant "dXRmOA==" (Base64 of "utf8")
-     * marker that prefixes each nested layer, until a plain http(s) URL appears. Both the number of nested hex layers and the orientation
-     * (forward/reversed) vary per response.
-     */
-    private final String decodeVeevSource(final String encoded) throws PluginException {
-        final String lzw = lzwDecode(encoded);
-        String url = veevMarkerLoop(lzw);
-        if (url == null) {
-            url = veevMarkerLoop(new StringBuilder(lzw).reverse().toString());
-        }
-        return url;
-    }
-
-    /**
-     * Hex-decodes {@code start} layer by layer, stripping the leading "dXRmOA==" marker each round, and returns the first plain http(s)
-     * URL.
-     */
-    private final String veevMarkerLoop(final String start) {
-        final String marker = "dXRmOA==";
-        String t = hexDecode(start);
-        int guard = 0;
-        while (t != null) {
-            if (t.startsWith(marker)) {
-                t = t.substring(marker.length());
-            }
-            if (t.startsWith("https://") || t.startsWith("http://")) {
-                return t;
-            }
-            t = hexDecode(t);
-            if (++guard > 20) {
-                return null;
-            }
-        }
-        return null;
-    }
-
-    /** Decompresses a classic LZW stream where each entry is a single UTF-16 codepoint (literals 0-255, dictionary entries 256+). */
-    private final String lzwDecode(final String data) throws PluginException {
-        if (data == null || data.length() == 0) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        final ArrayList<String> dict = new ArrayList<String>();
-        for (int i = 0; i < 256; i++) {
-            dict.add(String.valueOf((char) i));
-        }
-        String prev = dict.get(data.charAt(0));
-        final StringBuilder out = new StringBuilder();
-        out.append(prev);
-        for (int i = 1; i < data.length(); i++) {
-            final int code = data.charAt(i);
-            final String entry;
-            if (code < dict.size()) {
-                entry = dict.get(code);
-            } else if (code == dict.size()) {
-                entry = prev + prev.charAt(0);
-            } else {
-                /* Malformed LZW stream. */
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            out.append(entry);
-            dict.add(prev + entry.charAt(0));
-            prev = entry;
-        }
-        return out.toString();
-    }
-
-    /**
-     * Decodes a hex string into the string built from the resulting bytes (one char per byte); returns null on odd length or non-hex input.
-     */
     private final String hexDecode(final String hex) {
         if (hex == null || (hex.length() % 2) != 0) {
             return null;
@@ -348,6 +277,138 @@ public class VeevTo extends XFileSharingProBasic {
             sb.append((char) ((hi << 4) | lo));
         }
         return sb.toString();
+    }
+
+    // 1:1 Nachbildung von JS: a = function(j)
+    public static String a(Object[] j) {
+        StringBuilder k = new StringBuilder();
+        for (Object item : j) {
+            if (item instanceof String && item.equals("NaN")) {
+                k.append("%0NaN");
+            } else {
+                int i = (Integer) item;
+                String d = Integer.toHexString(i);
+                if (i < 16) {
+                    k.append("%0").append(d);
+                } else {
+                    k.append("%").append(d);
+                }
+            }
+        }
+        // Simuliert JS decodeURIComponent(k)
+        return jsDecodeURIComponent(k.toString());
+    }
+
+    // 1:1 Nachbildung von JS: p = function(j)
+    public static Object[] p(String j) {
+        List<Object> result = new ArrayList<Object>();
+        for (int d = 0; d < j.length(); d += 2) {
+            int end = Math.min(d + 2, j.length());
+            String sub = j.substring(d, end);
+            // Simuliert JS parseInt(sub, 16)
+            Integer parsed = jsParseIntHex(sub);
+            if (parsed == null) {
+                result.add("NaN"); // JS gibt NaN zurück
+            } else {
+                result.add(parsed);
+            }
+        }
+        return result.toArray();
+    }
+
+    // Emuliert exakt das JS parseInt(str, 16) Abbrech-Verhalten
+    private static Integer jsParseIntHex(String s) {
+        int result = 0;
+        boolean hasDigit = false;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            final int digit = Character.digit(c, 16);
+            if (digit != -1) {
+                result = result * 16 + digit;
+                hasDigit = true;
+            } else {
+                break; // JS stoppt beim ersten Nicht-Hex-Zeichen!
+            }
+        }
+        return hasDigit ? result : null; // null = NaN
+    }
+
+    // Simuliert JS decodeURIComponent, indem fehlerhafte Sequenzen (wie %0NaN) unberührt bleiben
+    private static String jsDecodeURIComponent(String encoded) {
+        final StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < encoded.length(); i++) {
+            final char c = encoded.charAt(i);
+            if (c == '%' && i + 2 < encoded.length()) {
+                final String hex = encoded.substring(i + 1, i + 3);
+                try {
+                    final int code = Integer.parseInt(hex, 16);
+                    sb.append((char) code);
+                    i += 2;
+                    continue;
+                } catch (NumberFormatException e) {
+                    // Falls z.B. %0N vorkommt, lässt JS es stehen
+                }
+            }
+            sb.append(c);
+        }
+        return sb.toString();
+    }
+
+    // 1:1 Nachbildung von JS: T = function(j)
+    public static String T(String j) {
+        return new StringBuilder(j).reverse().toString();
+    }
+
+    // 1:1 Nachbildung von JS: L = function(j, I)
+    public static String L(String j, List<Integer> I) {
+        String D = j;
+        for (int k = 0; k < I.size(); k++) {
+            if (1 == I.get(k)) {
+                D = T(D);
+            }
+            D = a(p(D)).replace("dXRmOA==", "");
+        }
+        return D;
+    }
+
+    public static String R(String j) {
+        if (j == null || j.isEmpty()) {
+            return "";
+        }
+        char[] k = j.toCharArray();
+        String C = String.valueOf(k[0]);
+        String M = C;
+        final List<String> U = new ArrayList<String>();
+        U.add(C);
+        // In JS: var D = { y: M + C }, y = 256
+        // 'y' war in JS ein Name/Literal, keine Variable!
+        final Map<Object, String> D = new HashMap<Object, String>();
+        D.put("y", M + C); // Key ist der String "y", NICHT 256!
+        int y = 256;
+        for (int G = 1; G < k.length; G++) {
+            int Y = k[G]; // JS: charCodeAt(0)
+            String I;
+            if (Y < 256) {
+                I = String.valueOf(k[G]);
+            } else if (D.containsKey(Y)) {
+                // Y ist ein Integer (z.B. 268) -> matcht NIE gegen den String-Key "y"!
+                I = D.get(Y);
+            } else {
+                // Deshalb sprang JS IMMER hierhin wenn Y >= 256 war!
+                I = M + C;
+            }
+            U.add(I);
+            C = String.valueOf(I.charAt(0));
+            // Erst hier wird der numerische Key 256, 257, ... gesetzt:
+            D.put(y, M + C);
+            y++;
+            M = I;
+        }
+        final StringBuilder result = new StringBuilder();
+        for (String s : U) {
+            result.append(s);
+        }
+        return result.toString();
     }
 
     @Override

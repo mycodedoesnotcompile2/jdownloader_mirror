@@ -30,6 +30,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.M3U8Playlist;
 import org.jdownloader.plugins.components.config.ArteMediathekConfig;
 import org.jdownloader.plugins.components.config.ArteMediathekConfig.FilenameSchemeType;
 import org.jdownloader.plugins.components.config.ArteMediathekConfig.LanguageSelectionMode;
@@ -58,7 +59,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.ArteTv;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 53324 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53356 $", interfaceVersion = 4, names = {}, urls = {})
 public class ArteMediathekV3 extends PluginForDecrypt {
     public ArteMediathekV3(PluginWrapper wrapper) {
         super(wrapper);
@@ -284,8 +285,20 @@ public class ArteMediathekV3 extends PluginForDecrypt {
             final String url = stream.get("url").toString();
             final Browser hls = brc.cloneBrowser();
             hls.getPage(url);
-            List<HlsContainer> qualities = HlsContainer.getHlsQualities(hls);
-            for (HlsContainer quality : qualities) {
+            final List<HlsContainer> qualities = HlsContainer.getHlsQualities(hls);
+            Boolean DRM_checked = null;
+            hlsQualities: for (HlsContainer quality : qualities) {
+                if (DRM_checked == null) {
+                    final Browser check = hls.cloneBrowser();
+                    check.getPage(quality.getStreamURL());
+                    final List<M3U8Playlist> m3u8 = M3U8Playlist.parseM3U8(check);
+                    if (m3u8.get(0).isEncrypted()) {
+                        DRM_checked = Boolean.TRUE;
+                        logger.info("skip HLS due to DRM protection:" + m3u8.get(0).getEncryptionMethod());
+                        break hlsQualities;
+                    }
+                    DRM_checked = Boolean.FALSE;
+                }
                 final StreamCodec streamCodec = quality.getCodecType(CODEC_TYPE.VIDEO);
                 if (streamCodec == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

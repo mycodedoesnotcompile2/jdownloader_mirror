@@ -33,6 +33,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
+import java.util.WeakHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -169,8 +170,48 @@ public abstract class Plugin implements ActionListener {
         }
     }
 
+    private static WeakHashMap<Plugin, Boolean> DEBUG_CONFIG         = new WeakHashMap<Plugin, Boolean>();
+    private final static boolean                DEBUG_CONFIG_ENABLED = LogController.getInstance().isDebugMode();
+
+    @Deprecated
+    public SubConfiguration getPluginConfig() {
+        final SubConfiguration ret = SubConfiguration.getConfig(getLazy().getDisplayName());
+        if (!DEBUG_CONFIG_ENABLED) {
+            return ret;
+        }
+        final boolean logConfigInterface;
+        synchronized (DEBUG_CONFIG) {
+            if (!DEBUG_CONFIG.containsKey(this)) {
+                DEBUG_CONFIG.put(this, Boolean.TRUE);
+                logConfigInterface = true;
+            } else {
+                logConfigInterface = false;
+            }
+        }
+        if (logConfigInterface) {
+            logger.info(JSonStorage.serializeToJson(ret.getProperties()));
+        }
+        return ret;
+    }
+
     public <T extends PluginConfigInterface> T get(Class<T> configInterface) {
-        return PluginJsonConfig.get(getLazy(), configInterface);
+        final T ret = PluginJsonConfig.get(getLazy(), configInterface);
+        if (!DEBUG_CONFIG_ENABLED) {
+            return ret;
+        }
+        final boolean logConfigInterface;
+        synchronized (DEBUG_CONFIG) {
+            if (!DEBUG_CONFIG.containsKey(this)) {
+                DEBUG_CONFIG.put(this, Boolean.TRUE);
+                logConfigInterface = true;
+            } else {
+                logConfigInterface = false;
+            }
+        }
+        if (logConfigInterface) {
+            logger.info(JSonStorage.serializeToJson(ret));
+        }
+        return ret;
     }
 
     public Browser createNewBrowserInstance() {
@@ -1155,13 +1196,6 @@ public abstract class Plugin implements ActionListener {
         cleanUpCaptchaFiles.addIfAbsent(dest);
         return dest;
     }
-
-    /**
-     * p gibt das interne properties objekt zurück indem die Plugineinstellungen gespeichert werden
-     *
-     * @return internes property objekt
-     */
-    public abstract SubConfiguration getPluginConfig();
 
     /**
      * Ein regulärer Ausdruck, der anzeigt, welche Links von diesem Plugin unterstützt werden

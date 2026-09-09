@@ -558,8 +558,12 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
      * @param res
      */
     protected void configure(HttpRequest request, HttpResponse response) {
+        if (response == null) {
+            // for example for EmptyRequestException, no HttpResponse instance available yet
+            return;
+        }
         response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_REQUEST_CONNECTION, "close"));
-        AbstractServerBasics server = getServer();
+        final AbstractServerBasics server = getServer();
         {
             String serverHeader = server.getResponseServerHeader();
             if (!StringUtils.isEmpty(serverHeader)) {

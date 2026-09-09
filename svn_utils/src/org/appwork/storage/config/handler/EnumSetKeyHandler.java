@@ -50,7 +50,7 @@ import org.appwork.utils.DebugMode;
  * @author Thomas
  *
  */
-public class EnumSetKeyHandler extends ObjectKeyHandler {
+public class EnumSetKeyHandler<T extends Enum<T>> extends ObjectKeyHandler<Set<T>> {
     public EnumSetKeyHandler(StorageHandler<?> storageHandler, String key, Type type) {
         super(storageHandler, key, type);
     }
@@ -64,7 +64,7 @@ public class EnumSetKeyHandler extends ObjectKeyHandler {
     protected void initDefaults() throws Throwable {
         final DefaultEnumArrayValue ann = this.getAnnotation(DefaultEnumArrayValue.class);
         if (ann != null) {
-            final List<Enum<?>> ret = new ArrayList<Enum<?>>();
+            final List<T> ret = new ArrayList<T>();
             for (final String value : ann.value()) {
                 try {
                     final int index = value.lastIndexOf(".");
@@ -73,23 +73,23 @@ public class EnumSetKeyHandler extends ObjectKeyHandler {
                     if (index == -1) {
                         name = value;
                         final ParameterizedType type = (ParameterizedType) getRawType();
-                        clazz = ((Class) type.getActualTypeArguments()[0]).getName();
+                        clazz = ((Class<T>) type.getActualTypeArguments()[0]).getName();
                     } else {
                         name = value.substring(index + 1);
                         clazz = value.substring(0, index);
                     }
-                    ret.add(Enum.valueOf((Class<Enum>) Class.forName(clazz), name));
+                    ret.add(Enum.valueOf((Class<T>) Class.forName(clazz), name));
                 } catch (Exception e) {
                     DebugMode.debugger(e);
                 }
             }
-            this.setDefaultValue(new CopyOnWriteArraySet<Enum<?>>(ret));
+            this.setDefaultValue(new CopyOnWriteArraySet<T>(ret));
             return;
         }
         if (getAnnotation(DefaultOnNull.class) != null) {
             final ParameterizedType type = (ParameterizedType) getRawType();
-            final Class enumClass = (Class) type.getActualTypeArguments()[0];
-            final Set<Object> defaultValue = new CopyOnWriteArraySet<Object>(Arrays.asList(enumClass.getEnumConstants()));
+            final Class<T> enumClass = (Class<T>) type.getActualTypeArguments()[0];
+            final Set<T> defaultValue = new CopyOnWriteArraySet<T>(Arrays.asList(enumClass.getEnumConstants()));
             this.setDefaultValue(defaultValue);
             return;
         }

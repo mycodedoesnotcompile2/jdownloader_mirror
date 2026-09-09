@@ -4345,6 +4345,39 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Ask me" })
     String ask();
 
+    @Default(lngs = { "en" }, values = { "Filename is too long" })
+    String IfFilenameTooLongDialog_title();
+
+    @Default(lngs = { "en" }, values = { "The filename is too long to be saved on your filesystem.\r\nHow would you like to proceed?" })
+    String IfFilenameTooLongDialog_message();
+
+    @Default(lngs = { "en" }, values = { "Tip: You can define your own filename auto cleanup regexes via filenametoolongregexreplacemap in the advanced settings." })
+    String IfFilenameTooLongDialog_regex_replace_hint();
+
+    @Default(lngs = { "en" }, values = { "Current filename:" })
+    String IfFilenameTooLongDialog_current_filename();
+
+    @Default(lngs = { "en" }, values = { "Auto shortened filename:" })
+    String IfFilenameTooLongDialog_auto_shortened_filename();
+
+    @Default(lngs = { "en" }, values = { "Custom shortened filename:" })
+    String IfFilenameTooLongDialog_custom_shortened_filename();
+
+    @Default(lngs = { "en" }, values = { "Use auto shortened filename" })
+    String IfFilenameTooLongDialog_use_auto_shortened_filename();
+
+    @Default(lngs = { "en" }, values = { "Use custom filename" })
+    String IfFilenameTooLongDialog_use_custom_filename();
+
+    @Default(lngs = { "en" }, values = { "Filesize:" })
+    String IfFilenameTooLongDialog_filesize();
+
+    @Default(lngs = { "en" }, values = { "Do not ask again" })
+    String IfFilenameTooLongDialog_do_not_ask_again();
+
+    @Default(lngs = { "en" }, values = { "Characters left: %s1/%s2" })
+    String IfFilenameTooLongDialog_characters_left(String charactersLeft, String maxCharacters);
+
     @Default(lngs = { "en" }, values = { "merge YouTube® Audio & Video streams" })
     String YoutubeDash_handleDownload_youtube_dash();
 

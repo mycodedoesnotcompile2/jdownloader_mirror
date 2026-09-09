@@ -59,7 +59,7 @@ public class FilePathCheckerTest extends AWTest {
                 /* Invalid path */
                 final File testInvalidFilePath = new File(testBasePath, "invalid:folder_because_of_invalid_char_colon");
                 CLEANUP.add(testInvalidFilePath);
-                testFolderCreationFail(testInvalidFilePath, new BadFilePathException(testInvalidFilePath, BadFilePathException.PathFailureReason.PERMISSION_PROBLEM));
+                testFolderCreationFail(testInvalidFilePath, new BadFilePathException(testInvalidFilePath, BadFilePathException.PathFailureReason.PERMISSION_PROBLEM_FOLDER));
                 /*
                  * Windows invalid path due to permission issue. If this test fails, application might have been started with admin
                  * permissions.
@@ -69,7 +69,7 @@ public class FilePathCheckerTest extends AWTest {
                     // TODO: Fix this test
                     final File testPermissionIssue = new File(testBasePathNoWrite, "we_cant_write_this_subfolder");
                     CLEANUP.add(testPermissionIssue);
-                    testFolderCreationFail(testPermissionIssue, new BadFilePathException(testPermissionIssue, BadFilePathException.PathFailureReason.PERMISSION_PROBLEM));
+                    testFolderCreationFail(testPermissionIssue, new BadFilePathException(testPermissionIssue, BadFilePathException.PathFailureReason.PERMISSION_PROBLEM_FOLDER));
                 }
                 /********************************************************************/
                 /* File tests */

@@ -775,12 +775,6 @@ public abstract class PluginForHost extends Plugin {
         return super.getLogger();
     }
 
-    @Override
-    @Deprecated
-    public SubConfiguration getPluginConfig() {
-        return SubConfiguration.getConfig(lazyP.getHost());
-    }
-
     protected PluginConfigPanelNG createConfigPanel() {
         boolean hasConfigPanel = getConfigInterface() != null;
         hasConfigPanel |= isPremiumEnabled() && getAccountConfigInterface(null) != null;
@@ -2472,24 +2466,25 @@ public abstract class PluginForHost extends Plugin {
                         @Override
                         public void execute(DownloadSession currentSession) {
                             final SingleDownloadController con = downloadLink.getDownloadLinkController();
-                            if (con == null) {
-                                updateDownloadLink(checkableLink, url);
+                            final DownloadWatchDogJob updateDownloadLinkJob = new DownloadWatchDogJob() {
+                                @Override
+                                public void execute(DownloadSession currentSession) {
+                                    updateDownloadLink(checkableLink, url);
+                                }
+
+                                @Override
+                                public void interrupt() {
+                                }
+
+                                @Override
+                                public boolean isHighPriority() {
+                                    return false;
+                                }
+                            };
+                            if (con == null || !con.isAlive()) {
+                                updateDownloadLinkJob.execute(currentSession);
                             } else {
-                                con.getJobsAfterDetach().add(new DownloadWatchDogJob() {
-                                    @Override
-                                    public void execute(DownloadSession currentSession) {
-                                        updateDownloadLink(checkableLink, url);
-                                    }
-
-                                    @Override
-                                    public void interrupt() {
-                                    }
-
-                                    @Override
-                                    public boolean isHighPriority() {
-                                        return false;
-                                    }
-                                });
+                                con.getJobsAfterDetach().add(updateDownloadLinkJob);
                             }
                         }
                     });

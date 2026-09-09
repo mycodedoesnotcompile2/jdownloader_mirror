@@ -60,7 +60,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.PornHubCom;
 
-@DecrypterPlugin(revision = "$Revision: 53209 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53356 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornHubComVideoCrawler extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public PornHubComVideoCrawler(PluginWrapper wrapper) {
@@ -845,6 +845,7 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
         ensureInitHosterplugin();
         String contenturl = getCorrectedContentURL(param.getCryptedUrl());
         this.hostplugin.getFirstPageWithAccount(hostplugin, account, contenturl);
+        this.hostplugin.getFirstPageWithAccount(hostplugin, account, contenturl);// twice to get working hls links (with hdl/hash/...query)
         handleErrorsAndCaptcha(this.br, account);
         if (PornHubCom.isOffline(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

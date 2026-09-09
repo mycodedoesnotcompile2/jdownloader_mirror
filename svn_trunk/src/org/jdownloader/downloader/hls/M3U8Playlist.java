@@ -6,13 +6,13 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
-import jd.http.Browser;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.downloader.hls.M3U8Playlist.M3U8Segment.X_KEY_METHOD;
+
+import jd.http.Browser;
 
 public class M3U8Playlist {
     public static class M3U8Segment {
@@ -542,6 +542,10 @@ public class M3U8Playlist {
                 map.remove(url);
             }
         }
+    }
+
+    public boolean isEncrypted() {
+        return getEncryptionMethod().isEncrypted();
     }
 
     public int addSegment(M3U8Segment segment) {

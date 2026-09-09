@@ -43,6 +43,7 @@ import org.appwork.utils.net.httpserver.AbstractServerBasics;
 import org.appwork.utils.net.httpserver.ContentSecurityPolicy;
 import org.appwork.utils.net.httpserver.CorsHandler;
 import org.appwork.utils.net.httpserver.HeaderValidationRules;
+import org.appwork.utils.net.httpserver.OriginRule;
 import org.appwork.utils.net.httpserver.ReferrerPolicy;
 import org.appwork.utils.net.httpserver.ResponseSecurityHeaders;
 import org.appwork.utils.net.httpserver.XContentTypeOptions;
@@ -51,6 +52,7 @@ import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.appwork.utils.swing.dialog.DialogNoAnswerException;
+import org.bouncycastle.tls.TlsFatalAlertReceived;
 import org.bouncycastle.tls.TlsNoCloseNotifyException;
 import org.jdownloader.api.RemoteAPIConfig;
 import org.jdownloader.api.RemoteAPIController;
@@ -135,7 +137,11 @@ public class MyJDownloaderController extends AbstractServerBasics implements Shu
 
     @Override
     public boolean onException(Throwable e, HttpRequest request, HttpResponse response) throws IOException {
-        if (Exceptions.containsInstanceOf(e, SocketException.class, TlsNoCloseNotifyException.class)) {
+        final TlsFatalAlertReceived tlsFatalAlertReceived = Exceptions.getInstanceof(e, TlsFatalAlertReceived.class);
+        if (tlsFatalAlertReceived != null && tlsFatalAlertReceived.getAlertDescription() == 42) {
+            // bad_certificate(42)
+            return true;
+        } else if (Exceptions.containsInstanceOf(e, SocketException.class, TlsNoCloseNotifyException.class)) {
             // TLS socket already closed
             return true;
         } else {
@@ -252,6 +258,7 @@ public class MyJDownloaderController extends AbstractServerBasics implements Shu
                 setAllowMethods(RequestMethod.GET, RequestMethod.POST, RequestMethod.OPTIONS);
                 setAllowHeadersFromRequest(true);
                 addPrivateNetworkRequestRule(Pattern.compile(".*"), true);
+                setAllowedOrigins(new OriginRule("*"));
             }
 
             @Override

@@ -49,7 +49,7 @@ import org.appwork.storage.config.defaults.AbstractDefaultFactory;
  * @author Thomas
  *
  */
-public class EnumKeyHandler extends KeyHandler<Enum> {
+public class EnumKeyHandler<T extends Enum<T>> extends KeyHandler<T> {
     /**
      * @param storageHandler
      * @param key
@@ -65,7 +65,7 @@ public class EnumKeyHandler extends KeyHandler<Enum> {
 
     @Override
     @SuppressWarnings("rawtypes")
-    public Enum getDefaultValue() {
+    public T getDefaultValue() {
         if (getDefaultFactoryAnnotation() != null) {
             // dynamic
             return readDefaultValue();
@@ -85,26 +85,26 @@ public class EnumKeyHandler extends KeyHandler<Enum> {
         }
     }
 
-    protected Enum readDefaultValue() {
+    protected T readDefaultValue() {
         try {
             final DefaultFactory df = getDefaultFactoryAnnotation();
             if (df != null) {
                 // dynamic
-                final AbstractDefaultFactory<Enum> defaultFactory = (AbstractDefaultFactory<Enum>) df.value().newInstance();
-                Enum defaultValue = defaultFactory.getDefaultValue(this);
-                defaultValue = (Enum) storageHandler.runDefaultValueFactory(this, defaultValue);
+                final AbstractDefaultFactory<T> defaultFactory = (AbstractDefaultFactory<T>) df.value().newInstance();
+                T defaultValue = defaultFactory.getDefaultValue(this);
+                defaultValue = (T) storageHandler.runDefaultValueFactory(this, defaultValue);
                 defaultValue = applyCustomValueGetter(defaultValue);
                 return defaultValue;
             } else if (isFactoryDefaultValueSet()) {
-                final Enum defaultValue = accessDefaultValue();
+                final T defaultValue = accessDefaultValue();
                 return defaultValue;
             }
             final DefaultJsonObject defaultJson = this.getAnnotation(DefaultJsonObject.class);
             if (defaultJson != null) {
                 // static
-                Enum defaultValue = JSonStorage.restoreFromString(defaultJson.value(), new TypeRef<Enum>(this.getRawClass()) {
+                T defaultValue = JSonStorage.restoreFromString(defaultJson.value(), new TypeRef<T>(this.getRawClass()) {
                 }, null);
-                defaultValue = (Enum) storageHandler.runDefaultValueFactory(this, defaultValue);
+                defaultValue = (T) storageHandler.runDefaultValueFactory(this, defaultValue);
                 defaultValue = applyCustomValueGetter(defaultValue);
                 setFactoryDefaultValue(defaultValue);
                 return defaultValue;
@@ -113,8 +113,8 @@ public class EnumKeyHandler extends KeyHandler<Enum> {
             if (ann != null) {
                 // static
                 try {
-                    Enum defaultValue = Enum.valueOf(this.getRawClass(), ann.value());
-                    defaultValue = (Enum) storageHandler.runDefaultValueFactory(this, defaultValue);
+                    T defaultValue = Enum.valueOf(this.getRawClass(), ann.value());
+                    defaultValue = (T) storageHandler.runDefaultValueFactory(this, defaultValue);
                     defaultValue = applyCustomValueGetter(defaultValue);
                     setFactoryDefaultValue(defaultValue);
                     return defaultValue;
@@ -123,8 +123,8 @@ public class EnumKeyHandler extends KeyHandler<Enum> {
                 }
             }
             // static
-            Enum defaultValue = this.getRawClass().getEnumConstants()[0];
-            defaultValue = (Enum) storageHandler.runDefaultValueFactory(this, defaultValue);
+            T defaultValue = this.getRawClass().getEnumConstants()[0];
+            defaultValue = (T) storageHandler.runDefaultValueFactory(this, defaultValue);
             defaultValue = applyCustomValueGetter(defaultValue);
             setFactoryDefaultValue(defaultValue);
             return defaultValue;
@@ -133,17 +133,18 @@ public class EnumKeyHandler extends KeyHandler<Enum> {
         }
     }
 
-    public Enum[] values() {
-        final List<Enum> ret = new ArrayList<Enum>();
+    public T[] values() {
+        final List<T> ret = new ArrayList<T>();
         for (final Object e : getRawClass().getEnumConstants()) {
-            ret.add((Enum) e);
+            ret.add((T) e);
         }
-        return ret.toArray(new Enum[0]);
+        final T[] array = (T[]) java.lang.reflect.Array.newInstance(getRawClass(), ret.size());
+        return ret.toArray(array);
     }
 
     @Override
     protected void initDefaults() throws Throwable {
-        final Enum defaultValue = readDefaultValue();
+        final T defaultValue = readDefaultValue();
         setDefaultValue(defaultValue);
     }
 

@@ -13,6 +13,14 @@ import javax.swing.JTextField;
 import javax.swing.JTextPane;
 import javax.swing.event.DocumentEvent;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.Storage;
+import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.swing.EDTRunner;
+import org.appwork.utils.swing.TextComponentChangeListener;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.images.AbstractIcon;
+
 import jd.config.SubConfiguration;
 import jd.controlling.reconnect.ReconnectException;
 import jd.controlling.reconnect.ReconnectInvoker;
@@ -23,28 +31,20 @@ import jd.gui.swing.components.ComboBrowseFile;
 import jd.utils.JDUtilities;
 import net.miginfocom.swing.MigLayout;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.Storage;
-import org.appwork.utils.os.CrossSystem;
-import org.appwork.utils.swing.EDTRunner;
-import org.appwork.utils.swing.TextComponentChangeListener;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.images.AbstractIcon;
-
 /**
  * Plugin to use an extern tool for reconnection
  */
 public class ExternBatchReconnectPlugin extends RouterPlugin implements ActionListener {
-    private static final String BATCH_TEXT              = "BATCH_COMMAND";
-    private static final String TERMINAL_COMMAND        = "TERMINAL";
-    private static final String EXECUTE_IN              = "EXECUTE_IN";
-    private static final String WAIT_FOR_RETURN_SECONDS = "WAIT_FOR_RETURN_SECONDS";
-    public static final String  ID                      = "ExternBatchReconnect";
-    private JTextField          txtCommand;
-    private ComboBrowseFile     browse;
-    private JTextPane           txtBatch;
-    private Icon                icon;
-    private ReconnectInvoker    invoker;
+    private static final String    BATCH_TEXT              = "BATCH_COMMAND";
+    private static final String    TERMINAL_COMMAND        = "TERMINAL";
+    private static final String    EXECUTE_IN              = "EXECUTE_IN";
+    private static final String    WAIT_FOR_RETURN_SECONDS = "WAIT_FOR_RETURN_SECONDS";
+    public static final String     ID                      = "ExternBatchReconnect";
+    private JTextField             txtCommand;
+    private ComboBrowseFile        browse;
+    private JTextPane              txtBatch;
+    private final Icon             icon;
+    private final ReconnectInvoker invoker;
 
     public ExternBatchReconnectPlugin() {
         super();
