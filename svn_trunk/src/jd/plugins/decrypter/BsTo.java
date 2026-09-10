@@ -44,7 +44,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 53094 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53368 $", interfaceVersion = 2, names = {}, urls = {})
 public class BsTo extends PluginForDecrypt {
     public BsTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -101,10 +101,8 @@ public class BsTo extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         String contenturl = param.getCryptedUrl();
         final String addedLinkDomain = Browser.getHost(contenturl, true);
-        String domainToUse = addedLinkDomain;
         if (getDeadDomains().contains(addedLinkDomain)) {
-            domainToUse = this.getHost();
-            contenturl = contenturl.replaceFirst(Pattern.quote(addedLinkDomain), domainToUse);
+            contenturl = contenturl.replaceFirst(Pattern.quote(addedLinkDomain), this.getHost());
         }
         if (contenturl.matches("(?i)https?://[^/]+/out.*")) {
             /* 2022-02-01: Old single link(?) */

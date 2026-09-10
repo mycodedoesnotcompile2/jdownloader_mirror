@@ -8,6 +8,7 @@ import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
+import java.io.File;
 
 import javax.swing.ButtonGroup;
 import javax.swing.JCheckBox;
@@ -51,7 +52,7 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongDia
                 return _GUI.T.skip_file();
             }
         },
-        RENAME_FILE() {
+        AUTO_RENAME() {
             @Override
             public String getLabel() {
                 return _GUI.T.too_long_filename_use_shortened_filename();
@@ -97,9 +98,17 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongDia
     private JRadioButton            useAutoShortened;
     private JRadioButton            useCustom;
     private JCheckBox               rememberForPackage;
+    /** "Don't ask again during this session" checkbox: remembers the decision session-wide (stored in the DownloadSession). */
+    private JCheckBox               dontAskAgainThisSession;
     private JTextField              textfieldFilenameNew;
     private FileNameField           customFilenameInput;
     private final JLabel            newFilenameCharactersLeft = new JLabel("");
+    /** Fully transparent color: used to "hide" the always-present warning text without changing the reserved layout space. */
+    private static final Color      TRANSPARENT_COLOR         = new Color(0, 0, 0, 0);
+    /** Non-blocking hint shown when the currently chosen (shortened) filename already exists in the download folder. */
+    private final JLabel            filenameExistsWarning     = new JLabel("");
+    /** Download folder the chosen filename would be written into; used to check whether that filename already exists. */
+    private final File              targetFolder;
     private final String            packageID;
     private final DownloadLink      downloadLink;
     private final String            autoShortenedFilename;
@@ -112,6 +121,7 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongDia
         this.singleItemPackage = link.getFilePackage().size() == 1;
         this.packageID = link.getFilePackage().getPackageKey();
         this.path = link.getFileOutput();
+        this.targetFolder = new File(this.path).getParentFile();
         this.downloadLink = link;
         this.parsedOriginalFilename = originalFilenameParsed;
         autoShortenedFilename = autoShortenedFilenameSuggestion;
@@ -143,18 +153,18 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongDia
      * {@link #isDontShowAgainSelected()} return false regardless of their checked state. The "Do not ask again" checkbox keeps its checked
      * state (it is only disabled), while the per-package checkbox is additionally unchecked. For all other options the checkboxes stay
      * enabled.</br>
-     * Exception: for a single-item package the "Remember selection for this Package" checkbox is always shown checked and greyed out
-     * (disabled), regardless of the selected option, because the decision trivially covers the whole package (its only item).
+     * Exception: for a single-item package the "Remember selection for this Package" checkbox is meaningless, so it is shown deselected and
+     * greyed out (disabled), regardless of the selected option.
      */
     private void updateDontShowAgainVisibility() {
         final boolean customSelected = this.useCustom != null && this.useCustom.isSelected();
+        final boolean dontShowAgainSelected = this.dontshowagain != null && this.dontshowagain.isSelected();
         if (this.rememberForPackage != null) {
             if (singleItemPackage) {
                 /*
-                 * Single-item package: "Remember selection for this Package" is meaningless to toggle -> show it checked and disabled as a
-                 * purely informational hint that the decision applies to the whole (one-item) package.
+                 * Single-item package: "Remember selection for this Package" is meaningless to toggle -> show it deselected and disabled.
                  */
-                this.rememberForPackage.setSelected(true);
+                this.rememberForPackage.setSelected(false);
                 this.rememberForPackage.setEnabled(false);
             } else {
                 if (customSelected) {
@@ -163,11 +173,12 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongDia
                 }
                 this.rememberForPackage.setEnabled(!customSelected);
             }
-            final java.awt.Container parent = this.rememberForPackage.getParent();
-            if (parent != null) {
-                parent.revalidate();
-                parent.repaint();
-            }
+            refreshCheckboxParent(this.rememberForPackage);
+        }
+        if (this.dontAskAgainThisSession != null) {
+            /* Disabled (and thus reporting false) while a custom filename or the global "do not show again" option is selected. */
+            this.dontAskAgainThisSession.setEnabled(!customSelected && !dontShowAgainSelected);
+            refreshCheckboxParent(this.dontAskAgainThisSession);
         }
         if (this.dontshowagain != null) {
             /*
@@ -176,21 +187,34 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongDia
              * already reports false and thus prevents storing auto-rename as the global default while a custom filename is selected.
              */
             this.dontshowagain.setEnabled(!customSelected);
-            final java.awt.Container parent = this.dontshowagain.getParent();
-            if (parent != null) {
-                parent.revalidate();
-                parent.repaint();
-            }
+            refreshCheckboxParent(this.dontshowagain);
+        }
+    }
+
+    private static void refreshCheckboxParent(final java.awt.Component component) {
+        final java.awt.Container parent = component.getParent();
+        if (parent != null) {
+            parent.revalidate();
+            parent.repaint();
         }
     }
 
     /**
      * The framework creates the "Do not ask again" checkbox only here (after {@link #layoutDialogContent()}), so re-apply the
-     * enabled/checked state of both checkboxes as soon as it exists.
+     * enabled/checked state of all checkboxes as soon as it exists. Toggling the framework checkbox also has to refresh the session
+     * checkbox, so hook a listener onto it.
      */
     @Override
     protected void initDoNotShowAgainCheckbox(final MigPanel bottom) {
         super.initDoNotShowAgainCheckbox(bottom);
+        if (this.dontshowagain != null) {
+            this.dontshowagain.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    updateDontShowAgainVisibility();
+                    stopTimer();
+                }
+            });
+        }
         updateDontShowAgainVisibility();
     }
 
@@ -210,9 +234,13 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongDia
         if (okButton != null) {
             okButton.removeFocusListener(this);
             if (!okButton.isEnabled()) {
-                /* Validation not passed aka user has entered bad "shortened" filename. */
+                /* Validation not passed aka user has entered bad "shortened" filename -> do not remember this as the last choice. */
                 return IfFilenameTooLongAction.SKIP_FILE;
             }
+        }
+        /* Remember the last choice for pre-selection next time. */
+        if (result != null) {
+            CFG_GUI.CFG.setLastIfFilenameTooLong(result);
         }
         return result;
     }
@@ -262,6 +290,13 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongDia
         this.textfieldFilenameNew = this.customFilenameInput.getNameField();
         p.add(this.customFilenameInput, textfieldConstraints);
         p.add(SwingUtils.toBold(newFilenameCharactersLeft));
+        /*
+         * Keep the warning text present at all times so its space (width and height) is reserved permanently; updateFilenameExistsWarning()
+         * only toggles the color (red vs. transparent), so showing/hiding the warning never changes the dialog dimensions.
+         */
+        filenameExistsWarning.setText(_GUI.T.IfFilenameTooLongDialog_filename_already_exists());
+        filenameExistsWarning.setForeground(TRANSPARENT_COLOR);
+        p.add(SwingUtils.toBold(filenameExistsWarning));
         updateNewFilenameCharactersLeftTextAndColor();
         p.add(SwingUtils.toBold(new JLabel(_GUI.T.IfFilenameTooLongDialog_filesize())), "split 2,sg 1");
         final SIZEUNIT maxSizeUnit = CFG_GUI.MAX_SIZE_UNIT.getValue();
@@ -269,31 +304,29 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongDia
         /* A negative value means the filesize is unknown and must be displayed as "~", not as an absolute byte value. */
         p.add(new JLabel(SIZEUNIT.formatValue(maxSizeUnit.toNonNegativeUnit(), bytesTotal)));
         p.add(SwingUtils.toBold(new JLabel(_GUI.T.IfFileExistsDialog_layoutDialogContent_package())), "split 2,sg 1");
-        final JTextField textfieldPackagename = new JTextField(packagename);
-        textfieldPackagename.setEditable(false);
-        p.add(textfieldPackagename, textfieldConstraints);
+        p.add(new PackageNameField(packagename), textfieldConstraints);
         p.add(SwingUtils.toBold(new JLabel(_GUI.T.IfFileExistsDialog_layoutDialogContent_hoster())), "split 2,sg 1");
         p.add(new JLabel(downloadLink.getDomainInfo().getTld()));
         // Group the radio buttons.
         final ButtonGroup group = new ButtonGroup();
-        skip = new JRadioButton(_GUI.T.IfFileExistsDialog_layoutDialogContent_skip_());
+        skip = new JRadioButton(IfFilenameTooLongAction.SKIP_FILE.getLabel());
         skip.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 result = IfFilenameTooLongAction.SKIP_FILE;
                 updateNewFilenameCharactersLeftTextAndColor();
             }
         });
-        useAutoShortened = new JRadioButton(_GUI.T.IfFilenameTooLongDialog_use_auto_shortened_filename());
+        useAutoShortened = new JRadioButton(IfFilenameTooLongAction.AUTO_RENAME.getLabel());
         useAutoShortened.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                result = IfFilenameTooLongAction.RENAME_FILE;
+                result = IfFilenameTooLongAction.AUTO_RENAME;
                 updateNewFilenameCharactersLeftTextAndColor();
             }
         });
         useCustom = new JRadioButton(_GUI.T.IfFilenameTooLongDialog_use_custom_filename());
         useCustom.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                result = IfFilenameTooLongAction.RENAME_FILE;
+                result = IfFilenameTooLongAction.AUTO_RENAME;
                 updateNewFilenameCharactersLeftTextAndColor();
             }
         });
@@ -312,9 +345,34 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongDia
             }
         });
         p.add(rememberForPackage, "gapleft 10");
-        // Default selection: use auto shortened filename.
-        useAutoShortened.setSelected(true);
-        result = IfFilenameTooLongAction.RENAME_FILE;
+        // "Don't ask again during this session" remembers the chosen action session-wide (stored in the DownloadSession).
+        dontAskAgainThisSession = new JCheckBox(_GUI.T.dialog_dont_ask_again_this_session());
+        dontAskAgainThisSession.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                stopTimer();
+            }
+        });
+        p.add(dontAskAgainThisSession, "gapleft 10");
+        /*
+         * Default selection: the last action the user chose. A custom filename is per-file and is never remembered, so AUTO_RENAME maps to
+         * "use auto shortened filename". ASK_FOR_EACH_FILE must never be pre-selected as a result -> fall back to auto shortened.
+         */
+        IfFilenameTooLongAction lastAction = CFG_GUI.CFG.getLastIfFilenameTooLong();
+        if (lastAction == null || lastAction == IfFilenameTooLongAction.ASK_FOR_EACH_FILE) {
+            lastAction = IfFilenameTooLongAction.AUTO_RENAME;
+        }
+        switch (lastAction) {
+        case SKIP_FILE:
+            skip.setSelected(true);
+            result = IfFilenameTooLongAction.SKIP_FILE;
+            break;
+        case ASK_FOR_EACH_FILE:
+        case AUTO_RENAME:
+        default:
+            useAutoShortened.setSelected(true);
+            result = IfFilenameTooLongAction.AUTO_RENAME;
+            break;
+        }
         skip.addItemListener(userSelectionListener);
         useAutoShortened.addItemListener(userSelectionListener);
         useCustom.addItemListener(userSelectionListener);
@@ -338,6 +396,11 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongDia
             }
         });
         setTextFieldLimit(this.textfieldFilenameNew);
+        /*
+         * The default selection above (useAutoShortened) is set before the item listeners are attached, so it does not trigger an update.
+         * Refresh once here so the initial state (characters left and the "file already exists" hint) reflects the default selection.
+         */
+        updateNewFilenameCharactersLeftTextAndColor();
         return p;
     }
 
@@ -436,7 +499,7 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongDia
             return;
         }
         useCustom.setSelected(true);
-        result = IfFilenameTooLongAction.RENAME_FILE;
+        result = IfFilenameTooLongAction.AUTO_RENAME;
     }
 
     private void updateNewFilenameCharactersLeftTextAndColor() {
@@ -448,6 +511,29 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongDia
             newFilenameCharactersLeft.setForeground(Color.BLACK);
         }
         newFilenameCharactersLeft.setText(_GUI.T.IfFilenameTooLongDialog_characters_left(String.valueOf(charactersLeft), String.valueOf(maxCharacters)));
+        updateFilenameExistsWarning();
+    }
+
+    /**
+     * Shows a non-blocking warning when the currently chosen (shortened) filename already exists in the download folder. This is only a
+     * hint: an already existing filename may still be selected and confirmed - the "file already exists" handling downstream then applies
+     * the user's configured policy for that case.
+     */
+    private void updateFilenameExistsWarning() {
+        if (this.filenameExistsWarning == null) {
+            /* Called before the label exists (should not happen). */
+            return;
+        }
+        boolean exists = false;
+        if (this.result == IfFilenameTooLongAction.AUTO_RENAME && this.targetFolder != null) {
+            /* Only relevant when we are actually going to write a (shortened) file; irrelevant when the file is skipped. */
+            final String newFilename = getNewFilename();
+            if (newFilename != null && new File(this.targetFolder, newFilename).exists()) {
+                exists = true;
+            }
+        }
+        /* The text stays set at all times (space reserved); only the color toggles so the dialog dimensions never change. */
+        this.filenameExistsWarning.setForeground(exists ? Color.RED : TRANSPARENT_COLOR);
     }
 
     /** Returns true if user defined filename differs from the initially suggested auto shortened filename. */
@@ -469,6 +555,12 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongDia
          * isEnabled() ensures a custom (per-file) filename is never remembered for the whole package (checkbox is disabled in that case).
          */
         return this.rememberForPackage != null && this.rememberForPackage.isSelected() && this.rememberForPackage.isEnabled();
+    }
+
+    @Override
+    public boolean isDontAskAgainThisSessionSelected() {
+        /* isEnabled() ensures this returns false when a custom filename or the global "do not show again" option is selected. */
+        return this.dontAskAgainThisSession != null && this.dontAskAgainThisSession.isSelected() && this.dontAskAgainThisSession.isEnabled();
     }
 
     public String getFilePath() {
@@ -513,48 +605,5 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongDia
             name += ext;
         }
         return name;
-    }
-
-    /**
-     * Reusable filename display used for all filenames shown in this dialog: an (optionally editable) name field next to a read-only
-     * extension field. The name/extension split is derived via {@link ParsedFilename}; when there is no extension only the name field is
-     * shown. Whether the name field is editable (read-only) is controlled via the constructor, so the same component renders both the
-     * read-only display filenames and the user-editable custom filename.
-     */
-    private static class FileNameField extends MigPanel {
-        private final JTextField nameField;
-        private final JTextField extensionField;
-        private final String     extension;
-
-        private FileNameField(final String filename, final boolean nameEditable) {
-            this(new ParsedFilename(filename), nameEditable);
-        }
-
-        private FileNameField(final ParsedFilename filename, final boolean nameEditable) {
-            super("ins 0", "[grow,fill][]", "[]");
-            this.extension = filename.getExtensionAdvanced();
-            this.nameField = new JTextField(filename.getFilenameWithoutExtensionAdvanced());
-            this.nameField.setEditable(nameEditable);
-            add(this.nameField, "growx, pushx, wmin 100");
-            if (this.extension != null && this.extension.length() > 0) {
-                /* Extension is shown in its own field and is always read-only. */
-                this.extensionField = new JTextField(this.extension);
-                this.extensionField.setEditable(false);
-                /*
-                 * Long names otherwise squeeze the extension field down to near-zero width. Keep it between 4 and 10 characters wide
-                 * (approximated from the font's character width).
-                 */
-                final java.awt.FontMetrics fm = this.extensionField.getFontMetrics(this.extensionField.getFont());
-                final int charWidth = fm.charWidth('m');
-                final int horizontalPadding = 8;
-                add(this.extensionField, "wmin " + (charWidth * 4 + horizontalPadding) + ", wmax " + (charWidth * 10 + horizontalPadding));
-            } else {
-                this.extensionField = null;
-            }
-        }
-
-        private JTextField getNameField() {
-            return this.nameField;
-        }
     }
 }

@@ -1792,17 +1792,14 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Reconnect Setup is invalid. Check Settings!" })
     String ReconnectDialog_run_failed_not_setup_();
 
-    @Default(lngs = { "en" }, values = { "Skip file" })
-    String IfFileExistsDialog_layoutDialogContent_skip_();
-
-    @Default(lngs = { "en" }, values = { "Overwrite existing file" })
-    String IfFileExistsDialog_layoutDialogContent_overwrite_();
-
-    @Default(lngs = { "en" }, values = { "Rename file" })
-    String IfFileExistsDialog_layoutDialogContent_rename_();
-
     @Default(lngs = { "en" }, values = { "Remember selection for this Package" })
     String IfFileExistsDialog_getDontShowAgainLabelText_();
+
+    @Default(lngs = { "en" }, values = { "Do not ask again" })
+    String IfFileExistsDialog_do_not_ask_again();
+
+    @Default(lngs = { "en" }, values = { "Don't ask again during this session" })
+    String dialog_dont_ask_again_this_session();
 
     @Default(lngs = { "en" }, values = { "Enter Test Url..." })
     String PackagizerFilterRuleDialog_PackagizerFilterRuleDialog_test_help();
@@ -3706,6 +3703,12 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Filename:" })
     String IfFileExistsDialog_layoutDialogContent_filename();
 
+    @Default(lngs = { "en" }, values = { "Auto renamed filename:" })
+    String IfFileExistsDialog_auto_renamed_filename();
+
+    @Default(lngs = { "en" }, values = { "Custom filename:" })
+    String IfFileExistsDialog_custom_filename();
+
     @Default(lngs = { "en" }, values = { "Package:" })
     String IfFileExistsDialog_layoutDialogContent_package();
 
@@ -4321,25 +4324,25 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Are you sure you want to move %s1 packages and %s2 links to downloadlist?" })
     String ConfirmContextmenuAction_confirmation_dialog_text(int i1, int i2);
 
-    @Default(lngs = { "en" }, values = { "Skip File" })
+    @Default(lngs = { "en" }, values = { "Skip File & mark as skipped" })
     String OnSkipDueToAlreadyExistsAction_skip_file();
 
     @Default(lngs = { "en" }, values = { "Skip File & mark as finished" })
     String OnSkipDueToAlreadyExistsAction_mark_successful();
 
-    @Default(lngs = { "en" }, values = { "Skip File & mark as finished when file is mirror" })
+    @Default(lngs = { "en" }, values = { "Skip File & mark as finished if file is mirror" })
     String OnSkipDueToAlreadyExistsAction_mark_successful_mirror();
 
-    @Default(lngs = { "en" }, values = { "Skip the file" })
+    @Default(lngs = { "en" }, values = { "Skip file" })
     String skip_file();
 
-    @Default(lngs = { "en" }, values = { "Overwrite the file" })
+    @Default(lngs = { "en" }, values = { "Overwrite existing file" })
     String overwrite();
 
-    @Default(lngs = { "en" }, values = { "Auto-Rename the new File" })
+    @Default(lngs = { "en" }, values = { "Auto rename" })
     String auto_rename();
 
-    @Default(lngs = { "en" }, values = { "Use shortened filename" })
+    @Default(lngs = { "en" }, values = { "Use auto shortened filename" })
     String too_long_filename_use_shortened_filename();
 
     @Default(lngs = { "en" }, values = { "Ask me" })
@@ -4363,9 +4366,6 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Custom shortened filename:" })
     String IfFilenameTooLongDialog_custom_shortened_filename();
 
-    @Default(lngs = { "en" }, values = { "Use auto shortened filename" })
-    String IfFilenameTooLongDialog_use_auto_shortened_filename();
-
     @Default(lngs = { "en" }, values = { "Use custom filename" })
     String IfFilenameTooLongDialog_use_custom_filename();
 
@@ -4377,6 +4377,9 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Characters left: %s1/%s2" })
     String IfFilenameTooLongDialog_characters_left(String charactersLeft, String maxCharacters);
+
+    @Default(lngs = { "en" }, values = { "Warning: A file with this name already exists in the download folder." })
+    String IfFilenameTooLongDialog_filename_already_exists();
 
     @Default(lngs = { "en" }, values = { "merge YouTube® Audio & Video streams" })
     String YoutubeDash_handleDownload_youtube_dash();

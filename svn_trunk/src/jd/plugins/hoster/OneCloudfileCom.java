@@ -18,11 +18,8 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
-
+import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.YetiShareCore;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -31,7 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51106 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53368 $", interfaceVersion = 2, names = {}, urls = {})
 public class OneCloudfileCom extends YetiShareCore {
     public OneCloudfileCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -95,27 +92,60 @@ public class OneCloudfileCom extends YetiShareCore {
 
     @Override
     protected String getContinueLink(final Browser br) throws Exception {
-        /* 2023-12-06: Similar for: 1cloudfile.com, bowfile.com, koramaup.com */
-        final String jsFunc = br.getRegex("(function getNextDownloadPageLink\\(crl, btnText\\).*?\\s+\\})\\s+").getMatch(0);
-        final String jsCall = br.getRegex("(getNextDownloadPageLink\\(\".*?\\))\n").getMatch(0);
-        if (jsFunc != null && jsCall != null) {
-            /* 2023-12-06: This doesn't work yet */
-            String result = null;
-            final StringBuilder sb = new StringBuilder();
-            sb.append(jsFunc);
-            sb.append("\nvar result = " + jsCall + ";");
-            // System.out.print(sb.toString());
-            final ScriptEngineManager manager = JavaScriptEngineFactory.getScriptEngineManager(this);
-            final ScriptEngine engine = manager.getEngineByName("javascript");
-            try {
-                engine.eval(sb.toString());
-                result = engine.get("result").toString();
-                return result;
-            } catch (final Exception e) {
-                e.printStackTrace();
+        /*
+         * 2026-09-09: The final download URL is embedded in the page as a single hex string that is XOR-encrypted with a single salt byte.
+         * Depending on the site version the browser decodes it either via an obfuscated JavaScript function (getNextDownloadPageLink ->
+         * W(salt, crl)) or via a WebAssembly module (release.wasm 'check' function), but in both cases the cipher is the same: every
+         * plaintext byte is XOR-ed with one salt byte that is the XOR-fold of the salt string's char codes. Since the plaintext always
+         * starts with "https://", the salt byte can be recovered from the first ciphertext byte, which lets us decode the URL ourselves
+         * without running any JavaScript/WASM. Similar for: 1cloudfile.com, bowfile.com, koramaup.com
+         */
+        final String[] hexCandidates = br.getRegex("\"([a-f0-9]{40,})\"").getColumn(0);
+        if (hexCandidates != null) {
+            for (final String hex : hexCandidates) {
+                final String decoded = decodeSingleByteXORHex(hex);
+                if (decoded != null && StringUtils.startsWithCaseInsensitive(decoded, "http")) {
+                    return decoded;
+                }
             }
         }
         return super.getContinueLink(br);
+    }
+
+    /**
+     * Decodes a hex string that is XOR-encrypted with a single salt byte. The salt byte is recovered from the fact that the plaintext
+     * always starts with the character 'h' (as in "https://..."). Returns null if the input is not valid even-length hex.
+     */
+    private String decodeSingleByteXORHex(final String hex) {
+        if (hex == null || hex.length() < 2 || hex.length() % 2 != 0) {
+            return null;
+        }
+        final int length = hex.length() / 2;
+        final byte[] bytes = new byte[length];
+        for (int i = 0; i < length; i++) {
+            final int hi = Character.digit(hex.charAt(i * 2), 16);
+            final int lo = Character.digit(hex.charAt(i * 2 + 1), 16);
+            if (hi == -1 || lo == -1) {
+                return null;
+            }
+            bytes[i] = (byte) ((hi << 4) | lo);
+        }
+        /* Recover the salt byte: firstPlaintextChar ('h') XOR firstCipherByte. */
+        final int salt = (bytes[0] & 0xff) ^ 'h';
+        final StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < length; i++) {
+            sb.append((char) ((bytes[i] & 0xff) ^ salt));
+        }
+        return sb.toString();
+    }
+
+    @Override
+    protected boolean isOfflineWebsite(final Browser br, final DownloadLink link) throws Exception {
+        if (br.containsHTML("triggerFreeDownload|>\\s*Direct URL")) {
+            /* 2026-09-09: Special */
+            return false;
+        }
+        return super.isOfflineWebsite(br, link);
     }
 
     @Override

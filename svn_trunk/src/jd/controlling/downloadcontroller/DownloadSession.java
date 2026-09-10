@@ -82,6 +82,9 @@ public class DownloadSession extends Property {
     private final WeakHashMap<DownloadLink, DownloadLinkCandidateHistory> candidateHistory           = new WeakHashMap<DownloadLink, DownloadLinkCandidateHistory>();
     private final WeakHashMap<UniqueAlltimeID, IfFileExistsAction>        fileExistsActions          = new WeakHashMap<UniqueAlltimeID, IfFileExistsAction>();
     private final WeakHashMap<UniqueAlltimeID, IfFilenameTooLongAction>   fileFilenameTooLongActions = new WeakHashMap<UniqueAlltimeID, IfFilenameTooLongAction>();
+    /** Session-wide "Don't ask again during this session" decisions (null = not set). */
+    private volatile IfFileExistsAction                                  sessionFileExistsAction    = null;
+    private volatile IfFilenameTooLongAction                             sessionFilenameTooLongAction = null;
     private final AtomicInteger                                           downloadsStarted           = new AtomicInteger(0);
     private final AtomicInteger                                           skipCounter                = new AtomicInteger(0);
     private volatile List<DownloadLink>                                   forcedLinks                = new CopyOnWriteArrayList<DownloadLink>();
@@ -762,6 +765,24 @@ public class DownloadSession extends Property {
         } else {
             fileFilenameTooLongActions.put(filePackage.getUniqueID(), action);
         }
+    }
+
+    /** Session-wide "Don't ask again during this session" decision for existing files; null when not set. */
+    public IfFileExistsAction getSessionOnFileExistsAction() {
+        return sessionFileExistsAction;
+    }
+
+    public void setSessionOnFileExistsAction(IfFileExistsAction action) {
+        this.sessionFileExistsAction = action;
+    }
+
+    /** Session-wide "Don't ask again during this session" decision for too long filenames; null when not set. */
+    public IfFilenameTooLongAction getSessionOnFilenameTooLongAction() {
+        return sessionFilenameTooLongAction;
+    }
+
+    public void setSessionOnFilenameTooLongAction(IfFilenameTooLongAction action) {
+        this.sessionFilenameTooLongAction = action;
     }
 
     public FileAccessManager getFileAccessManager() {

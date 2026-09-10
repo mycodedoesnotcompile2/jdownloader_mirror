@@ -6,6 +6,7 @@ import java.awt.event.ActionListener;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.io.File;
+import java.text.NumberFormat;
 
 import javax.swing.ButtonGroup;
 import javax.swing.JComponent;
@@ -13,9 +14,6 @@ import javax.swing.JLabel;
 import javax.swing.JRadioButton;
 import javax.swing.JSeparator;
 import javax.swing.JTextField;
-
-import jd.controlling.downloadcontroller.IfFileExistsDialogInterface;
-import jd.plugins.DownloadLink;
 
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtTextArea;
@@ -36,6 +34,9 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.downloads.table.DownloadsTableModel;
 import org.jdownloader.settings.IfFileExistsAction;
 import org.jdownloader.translate._JDT;
+
+import jd.controlling.downloadcontroller.IfFileExistsDialogInterface;
+import jd.plugins.DownloadLink;
 
 public class IfFileExistsDialog extends AbstractDialog<IfFileExistsAction> implements IfFileExistsDialogInterface, FocusListener {
     private final String       path;
@@ -134,34 +135,34 @@ public class IfFileExistsDialog extends AbstractDialog<IfFileExistsAction> imple
         if (item != null) {
             p.add(SwingUtils.toBold(new JLabel(_GUI.T.IfFileExistsDialog_layoutDialogContent_filesize2())), "sg 1");
             if (item.getSize() >= 0) {
-                p.add(new JLabel(SizeFormatter.formatBytes(item.getSize())));
+                p.add(new JLabel(SizeFormatter.formatBytes(NumberFormat.getInstance(), item.getSize())));
             } else {
                 p.add(new JLabel(_GUI.T.OriginFilter_toString_nothing()));
             }
         }
         p.add(SwingUtils.toBold(new JLabel(_GUI.T.IfFileExistsDialog_layoutDialogContent_filesize_existing())), "sg 1");
-        p.add(new JLabel(SizeFormatter.formatBytes(localFile.length())));
+        p.add(new JLabel(SizeFormatter.formatBytes(NumberFormat.getInstance(), localFile.length())));
         if (packagename != null) {
             p.add(SwingUtils.toBold(new JLabel(_GUI.T.IfFileExistsDialog_layoutDialogContent_package())), "sg 1");
             p.add(new JLabel(packagename));
         }
         p.add(SwingUtils.toBold(new JLabel(T.T.IfFileExistsDialog_layoutDialogContent_archive())), "sg 1");
         p.add(new JLabel(archive.getName()));
-        skip = new JRadioButton(_GUI.T.IfFileExistsDialog_layoutDialogContent_skip_());
+        skip = new JRadioButton(IfFileExistsAction.SKIP_FILE.getLabel());
         skip.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 result = IfFileExistsAction.SKIP_FILE;
                 newName.setEnabled(false);
             }
         });
-        overwrite = new JRadioButton(_GUI.T.IfFileExistsDialog_layoutDialogContent_overwrite_());
+        overwrite = new JRadioButton(IfFileExistsAction.OVERWRITE_FILE.getLabel());
         overwrite.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 result = IfFileExistsAction.OVERWRITE_FILE;
                 newName.setEnabled(false);
             }
         });
-        rename = new JRadioButton(_GUI.T.IfFileExistsDialog_layoutDialogContent_rename_());
+        rename = new JRadioButton(IfFileExistsAction.AUTO_RENAME.getLabel());
         rename.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 result = IfFileExistsAction.AUTO_RENAME;
@@ -204,6 +205,33 @@ public class IfFileExistsDialog extends AbstractDialog<IfFileExistsAction> imple
 
     public String getNewName() {
         return newName.getText();
+    }
+
+    @Override
+    public String getNewFilename() {
+        /* Only meaningful for the rename case; the field is created lazily in layoutDialogContent(). */
+        if (result == IfFileExistsAction.AUTO_RENAME && newName != null) {
+            return newName.getText();
+        }
+        return null;
+    }
+
+    @Override
+    public boolean isRememberForPackageSelected() {
+        /* No per-package "remember" option in the extraction dialog. */
+        return false;
+    }
+
+    @Override
+    public boolean isDontAskAgainThisSessionSelected() {
+        /* No "don't ask again during this session" option in the extraction dialog. */
+        return false;
+    }
+
+    @Override
+    public org.jdownloader.settings.GeneralSettings.OnSkipDueToAlreadyExistsAction getOnSkipDueToAlreadyExistsAction() {
+        /* No "on skip due to already exists" dropdown in the extraction dialog -> fall back to the global config value. */
+        return null;
     }
 
     public IfFileExistsAction getAction() {

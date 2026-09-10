@@ -14,9 +14,7 @@ import org.jdownloader.logging.LogController;
 import org.jdownloader.translate._JDT;
 import org.jdownloader.utils.JDFileUtils;
 
-import jd.controlling.downloadcontroller.BadDestinationException;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.PathTooLongException;
+import jd.controlling.downloadcontroller.FilePathChecker;
 
 public class FileCreationManager {
     public static enum DeleteOption implements LabelInterface {
@@ -67,7 +65,7 @@ public class FileCreationManager {
         logger = LogController.getInstance().getLogger(FileCreationManager.class.getName());
     }
 
-    public boolean mkdir(File folder) {
+    public boolean mkdir(final File folder) {
         if (folder.exists()) {
             return false;
         }
@@ -92,10 +90,10 @@ public class FileCreationManager {
 
     private boolean mkdirInternal(File file) {
         try {
-            DownloadWatchDog.getInstance().validateDestination(file);
-            return file.mkdir();
-        } catch (PathTooLongException e) {
-        } catch (BadDestinationException e) {
+            FilePathChecker.createFolderPath(file);
+            /* createFolderPath returns void (throws on failure); mirror mkdir()'s boolean by confirming the directory now exists. */
+            return file.isDirectory();
+        } catch (IOException e) {
         }
         return false;
     }

@@ -57,7 +57,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 53364 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53370 $", interfaceVersion = 3, names = {}, urls = {})
 public class SerienStreamTo extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public SerienStreamTo(final PluginWrapper wrapper) {
@@ -87,7 +87,7 @@ public class SerienStreamTo extends PluginForDecrypt {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "serienstream.to", "serienstream.sx", "s.to", "serienstream.ch", "serienstream.stream", "serienstream.cloud", "serien.sx", "serien.domains", "186.2.175.5" });
-        ret.add(new String[] { "aniworld.to" });
+        ret.add(new String[] { "aniworld.to", "aniworld.info" });
         return ret;
     }
 
@@ -102,6 +102,8 @@ public class SerienStreamTo extends PluginForDecrypt {
          */
         deadDomains.add("serienstream.cloud");
         deadDomains.add("serienstream.ch"); // also scam, redirects to .cloud domain
+        deadDomains.add("serienstream.stream"); // also scam, redirects to .cloud domain
+        deadDomains.add("aniworld.info"); // also scam
         return deadDomains;
     }
 
@@ -134,7 +136,7 @@ public class SerienStreamTo extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, final ProgressController progress) throws Exception {
         String contenturl = param.getCryptedUrl();
-        final String addedLinkDomain = Browser.getHost(contenturl, true);
+        final String addedLinkDomain = Browser.getHost(contenturl, false);
         if (getDeadDomains().contains(addedLinkDomain)) {
             contenturl = contenturl.replaceFirst(Pattern.quote(addedLinkDomain), this.getHost());
         }

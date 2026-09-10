@@ -68,7 +68,6 @@ import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.net.httpconnection.ProxyAuthException;
 import org.appwork.utils.net.httpconnection.ProxyConnectException;
 import org.appwork.utils.os.CrossSystem;
-import org.appwork.utils.os.CrossSystem.OperatingSystem;
 import org.appwork.utils.speedmeter.SpeedMeterInterface.Resolution;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.ExceptionDialog;
@@ -79,7 +78,6 @@ import org.jdownloader.controlling.FileCreationListener;
 import org.jdownloader.controlling.FileCreationManager;
 import org.jdownloader.controlling.FileCreationManager.DeleteOption;
 import org.jdownloader.controlling.Priority;
-import org.jdownloader.controlling.UniqueAlltimeID;
 import org.jdownloader.controlling.domainrules.DomainRuleController;
 import org.jdownloader.controlling.domainrules.event.DomainRuleControllerListener;
 import org.jdownloader.controlling.download.DownloadControllerListener;
@@ -107,6 +105,7 @@ import org.jdownloader.plugins.WaitingSkipReason.CAUSE;
 import org.jdownloader.plugins.controller.container.ContainerPluginController;
 import org.jdownloader.settings.CleanAfterDownloadAction;
 import org.jdownloader.settings.GeneralSettings;
+import org.jdownloader.settings.GeneralSettings.OnSkipDueToAlreadyExistsAction;
 import org.jdownloader.settings.IfFileExistsAction;
 import org.jdownloader.settings.MirrorDetectionDecision;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
@@ -128,6 +127,7 @@ import jd.controlling.downloadcontroller.DownloadLinkCandidateSelector.CachedAcc
 import jd.controlling.downloadcontroller.DownloadLinkCandidateSelector.DownloadLinkCandidatePermission;
 import jd.controlling.downloadcontroller.DownloadSession.STOPMARK;
 import jd.controlling.downloadcontroller.DownloadSession.SessionState;
+import jd.controlling.downloadcontroller.FilePathChecker.CheckFlag;
 import jd.controlling.downloadcontroller.IfFilenameTooLongDialog.IfFilenameTooLongAction;
 import jd.controlling.downloadcontroller.ProxyInfoHistory.WaitingSkipReasonContainer;
 import jd.controlling.downloadcontroller.event.DownloadWatchdogEvent;
@@ -712,82 +712,6 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
         return dsm;
     }
 
-    /** Throws Exception if given download destination looks to be invalid. */
-    public void validateDestination(final File file) throws BadDestinationException {
-        if (file.exists()) {
-            return;
-        }
-        File checking = null;
-        try {
-            String[] folders;
-            switch (CrossSystem.getOSFamily()) {
-            case LINUX:
-                folders = CrossSystem.getPathComponents(file);
-                if (folders.length >= 3) {
-                    final String userName = System.getProperty("user.name");
-                    if (folders.length >= 5 && "run".equals(folders[1]) && "media".equals(folders[2]) && folders[3].equals(userName)) {
-                        /* 0:/ | 1:run | 2:media | 3:user | 4:mounted volume */
-                        checking = new File("/run/media/" + userName + "/" + folders[4]);
-                    } else if ("media".equals(folders[1])) {
-                        /* 0:/ | 1:media | 2:mounted volume */
-                        checking = new File("/media/" + folders[2]);
-                    } else if ("mnt".equals(folders[1])) {
-                        /* 0:/ | 1:media | 2:mounted volume */
-                        checking = new File("/mnt/" + folders[2]);
-                    }
-                }
-                break;
-            case MAC:
-                folders = CrossSystem.getPathComponents(file);
-                if (folders.length >= 3) {
-                    if ("media".equals(folders[1])) {
-                        /* 0:/ | 1:media | 2:mounted volume */
-                        checking = new File("/media/" + folders[2]);
-                    } else if ("mnt".equals(folders[1])) {
-                        /* 0:/ | 1:media | 2:mounted volume */
-                        checking = new File("/mnt/" + folders[2]);
-                    } else if ("Volumes".equals(folders[1])) {
-                        /* 0:/ | 1:Volumes | 2:mounted volume */
-                        checking = new File("/Volumes/" + folders[2]);
-                    }
-                }
-                break;
-            case WINDOWS:
-            default:
-                if (CrossSystem.getOS().isMaximum(OperatingSystem.WINDOWS_NT) && file.getAbsolutePath().length() > 259) {
-                    // old windows API does not allow longer paths
-                    checking = file;
-                    throw new PathTooLongException(file);
-                } else {
-                    folders = CrossSystem.getPathComponents(file);
-                    if (folders.length > 0) {
-                        String root = folders[0];
-                        if (root.matches("^[a-zA-Z]{1}:\\\\$") || root.matches("^[a-zA-Z]{1}://$")) {
-                            /* X:/ or X:\ */
-                            checking = new File(folders[0]);
-                        } else if (root.equals("\\\\")) {
-                            if (folders.length >= 3) {
-                                /* \\\\computer\\folder\\ in network */
-                                checking = new File(folders[0] + folders[1] + "\\" + folders[2]);
-                            }
-                        }
-                    }
-                }
-            }
-            if (checking != null && checking.exists() && checking.isDirectory()) {
-                checking = null;
-            }
-        } catch (BadDestinationException e) {
-            throw e;
-        } catch (Throwable e) {
-            logger.log(e);
-        }
-        if (checking != null) {
-            logger.info("DownloadFolderRoot: " + checking + " for " + file + " is invalid! Missing or not a directory!");
-            throw new BadDestinationException(checking);
-        }
-    }
-
     private DownloadLinkCandidate next(final DownloadLinkCandidateSelector selector) {
         final DownloadSession currentSession = selector.getSession();
         final HashMap<String, Boolean> destinationValidationCache = new HashMap<String, Boolean>();
@@ -805,7 +729,7 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
             try {
                 final Boolean cachedValidationResult = destinationValidationCache.get(destination);
                 if (cachedValidationResult == null) {
-                    validateDestination(new File(destination));
+                    FilePathChecker.validatePath(new File(destination));
                     validationOk = true;
                 } else if (cachedValidationResult.booleanValue() == true) {
                     validationOk = true;
@@ -814,11 +738,21 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                         selector.addExcluded(candidate, new DownloadLinkCandidateResult(SkipReason.INVALID_DESTINATION, null, null));
                     }
                 }
-            } catch (PathTooLongException e) {
-                for (final DownloadLinkCandidate candidate : nextCandidates) {
-                    selector.addExcluded(candidate, new DownloadLinkCandidateResult(SkipReason.INVALID_DESTINATION_TOO_LONG_PATH, null, null));
+            } catch (final BadFilePathException e) {
+                final SkipReason skipReason;
+                switch (e.getReason()) {
+                case PATH_TOO_LONG:
+                    skipReason = SkipReason.INVALID_DESTINATION_TOO_LONG_PATH;
+                    break;
+                default:
+                    skipReason = SkipReason.INVALID_DESTINATION;
+                    break;
                 }
-            } catch (BadDestinationException e) {
+                for (final DownloadLinkCandidate candidate : nextCandidates) {
+                    selector.addExcluded(candidate, new DownloadLinkCandidateResult(skipReason, null, null));
+                }
+            } catch (final IOException e) {
+                /* e.g. canonicalization failure -> treat as invalid destination. */
                 for (final DownloadLinkCandidate candidate : nextCandidates) {
                     selector.addExcluded(candidate, new DownloadLinkCandidateResult(SkipReason.INVALID_DESTINATION, null, null));
                 }
@@ -827,7 +761,8 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
             }
             if (!validationOk) {
                 continue;
-            } else if (DISKSPACERESERVATIONRESULT.FAILED.equals(validateDiskFree(nextCandidates))) {
+            }
+            if (DISKSPACERESERVATIONRESULT.FAILED.equals(validateDiskFree(nextCandidates))) {
                 for (final DownloadLinkCandidate candidate : nextCandidates) {
                     selector.addExcluded(candidate, new DownloadLinkCandidateResult(SkipReason.DISK_FULL, null, null));
                 }
@@ -4154,9 +4089,41 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
     }
 
     /**
+     * EXPERIMENTAL test toggle: when enabled, long paths are assumed to be supported by the OS/JVM (e.g. Windows LongPathsEnabled together
+     * with a longPathAware runtime). The classic total MAX_PATH limit is then irrelevant and only the per-segment limit (255 characters per
+     * path component on NTFS) constrains the filename length. Set to false for the classic MAX_PATH (260) behaviour.
+     */
+    public static volatile boolean longWindowsPathsAllowed = true;
+
+    /**
+     * Builds a non-existing "jd_accessCheck_..." file inside the given folder whose name has exactly {@code targetNameLength} characters
+     * (but at least "jd_accessCheck_" + 4 random digits, regardless of {@code targetNameLength}). </br>
+     * The random digits both provide uniqueness and are used to pad the name to the requested length. </br>
+     * Used for the destination write-test: the test file is named differently from the real download file (so a test file that cannot be
+     * deleted right away does not collide with the real file later) but reproduces the same name length so that a too-long path/filename is
+     * still detected reliably.
+     */
+    private static File createAccessCheckFile(final File parentFolder, final int targetNameLength) {
+        final String prefix = "jd_accessCheck_";
+        /* At least 4 random digits, regardless of targetNameLength; otherwise use as many as needed to reach the requested length. */
+        int randomDigits = targetNameLength - prefix.length();
+        if (randomDigits < 4) {
+            randomDigits = 4;
+        }
+        final java.util.Random random = new java.util.Random();
+        final StringBuilder name = new StringBuilder(prefix.length() + randomDigits);
+        name.append(prefix);
+        for (int i = 0; i < randomDigits; i++) {
+            name.append(random.nextInt(10));
+        }
+        return new File(parentFolder, name.toString());
+    }
+
+    /**
      * Ensures that the file we are about to download can be written to the desired destination. </br>
      * This combines the former destination-write-check and too-long-filename handling into a single step: <br>
-     * 1. Create the directory tree up until the download folder (via {@link FilePathChecker#createFolderPath(File)}). <br>
+     * 1. Create the directory tree up until the download folder and perform a write-test on the target file (via
+     * {@link FilePathChecker#createFilePath(File, jd.controlling.downloadcontroller.FilePathChecker.CheckFlag...)}). <br>
      * 2. Verify that we are allowed to write into that folder (result cached via {@link #accessChecks}). <br>
      * 3. [Windows] Check for- and handle too long filenames (offer auto-shortening). <br>
      * Path/permission problems detected via {@link FilePathChecker} are raised as {@link BadFilePathException} and mapped to a
@@ -4168,20 +4135,55 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
          * this call may return an unsafe(not final) fileOutput, but it is the fileOutput we want to start with
          */
         final File fileOutput = controller.getFileOutput(false, true);
-        if (fileOutput.exists()) {
-            return;
-        }
-        /* File does not exist yet: Check- and prepare path and ensure we can write into the download folder. */
+        /* Check- and prepare path and ensure we can write into the download folder. */
         /* Create directory tree up until file. */
         final File parentFolder = fileOutput.getParentFile();
-        if (!accessChecks.contains(parentFolder.getAbsolutePath())) {
-            /* Ensure that all folders up until this point exist. */
-            FilePathChecker.createFolderPath(parentFolder);
-            final File writeTest = new File(fileOutput.getParentFile(), "jd_accessCheck_" + new UniqueAlltimeID().getID());
-            FilePathChecker.createFilePath(writeTest);
-            accessChecks.add(fileOutput.getParentFile().getAbsolutePath());
-            if (writeTest.exists()) {
-                /* Write-test succeeded but the test-file could not be deleted right away -> schedule a late deletion. */
+        final boolean isWindows = CrossSystem.isWindows();
+        if (!isWindows) {
+            /* Non Windows OS -> Trust cache since we do not expect issues due to long paths. */
+            if (accessChecks.contains(parentFolder.getAbsolutePath())) {
+                return;
+            }
+            if (fileOutput.exists()) {
+                return;
+            }
+        }
+        /**
+         * We are close to the finish line! </br>
+         * We know that we can write in the directory but can we write the specific file we want to write? </br>
+         * The filename could still be too long!
+         */
+        /**
+         * Determine the length of the longest filename the plugin could write (the final file or one of its process files, e.g. the .part
+         * file). We reproduce this worst-case name length in the write-test so that a too-long path/filename is detected reliably. <br>
+         * In most cases the longest name will be that of our temporary .part file.
+         */
+        int longestNameLength = fileOutput.getName().length();
+        final List<File> processFiles = downloadLink.getDefaultPlugin().listProcessFiles(downloadLink);
+        if (processFiles != null) {
+            for (final File file : processFiles) {
+                if (file.getName().length() > longestNameLength && !file.exists()) {
+                    longestNameLength = file.getName().length();
+                }
+            }
+        }
+        /*
+         * Perform the write-test with a file that is named differently from the real target file but has the same name length. This way a
+         * test file that (for whatever reason) could not be deleted right away does not collide with the real download file later on.
+         */
+        final File writeTest = createAccessCheckFile(parentFolder, longestNameLength);
+        final BadFilePathException bfpe;
+        try {
+            FilePathChecker.createFilePath(writeTest, new CheckFlag[] { CheckFlag.IS_FILE, CheckFlag.CHECK_FILE_WRITE, CheckFlag.CHECK_FILE_FOR_TOO_LONG_FILENAME, CheckFlag.ERROR_ON_WRITE_TEST_DELETION_FAILURE });
+            /* Write-test succeeded -> Update cache of valid/created folders. */
+            accessChecks.add(parentFolder.getAbsolutePath());
+            return;
+        } catch (final BadFilePathException e) {
+            if (e.getReason() == PathFailureReason.WRITE_TEST_DELETION_FAILURE) {
+                /*
+                 * Write-test succeeded but the test-file could not be deleted right away -> schedule a late deletion and ignore this
+                 * exception.
+                 */
                 controller.getJobsAfterDetach().add(new DownloadWatchDogJob() {
                     @Override
                     public void interrupt() {
@@ -4197,133 +4199,154 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                         return false;
                     }
                 });
+                /* Update cache of valid/created folders. */
+                accessChecks.add(parentFolder.getAbsolutePath());
+                return;
             }
+            bfpe = e;
         }
-        if (!CrossSystem.isWindows()) {
-            /* Too long path/filename handling below is only relevant for Windows systems. */
-            return;
+        if (bfpe.getReason() != PathFailureReason.PATH_SEGMENT_TOO_LONG) {
+            /* Something not related to the length of our filename happened -> Throw exception */
+            throw bfpe;
         }
-        /**
-         * We are close to the finish line! </br>
-         * We know that we can write in the directory but can we write the specific file we want to write? </br>
-         * The filename could still be too long!
-         */
-        File writeTest = fileOutput;
-        final List<File> processFiles = downloadLink.getDefaultPlugin().listProcessFiles(downloadLink);
-        if (processFiles != null) {
-            /*
-             * Get list of all possible files the related plugin could write and pick the longest one to perform our write-test. Typically
-             * this will be our temporary .part file.
-             */
-            int maxlen = fileOutput.getName().length();
-            for (final File file : processFiles) {
-                if (file.getName().length() > maxlen && !file.exists()) {
-                    maxlen = file.getName().length();
-                    writeTest = file;
-                }
-            }
+        if (!isWindows) {
+            throw bfpe;
         }
+        /* We know that the folder path has been created successfully and our problem is solely the file name. */
+        /* Update cache of valid/created folders. */
+        accessChecks.add(parentFolder.getAbsolutePath());
+        /* Looks like filename might be too long -> Check if writing a shortened filename would be possible. */
         final int maxPathLengthWindows = 259; // 260 but only 259 usable
-        try {
-            FilePathChecker.createFilePath(writeTest);
-        } catch (final BadFilePathException e) {
-            /* Looks like filename might be too long -> Check if writing a shortened filename would be possible. */
-            int maxFilenameLength = maxPathLengthWindows - fileOutput.getParentFile().getAbsolutePath().length();
-            final String filename = getFilename(controller);
-            if (fileOutput.getName().length() > filename.length()) {
+        final int maxSegmentLength = 255; // NTFS per-segment limit that applies when long paths are allowed
+        int maxFilenameLength;
+        if (longWindowsPathsAllowed) {
+            /* Long paths allowed -> the total path length is not the limit; only the per-segment limit applies to the filename. */
+            maxFilenameLength = maxSegmentLength;
+        } else {
+            /*
+             * Classic MAX_PATH -> the whole path must fit; -1 accounts for the path separator between the parent folder and the filename.
+             */
+            maxFilenameLength = maxPathLengthWindows - fileOutput.getParentFile().getAbsolutePath().length() - 1;
+        }
+        final String filename = getFilename(controller);
+        if (longestNameLength > filename.length()) {
+            /*
+             * The write-test was performed with the longest file the plugin could write (e.g. the .part file), which is longer than the
+             * filename -> the filename needs to be smaller to compensate for that.
+             */
+            maxFilenameLength = maxFilenameLength - (longestNameLength - filename.length());
+        }
+        final ParsedFilename pfname;
+        if ((pfname = new jd.plugins.ParsedFilename(filename)).isMultipartArchive()) {
+            /* Do not offer auto filename shortening for multipart archive files. User needs to do this manually. */
+            throw bfpe;
+        } else if (maxFilenameLength <= 0) {
+            /*
+             * Does not look like too long filename -> Write-fail must have happened for a different reason, possibly permission problem ->
+             * Give up.
+             */
+            logger.info("Filename is too long according to Exception but it's not");
+            throw bfpe;
+            // throw new SkipReasonException(SkipReason.INVALID_DESTINATION, bfpe);
+        }
+        /* Shorten filename and try again */
+        IfFilenameTooLongAction action = session.getOnFilenameTooLongAction(downloadLink.getFilePackage());
+        if (action == IfFilenameTooLongAction.ASK_FOR_EACH_FILE) {
+            /* "Don't ask again during this session" overrides asking for the rest of the current session. */
+            final IfFilenameTooLongAction sessionWide = session.getSessionOnFilenameTooLongAction();
+            if (sessionWide != null) {
+                action = sessionWide;
+            }
+        }
+        switch (action) {
+        case SKIP_FILE:
+            /* User wants us to skip too long filenames. */
+            throw bfpe;
+        default:
+            break;
+        }
+        final String autoShortenedFilename = LinknameCleaner.shortenFilename(pfname, maxFilenameLength);
+        String shortenedFilename = LinknameCleaner.shortenFilename(pfname, maxFilenameLength);
+        if (shortenedFilename == null) {
+            /* This should never happen! */
+            logger.info("Shortening this filename is not possible");
+            throw bfpe;
+        }
+        switch (action) {
+        case ASK_FOR_EACH_FILE: {
+            final IfFilenameTooLongDialogInterface io = new IfFilenameTooLongDialog(downloadLink, pfname, shortenedFilename).show();
+            if (io.getCloseReason() == CloseReason.OK) {
+                action = io.getAction();
+            } else {
+                /* Timeout or dialog closed/ignored -> Do not auto rename */
+                action = IfFilenameTooLongAction.SKIP_FILE;
+            }
+            if (io.isRememberForPackageSelected()) {
+                session.setOnFileFilenameTooLongAction(downloadLink.getFilePackage(), action);
+            } else {
+                session.setOnFileFilenameTooLongAction(downloadLink.getFilePackage(), null);
+            }
+            /*
+             * "Don't ask again during this session" checkbox -> store session-wide (in the DownloadSession). A custom filename or the
+             * global "do not show again" option disables the checkbox, so it only reports true for a plain auto-shortened rename or skip.
+             */
+            if (io.isDontAskAgainThisSessionSelected() && action != IfFilenameTooLongAction.ASK_FOR_EACH_FILE) {
+                session.setSessionOnFilenameTooLongAction(action);
+            }
+            if (io.isDontShowAgainSelected()) {
                 /*
-                 * Name of write-test file was longer than name of filename -> Filename needs to be smaller to compensate for that.
+                 * Store the decision as the global default. Only auto shortened rename or skip may be stored globally; a custom filename is
+                 * a per-file decision and the dialog disables this option in that case.
                  */
-                maxFilenameLength = maxFilenameLength - (fileOutput.getName().length() - filename.length());
-            }
-            final ParsedFilename pfname;
-            if (e.getReason() != PathFailureReason.PATH_SEGMENT_TOO_LONG) {
-                throw e;
-            } else if ((pfname = new jd.plugins.ParsedFilename(filename)).isMultipartArchive()) {
-                /* Do not offer auto filename shortening for multipart archive files. User needs to do this manually. */
-                throw e;
-            } else if (maxFilenameLength <= 0) {
-                /*
-                 * Does not look like too long filename -> Write-fail must have happened for a different reason, possibly permission problem
-                 * -> Give up.
-                 */
-                logger.info("Filename is too long according to Exception but it's not");
-                // throw e;
-                throw new SkipReasonException(SkipReason.INVALID_DESTINATION, e);
-            }
-            /* Shorten filename and try again */
-            IfFilenameTooLongAction action = session.getOnFilenameTooLongAction(downloadLink.getFilePackage());
-            switch (action) {
-            case SKIP_FILE:
-                /* User wants us to skip too long filenames. */
-                throw e;
-            default:
-                break;
-            }
-            final String autoShortenedFilename = LinknameCleaner.shortenFilename(pfname, maxFilenameLength);
-            String shortenedFilename = autoShortenedFilename;
-            if (shortenedFilename == null) {
-                logger.info("Shortening this filename is not possible");
-                throw e;
-            }
-            switch (action) {
-            case ASK_FOR_EACH_FILE: {
-                final IfFilenameTooLongDialogInterface io = new IfFilenameTooLongDialog(downloadLink, pfname, shortenedFilename).show();
-                if (io.getCloseReason() == CloseReason.OK) {
-                    action = io.getAction();
-                } else {
-                    /* Timeout or dialog closed/ignored -> Do not auto rename */
-                    action = IfFilenameTooLongAction.SKIP_FILE;
+                switch (action) {
+                case AUTO_RENAME:
+                case SKIP_FILE:
+                    config.setIfFilenameTooLongAction(action);
+                    break;
+                default:
+                    break;
                 }
-                if (io.isRememberForPackageSelected()) {
-                    session.setOnFileFilenameTooLongAction(downloadLink.getFilePackage(), action);
-                } else {
-                    session.setOnFileFilenameTooLongAction(downloadLink.getFilePackage(), null);
-                }
-                if (io.isDontShowAgainSelected()) {
-                    /*
-                     * Store the decision as the global default. Only auto shortened rename or skip may be stored globally; a custom
-                     * filename is a per-file decision and the dialog disables this option in that case.
-                     */
-                    switch (action) {
-                    case RENAME_FILE:
-                    case SKIP_FILE:
-                        config.setIfFilenameTooLongAction(action);
-                        break;
-                    default:
-                        break;
-                    }
-                }
-                shortenedFilename = io.getNewFilename();
-                break;
             }
-            default:
-                break;
-            }
-            if (action == null) {
-                /* No decision available (e.g. dialog returned no action) -> do not rename. */
-                throw e;
-            }
-            if (shortenedFilename == null) {
-                /* This shouldn't happen. */
-                throw e;
-            }
-            switch (action) {
-            case RENAME_FILE:
-                break;
-            default:
-                /* No rename wished -> Dead end */
-                throw e;
-            }
-            /* Check edge case */
-            if (new File(writeTest.getParent(), shortenedFilename).exists()) {
-                logger.info("File with shortened filename already exists!");
-                throw new SkipReasonException(SkipReason.FILE_EXISTS);
-            }
-            /* Continue with shortened filename */
-            controller.setSessionDownloadFilename(shortenedFilename);
-            downloadLink.setForcedFileName(shortenedFilename);
-            downloadLink.setChunksProgress(null);
+            shortenedFilename = io.getNewFilename();
+            break;
+        }
+        default:
+            break;
+        }
+        if (action == null) {
+            /* No decision available (e.g. dialog returned no action) -> do not rename. */
+            throw bfpe;
+        }
+        if (shortenedFilename == null) {
+            /* This shouldn't happen. */
+            throw bfpe;
+        }
+        switch (action) {
+        case AUTO_RENAME:
+            break;
+        default:
+            /* No rename wished -> Dead end */
+            throw bfpe;
+        }
+        /* Continue with shortened filename */
+        controller.setSessionDownloadFilename(shortenedFilename);
+        downloadLink.setForcedFileName(shortenedFilename);
+        downloadLink.setChunksProgress(null);
+        /*
+         * Edge case: the shortened filename may already exist in the download folder. The file-exists check earlier in localFileCheck ran
+         * on the original (un-shortened) filename, so the shortened name was never checked. Now that the final filename is known, route
+         * this through the regular file-already-exists handling so the user's configured policy (overwrite / auto-rename / skip / set to
+         * successful mirror / ask) is honoured instead of always skipping. We pass maxFilenameLength so any filename generated there (e.g.
+         * the auto-rename "_2" variant) stays within the length limit that made us shorten in the first place.
+         */
+        if (new File(writeTest.getParent(), shortenedFilename).exists()) {
+            logger.info("File with shortened filename already exists -> route to file-already-exists handling");
+            /*
+             * If the too-long handling auto-shortened the file (i.e. the final name is the auto-shortened suggestion, not a custom name the
+             * user typed), keep auto-renaming on this collision regardless of the configured file-exists policy.
+             */
+            final boolean forceAutoRename = shortenedFilename.equals(autoShortenedFilename);
+            fileAlreadyExistsHandling(session, controller, null, maxFilenameLength, forceAutoRename);
         }
     }
 
@@ -4357,41 +4380,202 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
     }
 
     public void fileAlreadyExistsHandling(final DownloadSession session, final SingleDownloadController controller, final DownloadLink fileInProgress) throws SkipReasonException, DeferredRunnableException, PluginException, InterruptedException {
+        /* No filename length restriction (-1) and no forced auto-rename -> classic behaviour. */
+        fileAlreadyExistsHandling(session, controller, fileInProgress, -1, false);
+    }
+
+    public void fileAlreadyExistsHandling(final DownloadSession session, final SingleDownloadController controller, final DownloadLink fileInProgress, final int maxFilenameLength) throws SkipReasonException, DeferredRunnableException, PluginException, InterruptedException {
+        fileAlreadyExistsHandling(session, controller, fileInProgress, maxFilenameLength, false);
+    }
+
+    /**
+     * Builds a single auto-rename candidate filename of the form "&lt;base&gt;_&lt;counter&gt;&lt;extensionWithDot&gt;". When
+     * {@code maxFilenameLength > 0} the base part is truncated so that the whole name still fits into that many characters. Returns null
+     * when even a minimal name (empty base) would not fit.
+     */
+    static String buildAutoRenameCandidate(final String baseNameWithoutExtension, final String extensionWithDot, final int counter, final int maxFilenameLength) {
+        final String suffix = "_" + counter;
+        String baseName = baseNameWithoutExtension;
+        if (maxFilenameLength > 0) {
+            final int allowedBaseLength = maxFilenameLength - suffix.length() - extensionWithDot.length();
+            if (allowedBaseLength <= 0) {
+                return null;
+            }
+            if (baseName.length() > allowedBaseLength) {
+                baseName = baseName.substring(0, allowedBaseLength);
+            }
+        }
+        return baseName + suffix + extensionWithDot;
+    }
+
+    /**
+     * Generates a suggested auto-rename filename for the given file by appending "_2", "_3", ... until a name is found that does not yet
+     * exist on disk. Uses existence-only checks (no lock detection) and is limited to a small number of attempts - it is meant for preview
+     * purposes only (e.g. as the pre-filled suggestion in the "file already exists" dialog). Returns null when no free name could be found
+     * within the attempt limit or none fits {@code maxFilenameLength}.
+     */
+    static String generateAutoRenameSuggestion(final File fileOutput, final int maxFilenameLength) {
+        final String splitName[] = CrossSystem.splitFileName(fileOutput.getName());
+        String extension = splitName[1];
+        if (extension == null) {
+            extension = "";
+        } else {
+            extension = "." + extension;
+        }
+        String baseName = splitName[0];
+        int duplicateFilenameCounter = 2;
+        final String alreadyDuplicated = new Regex(baseName, ".*_(\\d{1,5})$").getMatch(0);
+        if (alreadyDuplicated != null) {
+            /* it seems the file already got auto renamed! */
+            duplicateFilenameCounter = Integer.parseInt(alreadyDuplicated) + 1;
+            baseName = new Regex(baseName, "(.*)_\\d+$").getMatch(0);
+        }
+        final File downloadPath = fileOutput.getParentFile();
+        final int maxAutoRenameAttempts = 10;
+        for (int autoRenameAttempt = 0; autoRenameAttempt < maxAutoRenameAttempts; autoRenameAttempt++) {
+            final String candidate = buildAutoRenameCandidate(baseName, extension, duplicateFilenameCounter++, maxFilenameLength);
+            if (candidate == null) {
+                return null;
+            }
+            if (!new File(downloadPath, candidate).exists()) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Returns true when the given target file neither exists on disk nor is currently locked by another download controller of the given
+     * session (i.e. it is safe to use as an auto-rename target).
+     */
+    static boolean isAutoRenameTargetFree(final DownloadSession session, final SingleDownloadController controller, final File target) {
+        if (target.exists()) {
+            return false;
+        }
+        for (final SingleDownloadController downloadController : session.getControllers()) {
+            if (downloadController == controller) {
+                continue;
+            }
+            if (session.getFileAccessManager().isLockedBy(target, downloadController)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * @param maxFilenameLength
+     *            When > 0, any filename generated by this method (currently the auto-rename "_N" variant) must not exceed this number of
+     *            characters. This is used when we already had to shorten a too-long filename and the shortened name turned out to already
+     *            exist: the auto-rename variant would otherwise grow the name beyond the filesystem limit again. A value <= 0 means "no
+     *            restriction".
+     * @param forceAutoRename
+     *            When true, the configured/asked policy is ignored and the file is auto-renamed. Used when the too-long handling already
+     *            auto-shortened (auto-renamed) the file: on a follow-up collision we keep auto-renaming regardless of the file-exists
+     *            setting instead of skipping or asking.
+     */
+    public void fileAlreadyExistsHandling(final DownloadSession session, final SingleDownloadController controller, final DownloadLink fileInProgress, final int maxFilenameLength, final boolean forceAutoRename) throws SkipReasonException, DeferredRunnableException, PluginException, InterruptedException {
         /* File already exists or file is currently being downloaded. */
         final DownloadLink downloadLink = controller.getDownloadLink();
         final File fileOutput = controller.getFileOutput(false, true);
-        IfFileExistsAction doAction = config.getIfFileExistsAction();
-        if (doAction == null || IfFileExistsAction.ASK_FOR_EACH_FILE == doAction) {
-            final DownloadSession currentSession = getSession();
-            doAction = currentSession.getOnFileExistsAction(downloadLink.getFilePackage());
-            if (doAction == IfFileExistsAction.ASK_FOR_EACH_FILE) {
-                final IfFileExistsDialogInterface io = new IfFileExistsDialog(downloadLink, fileInProgress).show();
+        /* A specific new filename the user entered/confirmed in the dialog (rename case); null when not applicable. */
+        String userDefinedFilename = null;
+        /* The "on skip due to already exists" action chosen in the dialog (skip option); null -> fall back to the global config value. */
+        OnSkipDueToAlreadyExistsAction dialogOnSkipAction = null;
+        final IfFileExistsAction doAction;
+        decideAction: {
+            if (forceAutoRename) {
+                /*
+                 * Too-long handling already auto-renamed the file -> keep auto-renaming on collision, regardless of the configured policy.
+                 */
+                doAction = IfFileExistsAction.AUTO_RENAME;
+                break decideAction;
+            }
+            final IfFileExistsAction settingsAction = config.getIfFileExistsAction();
+            if (settingsAction != null && settingsAction != IfFileExistsAction.ASK_FOR_EACH_FILE) {
+                /* User pre selected action and does not want to be asked. */
+                doAction = settingsAction;
+                break decideAction;
+            }
+            /* "Don't ask again during this session" overrides asking for the rest of the current session. */
+            final IfFileExistsAction sessionWide = session.getSessionOnFileExistsAction();
+            if (sessionWide != null && sessionWide != IfFileExistsAction.ASK_FOR_EACH_FILE) {
+                doAction = sessionWide;
+                break decideAction;
+            }
+            final IfFileExistsAction packageWide = session.getOnFileExistsAction(downloadLink.getFilePackage());
+            if (packageWide != null && packageWide != IfFileExistsAction.ASK_FOR_EACH_FILE) {
+                doAction = packageWide;
+                break decideAction;
+            }
+            {
+                /* Get action from dialog */
+                /* The dialog is going to be shown -> we always need an auto-rename suggestion to display and pre-fill. */
+                final String autoRenameSuggestion = generateAutoRenameSuggestion(fileOutput, maxFilenameLength);
+                final IfFileExistsDialogInterface io = new IfFileExistsDialog(downloadLink, fileInProgress, autoRenameSuggestion).show();
                 if (io.getCloseReason() == CloseReason.TIMEOUT) {
                     /* User did not react -> All we can do is display an error. */
                     throw new SkipReasonException(SkipReason.FILE_EXISTS);
                 } else if (io.getCloseReason() == CloseReason.INTERRUPT) {
                     throw new InterruptedException("IFFileExistsDialog Interrupted");
                 }
-                if (io.getCloseReason() == CloseReason.OK) {
-                    doAction = io.getAction();
-                } else {
+                if (io.getCloseReason() != CloseReason.OK) {
                     doAction = IfFileExistsAction.SKIP_FILE;
+                    break decideAction;
                 }
-                if (doAction == null) {
+                IfFileExistsAction dialogAction = io.getAction();
+                /* Only relevant for the rename case; null otherwise. */
+                userDefinedFilename = io.getNewFilename();
+                /* Only relevant for the skip case; null otherwise -> caller then uses the global config value. */
+                dialogOnSkipAction = io.getOnSkipDueToAlreadyExistsAction();
+                if (dialogAction == null) {
                     /* Fallback */
-                    doAction = IfFileExistsAction.SKIP_FILE;
+                    dialogAction = IfFileExistsAction.SKIP_FILE;
                 }
-                if (io.isDontShowAgainSelected() && io.getCloseReason() == CloseReason.OK) {
-                    currentSession.setOnFileExistsAction(downloadLink.getFilePackage(), doAction);
+                if (userDefinedFilename != null && userDefinedFilename.equalsIgnoreCase(fileOutput.getName())) {
+                    logger.info("User chosen filename is the same as before");
+                    throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
+                }
+                /* Per-package "remember" checkbox -> apply the chosen action to the remaining items of this package. */
+                if (io.isRememberForPackageSelected()) {
+                    session.setOnFileExistsAction(downloadLink.getFilePackage(), dialogAction);
                 } else {
-                    currentSession.setOnFileExistsAction(downloadLink.getFilePackage(), null);
+                    session.setOnFileExistsAction(downloadLink.getFilePackage(), null);
                 }
+                /*
+                 * "Don't ask again during this session" checkbox -> store session-wide (in the DownloadSession). A custom filename or the
+                 * global "do not show again" option disables the checkbox, so it only reports true for a plain overwrite/skip/auto-rename.
+                 */
+                if (io.isDontAskAgainThisSessionSelected() && dialogAction != IfFileExistsAction.ASK_FOR_EACH_FILE) {
+                    session.setSessionOnFileExistsAction(dialogAction);
+                }
+                /*
+                 * Framework "Do not ask again" checkbox -> store as the global default. Only overwrite/skip/auto-rename may be stored; a
+                 * custom filename is a per-file decision (the dialog disables the checkbox in that case) and ASK must never be stored.
+                 */
+                if (io.isDontShowAgainSelected()) {
+                    switch (dialogAction) {
+                    case OVERWRITE_FILE:
+                    case SKIP_FILE:
+                    case AUTO_RENAME:
+                        config.setIfFileExistsAction(dialogAction);
+                        break;
+                    default:
+                        break;
+                    }
+                }
+                doAction = dialogAction;
             }
         }
         switch (doAction) {
         case SKIP_FILE:
-            switch (CFG_GENERAL.CFG.getOnSkipDueToAlreadyExistsAction()) {
+            /* Use the action chosen in the dialog's skip dropdown if present, otherwise the global config value. */
+            switch (dialogOnSkipAction != null ? dialogOnSkipAction : CFG_GENERAL.CFG.getOnSkipDueToAlreadyExistsAction()) {
             case SET_FILE_TO_SUCCESSFUL_MIRROR:
+                /*
+                 * TODO: Maybe check this in beforehand so that in the dialog, we can already hide the
+                 * "Skip & mark as finished if file is a mirror" option?
+                 */
                 if (fileInProgress != null) {
                     throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
                 }
@@ -4443,50 +4627,62 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                 /* We cannot overwrite a file that is currently in progress */
                 controller.getLogger().severe("Cannot overwrite file:" + fileOutput + " | Blocked by:" + fileInProgress);
                 throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
-            } else if (!fileOutput.delete()) {
+            }
+            if (!fileOutput.delete()) {
                 controller.getLogger().severe("Cannot overwrite file:" + fileOutput + " | Can't delete initial file");
                 throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
-            } else {
-                break;
             }
-        case AUTO_RENAME:
-            final String splitName[] = CrossSystem.splitFileName(fileOutput.getName());
+            break;
+        case AUTO_RENAME: {
             final String downloadPath = fileOutput.getParent();
-            String extension = splitName[1];
-            if (extension == null) {
-                extension = "";
-            } else {
-                extension = "." + extension;
-            }
-            String name = splitName[0];
-            int duplicateFilenameCounter = 2;
-            final String alreadyDuplicated = new Regex(name, ".*_(\\d{1,5})$").getMatch(0);
-            if (alreadyDuplicated != null) {
-                /* it seems the file already got auto renamed! */
-                duplicateFilenameCounter = Integer.parseInt(alreadyDuplicated) + 1;
-                name = new Regex(name, "(.*)_\\d+$").getMatch(0);
-            }
             try {
-                File check = null;
                 String newName = null;
-                while (true) {
-                    newName = name + "_" + (duplicateFilenameCounter++) + extension;
-                    check = new File(downloadPath, newName);
-                    if (check.exists()) {
-                        check = null;
+                if (userDefinedFilename != null) {
+                    /*
+                     * The user entered/confirmed a specific new filename in the dialog. Use it as-is as long as it is still free (not
+                     * existing, not locked by another download) and within the allowed length; otherwise fall back to auto-generation.
+                     */
+                    final boolean fitsLength = maxFilenameLength <= 0 || userDefinedFilename.length() <= maxFilenameLength;
+                    if (fitsLength && isAutoRenameTargetFree(session, controller, new File(downloadPath, userDefinedFilename))) {
+                        newName = userDefinedFilename;
                     } else {
-                        for (SingleDownloadController downloadController : session.getControllers()) {
-                            if (downloadController == controller) {
-                                continue;
-                            }
-                            if (session.getFileAccessManager().isLockedBy(check, downloadController)) {
-                                check = null;
-                                break;
-                            }
-                        }
+                        controller.getLogger().info("User defined rename target not usable, falling back to auto-rename: " + userDefinedFilename);
                     }
-                    if (check != null) {
-                        break;
+                }
+                if (newName == null) {
+                    /* Auto-generate "<name>_<n>" until we find a free (non-existing, non-locked) name. */
+                    final String splitName[] = CrossSystem.splitFileName(fileOutput.getName());
+                    String extension = splitName[1];
+                    if (extension == null) {
+                        extension = "";
+                    } else {
+                        extension = "." + extension;
+                    }
+                    String name = splitName[0];
+                    int duplicateFilenameCounter = 2;
+                    final String alreadyDuplicated = new Regex(name, ".*_(\\d{1,5})$").getMatch(0);
+                    if (alreadyDuplicated != null) {
+                        /* it seems the file already got auto renamed! */
+                        duplicateFilenameCounter = Integer.parseInt(alreadyDuplicated) + 1;
+                        name = new Regex(name, "(.*)_\\d+$").getMatch(0);
+                    }
+                    /* Limit the number of auto-rename attempts so we never loop (near) endlessly when many variants already exist. */
+                    final int maxAutoRenameAttempts = 10;
+                    int autoRenameAttempt = 0;
+                    while (true) {
+                        if (autoRenameAttempt++ >= maxAutoRenameAttempts) {
+                            controller.getLogger().severe("Giving up auto-rename after " + maxAutoRenameAttempts + " attempts for:" + fileOutput.getName());
+                            throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
+                        }
+                        final String candidate = buildAutoRenameCandidate(name, extension, duplicateFilenameCounter++, maxFilenameLength);
+                        if (candidate == null) {
+                            /* Not even a minimal renamed filename fits into the allowed length -> give up. */
+                            throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
+                        }
+                        if (isAutoRenameTargetFree(session, controller, new File(downloadPath, candidate))) {
+                            newName = candidate;
+                            break;
+                        }
                     }
                 }
                 // we can do this, because the localFilecheck always runs BEFORE the download
@@ -4500,6 +4696,7 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                 throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
             }
             break;
+        }
         default:
             throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
         }

@@ -616,6 +616,7 @@ public interface GeneralSettings extends ConfigInterface {
     }
 
     @AboutConfig
+    @DescriptionForConfigEntry("Defines which status will be set on items that got skipped because a file with the same name already exists on disk.")
     @DefaultEnumValue("SKIP_FILE")
     OnSkipDueToAlreadyExistsAction getOnSkipDueToAlreadyExistsAction();
 

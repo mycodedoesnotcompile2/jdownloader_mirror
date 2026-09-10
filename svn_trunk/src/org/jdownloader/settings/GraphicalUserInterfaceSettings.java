@@ -6,6 +6,8 @@ import java.text.NumberFormat;
 import java.util.HashMap;
 import java.util.Map;
 
+import jd.controlling.downloadcontroller.IfFilenameTooLongDialog.IfFilenameTooLongAction;
+
 import org.appwork.storage.Storable;
 import org.appwork.storage.config.ConfigInterface;
 import org.appwork.storage.config.annotations.AboutConfig;
@@ -117,8 +119,15 @@ public interface GraphicalUserInterfaceSettings extends ConfigInterface {
 
     FrameStatus getLastFrameStatus();
 
+    @AboutConfig
     @DefaultEnumValue("SKIP_FILE")
     IfFileExistsAction getLastIfFileExists();
+
+    @AboutConfig
+    @DefaultEnumValue("AUTO_RENAME")
+    IfFilenameTooLongAction getLastIfFilenameTooLong();
+
+    void setLastIfFilenameTooLong(IfFilenameTooLongAction value);
 
     @AboutConfig
     public String getPassword();

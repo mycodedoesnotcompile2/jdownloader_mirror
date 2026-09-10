@@ -489,6 +489,9 @@ public interface JdownloaderTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "This path cannot be used for unknown reasons" })
     String BadFilePathException_PathFailureReason_INVALID_DESTINATION();
 
+    @Default(lngs = { "en" }, values = { "Failed to delete written test file" })
+    String BadFilePathException_PathFailureReason_WRITE_TEST_DELETION_FAILURE();
+
     @Default(lngs = { "en" }, values = { "Skipped - Account is missing" })
     String DownloadLink_setSkipped_statusmessage_account();
 

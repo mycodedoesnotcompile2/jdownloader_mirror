@@ -51,6 +51,12 @@ public class BadFilePathException extends IOException {
             public String getLabel() {
                 return _JDT.T.BadFilePathException_PathFailureReason_INVALID_DESTINATION();
             }
+        },
+        WRITE_TEST_DELETION_FAILURE {
+            @Override
+            public String getLabel() {
+                return _JDT.T.BadFilePathException_PathFailureReason_WRITE_TEST_DELETION_FAILURE();
+            }
         };
     }
 

@@ -2217,31 +2217,35 @@ public class CrossSystem {
     }
 
     /**
-     * @param saveTo
+     * @param file
      */
-    public static void showInExplorer(final File saveTo, boolean useExitingWindow) {
-        if (saveTo.exists()) {
+    public static void showInExplorer(final File file, boolean useExistingWindow) {
+        if (file.exists()) {
             if (CrossSystem.isWindows()) {
                 try {
-                    final File parentFolderToShowSelection = saveTo.getParentFile();
-                    getDesktopSupport().openFile(parentFolderToShowSelection, useExitingWindow);
+                    /*
+                     * Reveal the item itself (open its folder AND select it) - like "open -R" on Mac. openFile(..., true) uses
+                     * "explorer /select", which opens the containing folder and selects the item (long paths are handled via the 8.3 short
+                     * path). Passing the parent folder or "false" would only open the folder without selecting anything.
+                     */
+                    getDesktopSupport().openFile(file, true);
                     return;
                 } catch (final IOException e) {
                     e.printStackTrace();
                 }
             } else if (CrossSystem.isMac()) {
                 try {
-                    ProcessBuilderFactory.create("open", "-R", saveTo.getAbsolutePath()).start();
+                    ProcessBuilderFactory.create("open", "-R", file.getAbsolutePath()).start();
                     return;
                 } catch (final IOException e) {
                     e.printStackTrace();
                 }
             }
         }
-        if (saveTo.isDirectory()) {
-            CrossSystem.openFile(saveTo);
+        if (file.isDirectory()) {
+            CrossSystem.openFile(file);
         } else {
-            CrossSystem.openFile(saveTo.getParentFile());
+            CrossSystem.openFile(file.getParentFile());
         }
     }
 

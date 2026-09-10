@@ -684,10 +684,11 @@ public class SingleDownloadController extends BrowserSettingsThread implements D
     }
 
     public void addTask(final PluginSubTask subTask) {
-        if (subTask != null) {
-            synchronized (tasks) {
-                tasks.add(subTask);
-            }
+        if (subTask == null) {
+            return;
+        }
+        synchronized (tasks) {
+            tasks.add(subTask);
         }
     }
 

@@ -27,4 +27,8 @@ public interface IfFilenameTooLongDialogInterface extends OKCancelCloseUserIODef
 
     @In
     public boolean isRememberForPackageSelected();
+
+    /** True when the chosen action should be remembered for the rest of the current session ("Don't ask again during this session"). */
+    @In
+    public boolean isDontAskAgainThisSessionSelected();
 }

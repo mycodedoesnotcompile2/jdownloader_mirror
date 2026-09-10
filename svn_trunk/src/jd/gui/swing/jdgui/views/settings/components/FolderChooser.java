@@ -1,6 +1,7 @@
 package jd.gui.swing.jdgui.views.settings.components;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.List;
 
 import javax.swing.AbstractAction;
@@ -23,9 +24,8 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.DownloadFolderChooserDialog;
 import org.jdownloader.translate._JDT;
 
-import jd.controlling.downloadcontroller.BadDestinationException;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.PathTooLongException;
+import jd.controlling.downloadcontroller.BadFilePathException;
+import jd.controlling.downloadcontroller.FilePathChecker;
 import jd.gui.swing.jdgui.views.settings.panels.packagizer.VariableAction;
 
 public class FolderChooser extends PathChooser implements SettingsComponent {
@@ -157,11 +157,11 @@ public class FolderChooser extends PathChooser implements SettingsComponent {
         }
         File forbidden = null;
         try {
-            DownloadWatchDog.getInstance().validateDestination(checkPath);
-        } catch (PathTooLongException e) {
+            FilePathChecker.validatePath(checkPath);
+        } catch (final BadFilePathException e) {
             forbidden = e.getFile();
-        } catch (BadDestinationException e) {
-            forbidden = e.getFile();
+        } catch (final IOException e) {
+            forbidden = checkPath;
         }
         if (forbidden != null) {
             final File finalForbidden = forbidden;
