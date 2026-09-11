@@ -319,7 +319,6 @@ public class WindowsUtils {
                 return _AWU.T.AccessPermission_ACCESS_SYSTEM_SECURITY();
             }
         };
-
         public final int mask;
 
         private AccessPermission(int mask) {
@@ -820,7 +819,6 @@ public class WindowsUtils {
                 return _AWU.T.SID_SID_KEY_PROPERTY_ATTESTATION();
             }
         };
-
         public final String sid;
 
         private SID(String sid) {
@@ -1289,7 +1287,7 @@ public class WindowsUtils {
             endTime = times[1];
         }
         String argumentsXMLNode = (arguments != null && arguments.length() > 0) ? "<Arguments>" + escapeXml(arguments) + "</Arguments>\n" : "";
-    // @formatter:off
+        // @formatter:off
     // LogonType: ServiceAccount is not in Task Scheduler 1.2 schema (InteractiveToken|Password|S4U). Use Password for SYSTEM (S-1-5-18).
     String xml =
             "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n" +
@@ -2110,7 +2108,6 @@ public class WindowsUtils {
              * Application is critical to system operation
              */
             RmCritical(6);
-
             private final int value;
 
             ApplicationType(int value) {
@@ -2597,7 +2594,7 @@ public class WindowsUtils {
         char[] pathNamesBuf = new char[512];
         if (!Kernel32VolumePath.INSTANCE.GetVolumePathNamesForVolumeNameW(volumeNameChars, pathNamesBuf, pathNamesBuf.length, returnLength)) {
             int err = Kernel32.INSTANCE.GetLastError();
-            if (err == 122 /* ERROR_MORE_DATA */ && returnLength.getValue() > 0 && returnLength.getValue() <= 4096) {
+            if (err == 122 /* ERROR_MORE_DATA */&& returnLength.getValue() > 0 && returnLength.getValue() <= 4096) {
                 pathNamesBuf = new char[returnLength.getValue()];
                 if (!Kernel32VolumePath.INSTANCE.GetVolumePathNamesForVolumeNameW(volumeNameChars, pathNamesBuf, pathNamesBuf.length, returnLength)) {
                     return path;
@@ -2785,8 +2782,7 @@ public class WindowsUtils {
             HANDLE hSource = new HANDLE(Pointer.createConstant(handleVal));
             HANDLEByReference phDup = new HANDLEByReference();
             if (!Kernel32.INSTANCE.DuplicateHandle(hProcess, hSource, Kernel32.INSTANCE.GetCurrentProcess(), phDup, FILE_READ_ATTRIBUTES, false, 0)) {
-                if (!Kernel32.INSTANCE.DuplicateHandle(hProcess, hSource, Kernel32.INSTANCE.GetCurrentProcess(), phDup, 0, false,
-                        0x00000002 /* DUPLICATE_SAME_ACCESS */)) {
+                if (!Kernel32.INSTANCE.DuplicateHandle(hProcess, hSource, Kernel32.INSTANCE.GetCurrentProcess(), phDup, 0, false, 0x00000002 /* DUPLICATE_SAME_ACCESS */)) {
                     int ntStatus = NtDllForHandleScan.INSTANCE.NtDuplicateObject(hProcess, hSource, Kernel32.INSTANCE.GetCurrentProcess(), phDup, FILE_READ_ATTRIBUTES, 0, 0);
                     if (ntStatus != NtDllForHandleScan.STATUS_SUCCESS) {
                         ntStatus = NtDllForHandleScan.INSTANCE.NtDuplicateObject(hProcess, hSource, Kernel32.INSTANCE.GetCurrentProcess(), phDup, 0, 0, NtDllForHandleScan.DUPLICATE_SAME_ACCESS);
@@ -3331,8 +3327,8 @@ public class WindowsUtils {
 
     /**
      * Returns the Terminal Services session ID of the current process. Used to pass a WTS session id into
-     * {@link org.appwork.utils.os.windows.execute.RunAsHelper#runInSession} when the caller runs under LocalSystem but must
-     * target the interactive user (e.g. RDP session instead of physical console).
+     * {@link org.appwork.utils.os.windows.execute.RunAsHelper#runInSession} when the caller runs under LocalSystem but must target the
+     * interactive user (e.g. RDP session instead of physical console).
      *
      * @return session id, or {@code -1} if {@link Kernel32Ext#ProcessIdToSessionId} fails
      */
@@ -3569,6 +3565,40 @@ public class WindowsUtils {
         fwi.uCount = 0; // flash until window comes to foreground
         fwi.dwTimeout = 0;
         User32Ext.INSTANCE.FlashWindowEx(fwi);
+    }
+
+    /**
+     * Returns the 8.3 short path for the given file, or null if it is unavailable (8.3 name generation disabled on the volume, or the call
+     * failed). The input is prefixed with "\\?\" so that paths beyond MAX_PATH can be resolved; the prefix is stripped from the result so
+     * the returned path can be passed to explorer.exe.
+     */
+    public static String getWindowsShortPath(final File file) {
+        try {
+            String input = file.getAbsolutePath();
+            if (!input.startsWith("\\\\?\\")) {
+                input = "\\\\?\\" + input;
+            }
+            char[] buffer = new char[input.length()];
+            int len = Kernel32.INSTANCE.GetShortPathName(input, buffer, buffer.length);
+            if (len > buffer.length) {
+                buffer = new char[len];
+                len = Kernel32.INSTANCE.GetShortPathName(input, buffer, buffer.length);
+            }
+            if (len == 0 | len > buffer.length) {
+                throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+            }
+            String shortPath = new String(buffer, 0, len);
+            if (shortPath.startsWith("\\\\?\\UNC\\")) {
+                /* "\\?\UNC\server\share\..." -> "\\server\share\..." */
+                shortPath = "\\\\" + shortPath.substring("\\\\?\\UNC\\".length());
+            } else if (shortPath.startsWith("\\\\?\\")) {
+                /* "\\?\C:\..." -> "C:\..." */
+                shortPath = shortPath.substring("\\\\?\\".length());
+            }
+            return shortPath;
+        } catch (final Throwable e) {
+            return null;
+        }
     }
 
     /**

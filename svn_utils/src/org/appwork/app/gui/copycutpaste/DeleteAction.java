@@ -60,14 +60,8 @@ public class DeleteAction extends AbstractAction {
         this.putValue(Action.ACCELERATOR_KEY, KeyStroke.getKeyStroke("DELETE"));
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see com.rapidshare.utils.event.Event.ActionListener#actionPerformed(com. rapidshare.utils.event.Event.ActionEvent)
-     */
     public void actionPerformed(final ActionEvent e) {
-        if (!this.text.isEditable() || !this.text.isEnabled()) {
-            /* Never modify non-editable/disabled (read-only) fields, e.g. plain JTextFields that do not guard replaceSelection themselves. */
+        if (text == null || !this.text.isEditable() || !this.text.isEnabled()) {
             return;
         }
         this.text.replaceSelection(null);
@@ -75,7 +69,6 @@ public class DeleteAction extends AbstractAction {
 
     @Override
     public boolean isEnabled() {
-        /* Only allow deleting text in editable fields, otherwise read-only fields could be modified via the context menu. */
-        return this.text.isEditable() && this.text.isEnabled() && this.text.getSelectedText() != null;
+        return text != null && this.text.isEditable() && this.text.isEnabled() && this.text.getSelectedText() != null;
     }
 }

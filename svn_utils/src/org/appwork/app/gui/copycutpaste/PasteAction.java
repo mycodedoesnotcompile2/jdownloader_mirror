@@ -63,21 +63,15 @@ public class PasteAction extends AbstractAction {
         putValue(Action.ACCELERATOR_KEY, KeyStroke.getKeyStroke(KeyEvent.VK_V, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @seecom.rapidshare.utils.event.Event.ActionListener#actionPerformed(com. rapidshare.utils.event.Event.ActionEvent)
-     */
     public void actionPerformed(final ActionEvent e) {
+        if (text == null) {
+            return;
+        }
         text.paste();
     }
 
     @Override
     public boolean isEnabled() {
-        if (text.isEditable() && text.isEnabled()) {
-            return Toolkit.getDefaultToolkit().getSystemClipboard().isDataFlavorAvailable(ClipboardUtils.stringFlavor);
-        } else {
-            return false;
-        }
+        return text != null && text.isEditable() && text.isEnabled() && Toolkit.getDefaultToolkit().getSystemClipboard().isDataFlavorAvailable(ClipboardUtils.stringFlavor);
     }
 }

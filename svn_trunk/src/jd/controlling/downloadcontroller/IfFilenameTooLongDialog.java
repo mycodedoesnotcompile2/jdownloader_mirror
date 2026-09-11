@@ -515,9 +515,9 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongDia
     }
 
     /**
-     * Shows a non-blocking warning when the currently chosen (shortened) filename already exists in the download folder. This is only a
-     * hint: an already existing filename may still be selected and confirmed - the "file already exists" handling downstream then applies
-     * the user's configured policy for that case.
+     * Shows a red warning when the currently chosen (shortened) filename already exists in the download folder. For the auto-shortened
+     * suggestion this is only a hint (the "file already exists" handling downstream applies the user's policy). For a user-entered custom
+     * filename it additionally greys out the OK button, so a colliding custom name cannot be confirmed.
      */
     private void updateFilenameExistsWarning() {
         if (this.filenameExistsWarning == null) {
@@ -534,6 +534,14 @@ public class IfFilenameTooLongDialog extends AbstractDialog<IfFilenameTooLongDia
         }
         /* The text stays set at all times (space reserved); only the color toggles so the dialog dimensions never change. */
         this.filenameExistsWarning.setForeground(exists ? Color.RED : TRANSPARENT_COLOR);
+        /*
+         * Grey out OK when the user entered a custom filename that already exists on disk, so a colliding name cannot be confirmed. The
+         * auto-shortened suggestion is handled by the downstream policy, so only the custom case blocks confirmation.
+         */
+        if (this.okButton != null) {
+            final boolean customFilenameExists = exists && this.useCustom != null && this.useCustom.isSelected();
+            this.okButton.setEnabled(!customFilenameExists);
+        }
     }
 
     /** Returns true if user defined filename differs from the initially suggested auto shortened filename. */

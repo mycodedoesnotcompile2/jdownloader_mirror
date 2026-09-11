@@ -62,17 +62,15 @@ public class SelectAction extends AbstractAction {
         putValue(Action.ACCELERATOR_KEY, KeyStroke.getKeyStroke(KeyEvent.VK_A, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see com.rapidshare.utils.event.Event.ActionListener#actionPerformed(com. rapidshare.utils.event.Event.ActionEvent)
-     */
     public void actionPerformed(final ActionEvent e) {
+        if (text == null) {
+            return;
+        }
         text.selectAll();
     }
 
     @Override
     public boolean isEnabled() {
-        return text.isEnabled() && text.getText().length() > 0;
+        return text != null && text.isEnabled() && text.getText().length() > 0;
     }
 }

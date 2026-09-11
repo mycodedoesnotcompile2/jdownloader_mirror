@@ -69,7 +69,7 @@ import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 53337 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53383 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     /* Cloud/DAV file links added by crawler HighWayMeFolder3. */
@@ -298,7 +298,20 @@ public abstract class HighWayCore extends UseNet {
      * The status is only present for Usenet items, see https://sabnzbd.org/wiki/extra/queue-history-searching </br>
      * A null status (e.g. for Torrent/TV items) is treated as downloadable.
      */
-    public static boolean isDavItemDownloadable(final String status) {
+    public static boolean isDavItemDownloadable(final Map<String, Object> item) {
+        /* New partial field 2026-09-11 */
+        final Boolean partial = (Boolean) item.get("partial");
+        if (partial != null) {
+            if (Boolean.TRUE.equals(partial)) {
+                /* Partially server-side downloaded file/folder -> Not (yet) downloadable for the user */
+                return false;
+            }
+            /* Fully server-side downloaded item -> Downloadable for the user */
+            return true;
+        }
+        /* Old status handling */
+        final Object statusO = item.get("status");
+        final String status = statusO != null ? statusO.toString() : null;
         if (status == null) {
             /* Unknown/missing status -> treat as downloadable. */
             return true;
@@ -335,36 +348,36 @@ public abstract class HighWayCore extends UseNet {
         } else if (brc.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final Map<String, Object> targetFile = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-        if (targetFile.get("error") != null) {
+        final Map<String, Object> finfo = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+        if (finfo.get("error") != null) {
             /* e.g. {"error":"not_found","message":"..."} */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        if (!"file".equalsIgnoreCase(targetFile.get("type").toString())) {
+        if (!"file".equalsIgnoreCase(finfo.get("type").toString())) {
             /* This should never happen: the URL we stored for a file now points to something that is not a file. */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         /* Block download of items whose status does not allow downloading. */
-        final Object statusO = targetFile.get("status");
-        final String status = statusO != null ? statusO.toString() : null;
-        if (!isDavItemDownloadable(status)) {
+        if (!isDavItemDownloadable(finfo)) {
+            final Object statusO = finfo.get("status");
+            final String status = statusO != null ? statusO.toString() : "unknown";
             throw new PluginException(LinkStatus.ERROR_FATAL, "Status " + status + " | Download not possible");
         }
-        link.setFinalFileName(targetFile.get("name").toString());
-        link.setVerifiedFileSize(((Number) targetFile.get("size")).longValue());
+        link.setFinalFileName(finfo.get("name").toString());
+        link.setVerifiedFileSize(((Number) finfo.get("size")).longValue());
         /* Set file hashes if available (both fields can be null). */
         final List<HashInfo> hashInfos = new ArrayList<HashInfo>();
-        final String md5 = (String) targetFile.get("md5");
+        final String md5 = (String) finfo.get("md5");
         if (md5 != null) {
             hashInfos.add(HashInfo.newInstanceSafe(md5, HashInfo.TYPE.MD5));
         }
-        final String sha256 = (String) targetFile.get("sha256");
+        final String sha256 = (String) finfo.get("sha256");
         if (sha256 != null) {
             hashInfos.add(HashInfo.newInstanceSafe(sha256, HashInfo.TYPE.SHA256));
         }
         link.setHashInfos(hashInfos);
         /* Store fresh direct download URL for the actual download. */
-        final String freshDirecturl = targetFile.get("downloadUrl").toString();
+        final String freshDirecturl = finfo.get("downloadUrl").toString();
         link.setProperty(PROPERTY_DAV_FRESH_DIRECTURL, freshDirecturl);
         return AvailableStatus.TRUE;
     }
@@ -761,9 +774,9 @@ public abstract class HighWayCore extends UseNet {
                 ai.setTrafficLeft(free_traffic_left);
                 /* Only free accounts have a daily download limit -> Display that in GUI. */
                 if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                    ai.setStatus(StringUtils.valueOfOrNull(accountInfo.get("type")) + " | Heute übrig: " + SIZEUNIT.formatValue((SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue(), trafficLeftToday));
+                    ai.setStatus(StringUtils.valueOfOrNull(accountInfo.get("type")) + " | Heute übrig: " + SIZEUNIT.formatValue(CFG_GUI.MAX_SIZE_UNIT.getValue(), trafficLeftToday));
                 } else {
-                    ai.setStatus(StringUtils.valueOfOrNull(accountInfo.get("type")) + " | Remaining today: " + SIZEUNIT.formatValue((SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue(), trafficLeftToday));
+                    ai.setStatus(StringUtils.valueOfOrNull(accountInfo.get("type")) + " | Remaining today: " + SIZEUNIT.formatValue(CFG_GUI.MAX_SIZE_UNIT.getValue(), trafficLeftToday));
                 }
             }
             account.setConcurrentUsePossible(true);
@@ -1196,7 +1209,7 @@ public abstract class HighWayCore extends UseNet {
             }
         }
         if (!ai.isUnlimitedTraffic() && !ai.isSpecialTraffic()) {
-            /* Check if enough traffic is left */
+            /* Check if enough base account traffic is left */
             if (trafficNeeded > trafficLeft) {
                 if (ai.isTrafficRefill()) {
                     final long howMuchTrafficIsMissing = trafficNeeded - trafficLeft;

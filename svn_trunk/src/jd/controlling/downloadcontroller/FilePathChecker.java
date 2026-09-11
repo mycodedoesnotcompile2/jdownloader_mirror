@@ -119,9 +119,10 @@ public class FilePathChecker {
             break;
         case WINDOWS:
             /*
-             * We must detect over-long segments WITHOUT canonicalizing the path first, because File.getCanonicalPath() (used by
-             * getPathComponents below) throws a raw "invalid parameter" IOException for over-long segments, which would mask the real
-             * cause.
+             * Detect over-long segments WITHOUT canonicalizing the path first. File.getCanonicalPath() (used by getPathComponents below)
+             * fails for over-long segments with an "invalid parameter" IOException; getPathComponents swallows/logs it, so we would neither
+             * get a clean error nor a proper classification. Checking the raw segment lengths first gives us early, correct file/folder
+             * classification and avoids that pointless (logged) canonicalize attempt.
              */
             if (hasTooLongWindowsPathSegment(parent)) {
                 /* One of the parent folder segments is too long -> the whole path is unusable. */
@@ -357,20 +358,21 @@ public class FilePathChecker {
         return false;
     }
 
-    public static boolean looksLikeTooLongWindowsPathSegment(final String str) throws IOException {
+    public static boolean looksLikeTooLongWindowsPathSegment(final String str) {
         return str.length() > 255;
     }
 
     /**
      * Checks - WITHOUT canonicalizing - whether any component of the given path exceeds the per-segment limit (255 characters on NTFS).
      * </br>
-     * We must not canonicalize here: {@link File#getCanonicalPath()} throws a raw "invalid parameter" IOException for over-long segments,
-     * which would mask the real cause. Walking {@link File#getParentFile()} / {@link File#getName()} avoids that.
+     * We deliberately avoid canonicalization here: {@link File#getCanonicalPath()} fails for over-long segments with an "invalid parameter"
+     * IOException (which getPathComponents only swallows/logs). Walking {@link File#getParentFile()} / {@link File#getName()} instead lets
+     * us detect the over-long segment reliably and classify it before any canonicalize attempt.
      */
     public static boolean hasTooLongWindowsPathSegment(final File file) {
         File current = file;
         while (current != null) {
-            if (current.getName().length() > 255) {
+            if (looksLikeTooLongWindowsPathSegment(current.getName())) {
                 return true;
             }
             current = current.getParentFile();

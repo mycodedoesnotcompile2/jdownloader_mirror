@@ -12,16 +12,16 @@ import jd.plugins.ParsedFilename;
  * the name field is editable (read-only) is controlled via the constructor, so the same component renders both read-only display filenames
  * and a user-editable custom filename.
  */
-class FileNameField extends MigPanel {
+public class FileNameField extends MigPanel {
     private final JTextField nameField;
     private final JTextField extensionField;
     private final String     extension;
 
-    FileNameField(final String filename, final boolean nameEditable) {
+    public FileNameField(final String filename, final boolean nameEditable) {
         this(new ParsedFilename(filename), nameEditable);
     }
 
-    FileNameField(final ParsedFilename filename, final boolean nameEditable) {
+    public FileNameField(final ParsedFilename filename, final boolean nameEditable) {
         super("ins 0", "[grow,fill][]", "[]");
         this.extension = filename.getExtensionAdvanced();
         this.nameField = new JTextField(filename.getFilenameWithoutExtensionAdvanced());
@@ -44,7 +44,7 @@ class FileNameField extends MigPanel {
         }
     }
 
-    JTextField getNameField() {
+    public JTextField getNameField() {
         return this.nameField;
     }
 }

@@ -33,33 +33,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.swing.JLabel;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
-import org.jdownloader.captcha.v2.Challenge;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudflareTurnstileCaptcha;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.images.AbstractIcon;
-import org.jdownloader.plugins.components.config.RapidGatorConfig;
-import org.jdownloader.plugins.components.config.RapidGatorConfig.PremiumDownloadBehaviorForSubscriberOnlyFiles;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
@@ -87,7 +60,34 @@ import jd.plugins.PluginConfigPanelNG;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53165 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
+import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudflareTurnstileCaptcha;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.plugins.components.config.RapidGatorConfig;
+import org.jdownloader.plugins.components.config.RapidGatorConfig.PremiumDownloadBehaviorForSubscriberOnlyFiles;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
+@HostPlugin(revision = "$Revision: 53381 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -160,6 +160,8 @@ public class RapidGatorNet extends PluginForHost {
     private final String             PROPERTY_ACCOUNT_timestamp_session_create_website = "session_create_website";
     private static final String      PROPERTY_ACCOUNT_SOLO_SUBSCRIPTIONS               = "solo_subscriptions_json";
     private static final String      PROPERTY_ACCOUNT_API_PREMIUM_END_TIME             = "api_premium_end_time";
+    private static final String      PROPERTY_ACCOUNT_API_TRAFFIC_LEFT                 = "api_account_traffic_left";
+    private static final String      PROPERTY_ACCOUNT_API_TRAFFIC_MAX                  = "api_account_traffic_MAX";
     /* 2019-12-12: Lowered from 2 to 1 hour */
     private final long               FREE_RECONNECTWAIT_GENERAL_MILLIS                 = 1 * 60 * 60 * 1001L;
     private final long               FREE_RECONNECTWAIT_DAILYLIMIT_MILLIS              = 3 * 60 * 60 * 1000L;
@@ -339,8 +341,8 @@ public class RapidGatorNet extends PluginForHost {
         try {
             if (this.looksLikeDownloadableContent(con)) {
                 /**
-                 * Looks like direct-downloadable item. </br>
-                 * Either we're logged in as a premium user or this item was made hot-linked by a premium user.
+                 * Looks like direct-downloadable item. </br> Either we're logged in as a premium user or this item was made hot-linked by a
+                 * premium user.
                  */
                 if (con.getCompleteContentLength() > 0) {
                     if (con.isContentDecoded()) {
@@ -371,8 +373,7 @@ public class RapidGatorNet extends PluginForHost {
                     link.setFinalFileName(filename);
                 }
                 if (filesize != null) {
-                    // 1020MB shown but file is 1060Mbyte, so looks like MB is MiB
-                    link.setDownloadSize(SizeFormatter.getSize(null, filesize, true, false));
+                    link.setDownloadSize(parseSize(Size.FILE, filesize));
                 }
                 final String md5 = br.getRegex(">\\s*MD5\\s*:\\s*([A-Fa-f0-9]{32})<").getMatch(0);
                 if (md5 != null) {
@@ -383,6 +384,29 @@ public class RapidGatorNet extends PluginForHost {
             con.disconnect();
         }
         return AvailableStatus.TRUE;
+    }
+
+    protected enum Size {
+        TRAFFIC,
+        STORAGE,
+        FILE
+    }
+
+    protected long parseSize(Size type, String string) {
+        switch (type) {
+        case TRAFFIC: {
+            // "traffic":{"total":6597069766656,"left":4105663543401} -> >Bandwith available</td><td>3.73 TB of 6 TB</br> -> 1024!(kibi)
+            final long ret = SizeFormatter.getSize(null, string, true, true);
+            if (ret == -1) {
+                return 0;
+            }
+            return ret;
+        }
+        case FILE:
+            // 1020MB shown but file is 1060Mbyte, so looks like MB is MiB
+        default:
+            return SizeFormatter.getSize(null, string, true, false);
+        }
     }
 
     private AvailableStatus requestFileInformationAPI(final DownloadLink link, final Account account, final String session_id) throws Exception {
@@ -482,10 +506,9 @@ public class RapidGatorNet extends PluginForHost {
                 }
                 if (finalDownloadURL != null) {
                     /**
-                     * Premium downloadlink found! </br>
-                     * This does not mean that the user owns a premium account. It can also mean that this is a subscription-only file and
-                     * the user owns the needed subscription. </br>
-                     * The maps down below help us to determine the resumeability of such items.
+                     * Premium downloadlink found! </br> This does not mean that the user owns a premium account. It can also mean that this
+                     * is a subscription-only file and the user owns the needed subscription. </br> The maps down below help us to determine
+                     * the resumeability of such items.
                      */
                     logger.info("Premium account or active subscription");
                     if (account != null) {
@@ -554,9 +577,8 @@ public class RapidGatorNet extends PluginForHost {
                 if (cfg.isEnableFreeDownloadModeCaptchaDuringPreDownloadWait() && lastUsedCaptchaType != null) {
                     /**
                      * 2023-10-03: A small trick: We know their captcha key and can thus always obtain captcha solutions at any point of
-                     * time. </br>
-                     * Requesting the captcha here basically allows us to solve it during the serverside wait time which is impossible to do
-                     * in browser.
+                     * time. </br> Requesting the captcha here basically allows us to solve it during the serverside wait time which is
+                     * impossible to do in browser.
                      */
                     final long timeBeforeCaptchaInput = Time.systemIndependentCurrentJVMTimeMillis();
                     if (CAPTCHA_TYPE_RECAPTCHA.equals(lastUsedCaptchaType)) { /* reCaptcha captcha */
@@ -713,8 +735,8 @@ public class RapidGatorNet extends PluginForHost {
                 link.setResumeable(false);
             }
             /**
-             * Save timestamp when download was started. </br>
-             * Serverside wait time until next download can be started counts from beginning of first/last download.
+             * Save timestamp when download was started. </br> Serverside wait time until next download can be started counts from beginning
+             * of first/last download.
              */
             if (currentIP != null) {
                 synchronized (blockedIPsMap) {
@@ -778,11 +800,10 @@ public class RapidGatorNet extends PluginForHost {
     public int getChallengeTimeout(Challenge<?> challenge) {
         /**
          * If users need more than X seconds to enter the captcha [in free download mode before final download-step] and we actually send
-         * the captcha input after this time has passed, rapidgator will 'ban' the IP of the user for at least 60 minutes. </br>
-         * RG will first display a precise errormessage but then it will display the same message which is displayed when the user has
-         * reached the daily/hourly download-limit. </br>
-         * This function exists to avoid this. Instead of sending the captcha it can throw a retry exception, avoiding the 60+ minutes IP
-         * 'ban'.
+         * the captcha input after this time has passed, rapidgator will 'ban' the IP of the user for at least 60 minutes. </br> RG will
+         * first display a precise errormessage but then it will display the same message which is displayed when the user has reached the
+         * daily/hourly download-limit. </br> This function exists to avoid this. Instead of sending the captcha it can throw a retry
+         * exception, avoiding the 60+ minutes IP 'ban'.
          */
         if (useShortChallengeTimeoutToAvoidServersideBan) {
             return FREE_CAPTCHA_EXPIRE_TIME_MILLIS;
@@ -895,6 +916,8 @@ public class RapidGatorNet extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         synchronized (account) {
             account.removeProperty(PROPERTY_ACCOUNT_API_PREMIUM_END_TIME);
+            account.removeProperty(PROPERTY_ACCOUNT_API_TRAFFIC_LEFT);
+            account.removeProperty(PROPERTY_ACCOUNT_API_TRAFFIC_MAX);
             if (PluginJsonConfig.get(RapidGatorConfig.class).isEnableAPIPremium()) {
                 return fetchAccountInfoAPI(account);
             } else {
@@ -998,10 +1021,12 @@ public class RapidGatorNet extends PluginForHost {
                     ai.setValidUntil(TimeUnit.SECONDS.toMillis(premium_end_time_timestamp.longValue()) + TimeUnit.DAYS.toMillis(1), br);
                 }
                 if (traffic_left != null) {
+                    account.setProperty(PROPERTY_ACCOUNT_API_TRAFFIC_LEFT, traffic_left);
                     ai.setTrafficLeft(traffic_left.longValue());
                 }
                 if (traffic_max != null) {
                     /* APIv2 */
+                    account.setProperty(PROPERTY_ACCOUNT_API_TRAFFIC_MAX, traffic_max);
                     ai.setTrafficMax(traffic_max.longValue());
                 }
                 setAccountLimitsByType(account, AccountType.PREMIUM);
@@ -1070,9 +1095,11 @@ public class RapidGatorNet extends PluginForHost {
             final String availableTrafficMax = br.getRegex(">\\s*Bandwith available\\s*</td>\\s*<td>\\s*[^<>\"]*? of (\\d+(\\.\\d+)? (?:MB|GB|TB))").getMatch(0);
             logger.info("availableTraffic = " + availableTrafficStr);
             if (availableTrafficStr != null) {
-                ai.setTrafficLeft(SizeFormatter.getSize(availableTrafficStr.trim()));
-                if (availableTrafficMax != null) {
-                    ai.setTrafficMax(SizeFormatter.getSize(availableTrafficMax.trim()));
+                final long trafficLeft = account.getLongProperty(PROPERTY_ACCOUNT_API_TRAFFIC_LEFT, parseSize(Size.TRAFFIC, availableTrafficStr));
+                ai.setTrafficLeft(trafficLeft);
+                final long trafficMax = account.getLongProperty(PROPERTY_ACCOUNT_API_TRAFFIC_MAX, availableTrafficMax == null ? -1 : parseSize(Size.TRAFFIC, availableTrafficMax));
+                if (trafficMax >= 0) {
+                    ai.setTrafficMax(trafficMax);
                 }
             } else {
                 /*
@@ -1176,7 +1203,7 @@ public class RapidGatorNet extends PluginForHost {
                 final String subscriptionUrl = brc.getURL(subscription[1]).toExternalForm();
                 final long subscriptionStartTimestamp = TimeFormatter.getMilliSeconds(subscription[0], "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
                 final long subscriptionEndTimestamp = TimeFormatter.getMilliSeconds(subscription[4], "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
-                final long subscriptionTraffic = SizeFormatter.getSize(subscription[3]);
+                final long subscriptionTraffic = parseSize(Size.TRAFFIC, subscription[3]);
                 final boolean subscriptionAutoRenew = subscription[6] != null && subscription[6].contains("/subscription/cancel/");
                 subscriptionIndex++;
                 final Map<String, Object> singleSubscriptionInfo = new LinkedHashMap<String, Object>();
@@ -1361,8 +1388,8 @@ public class RapidGatorNet extends PluginForHost {
                 captcha_url = findLoginCaptchaURL(br);
                 if (accountRequires2FALoginCode && br.containsHTML(">\\s*Invalid auth code")) {
                     /**
-                     * Previously entered 2FA code is invalid. This also means that the users' login credentials are valid. </br>
-                     * Ask user for another 2FA login code in next round.
+                     * Previously entered 2FA code is invalid. This also means that the users' login credentials are valid. </br> Ask user
+                     * for another 2FA login code in next round.
                      */
                     logger.info("2FA login: User entered invalid 2FA code");
                 } else if (this.requiresTwoFALogin(loginform)) {
@@ -1926,8 +1953,8 @@ public class RapidGatorNet extends PluginForHost {
     /**
      * Returns error message for files that require the user to be subscribed to a specific uploader to be able to download them. <br>
      *
-     * This can even happen for premium account owners since an extra subscription is needed to download such files. </br>
-     * This can be the same as when "isBuyFile()" returns true but with a more detailed error message.
+     * This can even happen for premium account owners since an extra subscription is needed to download such files. </br> This can be the
+     * same as when "isBuyFile()" returns true but with a more detailed error message.
      */
     private String getErrormessageSubscriberOnlyDownload(final Browser br) {
         return br.getRegex("(The files of this publisher \"[^\"<>]+\" can be downloaded only by subscribers\\.)").getMatch(0);
@@ -1987,11 +2014,11 @@ public class RapidGatorNet extends PluginForHost {
         if (br.containsHTML("id=\"exceeded_storage\"")) {
             /**
              * 2024-10-31: <br>
-             * Your storage space is full. Delete some files or upgrade to the new
-             * <a href="/article/premium" style="color: #ff801a;">storage plan</a>.<br>
+             * Your storage space is full. Delete some files or upgrade to the new <a href="/article/premium"
+             * style="color: #ff801a;">storage plan</a>.<br>
              * It looks like this error can happen even when a user is not logged in. At this moment we just assume that this means that the
-             * uploaders' account is out of space and for this reason, the file can't be downloaded. </br>
-             * This could also be a fake message which they display whenever the user tried to use a blocked proxy/VPN.
+             * uploaders' account is out of space and for this reason, the file can't be downloaded. </br> This could also be a fake message
+             * which they display whenever the user tried to use a blocked proxy/VPN.
              *
              */
             throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Uploaders' storage is full. Wait until uploader buys more traffic to download this file");
@@ -2139,7 +2166,7 @@ public class RapidGatorNet extends PluginForHost {
             return;
         }
         panel.addHeader("Solo Subscriptions (" + subscriptionInfoMap.size() + ")", new AbstractIcon(IconKey.ICON_PREMIUM, 18));
-        final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
+        final SIZEUNIT maxSizeUnit = CFG_GUI.MAX_SIZE_UNIT.getValue();
         int index = 0;
         for (final Object value : subscriptionInfoMap.values()) {
             if (!(value instanceof Map)) {

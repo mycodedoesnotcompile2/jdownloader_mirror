@@ -63,28 +63,28 @@ public class CutAction extends AbstractAction {
         putValue(Action.ACCELERATOR_KEY, KeyStroke.getKeyStroke(KeyEvent.VK_X, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see com.rapidshare.utils.event.Event.ActionListener#actionPerformed(com. rapidshare.utils.event.Event.ActionEvent)
-     */
     public void actionPerformed(final ActionEvent e) {
-        if (text == null) {
-            if (e.getSource() instanceof JTextComponent) {
-                final JTextComponent text = (JTextComponent) e.getSource();
+        if (text != null) {
+            if (text.isEditable()) {
                 text.cut();
+            } else {
+                text.copy();
             }
-        } else {
-            text.cut();
+            return;
+        }
+        if (e.getSource() instanceof JTextComponent) {
+            final JTextComponent text = (JTextComponent) e.getSource();
+            if (text.isEditable()) {
+                text.cut();
+            } else {
+                text.copy();
+            }
+            return;
         }
     }
 
     @Override
     public boolean isEnabled() {
-        if (text == null) {
-            return true;
-        }
-        /* Only allow cutting text out of editable fields, otherwise read-only fields could be modified via the context menu. */
-        return !(text instanceof JPasswordField) && text.isEditable() && text.isEnabled() && text.getSelectedText() != null;
+        return text != null && !(text instanceof JPasswordField) && text.isEnabled() && text.getSelectedText() != null;
     }
 }

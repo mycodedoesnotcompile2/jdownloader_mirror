@@ -41,21 +41,20 @@ import java.util.Map;
 import com.sun.jna.win32.W32APIOptions;
 
 /**
- * Standard {@link com.sun.jna.Native#load} option maps for Windows DLL bindings in AppWork projects.
- * Always pass one of these constants as the third argument — never {@link W32APIOptions#UNICODE_OPTIONS} or
- * {@link W32APIOptions#DEFAULT_OPTIONS} directly.
+ * Standard {@link com.sun.jna.Native#load} option maps for Windows DLL bindings in AppWork projects. Always pass one of these constants as
+ * the third argument — never {@link W32APIOptions#UNICODE_OPTIONS} or {@link W32APIOptions#DEFAULT_OPTIONS} directly.
  */
 public class JNAOptions {
     /** {@link W32APIOptions#DEFAULT_OPTIONS} plus {@code LOAD_LIBRARY_SEARCH_SYSTEM32}. */
-    public static final Map SYSTEM_DLLS_ONLY         = Collections.unmodifiableMap(new HashMap<String, Object>(W32APIOptions.DEFAULT_OPTIONS) {
-                                                                                       {
-                                                                                           put(com.sun.jna.Library.OPTION_OPEN_FLAGS, 0x00000800);
-                                                                                       }
-                                                                                   });
+    public static final Map<String, Object> SYSTEM_DLLS_ONLY         = Collections.unmodifiableMap(new HashMap<String, Object>(W32APIOptions.DEFAULT_OPTIONS) {
+                                                                         {
+                                                                             put(com.sun.jna.Library.OPTION_OPEN_FLAGS, 0x00000800);
+                                                                         }
+                                                                     });
     /** {@link W32APIOptions#UNICODE_OPTIONS} plus {@code LOAD_LIBRARY_SEARCH_SYSTEM32} (Win32 {@code *W} APIs). */
-    public static final Map UNICODE_SYSTEM_DLLS_ONLY = Collections.unmodifiableMap(new HashMap<String, Object>(W32APIOptions.UNICODE_OPTIONS) {
-                                                                                       {
-                                                                                           put(com.sun.jna.Library.OPTION_OPEN_FLAGS, 0x00000800);
-                                                                                       }
-                                                                                   });
+    public static final Map<String, Object> UNICODE_SYSTEM_DLLS_ONLY = Collections.unmodifiableMap(new HashMap<String, Object>(W32APIOptions.UNICODE_OPTIONS) {
+                                                                         {
+                                                                             put(com.sun.jna.Library.OPTION_OPEN_FLAGS, 0x00000800);
+                                                                         }
+                                                                     });
 }

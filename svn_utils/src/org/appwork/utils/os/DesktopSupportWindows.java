@@ -41,7 +41,6 @@ import java.net.URL;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.appwork.jna.windows.JNAOptions;
 import org.appwork.utils.Application;
 import org.appwork.utils.Files;
 import org.appwork.utils.IO;
@@ -50,10 +49,6 @@ import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.os.CrossSystem.OperatingSystem;
 import org.appwork.utils.processes.ProcessBuilderFactory;
 import org.appwork.utils.processes.ProcessOutput;
-
-import com.sun.jna.Native;
-import com.sun.jna.WString;
-import com.sun.jna.win32.StdCallLibrary;
 
 /**
  * @author daniel
@@ -134,28 +129,7 @@ public class DesktopSupportWindows extends DesktopSupportJavaDesktop {
                         if (tryToReuseWindows) {
                             // we need to go this cmd /c way, because explorer.exe seems to
                             // do some strange parameter parsing.
-                            String selectPath = file.getAbsolutePath();
-                            if (selectPath.length() > 259) {
-                                /*
-                                 * explorer.exe /select cannot select files whose full path exceeds MAX_PATH (260) and does not accept the
-                                 * "\\?\" prefix. Fall back to the 8.3 short path (below MAX_PATH), which explorer can select.
-                                 */
-                                final String shortPath = getWindowsShortPath(file);
-                                if (shortPath != null && shortPath.length() <= 259) {
-                                    selectPath = shortPath;
-                                } else {
-                                    /*
-                                     * No usable short path (e.g. 8.3 name generation disabled) -> open the parent folder without selecting.
-                                     */
-                                    selectPath = null;
-                                }
-                            }
-                            if (selectPath != null) {
-                                new ProcessBuilder("cmd", "/c", "explorer /select,\"" + selectPath + "\"").start();
-                            } else {
-                                /* No short path available -> Fallback */
-                                new ProcessBuilder("cmd", "/c", "explorer \"" + file.getParent() + "\"").start();
-                            }
+                            new ProcessBuilder("cmd", "/c", "explorer /select,\"" + file.getAbsolutePath() + "\"").start();
                         } else {
                             Desktop.getDesktop().open(file);
                         }
@@ -191,48 +165,6 @@ public class DesktopSupportWindows extends DesktopSupportJavaDesktop {
             }
         } catch (final Exception e) {
             ProcessBuilderFactory.create("rundll32.exe", "url.dll,FileProtocolHandler", file.getCanonicalPath()).start();
-        }
-    }
-
-    /**
-     * Minimal kernel32 binding for GetShortPathNameW (8.3 short path resolution). <br>
-     * https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getshortpathnamew
-     */
-    public interface Kernel32ShortPath extends StdCallLibrary {
-        Kernel32ShortPath INSTANCE = Native.load("kernel32", Kernel32ShortPath.class, JNAOptions.SYSTEM_DLLS_ONLY);
-
-        /** DWORD GetShortPathNameW(LPCWSTR lpszLongPath, LPWSTR lpszShortPath, DWORD cchBuffer). */
-        int GetShortPathNameW(WString lpszLongPath, char[] lpszShortPath, int cchBuffer);
-    }
-
-    /**
-     * Returns the 8.3 short path for the given file, or null if it is unavailable (8.3 name generation disabled on the volume, or the call
-     * failed). The input is prefixed with "\\?\" so that paths beyond MAX_PATH can be resolved; the prefix is stripped from the result so
-     * the returned path can be passed to explorer.exe.
-     */
-    private static String getWindowsShortPath(final File file) {
-        try {
-            String input = file.getAbsolutePath();
-            if (!input.startsWith("\\\\?\\")) {
-                input = "\\\\?\\" + input;
-            }
-            final char[] buffer = new char[8192];
-            final int len = Kernel32ShortPath.INSTANCE.GetShortPathNameW(new WString(input), buffer, buffer.length);
-            if (len <= 0 || len > buffer.length) {
-                /* 0 = failure; > buffer.length = buffer too small (should not happen with 8192). */
-                return null;
-            }
-            String shortPath = new String(buffer, 0, len);
-            if (shortPath.startsWith("\\\\?\\UNC\\")) {
-                /* "\\?\UNC\server\share\..." -> "\\server\share\..." */
-                shortPath = "\\\\" + shortPath.substring("\\\\?\\UNC\\".length());
-            } else if (shortPath.startsWith("\\\\?\\")) {
-                /* "\\?\C:\..." -> "C:\..." */
-                shortPath = shortPath.substring("\\\\?\\".length());
-            }
-            return shortPath;
-        } catch (final Throwable e) {
-            return null;
         }
     }
 

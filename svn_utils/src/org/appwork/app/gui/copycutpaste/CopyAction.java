@@ -67,17 +67,15 @@ public class CopyAction extends AbstractAction {
         return super.getValue(key);
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @seecom.rapidshare.utils.event.Event.ActionListener#actionPerformed(com. rapidshare.utils.event.Event.ActionEvent)
-     */
     public void actionPerformed(final ActionEvent e) {
+        if (text == null) {
+            return;
+        }
         text.copy();
     }
 
     @Override
     public boolean isEnabled() {
-        return !(text instanceof JPasswordField) && text.isEnabled() && text.getSelectedText() != null;
+        return text != null && !(text instanceof JPasswordField) && text.isEnabled() && text.getSelectedText() != null;
     }
 }

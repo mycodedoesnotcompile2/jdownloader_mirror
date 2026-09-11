@@ -57,7 +57,7 @@ import jd.plugins.hoster.HighWayMe2;
  * It recursively walks the users' HIGHWAY cloud via the JSON API and returns all contained files. </br>
  * Docs: https://high-way.me/threads/highway-api.201/ (section "HIGHWAY DAV JSON API")
  */
-@DecrypterPlugin(revision = "$Revision: 53361 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53383 $", interfaceVersion = 3, names = {}, urls = {})
 public class HighWayMeFolder3 extends PluginForDecrypt {
     public HighWayMeFolder3(PluginWrapper wrapper) {
         super(wrapper);
@@ -125,11 +125,13 @@ public class HighWayMeFolder3 extends PluginForDecrypt {
         br.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Basic " + Encoding.Base64Encode(usenetUsername + ":" + usenetPassword));
         br.getHeaders().put("Accept", "application/json");
         /**
-         * If true, items whose status does not allow downloading (see {@link HighWayCore#isDavItemDownloadable(String)}) are skipped and not
-         * added at all. </br>
+         * If true, items whose status does not allow downloading (see {@link HighWayCore#isDavItemDownloadable(String)}) are skipped and
+         * not added at all. </br>
          * If false, such items are added anyway but get a "Status_<status>_" filename prefix so they are easy to recognize.
          */
         final boolean skipUnDownloadableItems = PluginJsonConfig.get(HighWayMeHosterConfig.class).isCloudCrawlerAddOnlyDownloadableItems();
+        /* If true, the leading default prefixes (Torrent/TV/Usenet) are stripped from the path shown to the user. */
+        final boolean removeDefaultPrefixesFromPaths = PluginJsonConfig.get(HighWayMeHosterConfig.class).isCloudCrawlerRemoveDefaultPrefixesFromPaths();
         /*
          * Normalize the added URL.
          */
@@ -150,20 +152,31 @@ public class HighWayMeFolder3 extends PluginForDecrypt {
         int numberofEmptyFolders = 0;
         int numberofSkippedDueToStatus = 0;
         /* Collects directory elements skipped because of a disallowed status, mapped by their status value. */
-        final Map<String, List<Map<String, Object>>> skippedDirectoriesByStatus = new HashMap<String, List<Map<String, Object>>>();
+        final Map<String, List<Map<String, Object>>> skippedItemsByStatus = new HashMap<String, List<Map<String, Object>>>();
         folderQueue.add(startURL);
         crawledFolderURLs.add(startURL);
         do {
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
-                break;
+                throw new InterruptedException();
             }
             final String folderURL = folderQueue.remove(0);
             br.getPage(folderURL);
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             checkErrors(entries);
             final String currentPath = entries.get("path").toString();
-            final String currentPathForUser = currentPath.replaceFirst("(?i)^/cloud/(Torrent|TV|Usenet)/", "");
+            String currentPathForUser;
+            if (removeDefaultPrefixesFromPaths) {
+                currentPathForUser = currentPath.replaceFirst("(?i)^/cloud/(Torrent|TV|Usenet)/", "");
+            } else {
+                /* Only strip the leading "/cloud/" mount prefix but keep the Torrent/TV/Usenet part. */
+                currentPathForUser = currentPath.replaceFirst("(?i)^/cloud/", "");
+            }
+            final int slashIndex = currentPathForUser.lastIndexOf("/");
+            if (slashIndex != -1 && slashIndex == currentPathForUser.length() - 1) {
+                /* Remove trailing slash */
+                currentPathForUser = currentPathForUser.substring(0, currentPathForUser.length() - 1);
+            }
             final List<Map<String, Object>> items = (List<Map<String, Object>>) entries.get("entries");
             if (items.isEmpty()) {
                 logger.info("Found empty folder: " + folderURL);
@@ -177,21 +190,17 @@ public class HighWayMeFolder3 extends PluginForDecrypt {
             fp.setPackageKey("highwaydav://" + currentPath);
             for (final Map<String, Object> item : items) {
                 final String type = item.get("type").toString();
+                final boolean downloadable = HighWayCore.isDavItemDownloadable(item);
+                final Object statusO = item.get("status");
+                final String status = statusO != null ? statusO.toString() : "unknown";
                 if (StringUtils.equalsIgnoreCase(type, "directory")) {
                     /* Only crawl directories whose status allows downloading. */
-                    final Object statusO = item.get("status");
-                    final String status = statusO != null ? statusO.toString() : null;
-                    if (skipUnDownloadableItems && !HighWayCore.isDavItemDownloadable(status)) {
-                        /**
-                         * Skip directory element with disallowed status and remember it. <br>
-                         * Only relevant for Usenet items, see https://sabnzbd.org/wiki/extra/queue-history-searching <br>
-                         * -> See all status strings in the linked docs + custom status "Archiviert".
-                         */
+                    if (skipUnDownloadableItems && !downloadable) {
                         logger.info("Skipping directory because of disallowed status: " + status + " | " + item.get("url"));
-                        List<Map<String, Object>> skippedForStatus = skippedDirectoriesByStatus.get(status);
+                        List<Map<String, Object>> skippedForStatus = skippedItemsByStatus.get(status);
                         if (skippedForStatus == null) {
                             skippedForStatus = new ArrayList<Map<String, Object>>();
-                            skippedDirectoriesByStatus.put(status, skippedForStatus);
+                            skippedItemsByStatus.put(status, skippedForStatus);
                         }
                         skippedForStatus.add(item);
                         numberofSkippedDueToStatus++;
@@ -204,12 +213,15 @@ public class HighWayMeFolder3 extends PluginForDecrypt {
                         numberofFolders++;
                     }
                 } else if (StringUtils.equalsIgnoreCase(type, "file")) {
-                    final Object statusO = item.get("status");
-                    final String status = statusO != null ? statusO.toString() : null;
-                    final boolean downloadable = HighWayCore.isDavItemDownloadable(status);
+                    /* Skip file element with disallowed status. */
                     if (skipUnDownloadableItems && !downloadable) {
-                        /* Skip file element with disallowed status. */
                         logger.info("Skipping file because of disallowed status: " + status + " | " + item.get("path"));
+                        List<Map<String, Object>> skippedForStatus = skippedItemsByStatus.get(status);
+                        if (skippedForStatus == null) {
+                            skippedForStatus = new ArrayList<Map<String, Object>>();
+                            skippedItemsByStatus.put(status, skippedForStatus);
+                        }
+                        skippedForStatus.add(item);
                         numberofSkippedDueToStatus++;
                         continue;
                     }
@@ -220,12 +232,13 @@ public class HighWayMeFolder3 extends PluginForDecrypt {
                      */
                     final String canonicalURL = added.getProtocol() + "://" + added.getHost() + path.replace(" ", "%20");
                     final DownloadLink link = this.createDownloadlink(canonicalURL);
-                    String filename = item.get("name").toString();
-                    if (!downloadable) {
+                    final String filename = item.get("name").toString();
+                    if (downloadable) {
+                        link.setFinalFileName(filename);
+                    } else {
                         /* Prefix the filename so non-downloadable items are easy to recognize. */
-                        filename = "Status_" + status + "_" + filename;
+                        link.setName("Status_" + status + "_" + filename);
                     }
-                    link.setName(filename);
                     link.setVerifiedFileSize(((Number) item.get("size")).longValue());
                     link.setRelativeDownloadFolderPath(currentPathForUser);
                     /* Set file hashes if available (both fields can be null). */
@@ -257,7 +270,7 @@ public class HighWayMeFolder3 extends PluginForDecrypt {
             } else if (numberofSkippedDueToStatus > 0) {
                 /* Build a comma separated list of all distinct statuses that led to skipped directories. */
                 final StringBuilder skippedStatuses = new StringBuilder();
-                for (final String status : skippedDirectoriesByStatus.keySet()) {
+                for (final String status : skippedItemsByStatus.keySet()) {
                     if (skippedStatuses.length() > 0) {
                         skippedStatuses.append(", ");
                     }

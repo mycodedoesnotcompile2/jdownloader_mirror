@@ -15,6 +15,10 @@ public interface HighWayMeHosterConfig extends PluginConfigInterface {
         public String getCloudCrawlerAddOnlyDownloadableItems_label() {
             return "Cloud crawler: Add only downloadable elements";
         }
+
+        public String getCloudCrawlerRemoveDefaultPrefixesFromPaths_label() {
+            return "Cloud crawler: Remove default prefixes from paths (e.g. Torrent/TV/Usenet)?";
+        }
     }
 
     @AboutConfig
@@ -23,4 +27,11 @@ public interface HighWayMeHosterConfig extends PluginConfigInterface {
     boolean isCloudCrawlerAddOnlyDownloadableItems();
 
     void setCloudCrawlerAddOnlyDownloadableItems(boolean b);
+
+    @AboutConfig
+    @DefaultBooleanValue(true)
+    @Order(20)
+    boolean isCloudCrawlerRemoveDefaultPrefixesFromPaths();
+
+    void setCloudCrawlerRemoveDefaultPrefixesFromPaths(boolean b);
 }
