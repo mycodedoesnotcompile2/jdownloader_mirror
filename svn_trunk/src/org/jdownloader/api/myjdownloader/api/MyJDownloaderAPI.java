@@ -141,13 +141,18 @@ public class MyJDownloaderAPI extends AbstractMyJDClientForDesktopJVM {
             try {
                 return br.openRequestConnection(request);
             } catch (BrowserException e) {
-                final LogSource logger = this.logger;
+                LogInterface logger = this.logger;
+                if (logger == null) {
+                    logger = br.getLogger();
+                }
                 if (logger != null) {
                     logger.log(e);
                 }
                 if (Exceptions.containsInstanceOf(e, SocketTimeoutException.class) && request.getHttpConnection() instanceof URLConnectionAdapterDirectImpl && retryDirectSocketTimeoutException-- > 0) {
                     request.getHeaders().put("X-RDSTE", Integer.toString(retryDirectSocketTimeoutException));
-                    logger.info("retryDirectSocketTimeoutException:" + retryDirectSocketTimeoutException);
+                    if (logger != null) {
+                        logger.info("retryDirectSocketTimeoutException:" + retryDirectSocketTimeoutException);
+                    }
                     try {
                         Thread.sleep(1000);
                     } catch (InterruptedException e1) {
@@ -201,7 +206,7 @@ public class MyJDownloaderAPI extends AbstractMyJDClientForDesktopJVM {
         } catch (final Throwable e) {
             LoggerFactory.getDefaultLogger().log(e);
         }
-        final String revision = new Regex("$Revision: 46545 $", "Revision:\\s*?(\\d+)").getMatch(0);
+        final String revision = new Regex("$Revision: 53386 $", "Revision:\\s*?(\\d+)").getMatch(0);
         if (revision == null) {
             return "api_0" + sb.toString();
         } else {

@@ -58,7 +58,6 @@ import org.appwork.utils.net.httpserver.requests.MkcolRequest;
 import org.appwork.utils.net.httpserver.requests.MoveRequest;
 import org.appwork.utils.net.httpserver.requests.MsearchRequest;
 import org.appwork.utils.net.httpserver.requests.NotifyRequest;
-import org.appwork.utils.net.httpserver.requests.OptionsRequest;
 import org.appwork.utils.net.httpserver.requests.PatchRequest;
 import org.appwork.utils.net.httpserver.requests.PostRequest;
 import org.appwork.utils.net.httpserver.requests.PropfindRequest;
@@ -276,7 +275,9 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
                 assertTrue(responseCode == ResponseCode.METHOD_NOT_ALLOWED.getCode(), "Connect is expected to be 405 here, because it is used for proxy servers only!, was: " + responseCode);
                 return;
             }
-            assertTrue(responseCode == 200, method.name() + " request to " + context.getUrl() + " should return 200, was: " + responseCode);
+            // OPTIONS is answered by CorsHandler.answerOptionsRequest with 204 No Content and an empty body, not by the API handler
+            final int expectedCode = method == RequestMethod.OPTIONS ? ResponseCode.SUCCESS_NO_CONTENT.getCode() : ResponseCode.SUCCESS_OK.getCode();
+            assertTrue(responseCode == expectedCode, method.name() + " request to " + context.getUrl() + " should return " + expectedCode + ", was: " + responseCode);
             // Verify Request class is included in response
             if (method == RequestMethod.GET) {
                 assertTrue(responseBody.contains("[Request: " + GetRequest.class.getSimpleName() + "]"), "Response should contain '[Request: " + GetRequest.class.getSimpleName() + "]', was: " + responseBody);
@@ -289,7 +290,7 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
             } else if (method == RequestMethod.HEAD) {
                 assertTrue(responseBody.equals(""), "No response for head request!. was: " + responseBody);
             } else if (method == RequestMethod.OPTIONS) {
-                assertTrue(responseBody.equals(""), "Response should be empty '[Request: " + OptionsRequest.class.getSimpleName() + "]', was: " + responseBody);
+                assertTrue(responseBody.equals(""), "OPTIONS response body should be empty, was: " + responseBody);
             } else if (method == RequestMethod.TRACE) {
                 assertTrue(responseBody.contains("[Request: " + TraceRequest.class.getSimpleName() + "]"), "Response should contain '[Request: " + TraceRequest.class.getSimpleName() + "]', was: " + responseBody);
             } else if (method == RequestMethod.CONNECT) {
@@ -384,6 +385,10 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
             assertTrue(responseCode == 200, method.name() + " request to /test/postData should return 200, was: " + responseCode);
             // Verify Request class is included in response
             assertTrue(responseBody.contains(" [Request: " + PostRequest.class.getSimpleName() + "]"), "Response should contain ' [Request: " + PostRequest.class.getSimpleName() + "]', was: " + responseBody);
+        } else if (method == RequestMethod.OPTIONS) {
+            // OPTIONS is answered by CorsHandler.answerOptionsRequest with 204 No Content and an empty body, not by the API handler
+            assertTrue(responseCode == ResponseCode.SUCCESS_NO_CONTENT.getCode(), method.name() + " request should return " + ResponseCode.SUCCESS_NO_CONTENT.getCode() + ", was: " + responseCode);
+            assertTrue(responseBody.equals(""), "OPTIONS response body should be empty, was: " + responseBody);
         } else {
             // Method is allowed (methods is null), so it should work fine
             assertTrue(responseCode == ResponseCode.SUCCESS_OK.getCode(), method.name() + " request should not return 405 (METHOD_NOT_ALLOWED) when methods is null (all allowed), was: " + responseCode);

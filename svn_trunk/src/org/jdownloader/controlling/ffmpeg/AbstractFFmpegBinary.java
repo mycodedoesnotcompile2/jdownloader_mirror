@@ -995,6 +995,9 @@ public abstract class AbstractFFmpegBinary {
                             throw new FFMpegException("FFmpeg Failed: disk full", lastStdout, lastStderr, ERROR.DISK_FULL);
                         } else if (StringUtils.containsIgnoreCase(lastStderr, ": Protocol not found'") || StringUtils.containsIgnoreCase(lastStderr, "Did you mean file:http")) {
                             throw new FFMpegException("FFmpeg Failed: version does not support http protocol", lastStdout, lastStderr, ERROR.INCOMPATIBLE);
+                        } else if (StringUtils.containsIgnoreCase(lastStderr, "GLIBC")) {
+                            // /lib/x86_64-linux-gnu/libm.so.6: version `GLIBC_2.27' not found
+                            throw new FFMpegException("FFmpeg Failed: too old GLIBC", lastStdout, lastStderr, ERROR.INCOMPATIBLE);
                         } else {
                             throw new FFMpegException("FFmpeg Failed", lastStdout, lastStderr);
                         }

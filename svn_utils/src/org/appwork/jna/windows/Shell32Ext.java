@@ -35,11 +35,15 @@
 package org.appwork.jna.windows;
 
 import com.sun.jna.Native;
+import com.sun.jna.Pointer;
 
 import org.appwork.jna.windows.structs.NOTIFYICONDATA;
 import org.appwork.jna.windows.structs.NOTIFYICONIDENTIFIER;
 
+import com.sun.jna.platform.win32.WinNT.HRESULT;
 import com.sun.jna.platform.win32.WinUser;
+import com.sun.jna.ptr.IntByReference;
+import com.sun.jna.ptr.PointerByReference;
 
 /**
  * Shell32 extension for System Tray functionality.
@@ -69,4 +73,46 @@ public interface Shell32Ext extends com.sun.jna.platform.win32.Shell32 {
      * @return HRESULT - S_OK if successful, otherwise an error code
      */
     int Shell_NotifyIconGetRect(NOTIFYICONIDENTIFIER identifier, WinUser.RECT iconLocation);
+
+    /**
+     * Translates a file-system path (or other display name) into an absolute ITEMIDLIST (PIDL). The returned PIDL must be released with
+     * {@code Ole32.INSTANCE.CoTaskMemFree(...)}. <br>
+     * Unlike {@code explorer.exe /select}, this works for paths that exceed MAX_PATH (260 chars) and does not depend on an 8.3 short name
+     * being available for the file.
+     *
+     * @param pszName
+     *            the parsing name (e.g. the absolute file path); passed as {@link String} because this interface is loaded with the UNICODE
+     *            {@code TypeMapper}, which marshals it as a wide string automatically - no {@link com.sun.jna.WString} needed
+     * @param pbc
+     *            bind context, may be {@code null}
+     * @param ppidl
+     *            receives the absolute PIDL on success
+     * @param sfgaoIn
+     *            attributes to query ({@code 0} if none)
+     * @param psfgaoOut
+     *            receives the queried attributes, may be {@code null}
+     * @return {@code S_OK} (0) on success
+     * @see <a href="https://learn.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shparsedisplayname">SHParseDisplayName</a>
+     */
+    HRESULT SHParseDisplayName(String pszName, Pointer pbc, PointerByReference ppidl, int sfgaoIn, IntByReference psfgaoOut);
+
+    /**
+     * Opens a Windows Explorer window with the items in a specified folder selected. <br>
+     * Special case: passing the item's own absolute PIDL as {@code pidlFolder} together with {@code cidl == 0} and {@code apidl == null}
+     * opens the item's <b>parent</b> folder and selects the item itself. This is the MAX_PATH-safe replacement for
+     * {@code explorer.exe /select,"<path>"}.
+     *
+     * @param pidlFolder
+     *            absolute PIDL of the folder (or of the item itself, see above)
+     * @param cidl
+     *            number of elements in {@code apidl}
+     * @param apidl
+     *            array of child PIDLs to select, may be {@code null}
+     * @param dwFlags
+     *            open flags ({@code 0} for default)
+     * @return {@code S_OK} (0) on success
+     * @see <a href=
+     *      "https://learn.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shopenfolderandselectitems">SHOpenFolderAndSelectItems</a>
+     */
+    HRESULT SHOpenFolderAndSelectItems(Pointer pidlFolder, int cidl, Pointer[] apidl, int dwFlags);
 }

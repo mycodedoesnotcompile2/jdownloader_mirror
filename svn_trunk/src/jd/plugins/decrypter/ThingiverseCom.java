@@ -4,16 +4,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
+import java.util.concurrent.atomic.AtomicReference;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
+import jd.http.Request;
 import jd.http.requests.PostRequest;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.CryptedLink;
@@ -26,13 +22,20 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49689 $", interfaceVersion = 2, names = { "thingiverse.com" }, urls = { "https?://(www\\.)?thingiverse\\.com/(thing:\\d+|make:\\d+|[^/]+/(about|designs|collections(/[^/]+)?|makes|likes|things)|groups/[^/]+(/(things|about))?)" })
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 53387 $", interfaceVersion = 2, names = { "thingiverse.com" }, urls = { "https?://(www\\.)?thingiverse\\.com/(thing:\\d+|make:\\d+|[^/]+/(about|designs|collections(/[^/]+)?|makes|likes|things)|groups/[^/]+(/(things|about))?)" })
 public class ThingiverseCom extends PluginForDecrypt {
     public ThingiverseCom(PluginWrapper wrapper) {
         super(wrapper);
     }
 
-    private final String API_BASE = "https://api.thingiverse.com";
+    private final String API_BASE = "https://www.thingiverse.com/api";
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
@@ -53,20 +56,7 @@ public class ThingiverseCom extends PluginForDecrypt {
             }
         } else if (thingID != null) {
             /* a thing */
-            /* 2024-04-23: Prefer WebAPI over website */
-            final boolean preferWebAPI = true;
-            if (preferWebAPI) {
-                /* API */
-                try {
-                    return crawlThingAPI(thingID);
-                } catch (final Throwable e) {
-                    logger.info("API handling failed -> Fallback to website handling");
-                    return this.crawlThingWebsite(thingID);
-                }
-            } else {
-                /* Website */
-                return this.crawlThingWebsite(thingID);
-            }
+            return crawlThingAPI(thingID);
         } else if (StringUtils.containsIgnoreCase(param.getCryptedUrl(), "/make:")) {
             // a make
             final String contentID = new Regex(param.getCryptedUrl(), "(\\d+)$").getMatch(0);
@@ -78,8 +68,10 @@ public class ThingiverseCom extends PluginForDecrypt {
             if (authtoken == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            br.getHeaders().put("Authorization", "Bearer " + authtoken);
-            br.getPage(API_BASE + "/copies/" + contentID);
+            final Request request = br.createGetRequest(API_BASE + "/copies/" + contentID);
+            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + authtoken);
+            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.thingiverse.com/");
+            br.getPage(request);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -111,8 +103,10 @@ public class ThingiverseCom extends PluginForDecrypt {
         if (authtoken == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        br.getHeaders().put("Authorization", "Bearer " + authtoken);
-        br.getPage(API_BASE + "/things/" + thingID);
+        final Request request = br.createGetRequest(API_BASE + "/things/" + thingID);
+        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + authtoken);
+        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.thingiverse.com/");
+        br.getPage(request);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -142,46 +136,21 @@ public class ThingiverseCom extends PluginForDecrypt {
         return ret;
     }
 
-    private ArrayList<DownloadLink> crawlThingWebsite(final String thingID) throws Exception {
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        br.getPage("https://www." + getHost() + "/thing:" + thingID);
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        String fpName = br.getRegex("<title>\\s*([^<]+?)\\s*-\\s*Thingiverse").getMatch(0);
-        final DownloadLink link = createDownloadlink(DirectHTTP.createURLForThisPlugin(String.format("https://www.thingiverse.com//thing:%s/zip", thingID)));
-        if (fpName != null) {
-            fpName = Encoding.htmlOnlyDecode(fpName).trim();
-            link.setFinalFileName(fpName + ".zip");
-        }
-        ret.add(link);
-        // Images to see what we've downloaded (in case the label doesn't make much sense in hindsight).
-        final String[] imageLinks = br.getRegex("<div class=\"gallery-photo\"[^>]*data-full=\"([^\"]+)\"[^>]*>").getColumn(0);
-        if (imageLinks != null && imageLinks.length > 0) {
-            for (String imageLink : imageLinks) {
-                imageLink = Encoding.htmlOnlyDecode(imageLink);
-                final DownloadLink imageDL = createDownloadlink(imageLink);
-                if (fpName != null) {
-                    imageDL.setFinalFileName(fpName + "_" + imageLink.hashCode() + ".jpg");
-                }
-                ret.add(imageDL);
-            }
-        }
-        final FilePackage fp = FilePackage.getInstance();
-        if (fpName != null) {
-            fp.setName(Encoding.htmlDecode(fpName).trim());
-        }
-        fp.addLinks(ret);
-        return ret;
-    }
+    private static AtomicReference<String> AUTH_TOKEN = new AtomicReference<String>();
 
     private String getAuthToken(final Browser br) throws Exception {
-        br.getPage("https://cdn." + this.getHost() + "/site/js/app.bundle.js");
-        final String authtoken = br.getRegex("(?:d|u|l)\\s*=\\s*\"([a-f0-9]{32})\"").getMatch(0);
-        if (StringUtils.isEmpty(authtoken)) {
+        String ret = AUTH_TOKEN.get();
+        if (ret != null) {
+            return ret;
+        }
+        final Browser brc = br.cloneBrowser();
+        brc.getPage("https://www.thingiverse.com/_next/static/chunks/8894.de789bbe5b3daaa5.js");
+        ret = brc.getRegex("\"\".concat\\(\"([a-fA-F0-9]{32})\"\\)").getMatch(0);
+        if (StringUtils.isEmpty(ret)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         } else {
-            return authtoken;
+            AUTH_TOKEN.set(ret);
+            return ret;
         }
     }
 

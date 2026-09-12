@@ -34,14 +34,33 @@ public final class InteractiveSessionOwner {
     }
 
     /**
-     * Resolves the owner of the current process WTS session (same session id as {@link WindowsUtils#getCurrentProcessSessionId()}).
+     * Resolves the interactive owner for launching UI/user-context children from the current process.
+     * <p>
+     * Callers without an interactive desktop (typically LocalSystem in session 0) use
+     * {@link SessionUserTokens#resolveInteractiveOwnerSession()} (Explorer / {@code WTSActive} / console fallback) instead of the process
+     * session.
      */
     public static InteractiveSessionOwner openForCurrentProcess() throws Exception {
-        int sid = WindowsUtils.getCurrentProcessSessionId();
-        if (sid < 0) {
+        return openForSession(resolveOwnerSessionIdForCurrentProcess());
+    }
+
+    /**
+     * Owner WTS session for {@link #openForCurrentProcess()} / {@link RunAsHelper#resolveCurrentContext()}: normally the process session;
+     * for LocalSystem in session 0 the interactive desktop session (not necessarily {@code WTSGetActiveConsoleSessionId}).
+     *
+     * @throws NoInteractiveOwnerSessionException
+     *             when session 0 / LocalSystem and no usable interactive owner session can be determined
+     */
+    public static int resolveOwnerSessionIdForCurrentProcess() {
+        int processSession = WindowsUtils.getCurrentProcessSessionId();
+        if (processSession < 0) {
             throw new IllegalStateException("Cannot resolve WTS session id for current process (ProcessIdToSessionId failed).");
         }
-        return openForSession(sid);
+        // Session 0 has no interactive desktop/Explorer — resolve via Explorer map + WTSActive (+ console fallback).
+        if (processSession == 0 && WindowsUtils.isRunningAsLocalSystem()) {
+            return SessionUserTokens.resolveInteractiveOwnerSession();
+        }
+        return processSession;
     }
 
     /**

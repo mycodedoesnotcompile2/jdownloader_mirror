@@ -39,7 +39,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * JD will not render these config handlers automatically, but expect that you create a custom config oanel extension
+ * JD will not render these config handlers automatically, but expect that you create a custom config panel extension
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.METHOD })

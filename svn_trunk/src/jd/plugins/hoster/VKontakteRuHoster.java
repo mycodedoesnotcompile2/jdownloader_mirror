@@ -23,9 +23,11 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
@@ -78,11 +80,11 @@ import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 @PluginDependencies(dependencies = { VKontakteRu.class })
-@HostPlugin(revision = "$Revision: 52614 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53392 $", interfaceVersion = 2, names = {}, urls = {})
 /* Most of all links are coming from a crawler plugin. */
 public class VKontakteRuHoster extends PluginForHost {
     /* Current main domain */
-    private static final String DOMAIN                                                                      = "vk.com";
+    private static final String DOMAIN                                                                      = "vk.ru";
     private static final String DOMAIN_VIDEO                                                                = "vkvideo.ru";
     private static final String TYPE_AUDIOLINK                                                              = "(?i)https?://vkontaktedecrypted\\.ru/audiolink/((?:\\-)?\\d+)_(\\d+)";
     /* TODO: Remove this */
@@ -141,6 +143,7 @@ public class VKontakteRuHoster extends PluginForHost {
     public static String        PROPERTY_GENERAL_wall_post_id                                               = "wall_post_id";
     /* Account properties */
     public static final String  PROPERTY_ACCOUNT_VK_VIDEO_SUPPORT                                           = "vk_video_support";
+    public static final String  PROPERTY_ACCOUNT_COOKIE_HOST                                                = "vk_account_cookie_host";
     /* For single photos */
     public static final String  PROPERTY_PHOTOS_directurls_fallback                                         = "directurls_fallback";
     public static final String  PROPERTY_PHOTOS_photo_list_id                                               = "photo_list_id";
@@ -194,7 +197,7 @@ public class VKontakteRuHoster extends PluginForHost {
     }
 
     public static Browser prepBrowser(final Browser br) {
-        final String useragent = SubConfiguration.getConfig("vk.com").getStringProperty(VKADVANCED_USER_AGENT, default_VKADVANCED_USER_AGENT);
+        final String useragent = SubConfiguration.getConfig("vk.rz").getStringProperty(VKADVANCED_USER_AGENT, default_VKADVANCED_USER_AGENT);
         if (!StringUtils.isEmpty(useragent) && !StringUtils.equals(useragent, default_VKADVANCED_USER_AGENT)) {
             br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, useragent);
         } else {
@@ -224,7 +227,7 @@ public class VKontakteRuHoster extends PluginForHost {
     }
 
     public static void setRequestIntervalLimits() {
-        Browser.setBurstRequestIntervalLimitGlobal("vk.com", 500, 15, 30000);
+        Browser.setBurstRequestIntervalLimitGlobal("vk.ru", 500, 15, 30000);
     }
 
     @Override
@@ -368,7 +371,7 @@ public class VKontakteRuHoster extends PluginForHost {
                     if (postID != null && fromId != null) {
                         logger.info("Trying to refresh audiolink directlink via wall-handling");
                         final String post = "act=get_wall_playlist&al=1&local_id=" + postID + "&oid=" + fromId + "&wall_type=own";
-                        brc.postPage(getBaseURL() + "/audio", post);
+                        brc.postPage(getBaseURL(account) + "/audio", post);
                         finalurl = brc.getRegex("\"0\":\"" + Pattern.quote(ownerID) + "\",\"1\":\"" + Pattern.quote(contentID) + "\",\"2\":(\"[^\"]+\")").getMatch(0);
                         if (finalurl != null) {
                             /* Decode the json string */
@@ -380,20 +383,20 @@ public class VKontakteRuHoster extends PluginForHost {
                         /*
                          * No way to easily get the needed info directly --> Load the complete audio album and find a fresh directlink for
                          * our ID.
-                         * 
+                         *
                          * E.g. get-play-link: https://vk.com/audio?id=<ownerID>&audio_id=<contentID>
                          */
                         /*
                          * 2017-01-05: They often change the order of the ownerID and contentID parameters here so from now on, let's try
                          * both variants.
                          */
-                        postPageSafe(account, link, getBaseURL() + "/al_audio.php", "act=reload_audio&al=1&ids=" + ownerID + "_" + contentID);
+                        postPageSafe(account, link, getBaseURL(account) + "/al_audio.php", "act=reload_audio&al=1&ids=" + ownerID + "_" + contentID);
                         finalurl = audioGetDirectURL(brc, account);
                         if (finalurl == null) {
-                            postPageSafe(account, link, getBaseURL() + "/al_audio.php", "act=reload_audio&al=1&ids=" + contentID + "_" + ownerID);
+                            postPageSafe(account, link, getBaseURL(account) + "/al_audio.php", "act=reload_audio&al=1&ids=" + contentID + "_" + ownerID);
                             finalurl = audioGetDirectURL(brc, account);
                             if (finalurl == null) {
-                                postPageSafe(account, link, getBaseURL() + "/al_audio.php", "act=reload_audio&al=1&ids=" + ownerID + "_" + contentID);
+                                postPageSafe(account, link, getBaseURL(account) + "/al_audio.php", "act=reload_audio&al=1&ids=" + ownerID + "_" + contentID);
                                 finalurl = audioGetDirectURL(brc, account);
                             }
                         }
@@ -471,7 +474,7 @@ public class VKontakteRuHoster extends PluginForHost {
                     /* Access normal single photo or photo inside album (in context of album). */
                     String albumID = link.getStringProperty(PROPERTY_PHOTOS_album_id);
                     /* Find albumID */
-                    getPageSafe(account, link, getBaseURL() + "/photo" + photoID);
+                    getPageSafe(account, link, getBaseURL(account) + "/photo" + photoID);
                     if (br.containsHTML("(?i)>\\s*(Unknown error|Unbekannter Fehler|Access denied|Error<)") || this.br.getHttpConnection().getResponseCode() == 404) {
                         throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                     } else if (!br.getURL().contains(photoID)) {
@@ -549,7 +552,7 @@ public class VKontakteRuHoster extends PluginForHost {
                             // TODO: Check this handling
                             /* Only go the json-way if we have to! */
                             if (albumID != null) {
-                                postPageSafe(br, account, link, getBaseURL() + "/al_photos.php", "act=show&al=1&module=photos&list=album" + albumID + "&photo=" + photoID);
+                                postPageSafe(br, account, link, getBaseURL(account) + "/al_photos.php", "act=show&al=1&module=photos&list=album" + albumID + "&photo=" + photoID);
                             } else {
                                 if (photo_list_id == null || module == null) {
                                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -562,7 +565,7 @@ public class VKontakteRuHoster extends PluginForHost {
                                 query.add("list", Encoding.urlEncode(photo_list_id));
                                 query.add("module", module);
                                 query.add("photo", photoID);
-                                postPageSafe(br, account, link, getBaseURL() + "/al_photos.php?act=show", query);
+                                postPageSafe(br, account, link, getBaseURL(account) + "/al_photos.php?act=show", query);
                             }
                             checkErrorsPhoto(br);
                             finalurl = getHighestQualityPictureDownloadurl(br, link, isDownload);
@@ -873,7 +876,7 @@ public class VKontakteRuHoster extends PluginForHost {
     private static void setHeadersPhoto(final Browser br) {
         br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
         br.getHeaders().put("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
-        br.getHeaders().put("Origin", "https://vk.com");
+        br.getHeaders().put("Origin", "https://vk.ru");
     }
 
     private static Map<String, String> LOCK_429 = new HashMap<String, String>();
@@ -945,7 +948,7 @@ public class VKontakteRuHoster extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return getBaseURL() + "/help.php?page=terms";
+        return getBaseURL(null) + "/help.php?page=terms";
     }
 
     @Override
@@ -1256,7 +1259,7 @@ public class VKontakteRuHoster extends PluginForHost {
                 }
             }
             logger.info("Performing full login");
-            br.getPage(getBaseURL() + "/");
+            br.getPage(getBaseURL(account) + "/");
             handleTooManyRequests(this, br);
             final Form login = br.getFormbyProperty("id", "quick_login_form");
             if (login == null) {
@@ -1318,9 +1321,10 @@ public class VKontakteRuHoster extends PluginForHost {
 
     private boolean checkCookieLogin(final Browser br, final Account account, final Cookies sourceCookies) throws Exception {
         /* Important: Added cookies may only be valid for the main domain OR the main video domain. */
-        final String[] urls;
         final List<Cookie> vkvideoCookies = new ArrayList<Cookie>();
+        final Set<String> cookieHosts = new LinkedHashSet<String>();
         for (final Cookie cookie : sourceCookies.getCookies()) {
+            cookieHosts.add("https://" + cookie.getHost());
             if (cookie.getHost().equalsIgnoreCase("vkvideo.ru")) {
                 vkvideoCookies.add(cookie);
             }
@@ -1329,19 +1333,22 @@ public class VKontakteRuHoster extends PluginForHost {
          * accessing vkvideo.ru without vkvideo.ru login cookies may result in http response 429. <br>
          * As a workaround we only check for vkvideo.ru login validity if the user has vkvideo.ru cookies.
          */
+        final LinkedHashSet<String> urls = new LinkedHashSet<String>();
         if (!vkvideoCookies.isEmpty()) {
-            urls = new String[2];
-            /* The order is important! First check for vkvideo, then vk.com! */
-            urls[0] = getBaseURLVideo();
-            urls[1] = getBaseURL();
-        } else {
-            urls = new String[1];
-            urls[0] = getBaseURL();
+            /* The order is important! First check for vkvideo, then vk! */
+            urls.add("vkvideo.ru");
+            urls.add(getBaseURLVideo(account));
         }
+        urls.addAll(cookieHosts);
+        urls.add(getBaseURL(account));
+        urls.add(getBaseURL(null));
         final int[] allowed_response_codes_before = br.getAllowedResponseCodes();
         br.setAllowedResponseCodes(429);
         try {
             for (final String url : urls) {
+                if (url == null) {
+                    continue;
+                }
                 br.getPage(url);
                 handleTooManyRequests(this, br);
                 if (!isLoggedinHTML(br)) {
@@ -1349,6 +1356,7 @@ public class VKontakteRuHoster extends PluginForHost {
                     Thread.sleep(1000l);
                     continue;
                 }
+                account.setProperty(PROPERTY_ACCOUNT_COOKIE_HOST, br.getHost());
                 final String user_id = regExVKAccountID(br);
                 logger.info("Cookie login successful for: " + url + " | user_id=" + user_id);
                 if (user_id != null) {
@@ -1401,7 +1409,7 @@ public class VKontakteRuHoster extends PluginForHost {
     private void getPageSafe(final Browser br, final Account acc, final DownloadLink link, final String page) throws Exception {
         br.getPage(page);
         handleTooManyRequests(this, br);
-        if (acc != null && br.getRedirectLocation() != null && br.getRedirectLocation().contains("login.vk.com/?role=fast")) {
+        if (acc != null && br.getRedirectLocation() != null && br.getRedirectLocation().contains("login.vk.ru/?role=fast")) {
             logger.info("Avoiding 'login.vk.com/?role=fast&_origin=' security check by re-logging in...");
             // Force login
             login(br, acc, false);
@@ -1411,7 +1419,7 @@ public class VKontakteRuHoster extends PluginForHost {
             // Force login
             login(br, acc, false);
             br.getPage(page);
-        } else if (br.getRedirectLocation() != null && br.getRedirectLocation().replaceAll("https?://(\\w+\\.)?vk\\.com", "").equals(page.replaceAll("https?://(\\w+\\.)?vk\\.com", ""))) {
+        } else if (br.getRedirectLocation() != null && br.getRedirectLocation().replaceAll("https?://(\\w+\\.)?vk\\.ru", "").equals(page.replaceAll("https?://(\\w+\\.)?vk\\.ru", ""))) {
             br.getPage(br.getRedirectLocation());
         }
         generalErrorhandling(br);
@@ -1427,7 +1435,7 @@ public class VKontakteRuHoster extends PluginForHost {
 
     private void postPageSafe(final Browser br, final Account acc, final DownloadLink link, final String page, final String postData) throws Exception {
         br.postPage(page, postData);
-        if (acc != null && br.getRedirectLocation() != null && br.getRedirectLocation().contains("login.vk.com/?role=fast")) {
+        if (acc != null && br.getRedirectLocation() != null && br.getRedirectLocation().contains("login.vk.ru/?role=fast")) {
             logger.info("Avoiding 'login.vk.com/?role=fast&_origin=' security check by re-logging in...");
             // Force login
             login(br, acc, false);
@@ -1750,11 +1758,14 @@ public class VKontakteRuHoster extends PluginForHost {
         return "https://";
     }
 
-    public static String getBaseURL() {
-        return getProtocol() + DOMAIN;
+    public static String getBaseURL(final Account account) {
+        if (account == null) {
+            return getProtocol() + DOMAIN;
+        }
+        return getProtocol() + account.getStringProperty(PROPERTY_ACCOUNT_COOKIE_HOST, DOMAIN);
     }
 
-    public static String getBaseURLVideo() {
+    public static String getBaseURLVideo(final Account account) {
         return getProtocol() + DOMAIN_VIDEO;
     }
 
@@ -1924,16 +1935,16 @@ public class VKontakteRuHoster extends PluginForHost {
     }
 
     public static QualitySelectionMode getSelectedVideoQualitySelectionMode() {
-        final int index = SubConfiguration.getConfig("vk.com").getIntegerProperty(VIDEO_QUALITY_SELECTION_MODE, default_VIDEO_QUALITY_SELECTION_MODE);
+        final int index = SubConfiguration.getConfig("vk.ru").getIntegerProperty(VIDEO_QUALITY_SELECTION_MODE, default_VIDEO_QUALITY_SELECTION_MODE);
         return QualitySelectionMode.values()[Math.min(QualitySelectionMode.values().length - 1, index)];
     }
 
     public static boolean getConfigPreferHLS() {
-        return SubConfiguration.getConfig("vk.com").getBooleanProperty(CONFIG_PREFER_HLS, default_CONFIG_PREFER_HLS);
+        return SubConfiguration.getConfig("vk.ru").getBooleanProperty(CONFIG_PREFER_HLS, default_CONFIG_PREFER_HLS);
     }
 
     public static String getPreferredQualityString() {
-        final int index = SubConfiguration.getConfig("vk.com").getIntegerProperty(PREFERRED_VIDEO_QUALITY, default_PREFERRED_VIDEO_QUALITY);
+        final int index = SubConfiguration.getConfig("vk.ru").getIntegerProperty(PREFERRED_VIDEO_QUALITY, default_PREFERRED_VIDEO_QUALITY);
         final Quality quality = Quality.values()[Math.min(Quality.values().length - 1, index)];
         switch (quality) {
         case Q2160:

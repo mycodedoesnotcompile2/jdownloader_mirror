@@ -234,6 +234,27 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Mark as finished" })
     String gui_table_contextmenu_markfinished();
 
+    @Default(lngs = { "en" }, values = { "Mark as finished if file exists on disk" })
+    String gui_table_contextmenu_markexistingondiskasfinished();
+
+    @Default(lngs = { "en" }, values = { "Mark existing files as finished" })
+    String MarkExistingOnDiskAsFinishedAction_progress_title();
+
+    @Default(lngs = { "en" }, values = { "Checking %s1 item(s) for existing files on disk ..." })
+    String MarkExistingOnDiskAsFinishedAction_progress_msg(int size);
+
+    @Default(lngs = { "en" }, values = { "%s1/%s2 | Marked: %s3 | Skipped: %s4 | Errors: %s5" })
+    String MarkExistingOnDiskAsFinishedAction_progress_status(int current, int total, int marked, int skipped, int errors);
+
+    @Default(lngs = { "en" }, values = { "Done | Marked: %s1 | Skipped: %s2 | Errors: %s3 | Closing in %s4 s" })
+    String MarkExistingOnDiskAsFinishedAction_progress_status_done(int marked, int skipped, int errors, int seconds);
+
+    @Default(lngs = { "en" }, values = { "Working on: %s1" })
+    String MarkExistingOnDiskAsFinishedAction_working_on(String name);
+
+    @Default(lngs = { "en" }, values = { "Done." })
+    String MarkExistingOnDiskAsFinishedAction_working_done();
+
     @Default(lngs = { "en" }, values = { "Stop after this download" })
     String gui_table_contextmenu_stopmark_set();
 

@@ -25,7 +25,11 @@ import org.jdownloader.plugins.config.PluginConfigPanelEventSenderListener;
 public class UsenetConfigPanel extends PluginConfigPanelNG {
     @Override
     protected boolean useCustomUI(KeyHandler<?> h) {
-        return true;
+        final Class<?> c = h.getGetMethod().getDeclaringClass();
+        if (c.equals(UsenetAccountConfigInterface.class)) {
+            return true;
+        }
+        return super.useCustomUI(h);
     }
 
     public static void extend(PluginConfigPanelNG panel, final String host, final List<UsenetServer> availableServers, final UsenetAccountConfigInterface cf) {

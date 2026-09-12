@@ -35,6 +35,7 @@ import org.jdownloader.gui.views.downloads.action.GenericChunksAction;
 import org.jdownloader.gui.views.downloads.action.GenericDeleteFromDownloadlistAction;
 import org.jdownloader.gui.views.downloads.action.GenericDeleteFromDownloadlistContextAction;
 import org.jdownloader.gui.views.downloads.action.MarkDownloadFinishedAction;
+import org.jdownloader.gui.views.downloads.action.MarkExistingOnDiskAsFinishedAction;
 import org.jdownloader.gui.views.downloads.action.MenuManagerAction;
 import org.jdownloader.gui.views.downloads.action.MergeSameNamedPackagesAction;
 import org.jdownloader.gui.views.downloads.action.MergeToPackageAction;
@@ -118,6 +119,7 @@ public class MenuManagerDownloadTableContext extends ContextMenuManager<FilePack
         opt.add(CollapseExpandContextAction.class);
         opt.add(CopyGenericContextAction.class);
         opt.add(MarkDownloadFinishedAction.class);
+        opt.add(MarkExistingOnDiskAsFinishedAction.class);
         return mr;
     }
 

@@ -31,6 +31,8 @@ import org.appwork.utils.os.WindowsUtils;
 import org.appwork.utils.processes.ProcessOutput;
 
 import com.sun.jna.platform.win32.Advapi32Util;
+import com.sun.jna.platform.win32.Kernel32;
+import com.sun.jna.platform.win32.WinNT.HANDLE;
 
 /**
  * AWTest for {@link org.appwork.experimental.windowsexecuter.WindowsExecuter#runAsNonElevatedUser(ExecuteOptions)}. Starts a task as admin
@@ -303,8 +305,9 @@ public class TestRunAsNonElevatedUser extends AWTest implements Serializable {
 
     /**
      * From LocalSystem, {@link WindowsExecuter#runAsNonElevatedUser} requires an explicit {@link ExecuteOptions#getWtsSessionId()} (no
-     * automatic active-console pick). Pass the physical active-console session id ({@code WTSGetActiveConsoleSessionId}), then from a
-     * LocalSystem task run {@code whoami /user} and assert the token matches {@link WindowsUtils#getActiveConsoleAccount()}.
+     * automatic session pick). This test intentionally targets the <strong>physical console</strong> session
+     * ({@code WTSGetActiveConsoleSessionId} + {@link WindowsUtils#getUserTokenForSessionId(int)}) — not
+     * {@link WindowsUtils#getInteractiveOwnerAccount()} — to verify that passing that console session id yields the console account SID.
      */
     private void testSidActiveConsoleUserInTask() throws Exception {
         LogV3.info("testSidActiveConsoleUserInTask");
@@ -317,18 +320,25 @@ public class TestRunAsNonElevatedUser extends AWTest implements Serializable {
         Integer result = AdminExecuter.runAsLocalSystem(new ElevatedTestTask() {
             @Override
             public Serializable run() throws Exception {
-                Advapi32Util.Account activeAccount = WindowsUtils.getActiveConsoleAccount();
-                assertNotNull(activeAccount);
-                assertNotNull(activeAccount.sidString);
-                ProcessOutput out = WindowsExecuter.runAsNonElevatedUser(ExecuteOptions.builder() //
-                        .cmd("cmd.exe", "/c", "whoami", "/user") //
-                        .waitFor(true) //
-                        .wtsSessionId(wtsSessionIdForChild) //
-                        .build());
-                LogV3.info("Output: " + out);
-                assertTrue(out != null, "ProcessOutput must not be null");
-                assertTrue(out.getStdOutString() != null, "stdout must not be null");
-                assertTrue(out.getStdOutString().contains(activeAccount.sidString), "Process must run under active console SID " + activeAccount.sidString + "; whoami /user output must contain that SID (got: " + out + ")");
+                // Intentional: assert against physical console account, matching the explicit wtsSessionId above.
+                HANDLE token = WindowsUtils.getUserTokenForSessionId(activeConsoleSessionId);
+                assertNotNull(token);
+                try {
+                    Advapi32Util.Account activeAccount = Advapi32Util.getTokenAccount(token);
+                    assertNotNull(activeAccount);
+                    assertNotNull(activeAccount.sidString);
+                    ProcessOutput out = WindowsExecuter.runAsNonElevatedUser(ExecuteOptions.builder() //
+                            .cmd("cmd.exe", "/c", "whoami", "/user") //
+                            .waitFor(true) //
+                            .wtsSessionId(wtsSessionIdForChild) //
+                            .build());
+                    LogV3.info("Output: " + out);
+                    assertTrue(out != null, "ProcessOutput must not be null");
+                    assertTrue(out.getStdOutString() != null, "stdout must not be null");
+                    assertTrue(out.getStdOutString().contains(activeAccount.sidString), "Process must run under active console SID " + activeAccount.sidString + "; whoami /user output must contain that SID (got: " + out + ")");
+                } finally {
+                    Kernel32.INSTANCE.CloseHandle(token);
+                }
                 return Integer.valueOf(0);
             }
         }, TypeRef.INT, null);

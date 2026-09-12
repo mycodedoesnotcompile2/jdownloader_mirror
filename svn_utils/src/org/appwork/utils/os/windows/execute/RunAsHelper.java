@@ -112,7 +112,9 @@ public final class RunAsHelper {
         String processSid = WindowsUtils.getCurrentUserSID();
         boolean elevated = WindowsUtils.isElevated();
         boolean localSystem = WindowsUtils.isRunningAsLocalSystem();
-        InteractiveSessionOwner owner = InteractiveSessionOwner.openForSession(processSession);
+        // Same rule as InteractiveSessionOwner.openForCurrentProcess: LocalSystem/session 0 -> interactive owner session
+        int ownerSession = InteractiveSessionOwner.resolveOwnerSessionIdForCurrentProcess();
+        InteractiveSessionOwner owner = InteractiveSessionOwner.openForSession(ownerSession);
         try {
             return new RunAsCurrentContext(processSession, processSid, elevated, localSystem, owner.getSessionId(), owner.getOwnerSid(), owner.getOwnerAccountName());
         } finally {

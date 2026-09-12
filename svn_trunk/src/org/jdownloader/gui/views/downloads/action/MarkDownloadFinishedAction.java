@@ -26,52 +26,53 @@ public class MarkDownloadFinishedAction extends CustomizableTableContextAppActio
 
     public void actionPerformed(ActionEvent e) {
         final List<DownloadLink> selection = getSelection().getChildren();
-        if (selection.size() > 0) {
-            DownloadWatchDog.getInstance().enqueueJob(new DownloadWatchDogJob() {
-                @Override
-                public boolean isHighPriority() {
-                    return false;
-                }
-
-                @Override
-                public void interrupt() {
-                }
-
-                private void setFinished(DownloadLink downloadlink) {
-                    downloadlink.setFinalLinkState(FinalLinkState.FINISHED);
-                    final long knownSize = downloadlink.getKnownDownloadSize();
-                    if (knownSize >= 0) {
-                        downloadlink.setDownloadCurrent(knownSize);
-                    }
-                }
-
-                @Override
-                public void execute(DownloadSession currentSession) {
-                    for (final DownloadLink link : selection) {
-                        final DownloadWatchDogJob setFinishedJob = new DownloadWatchDogJob() {
-                            @Override
-                            public boolean isHighPriority() {
-                                return false;
-                            }
-
-                            @Override
-                            public void interrupt() {
-                            }
-
-                            @Override
-                            public void execute(DownloadSession currentSession) {
-                                setFinished(link);
-                            }
-                        };
-                        final SingleDownloadController con = link.getDownloadLinkController();
-                        if (con == null || !con.isAlive()) {
-                            setFinishedJob.execute(currentSession);
-                        } else {
-                            con.getJobsAfterDetach().add(setFinishedJob);
-                        }
-                    }
-                }
-            });
+        if (selection.size() == 0) {
+            return;
         }
+        DownloadWatchDog.getInstance().enqueueJob(new DownloadWatchDogJob() {
+            @Override
+            public boolean isHighPriority() {
+                return false;
+            }
+
+            @Override
+            public void interrupt() {
+            }
+
+            private void setFinished(DownloadLink link) {
+                link.setFinalLinkState(FinalLinkState.FINISHED);
+                final long knownSize = link.getKnownDownloadSize();
+                if (knownSize >= 0) {
+                    link.setDownloadCurrent(knownSize);
+                }
+            }
+
+            @Override
+            public void execute(DownloadSession currentSession) {
+                for (final DownloadLink link : selection) {
+                    final DownloadWatchDogJob setFinishedJob = new DownloadWatchDogJob() {
+                        @Override
+                        public boolean isHighPriority() {
+                            return false;
+                        }
+
+                        @Override
+                        public void interrupt() {
+                        }
+
+                        @Override
+                        public void execute(DownloadSession currentSession) {
+                            setFinished(link);
+                        }
+                    };
+                    final SingleDownloadController con = link.getDownloadLinkController();
+                    if (con == null || !con.isAlive()) {
+                        setFinishedJob.execute(currentSession);
+                    } else {
+                        con.getJobsAfterDetach().add(setFinishedJob);
+                    }
+                }
+            }
+        });
     }
 }

@@ -18,9 +18,17 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import jd.PluginWrapper;
+import jd.plugins.Account;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginConfigPanelNG;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.MultiHosterManagement;
+
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
-import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
@@ -32,16 +40,7 @@ import org.jdownloader.plugins.components.usenet.UsenetServer;
 import org.jdownloader.plugins.config.AccountConfigInterface;
 import org.jdownloader.plugins.config.Order;
 
-import jd.PluginWrapper;
-import jd.plugins.Account;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginConfigPanelNG;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.MultiHosterManagement;
-
-@HostPlugin(revision = "$Revision: 51503 $", interfaceVersion = 4, names = { "simply-premium.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53386 $", interfaceVersion = 4, names = { "simply-premium.com" }, urls = { "" })
 public class SimplyPremiumCom2 extends HighWayCore {
     protected static MultiHosterManagement mhm = new MultiHosterManagement("simply-premium.com");
 
@@ -157,16 +156,6 @@ public class SimplyPremiumCom2 extends HighWayCore {
     protected PluginConfigPanelNG createConfigPanel() {
         return new UsenetConfigPanel() {
             private static final long serialVersionUID = 1L;
-
-            @Override
-            protected boolean showKeyHandler(KeyHandler<?> keyHandler) {
-                return "usedownloadslotblockingclouddownloadmode".equals(keyHandler.getKey());
-            }
-
-            @Override
-            protected boolean useCustomUI(KeyHandler<?> keyHandler) {
-                return !"usedownloadslotblockingclouddownloadmode".equals(keyHandler.getKey());
-            }
 
             @Override
             protected void initAccountConfig(PluginForHost plgh, Account acc, Class<? extends AccountConfigInterface> cf) {

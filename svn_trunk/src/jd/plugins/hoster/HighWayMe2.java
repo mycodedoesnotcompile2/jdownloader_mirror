@@ -18,9 +18,16 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.storage.config.annotations.AboutConfig;
+import jd.PluginWrapper;
+import jd.plugins.Account;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.HostPlugin;
+import jd.plugins.PluginConfigPanelNG;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.MultiHosterManagement;
+
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
-import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
@@ -33,16 +40,7 @@ import org.jdownloader.plugins.components.usenet.UsenetServer;
 import org.jdownloader.plugins.config.AccountConfigInterface;
 import org.jdownloader.plugins.config.Order;
 
-import jd.PluginWrapper;
-import jd.plugins.Account;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.HostPlugin;
-import jd.plugins.PluginConfigPanelNG;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.MultiHosterManagement;
-
-@HostPlugin(revision = "$Revision: 53383 $", interfaceVersion = 4, names = { "high-way.me" }, urls = { "https?://high-way\\.me/onlinetv\\.php\\?id=\\d+[^/]+" })
+@HostPlugin(revision = "$Revision: 53386 $", interfaceVersion = 4, names = { "high-way.me" }, urls = { "https?://high-way\\.me/onlinetv\\.php\\?id=\\d+[^/]+" })
 public class HighWayMe2 extends HighWayCore {
     protected static MultiHosterManagement mhm                      = new MultiHosterManagement("high-way.me");
     private static final String            urlWebsiteAPICredentials = "high-way.me/pages/cred/";
@@ -68,8 +66,8 @@ public class HighWayMe2 extends HighWayCore {
     }
 
     /**
-     * Usenet username of the given account. </br>
-     * Public accessor so decrypter plugins (e.g. HighWayMeFolder3 for the /dav /cloud JSON API) can build the required HTTP basic auth.
+     * Usenet username of the given account. </br> Public accessor so decrypter plugins (e.g. HighWayMeFolder3 for the /dav /cloud JSON API)
+     * can build the required HTTP basic auth.
      */
     @Override
     public String getUseNetUsername(final Account account) {
@@ -77,8 +75,8 @@ public class HighWayMe2 extends HighWayCore {
     }
 
     /**
-     * Usenet password of the given account. </br>
-     * Public accessor so decrypter plugins (e.g. HighWayMeFolder3 for the /dav /cloud JSON API) can build the required HTTP basic auth.
+     * Usenet password of the given account. </br> Public accessor so decrypter plugins (e.g. HighWayMeFolder3 for the /dav /cloud JSON API)
+     * can build the required HTTP basic auth.
      */
     @Override
     public String getUseNetPassword(final Account account) {
@@ -160,7 +158,6 @@ public class HighWayMe2 extends HighWayCore {
 
         public static final HighWayMeConfigInterface.Translation TRANSLATION = new Translation();
 
-        @AboutConfig
         @DefaultBooleanValue(true)
         @Order(10)
         boolean isUseDownloadslotBlockingCloudDownloadMode();
@@ -177,18 +174,6 @@ public class HighWayMe2 extends HighWayCore {
     protected PluginConfigPanelNG createConfigPanel() {
         return new UsenetConfigPanel() {
             private static final long serialVersionUID = 1L;
-
-            @Override
-            protected boolean showKeyHandler(KeyHandler<?> keyHandler) {
-                final String key = keyHandler.getKey();
-                return "usedownloadslotblockingclouddownloadmode".equals(key) || "cloudcrawleraddonlydownloadableitems".equals(key) || "cloudcrawlerremovedefaultprefixesfrompaths".equals(key);
-            }
-
-            @Override
-            protected boolean useCustomUI(KeyHandler<?> keyHandler) {
-                final String key = keyHandler.getKey();
-                return !"usedownloadslotblockingclouddownloadmode".equals(key) && !"cloudcrawleraddonlydownloadableitems".equals(key) && !"cloudcrawlerremovedefaultprefixesfrompaths".equals(key);
-            }
 
             @Override
             protected void initAccountConfig(PluginForHost plgh, Account acc, Class<? extends AccountConfigInterface> cf) {

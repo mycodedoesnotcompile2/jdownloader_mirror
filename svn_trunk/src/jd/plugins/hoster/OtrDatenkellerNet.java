@@ -26,16 +26,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.config.annotations.AboutConfig;
-import org.appwork.storage.config.annotations.DefaultIntValue;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.RandomUserAgent;
@@ -54,7 +44,17 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53362 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.storage.config.annotations.AboutConfig;
+import org.appwork.storage.config.annotations.DefaultIntValue;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+
+@HostPlugin(revision = "$Revision: 53386 $", interfaceVersion = 3, names = {}, urls = {})
 public class OtrDatenkellerNet extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -198,7 +198,7 @@ public class OtrDatenkellerNet extends PluginForHost {
                 sb.delete(0, sb.capacity());
                 for (final DownloadLink dl : links) {
                     if (sb.length() > 0) {
-                        sb.append("%2C");
+                        sb.append(",");
                     }
                     sb.append(Encoding.urlEncode(getFilenameFromURL(dl)));
                 }

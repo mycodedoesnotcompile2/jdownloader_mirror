@@ -63,6 +63,14 @@ public class EnumKeyHandler<T extends Enum<T>> extends KeyHandler<T> {
         return DefaultEnumValue.class;
     }
 
+    /**
+     * @see org.appwork.storage.config.handler.KeyHandler#getValue()
+     */
+    @Override
+    public T getValue() {
+        return super.getValue();
+    }
+
     @Override
     @SuppressWarnings("rawtypes")
     public T getDefaultValue() {

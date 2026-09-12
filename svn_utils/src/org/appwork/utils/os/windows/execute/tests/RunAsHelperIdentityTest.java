@@ -13,10 +13,11 @@ import java.util.EnumSet;
 import java.util.Set;
 
 import org.appwork.JNAHelper;
+import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.TypeRef;
 import org.appwork.testframework.AWTest;
-import org.appwork.testframework.TestTag;
 import org.appwork.testframework.TestDependency;
+import org.appwork.testframework.TestTag;
 import org.appwork.testframework.executer.AdminExecuter;
 import org.appwork.testframework.executer.ElevatedTestTask;
 import org.appwork.testframework.executer.ProcessOptions;
@@ -24,23 +25,31 @@ import org.appwork.utils.Exceptions;
 import org.appwork.utils.crypto.Crypto;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.WindowsUtils;
+import org.appwork.utils.os.windows.execute.InteractiveSessionOwner;
 import org.appwork.utils.os.windows.execute.RunAsHelper;
 import org.appwork.utils.os.windows.execute.RunAsLaunchOptions;
+import org.appwork.utils.os.windows.execute.RunAsWin32ApiTrace;
+import org.appwork.utils.os.windows.execute.SessionUserTokens;
 import org.appwork.utils.processes.ProcessBuilderFactory;
 import org.appwork.utils.processes.ProcessOutput;
 
 import com.sun.jna.platform.win32.Advapi32Util;
+import com.sun.jna.platform.win32.Kernel32;
+import com.sun.jna.platform.win32.User32;
+import com.sun.jna.platform.win32.WinDef.HWND;
+
 /**
  * Identity tests for {@link RunAsHelper} only: WTS session id, user SID, high-integrity (elevation) flag, and {@code whoami} text from
  * processes started via {@link RunAsHelper#runInOwnerSession} / {@link RunAsHelper#runInSession} / {@link RunAsHelper#runAsUser}.
  * <p>
- * {@link AdminExecuter} is used only to place the launching JVM in SYSTEM / elevated / other-user JVMs; pass/fail rules target {@link RunAsHelper}
- * behaviour, not AdminExecuter internals.
+ * {@link AdminExecuter} is used only to place the launching JVM in SYSTEM / elevated / other-user JVMs; pass/fail rules target
+ * {@link RunAsHelper} behaviour, not AdminExecuter internals.
  * <p>
  * Before cross-account scenarios, this test captures {@link InteractiveOwnerBaseline} from the host interactive session (session id,
  * {@code ownerSid}, elevation flag). Session-owner children must match that baseline (WTS session, SID, non-elevated integrity).
  * <p>
  * Scenario overview:
+ *
  * <pre>
  * 00 Host runInOwnerSession (same interactive owner, not elevated)
  *    Step 1: Skip if host is elevated or Local System
@@ -51,10 +60,15 @@ import com.sun.jna.platform.win32.Advapi32Util;
  *    Step 1: runAsUser with bogus expectedSid must throw
  *    Step 2: runAsUser with baseline.ownerSid must succeed
  *
- * 01 Local System -&gt; session owner (runInSession)
+ * 01 Local System -&gt; session owner (runInSession with explicit interactive session id)
  *    Step 1: Execute task as Local System
- *    Step 2: Launch session-owner identity probe
+ *    Step 2: Launch session-owner identity probe via runInSession(interactiveSessionId)
  *    Step 3: We expect session-owner SID to match InteractiveOwnerBaseline (not S-1-5-18)
+ *
+ * 01b Local System -&gt; session owner (runInOwnerSession — installer / Software Center / PsExec -s path)
+ *    Step 1: Execute task as Local System (helper JVM is in session 0)
+ *    Step 2: resolveOwnerSessionIdForCurrentProcess must map session 0 -&gt; interactive owner (Explorer / WTSActive+winStation, not merely active console); then runInOwnerSession
+ *    Step 3: We expect session-owner SID/WTS to match InteractiveOwnerBaseline
  *
  * 02 Elevated admin -&gt; session owner (runInOwnerSession)
  *    Step 1: Execute task as elevated admin
@@ -74,26 +88,20 @@ import com.sun.jna.platform.win32.Advapi32Util;
  */
 @TestDependency({ "org.appwork.utils.os.windows.execute.RunAsHelper", "org.appwork.testframework.executer.AdminExecuter", "org.appwork.testframework.executer.AdminHelperProcess" })
 public class RunAsHelperIdentityTest extends AWTest {
-    private static final String SID_LOCAL_SYSTEM = "S-1-5-18";
+    private static final String                        SID_LOCAL_SYSTEM            = "S-1-5-18";
     /**
      * Machine line {@code session|sid|elev} from a <strong>powershell.exe child</strong> ({@code elev} {@code 1} = high mandatory label
-     * S-1-16-12288 in that child). This can differ from {@link WindowsUtils#isElevated()} ({@code TokenIsElevated}) on the host JVM when
-     * an elevated Java process spawns a medium-integrity probe. Use {@link IdentityJvmSnapshot#windowsUtilsElevated} for launching JVM
+     * S-1-16-12288 in that child). This can differ from {@link WindowsUtils#isElevated()} ({@code TokenIsElevated}) on the host JVM when an
+     * elevated Java process spawns a medium-integrity probe. Use {@link IdentityJvmSnapshot#windowsUtilsElevated} for launching JVM
      * elevation; use this probe for session owner children launched via {@link RunAsHelper}.
      */
-    private static final String PS_PROBE_SESSION_SID_ELEV = "$s=[int]([Diagnostics.Process]::GetCurrentProcess().SessionId);"
-            + "$id=[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value;"
-            + "$pr=New-Object System.Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent());"
-            + "$hi=$pr.IsInRole([System.Security.Principal.SecurityIdentifier]::new('S-1-16-12288'));"
-            + "$e=if($hi){'1'}else{'0'};"
-            + "Write-Output ($s.ToString()+'|'+$id+'|'+$e);"
-            + "Write-Output ('session='+$s);Write-Output ('sid='+$id);Write-Output ('elev='+$e)";
-    private static final String                USER_PLAIN           = "RunAsEnvPlainUser";
-    private static final String                USER_ADMIN_CAPABLE   = "RunAsEnvTestUser";
-    private static final TypeRef<IdentityJvmSnapshot>   TYPE_IDENTITY_JVM_SNAPSHOT   = new TypeRef<IdentityJvmSnapshot>() {
-                                                                                       };
+    private static final String                        PS_PROBE_SESSION_SID_ELEV   = "$s=[int]([Diagnostics.Process]::GetCurrentProcess().SessionId);" + "$id=[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value;" + "$pr=New-Object System.Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent());" + "$hi=$pr.IsInRole([System.Security.Principal.SecurityIdentifier]::new('S-1-16-12288'));" + "$e=if($hi){'1'}else{'0'};" + "Write-Output ($s.ToString()+'|'+$id+'|'+$e);" + "Write-Output ('session='+$s);Write-Output ('sid='+$id);Write-Output ('elev='+$e)";
+    private static final String                        USER_PLAIN                  = "RunAsEnvPlainUser";
+    private static final String                        USER_ADMIN_CAPABLE          = "RunAsEnvTestUser";
+    private static final TypeRef<IdentityJvmSnapshot>  TYPE_IDENTITY_JVM_SNAPSHOT  = new TypeRef<IdentityJvmSnapshot>() {
+                                                                                   };
     private static final TypeRef<NestedIdentityReport> TYPE_NESTED_IDENTITY_REPORT = new TypeRef<NestedIdentityReport>() {
-                                                                                       };
+                                                                                   };
 
     public static void main(String[] args) {
         run();
@@ -122,11 +130,11 @@ public class RunAsHelperIdentityTest extends AWTest {
         }
         final InteractiveOwnerBaseline baseline = captureInteractiveOwnerBaseline(interactiveSessionId);
         logInfoAnyway("RunAsHelperIdentityTest: interactive baseline " + baseline.machineLine);
-
         // Scenario 00 + host guards
         testHostRunInOwnerSessionWhenSameUserNotElevated(baseline);
         testHostRunAsUserSidGuards(baseline);
         test01LocalSystemToSessionOwnerIdentity(baseline, interactiveSessionId);
+        test01bLocalSystemToSessionOwnerViaRunInOwnerSession(baseline, interactiveSessionId);
         test02ElevatedAdminToSessionOwnerIdentity(baseline);
         test03PlainTestUserCannotLaunchSessionOwnerIdentity();
         test04AdminCapableTestUserToSessionOwnerIdentity(baseline);
@@ -182,6 +190,19 @@ public class RunAsHelperIdentityTest extends AWTest {
         assertIdentityLineEquals("01/launchingJvm", snapshot.launchingJvmIdentity, SID_LOCAL_SYSTEM, null, null);
         // Steps 2–3: session-owner probe must match InteractiveOwnerBaseline
         assertSessionOwnerMatchesInteractiveBaseline("01-local-system->sessionOwner", snapshot, baseline);
+    }
+
+    /**
+     * Scenario 01b: same as 01, but via {@link RunAsHelper#runInOwnerSession} (installer path under LocalSystem/session 0). Covers
+     * {@link InteractiveSessionOwner#resolveOwnerSessionIdForCurrentProcess()} redirect to the interactive owner session (Explorer /
+     * WTSActive+winStation, same idea as ConnectService HTTPHandler.handleSelfTest).
+     */
+    private void test01bLocalSystemToSessionOwnerViaRunInOwnerSession(final InteractiveOwnerBaseline baseline, final int interactiveSessionId) throws Exception {
+        final IdentityJvmSnapshot snapshot = AdminExecuter.runAsLocalSystem(new LocalSystemToSessionOwnerViaRunInOwnerSessionIdentityTask(interactiveSessionId), TYPE_IDENTITY_JVM_SNAPSHOT, ProcessOptions.DEFAULT);
+        assertTrue(snapshot.isLocalSystem, "01b: launching JVM must be LocalSystem");
+        assertIdentityLineEquals("01b/launchingJvm", snapshot.launchingJvmIdentity, SID_LOCAL_SYSTEM, null, null);
+        assertEquals(interactiveSessionId, snapshot.resolvedOwnerSessionId, "01b: resolveOwnerSessionIdForCurrentProcess must map LocalSystem/session0 to interactive owner session");
+        assertSessionOwnerMatchesInteractiveBaseline("01b-local-system->runInOwnerSession", snapshot, baseline);
     }
 
     /** Scenario 02: Elevated admin helper JVM; session-owner identity via {@link RunAsHelper#runInOwnerSession}. */
@@ -353,8 +374,7 @@ public class RunAsHelperIdentityTest extends AWTest {
             return false;
         }
         final String s = stderr.toLowerCase();
-        return s.indexOf("win32exception") >= 0 || s.indexOf("zugriff verweigert") >= 0 || s.indexOf("access denied") >= 0 || s.indexOf("privilege") >= 0 || s.indexOf(" 1314") >= 0 || s.indexOf("runashelper") >= 0 || s.indexOf("runtasprocesslauncher") >= 0
-                || s.indexOf("createenvironmentblock") >= 0;
+        return s.indexOf("win32exception") >= 0 || s.indexOf("zugriff verweigert") >= 0 || s.indexOf("access denied") >= 0 || s.indexOf("privilege") >= 0 || s.indexOf(" 1314") >= 0 || s.indexOf("runashelper") >= 0 || s.indexOf("runtasprocesslauncher") >= 0 || s.indexOf("createenvironmentblock") >= 0;
     }
 
     private static boolean stdoutContainsSid(final IdentityProbeRun run, final String sid) {
@@ -522,9 +542,14 @@ public class RunAsHelperIdentityTest extends AWTest {
     }
 
     public static final class IdentityJvmSnapshot implements Serializable {
-        private static final long serialVersionUID = 1L;
+        private static final long serialVersionUID       = 1L;
         public boolean            windowsUtilsElevated;
         public boolean            isLocalSystem;
+        /**
+         * Set by LocalSystem runInOwnerSession scenario: result of
+         * {@link InteractiveSessionOwner#resolveOwnerSessionIdForCurrentProcess()}.
+         */
+        public int                resolvedOwnerSessionId = -1;
         public ParsedIdentityLine launchingJvmIdentity;
         public IdentityProbeRun   launchingJvmIdentityProbe;
         public ParsedIdentityLine launchingJvmIdentityParsed;
@@ -533,16 +558,17 @@ public class RunAsHelperIdentityTest extends AWTest {
         public IdentityProbeRun   sessionOwnerIdentityProbe;
         public ParsedIdentityLine sessionOwnerIdentityParsed;
         public IdentityProbeRun   sessionOwnerWhoamiProbe;
+        public boolean            hasTrayWindow;
 
         public IdentityJvmSnapshot() {
         }
     }
 
     public static final class NestedIdentityReport implements Serializable {
-        private static final long serialVersionUID = 1L;
+        private static final long  serialVersionUID = 1L;
         public IdentityJvmSnapshot adminCapableTestUserSnapshot;
         public IdentityJvmSnapshot elevatedAdminSnapshot;
-        public String             nestedFailureStack;
+        public String              nestedFailureStack;
 
         public NestedIdentityReport() {
         }
@@ -565,13 +591,51 @@ public class RunAsHelperIdentityTest extends AWTest {
             final IdentityJvmSnapshot snapshot = new IdentityJvmSnapshot();
             fillLaunchingJvmIdentity(snapshot);
             // Step 2: Launch session-owner identity probe (runInSession from Local System)
+            LogV3.info("RunAsHelperIdentityTest 01 LocalSystem: pre-token diagnostics for session " + interactiveSessionId);
+            SessionUserTokens.logTokenResolutionDiagnostics(interactiveSessionId);
             launchSessionOwnerIdentityProbe(snapshot, OwnerLaunchMode.INTERACTIVE_SESSION, interactiveSessionId);
+            HWND hwnd = User32.INSTANCE.FindWindow("Shell_TrayWnd", null);
+            int gleFw = Kernel32.INSTANCE.GetLastError();
+            RunAsWin32ApiTrace.out("SessionUserTokens", "FindWindow", hwnd != null, gleFw);
+            snapshot.hasTrayWindow = hwnd != null;
+            LogV3.info("RunAsHelperIdentityTest 01 LocalSystem: FindWindow(Shell_TrayWnd) from SYSTEM session0 visible=" + snapshot.hasTrayWindow + " gle=" + gleFw);
+            return snapshot;
+        }
+    }
+
+    /**
+     * Installer-style path: LocalSystem in session 0 must reach the interactive owner via {@link RunAsHelper#runInOwnerSession}
+     * (console-session redirect), not only via explicit {@link RunAsHelper#runInSession}.
+     */
+    private static final class LocalSystemToSessionOwnerViaRunInOwnerSessionIdentityTask implements ElevatedTestTask {
+        private static final long serialVersionUID = 1L;
+        private final int         expectedInteractiveSessionId;
+
+        LocalSystemToSessionOwnerViaRunInOwnerSessionIdentityTask(final int expectedInteractiveSessionId) {
+            this.expectedInteractiveSessionId = expectedInteractiveSessionId;
+        }
+
+        @Override
+        public Serializable run() throws Exception {
+            if (!WindowsUtils.isRunningAsLocalSystem()) {
+                throw new Exception("LocalSystemToSessionOwnerViaRunInOwnerSessionIdentityTask requires SYSTEM");
+            }
+            final IdentityJvmSnapshot snapshot = new IdentityJvmSnapshot();
+            fillLaunchingJvmIdentity(snapshot);
+            // Tried openForCurrentProcess(processSession=0) alone: fails (no Shell_TrayWnd in session 0). Redirect via Explorer/WTSActive.
+            snapshot.resolvedOwnerSessionId = InteractiveSessionOwner.resolveOwnerSessionIdForCurrentProcess();
+            if (snapshot.resolvedOwnerSessionId != expectedInteractiveSessionId) {
+                throw new Exception("resolveOwnerSessionIdForCurrentProcess expected " + expectedInteractiveSessionId + " but got " + snapshot.resolvedOwnerSessionId + " (processSession=" + WindowsUtils.getCurrentProcessSessionId() + ")");
+            }
+            LogV3.info("RunAsHelperIdentityTest 01b LocalSystem: resolvedOwnerSessionId=" + snapshot.resolvedOwnerSessionId + " processSession=" + WindowsUtils.getCurrentProcessSessionId());
+            SessionUserTokens.logTokenResolutionDiagnostics(snapshot.resolvedOwnerSessionId);
+            launchSessionOwnerIdentityProbe(snapshot, OwnerLaunchMode.CURRENT_SESSION, -1);
             return snapshot;
         }
     }
 
     private static final class ElevatedAdminToSessionOwnerIdentityTask implements ElevatedTestTask {
-        private static final long serialVersionUID = 1L;
+        private static final long     serialVersionUID = 1L;
         private final OwnerLaunchMode launchMode;
         private final int             interactiveSessionId;
 
@@ -591,7 +655,7 @@ public class RunAsHelperIdentityTest extends AWTest {
     }
 
     private static final class PlainTestUserToSessionOwnerIdentityTask implements ElevatedTestTask {
-        private static final long serialVersionUID = 1L;
+        private static final long     serialVersionUID = 1L;
         private final OwnerLaunchMode launchMode;
 
         PlainTestUserToSessionOwnerIdentityTask(final OwnerLaunchMode launchMode) {

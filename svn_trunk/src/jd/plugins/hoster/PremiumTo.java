@@ -23,29 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.config.annotations.AboutConfig;
-import org.appwork.storage.config.annotations.DefaultBooleanValue;
-import org.appwork.storage.config.annotations.DefaultStringValue;
-import org.appwork.storage.config.handler.KeyHandler;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.appwork.utils.swing.dialog.DialogNoAnswerException;
-import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
-import org.jdownloader.plugins.components.usenet.UsenetConfigPanel;
-import org.jdownloader.plugins.components.usenet.UsenetServer;
-import org.jdownloader.plugins.config.AccountConfigInterface;
-import org.jdownloader.plugins.config.Order;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -71,7 +48,30 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.download.DownloadLinkDownloadable;
 
-@HostPlugin(revision = "$Revision: 52925 $", interfaceVersion = 3, names = { "premium.to" }, urls = { "https?://torrent(?:\\d+)?\\.premium\\.to/(?:t/[a-z0-9]+/\\d+|z/[a-z0-9]+|r/\\d+/[A-F0-9]{32}/[a-z0-9]+/\\d+/[^/]+)|https?://storage\\.premium\\.to/(?:file/[A-Z0-9]+|remote/[A-Z0-9]+/[A-Z0-9]+/[A-Z0-9]+/[^/]+)" })
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.storage.config.annotations.AboutConfig;
+import org.appwork.storage.config.annotations.DefaultBooleanValue;
+import org.appwork.storage.config.annotations.DefaultStringValue;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.appwork.utils.swing.dialog.DialogNoAnswerException;
+import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
+import org.jdownloader.plugins.components.usenet.UsenetConfigPanel;
+import org.jdownloader.plugins.components.usenet.UsenetServer;
+import org.jdownloader.plugins.config.AccountConfigInterface;
+import org.jdownloader.plugins.config.CustomUI;
+import org.jdownloader.plugins.config.Order;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
+@HostPlugin(revision = "$Revision: 53386 $", interfaceVersion = 3, names = { "premium.to" }, urls = { "https?://torrent(?:\\d+)?\\.premium\\.to/(?:t/[a-z0-9]+/\\d+|z/[a-z0-9]+|r/\\d+/[A-F0-9]{32}/[a-z0-9]+/\\d+/[^/]+)|https?://storage\\.premium\\.to/(?:file/[A-Z0-9]+|remote/[A-Z0-9]+/[A-Z0-9]+/[A-Z0-9]+/[^/]+)" })
 public class PremiumTo extends UseNet {
     private final String             PROPERTY_normalTraffic                                            = "normalTraffic";
     private final String             PROPERTY_specialTraffic                                           = "specialTraffic";
@@ -182,6 +182,7 @@ public class PremiumTo extends UseNet {
 
         @AboutConfig
         @DefaultBooleanValue(true)
+        @CustomUI()
         @Order(10)
         boolean isClearDownloadHistory();
 
@@ -189,6 +190,7 @@ public class PremiumTo extends UseNet {
 
         @AboutConfig
         @DefaultBooleanValue(false)
+        @CustomUI()
         @Order(20)
         boolean isEnableStorageWhiteListing();
 
@@ -196,6 +198,7 @@ public class PremiumTo extends UseNet {
 
         @AboutConfig
         @DefaultStringValue("examplehost1.com,examplehost2.net")
+        @CustomUI()
         @Order(30)
         String getWhitelistedStorageHosts();
 
@@ -206,16 +209,6 @@ public class PremiumTo extends UseNet {
     protected PluginConfigPanelNG createConfigPanel() {
         return new UsenetConfigPanel() {
             private static final long serialVersionUID = 1L;
-
-            @Override
-            protected boolean showKeyHandler(KeyHandler<?> keyHandler) {
-                return "cleardownloadhistory".equals(keyHandler.getKey()) || "enablestoragewhitelisting".equals(keyHandler.getKey()) || "whitelistedstoragehosts".equals(keyHandler.getKey());
-            }
-
-            @Override
-            protected boolean useCustomUI(KeyHandler<?> keyHandler) {
-                return !"cleardownloadhistory".equals(keyHandler.getKey()) && !"enablestoragewhitelisting".equals(keyHandler.getKey()) && !"whitelistedstoragehosts".equals(keyHandler.getKey());
-            }
 
             @Override
             protected void initAccountConfig(PluginForHost plgh, Account acc, Class<? extends AccountConfigInterface> cf) {
@@ -285,7 +278,7 @@ public class PremiumTo extends UseNet {
         account.setProperty(PROPERTY_specialTraffic, spT);
         String additionalAccountStatus = "";
         if (nT > 0 && spT > 0) {
-            final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
+            final SIZEUNIT maxSizeUnit = CFG_GUI.MAX_SIZE_UNIT.getValue();
             additionalAccountStatus = String.format(" | Normal Traffic: %s Special Traffic: %s", SIZEUNIT.formatValue(maxSizeUnit, nT), SIZEUNIT.formatValue(maxSizeUnit, spT));
         }
         final List<String> supported_hosts_regular = new ArrayList<String>();
@@ -421,8 +414,8 @@ public class PremiumTo extends UseNet {
 
     /**
      * This dialog is there to make users of this multihoster aware that they can control the list of supported filehosts for this
-     * multihoster serverside in their multihoster account. </br>
-     * Some filehosts are disabled by default which is the core information this dialog is supposed to tell the user.
+     * multihoster serverside in their multihoster account. </br> Some filehosts are disabled by default which is the core information this
+     * dialog is supposed to tell the user.
      */
     private Thread showServersideDeactivatedHostInformation(final Account account, final String exampleHost) {
         final boolean userConfirmedDialogAlready = account.getBooleanProperty(PROPERTY_ACCOUNT_DEACTIVATED_FILEHOSTS_DIALOG_SHOWN_AND_CONFIRMED, false);

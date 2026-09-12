@@ -230,52 +230,41 @@ public class FilePathChecker {
             return;
         }
         /**
-         * Create a list of the full folder path structure.
+         * Create a list of the full folder path structure, ordered from root (index 0) to the target file (last index).
          */
         final List<File> pathlist = new ArrayList<File>();
-        int loop = 0;
         File next = file;
-        int folderCreateStartSegmentIndex = -1;
-        while (true) {
+        while (next != null) {
             pathlist.add(0, next);
-            if (folderCreateStartSegmentIndex == -1 && !next.exists()) {
-                /* Find first non-existent part of path. */
-                folderCreateStartSegmentIndex = loop;
-            }
             next = next.getParentFile();
-            if (next == null) {
-                /* We've reached the end. */
+        }
+        /**
+         * Manually create all missing folders top-down (root first) up until the final folder where we want to write the file we want to
+         * download. </br>
+         * We walk the whole path and only create segments that do not exist yet. This may look more complicated compared to File.mkdirs()
+         * but this way we can know exactly at which point a directory could not be created which allows for better error handling on path
+         * issues.
+         */
+        for (int index = 0; index < pathlist.size(); index++) {
+            final boolean isLastItem = index == pathlist.size() - 1;
+            if (shouldBeFile && isLastItem) {
+                /* Last path segment is file -> Do not create folder! */
                 break;
             }
-            loop++;
-        }
-        if (folderCreateStartSegmentIndex != -1) {
-            /**
-             * Manually create all folders up until we are in our final folder where we want to write the file we want to download. </br>
-             * This may look more complicated compared to File.mkdirs() but this way we can know exactly at which point a directory could
-             * not be created which allows for better error handling on path issues.
-             */
-            folderCreateStartSegmentIndex = pathlist.size() - folderCreateStartSegmentIndex - 1;
-            for (int index = folderCreateStartSegmentIndex; index < pathlist.size(); index++) {
-                final boolean isLastItem = index == pathlist.size() - 1;
-                if (shouldBeFile && isLastItem) {
-                    /* Last path segment is file -> Do not create folder! */
-                    break;
+            final File thisfolder = pathlist.get(index);
+            if (!thisfolder.exists() && !thisfolder.mkdir() && !thisfolder.isDirectory()) {
+                /* Folder creation failed -> Check/assume why */
+                /* Check for Windows related path length problems. */
+                if (CrossSystem.isWindows() && looksLikeTooLongWindowsPathOrFilename(thisfolder)) {
+                    /*
+                     * Assume that path is too long. We could check it by writing a shorter folder but it would not change the end result:
+                     * The path is not usable for us.
+                     */
+                    // controller.getLogger().severe("Looks like too long downloadpath for Windows: " + thisfolder.getAbsolutePath());
+                    throw new BadFilePathException(thisfolder, BadFilePathException.PathFailureReason.PATH_TOO_LONG, index);
                 }
-                final File thisfolder = pathlist.get(index);
-                if (!thisfolder.exists() && !thisfolder.mkdir() && !thisfolder.isDirectory()) {
-                    /* Folder creation failed -> Check/assume why */
-                    /* Check for Windows related path length problems. */
-                    if (CrossSystem.isWindows() && looksLikeTooLongWindowsPathOrFilename(thisfolder)) {
-                        /*
-                         * Assume that path is too long. We could check it by writing a shorter folder but it would not change the end
-                         * result: The path is not usable for us.
-                         */
-                        // controller.getLogger().severe("Looks like too long downloadpath for Windows: " + thisfolder.getAbsolutePath());
-                        throw new BadFilePathException(thisfolder, BadFilePathException.PathFailureReason.PATH_TOO_LONG, index);
-                    }
-                    throw new BadFilePathException(thisfolder, BadFilePathException.PathFailureReason.PERMISSION_PROBLEM_FOLDER, index);
-                }
+                /* Assume permission problem */
+                throw new BadFilePathException(thisfolder, BadFilePathException.PathFailureReason.PERMISSION_PROBLEM_FOLDER, index);
             }
         }
         /* Check file writability if needed. */

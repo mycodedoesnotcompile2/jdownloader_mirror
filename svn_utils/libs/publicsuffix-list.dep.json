@@ -1862,25 +1862,105 @@
       "signatures":{},
       "version":"2026.196.0 9b5c814414374aa19a93dc6dd7e47c01909524cc",
       "vulnerabilities":null
+    },
+    {
+      "changes":"2026.201.0 efb337b9a27d9520672f01dc494494900df18f46\t: Remove Storj Labs entries from public_suffix_list.dat (#3063)\r\n2026.201.1 edcf9a410dbb4d6b52c0cdb485e95578ed816717\t: Delete protonet.io and Protonet GmbH entry (#3048)\r\n2026.201.2 97e05b81e5deffa70f3a9cce81ac3acb37b46f6f\t: AI Agent notice about not modifying the repo PR template (#3043)\r\n2026.201.3 dce40fc2c486ed956eeeeddb826a53ac156b9de0\t: Remove hzc.io RethinkDB entries from public_suffix_list.dat (#3052)\r\n2026.201.4 66380ae99d65180c662336959526bcfa9f6680d6\t: Remove api.stdlib.com from public suffix list (#3051)\r\n2026.201.5 93560af4d157ed99d53e5db2576e8c20adf25af5\t: Remove cryptonomic.net Cryptonomic entries from public_suffix_list.dat (#3050)\r\n2026.201.6 4a11152dbd5de9c37e7e37795ff29faad307b024\t: Update `.it` (#3049)\r\n2026.201.7 ca355e4aadee94e349e1f9c86145618cf762249d\t: Remove Bytemark Hosting entries: uk0.bigv.io dh.bytemark.co.uk vm.bytemark.co.uk (#3053)\r\n2026.203.0 54cf5588656759f9ce7ab8a087c7be336bcf8d12\t: Remove onfabrica.com Fabrica Technologies entry (#3065)\r\n2026.203.1 8ab4253fd2cbaf4c411bd7ccea56bff0db0e82cf\t: Add a workflow that checks the PR template is filled out (#3077)\r\n2026.204.0 438c5e02a9db7870300cb3108258aeefc8467c36\t: Remove deta.dev, deta.app entries from public_suffix_list.dat (#3066)\r\n2026.204.1 93b4eb174b2da9ee3f6effc363b579a96a65c93a\t: Add playcode.site to PRIVATE section (#3072)\r\n2026.205.0 f85a38e61c222ea2d9901a41296c6c74fd3e2c28\t: util: gTLD data autopull updates for 2026-07-24T16:40:16 UTC (#3090)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2026.206.0 e1b8015c3b2f0f4f8c18659c2480fc1a22c07b20\t: Remove Acorn Labs on-acorn.io entries from public_suffix_list.dat (#3093)",
+      "date":"2026-07-28T15:12:26.9+02:00",
+      "dependencies":null,
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"fe6adc7fb8014f57d28d69b18d0aa3e581efb432544922e12131a5d4a87bd954"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "signatures":{},
+      "version":"2026.206.0 e1b8015c3b2f0f4f8c18659c2480fc1a22c07b20",
+      "vulnerabilities":null
+    },
+    {
+      "changes":"2026.226.0 a77cfe0674a4b05c6e2448c01f3cb2c965a1b6d8\t: migrate `vps.hrsn.au` to `vps.hrsn.net` (#3121)\r\n2026.229.0 5aa186c39bedca95e872d4165d6919a9148a97d7\t: Remove adaptable entries (#3144)\r\n2026.229.1 1beb4a0245176d103b4a476c64a857158b4b4a12\t: Add here.now (#3096)\n\nCo-authored-by: Cursor <cursoragent@cursor.com>\r\n2026.229.2 621d6850c1da928ceff884ab9b9e77e4bdd1c648\t: Add scw.site, ams.scw.site, waw.scw.site (#3110)\r\n2026.229.3 23077c5fdccb9981c487e1385fb548f608d006a5\t: Add online-server.cloud to PSL (#3138)\r\n2026.229.4 c1ec21918dbbfba364f2347f33fbd8ec714e320a\t: Add *.cursorusercontent.com (#3092)\r\n2026.229.5 578c6fbcdb5414bf49f335c85715a67518bcf12a\t: Add CodePen domains (#3143)\r\n2026.229.6 fe5aa073ba579b9d5ae92958b63a7d1de8c13e3a\t: Add *.aivencloud.com subdomain (#3019)\r\n2026.231.0 d91e55ea128af6218897d3b3723b28af7138c3d6\t: Remove non-wildcard `aivencloud.com` (#3169)\r\n2026.231.1 e8c9a2b2b2856b6449999dd0ec0d118f364ed0cd\t: Add claudeusercontent.com to PSL (Anthropic) (#3087)",
+      "date":"2026-08-21T15:49:22.326+02:00",
+      "dependencies":null,
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"df6306ec61971424ad259757b399911f4d414486629a5a00e299a2b6c7957089"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "signatures":{},
+      "version":"2026.231.1 e8c9a2b2b2856b6449999dd0ec0d118f364ed0cd",
+      "vulnerabilities":null
+    },
+    {
+      "changes":"2026.244.0 fdf41a81970929e9cb77e5a242517d1416ff1c5a\t: Remove XnBay Technology entries from suffix list (#3176)\r\n2026.244.1 01ff706adaec7ffa9481ddefd162d1bd761e3726\t: Removed demo.datacenter.fi + paas.datacenter.fi (#3197)\r\n2026.244.2 8066559ea05817067ce9ed501566efb8d8899f53\t: Add eth.limo and eth.link gateways (#3199)\r\n2026.244.3 9a53bdb2a2a28605ba927790a9ba46c602223f92\t: Add tmp.now (Vercel) to PRIVATE section (#3193)\r\n2026.244.4 b960a1b2a9bdec73e4010f7b51a02a074ff59fc3\t: Add canva-code.cn to the Public Suffix List (#2980)\r\n2026.245.0 0f1fa47ec45056a19c2fdcd32a08442de9715d12\t: Add builtwithrocket.new and rocketpreview.app (PRIVATE) (#2948)",
+      "date":"2026-09-02T16:25:46.822+02:00",
+      "dependencies":null,
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"65365c4c9a4a6f746d53aadc758ab6b08aa10bb1379fea8ac353e381bca4b62e"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "signatures":{},
+      "version":"2026.245.0 0f1fa47ec45056a19c2fdcd32a08442de9715d12",
+      "vulnerabilities":null
+    },
+    {
+      "changes":"2026.246.0 b952f046c27f9b2a7c3e5d2060f9e3acbc4cf1e8\t: Add Azure App Service delegated zones under azurewebsites.net (#3147)\n\n* Add Azure App Service delegated zones under azurewebsites.net\n\nAdds 74 entries to the Microsoft Corporation PRIVATE section: 73 regional\ndelegated zones of the form <region>-01.azurewebsites.net, plus the wildcard\n*.p.azurewebsites.net.\n\nThe existing azurewebsites.net rule only covers single-label customer\nhostnames. App Service now delegates a child zone per region, so hostnames\nsuch as contoso.eastus-01.azurewebsites.net currently compute a registrable\ndomain of eastus-01.azurewebsites.net, which is shared by mutually untrusting\ntenants in that region. These additions move the boundary back down to the\nindividual customer application.\n\nAdditions only; the existing azurewebsites.net rule is unchanged.\n\n* Remove two retired stage zones\n\nsoutheastasiastage-01.azurewebsites.net and centralusstage-01.azurewebsites.net\nare no longer in use, per Azure App Service engineering. Net addition is now\n72 entries.\r\n2026.248.0 ad009f276c3ee20365cd14237f91d5b80ae7cb50\t: Add opencloud.me (Dfinity Foundation section) (#3174)\r\n2026.248.1 69d97f7f9a4bb1d52ee0e43c759eae7be29e62b4\t: Fix sorting in Rocket section\r\n2026.248.2 8c6c91c53d83616a1ae026d038e27be70c419da2\t: Update go x/net and x/text\r\n2026.248.3 46ae48ceff01716409d78d38c2bbb36489cce68e\t: Add official social ccTLD subdomain ia.bo for Bolivia (.BO) (#3214)\r\n2026.248.4 ddc71a75ef63befa2d2a99ba25b22e03656bc6fa\t: Consolidate CI workflows and add Dependabot config (#2903)\n\n* Consolidate test.yml and psltool_pr_check.yml into ci.yml\n\nBoth ran on every PR with separate Go setups and surfaced as separate\nstatus checks. Merging into a single workflow with two parallel jobs\n(unit-tests, psl-validation) gives one Go setup per job, one CI status\nrow, and removes the inconsistency where one workflow used pinned\nubuntu-22.04 with old action SHAs and the other used ubuntu-latest with\ncurrent pins.\n\nThe psl-validation job is gated to pull_request events because\ncheck-pr needs a PR number; the unit-tests job continues to run on\npush as well.\n\n* Add Dependabot config for gomod and GitHub Actions\n\nWeekly updates for the Go module under tools/ and for the workflow\naction pins. Action updates are grouped (patch + minor) and gated\nbehind a 3-day cooldown to avoid churn from same-day re-tags.\n\n* Pin actions to version tags so Dependabot can manage them\n\n* Bump actions/setup-go to v6.4.0\n\n* Bump actions/checkout to v6.0.2\n\n* Reformat psl-validation run block onto multiple lines\r\n2026.248.5 f540a06159213b6e8ed9c87d2dd3a52373637e92\t: chore: Replace broken links, replace IANA db placeholders with specific registry URLs (#3069)",
+      "date":"2026-09-06T09:20:27.726+02:00",
+      "dependencies":null,
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"ad47cebef5f86eb77e2c9514d42cde4bd07f591a1f93384a63568624ec3f1f37"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "signatures":{},
+      "version":"2026.248.5 f540a06159213b6e8ed9c87d2dd3a52373637e92",
+      "vulnerabilities":null
     }
   ],
   "installed":{
-    "changes":"2026.201.0 efb337b9a27d9520672f01dc494494900df18f46\t: Remove Storj Labs entries from public_suffix_list.dat (#3063)\r\n2026.201.1 edcf9a410dbb4d6b52c0cdb485e95578ed816717\t: Delete protonet.io and Protonet GmbH entry (#3048)\r\n2026.201.2 97e05b81e5deffa70f3a9cce81ac3acb37b46f6f\t: AI Agent notice about not modifying the repo PR template (#3043)\r\n2026.201.3 dce40fc2c486ed956eeeeddb826a53ac156b9de0\t: Remove hzc.io RethinkDB entries from public_suffix_list.dat (#3052)\r\n2026.201.4 66380ae99d65180c662336959526bcfa9f6680d6\t: Remove api.stdlib.com from public suffix list (#3051)\r\n2026.201.5 93560af4d157ed99d53e5db2576e8c20adf25af5\t: Remove cryptonomic.net Cryptonomic entries from public_suffix_list.dat (#3050)\r\n2026.201.6 4a11152dbd5de9c37e7e37795ff29faad307b024\t: Update `.it` (#3049)\r\n2026.201.7 ca355e4aadee94e349e1f9c86145618cf762249d\t: Remove Bytemark Hosting entries: uk0.bigv.io dh.bytemark.co.uk vm.bytemark.co.uk (#3053)\r\n2026.203.0 54cf5588656759f9ce7ab8a087c7be336bcf8d12\t: Remove onfabrica.com Fabrica Technologies entry (#3065)\r\n2026.203.1 8ab4253fd2cbaf4c411bd7ccea56bff0db0e82cf\t: Add a workflow that checks the PR template is filled out (#3077)\r\n2026.204.0 438c5e02a9db7870300cb3108258aeefc8467c36\t: Remove deta.dev, deta.app entries from public_suffix_list.dat (#3066)\r\n2026.204.1 93b4eb174b2da9ee3f6effc363b579a96a65c93a\t: Add playcode.site to PRIVATE section (#3072)\r\n2026.205.0 f85a38e61c222ea2d9901a41296c6c74fd3e2c28\t: util: gTLD data autopull updates for 2026-07-24T16:40:16 UTC (#3090)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2026.206.0 e1b8015c3b2f0f4f8c18659c2480fc1a22c07b20\t: Remove Acorn Labs on-acorn.io entries from public_suffix_list.dat (#3093)",
-    "date":"2026-07-28T15:12:26.9+02:00",
+    "changes":"2026.250.0 63667f43159da5458933751902921cbf6320024e\t: Bump peter-evans/create-pull-request from 4.2.4 to 8.1.1 (#3236)\n\nBumps [peter-evans/create-pull-request](https://github.com/peter-evans/create-pull-request) from 4.2.4 to 8.1.1.\n- [Release notes](https://github.com/peter-evans/create-pull-request/releases)\n- [Commits](https://github.com/peter-evans/create-pull-request/compare/v4.2.4...5f6978faf089d4d20b00c7766989d076bb2fc7f1)\n\n---\nupdated-dependencies:\n- dependency-name: peter-evans/create-pull-request\n  dependency-version: 8.1.1\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>\r\n2026.250.1 712161e4517177bf7fe49d5afb170882bc8fc573\t: Bump actions/checkout from 3.6.0 to 7.0.1 (#3240)\n\nBumps [actions/checkout](https://github.com/actions/checkout) from 3.6.0 to 7.0.1.\n- [Release notes](https://github.com/actions/checkout/releases)\n- [Commits](https://github.com/actions/checkout/compare/v3.6.0...v7.0.1)\n\n---\nupdated-dependencies:\n- dependency-name: actions/checkout\n  dependency-version: 7.0.1\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>\r\n2026.250.2 74b925676360868b9589b9cd7be85c351fc5cbab\t: Bump github.com/google/go-cmp from 0.6.0 to 0.7.0 in /tools (#3239)\n\nBumps [github.com/google/go-cmp](https://github.com/google/go-cmp) from 0.6.0 to 0.7.0.\n- [Release notes](https://github.com/google/go-cmp/releases)\n- [Commits](https://github.com/google/go-cmp/compare/v0.6.0...v0.7.0)\n\n---\nupdated-dependencies:\n- dependency-name: github.com/google/go-cmp\n  dependency-version: 0.7.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>\r\n2026.250.3 24fdb5107983c3997144ca19e0d7e1e8fc714f03\t: Bump actions/setup-go from 3.5.0 to 7.0.0 (#3238)\n\nBumps [actions/setup-go](https://github.com/actions/setup-go) from 3.5.0 to 7.0.0.\n- [Release notes](https://github.com/actions/setup-go/releases)\n- [Commits](https://github.com/actions/setup-go/compare/v3.5.0...v7)\n\n---\nupdated-dependencies:\n- dependency-name: actions/setup-go\n  dependency-version: 7.0.0\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>\r\n2026.250.4 50083a95fe86705cc431ec430ae4732260243b16\t: Bump github.com/creachadair/flax in /tools (#3241)\n\nBumps [github.com/creachadair/flax](https://github.com/creachadair/flax) from 0.0.0-20240525192034-44db93b3a8ad to 0.1.0.\n- [Commits](https://github.com/creachadair/flax/commits/v0.1.0)\n\n---\nupdated-dependencies:\n- dependency-name: github.com/creachadair/flax\n  dependency-version: 0.1.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>\r\n2026.250.5 94de7acbc1ba5e9d2776c93e6e8e4ca9963ba60b\t: Add 7 day cooldown to dependabot\r\n2026.250.6 9fc6745c5d3f678a59af9c24de72e5eb3c300e2c\t: Fix go dependency API changes\r\n2026.251.0 3955e3ec29b94c3cca7bd4509c5f14a7c0959e26\t: Add `cloud.run` and `ai.studio` to PSL. (#2959)",
+    "date":"2026-09-11T12:16:56.766+02:00",
     "dependencies":null,
     "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
     "files":[
       "",
       ".github",
+      ".github/dependabot.yml",
       ".github/pull_request_template.md",
       ".github/scripts",
       ".github/scripts/check_pr_template.py",
       ".github/workflows",
+      ".github/workflows/ci.yml",
       ".github/workflows/deploy-site.yml",
       ".github/workflows/pr_template_check.yml",
       ".github/workflows/psltool-fmt.yml",
-      ".github/workflows/psltool_pr_check.yml",
-      ".github/workflows/test.yml",
       ".github/workflows/tld-update.yml",
       ".github/workflows/validate.yml",
       ".gitignore",
@@ -1975,7 +2055,7 @@
       "tools/psltool",
       "tools/psltool/psltool.go"
     ],
-    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"fe6adc7fb8014f57d28d69b18d0aa3e581efb432544922e12131a5d4a87bd954"},
+    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"a26f7d7e334778ed69216cedb5451ef82031feba6615c12039783cdd94e1fcae"},
     "licenses":[{
       "name":"Mozilla Public License 2.0",
       "spdx_id":"MPL-2.0",
@@ -1986,7 +2066,7 @@
     "minJRE":null,
     "name":"\"Public Suffix List Library\"",
     "signatures":{},
-    "version":"2026.206.0 e1b8015c3b2f0f4f8c18659c2480fc1a22c07b20",
+    "version":"2026.251.0 3955e3ec29b94c3cca7bd4509c5f14a7c0959e26",
     "vulnerabilities":null
   },
   "minJRE":null,

@@ -72,7 +72,7 @@ import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 52614 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53392 $", interfaceVersion = 2, names = {}, urls = {})
 public class VKontakteRu extends PluginForDecrypt {
     public VKontakteRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -95,17 +95,13 @@ public class VKontakteRu extends PluginForDecrypt {
         return 2;
     }
 
-    private static String getBaseURL() {
-        return VKontakteRuHoster.getBaseURL();
-    }
-
     private static String getProtocol() {
         return VKontakteRuHoster.getProtocol();
     }
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        ret.add(new String[] { "vk.com", "vk.ru", "vkontakte.com", "vkontakte.ru", "vkvideo.ru" });
+        ret.add(new String[] { "vk.ru", "vk.com", "vkontakte.com", "vkontakte.ru", "vkvideo.ru" });
         return ret;
     }
 
@@ -257,7 +253,7 @@ public class VKontakteRu extends PluginForDecrypt {
         }
         br.setFollowRedirects(true);
         /* Set settings */
-        cfg = SubConfiguration.getConfig("vk.com");
+        cfg = SubConfiguration.getConfig(getHost());
         fastcheck_photo = cfg.getBooleanProperty(VKontakteRuHoster.FASTLINKCHECK_PICTURES, VKontakteRuHoster.default_FASTLINKCHECK_PICTURES);
         fastcheck_audio = cfg.getBooleanProperty(VKontakteRuHoster.FASTLINKCHECK_AUDIO, VKontakteRuHoster.default_FASTLINKCHECK_AUDIO);
         vkwall_grabalbums = cfg.getBooleanProperty(VKontakteRuHoster.VKWALL_GRAB_ALBUMS, VKontakteRuHoster.default_VKWALL_GRAB_ALBUMS);
@@ -468,7 +464,7 @@ public class VKontakteRu extends PluginForDecrypt {
         if (StringUtils.containsIgnoreCase(contenturl, "vkvideo.ru")) {
             host_to_use = "vkvideo.ru";
         } else {
-            host_to_use = "vk.com";
+            host_to_use = "vk.ru";
         }
         if (this.cfg.getBooleanProperty(VKontakteRuHoster.FASTCRAWL_VIDEO, VKontakteRuHoster.default_FASTCRAWL_VIDEO) && !userWantsMultipleQualities && linkCanBeFastCrawled) {
             final DownloadLink dl = this.createDownloadlink(contenturl);
@@ -874,9 +870,9 @@ public class VKontakteRu extends PluginForDecrypt {
     private ArrayList<DownloadLink> crawlPhotoAlbumWebsite(final CryptedLink param) throws Exception {
         final String contenturl;
         if (StringUtils.contains(param.getCryptedUrl(), "#/album")) {
-            contenturl = getProtocol() + "vk.com/album" + new Regex(param.getCryptedUrl(), "#/album((\\-)?\\d+_\\d+)").getMatch(0);
+            contenturl = getProtocol() + "vk.ru/album" + new Regex(param.getCryptedUrl(), "#/album((\\-)?\\d+_\\d+)").getMatch(0);
         } else if (param.getCryptedUrl().matches("(?i).*?vk\\.com/id(?:\\-)?\\d+")) {
-            contenturl = param.getCryptedUrl().replaceAll("(?i)vk\\.com/|id(?:\\-)?", "vk.com/album") + "_0";
+            contenturl = param.getCryptedUrl().replaceAll("(?i)vk\\.com/|id(?:\\-)?", "vk.ru/album") + "_0";
         } else {
             contenturl = this.fixAddedURL(param.getCryptedUrl());
         }
@@ -1189,7 +1185,7 @@ public class VKontakteRu extends PluginForDecrypt {
         final long toId = ((Number) entry.get("to_id")).longValue();
         final String wall_list_id = ownerID + "_" + postID;
         /* URL to show this post. */
-        final String wall_single_post_url = "https://vk.com/wall" + wall_list_id;
+        final String wall_single_post_url = "https://vk.ru/wall" + wall_list_id;
         final String post_text = (String) entry.get("text");
         List<Map<String, Object>> attachments = (List<Map<String, Object>>) entry.get("attachments");
         final ArrayList<DownloadLink> ret = this.getReturnArray();
@@ -1219,7 +1215,7 @@ public class VKontakteRu extends PluginForDecrypt {
                 if (type.equals(wallpost_type_photo) && vkwall_grabphotos) {
                     content_id = typeObject.get("pid").toString();
                     final String album_id = typeObject.get("aid").toString();
-                    final String wall_single_photo_content_url = getProtocol() + "vk.com/wall" + ownerID + "?own=1&z=photo" + owner_id + "_" + content_id + "/" + wall_list_id;
+                    final String wall_single_photo_content_url = getProtocol() + "vk.ru/wall" + ownerID + "?own=1&z=photo" + owner_id + "_" + content_id + "/" + wall_list_id;
                     dl = getPhotoDownloadLink(owner_id, content_id);
                     /*
                      * Override previously set content URL as this really is the direct link to the picture which works fine via browser.
@@ -1283,7 +1279,7 @@ public class VKontakteRu extends PluginForDecrypt {
                     dl = createDownloadlink(url);
                 } else if (type.equals(wallpost_type_video) && vkwall_grabvideo) {
                     content_id = typeObject.get("vid").toString();
-                    String videolink = getProtocol() + "vk.com/video" + owner_id + "_" + content_id;
+                    String videolink = getProtocol() + "vk.ru/video" + owner_id + "_" + content_id;
                     /*
                      * Try to find listID which sometimes is needed to decrypt videos as it grants permissions that would otherwise be
                      * missing!
@@ -1296,7 +1292,7 @@ public class VKontakteRu extends PluginForDecrypt {
                 } else if (type.equals(wallpost_type_album) && vkwall_grabalbums) {
                     // it's string here. no idea why
                     final String album_id = typeObject.get("aid").toString();
-                    dl = createDownloadlink(getProtocol() + "vk.com/album" + owner_id + "_" + album_id);
+                    dl = createDownloadlink(getProtocol() + "vk.ru/album" + owner_id + "_" + album_id);
                 } else if (type.equals(wallpost_type_poll)) {
                     logger.info("Current post only contains a poll --> Skipping it");
                 } else {
@@ -1350,7 +1346,7 @@ public class VKontakteRu extends PluginForDecrypt {
                     add_url = posted_url.matches(vkwall_graburlsinsideposts_regex_default);
                 }
                 if (add_url) {
-                    if (!posted_url.contains("vk.com/")) {
+                    if (!posted_url.contains("vk.ru/")) {
                         logger.info("WTF url: " + posted_url);
                     }
                     logger.info("ADDING url: " + posted_url);
@@ -1379,7 +1375,7 @@ public class VKontakteRu extends PluginForDecrypt {
         final String contenturl;
         final String wValue = UrlQuery.parse(param.getCryptedUrl()).get("w");
         if (wValue != null && wValue.matches("(?i)wall-?\\d+_\\d+")) {
-            contenturl = "https://vk.com/" + wValue;
+            contenturl = "https://vk.ru/" + wValue;
         } else {
             contenturl = this.fixAddedURL(param.getCryptedUrl());
         }
@@ -1533,7 +1529,7 @@ public class VKontakteRu extends PluginForDecrypt {
         Map<String, Object> map = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(br.getRequest().getHtmlCode());
         try {
             /* Access original url as we sometimes need the listID for videos (see decryptWallPost). */
-            this.apiGetPageSafe("https://vk.com/wall" + postIDWithOwnerID);
+            this.apiGetPageSafe("https://vk.ru/wall" + postIDWithOwnerID);
         } catch (final Throwable e) {
         }
         if (map == null) {
@@ -1690,7 +1686,7 @@ public class VKontakteRu extends PluginForDecrypt {
                 logger.info("User wants content of comments --> First adding comment URLs during wall-crawling");
                 final String[] singleWallPostIDs = br.getRegex("wall(" + ownerID + "_\\d+)").getColumn(0);
                 for (final String singleWallpostID : singleWallPostIDs) {
-                    final DownloadLink dl = this.createDownloadlink("https://vk.com/wall" + singleWallpostID);
+                    final DownloadLink dl = this.createDownloadlink("https://vk.ru/wall" + singleWallpostID);
                     ret.add(dl);
                 }
             } else {
@@ -1794,7 +1790,7 @@ public class VKontakteRu extends PluginForDecrypt {
             final String[] wall_post_IDs = url_source.split("_");
             wall_post_owner_id = wall_post_IDs[0];
             wall_post_content_id = wall_post_IDs[1];
-            wall_single_post_url = String.format("https://vk.com/wall%s", url_source);
+            wall_single_post_url = String.format("https://vk.ru/wall%s", url_source);
             isPostContentURLGivenAndTheSameForAllItems = true;
         } else if (url_source.matches(PATTERN_GENERAL_WALL_LINK)) {
             /* url_source = not an URL but our wall_IDs */
@@ -1854,7 +1850,7 @@ public class VKontakteRu extends PluginForDecrypt {
                             /* 2023-11-17: I have no idea what I'm doing lol */
                             albumID = albumID.replace("-6", "0");
                             albumID = albumID.replace("-7", "00");
-                            final String url = "https://vk.com/album" + photoalbum.get("owner_id") + "_" + albumID;
+                            final String url = "https://vk.ru/album" + photoalbum.get("owner_id") + "_" + albumID;
                             final DownloadLink albumdl = this.createDownloadlink(url);
                             ret.add(albumdl);
                         }
@@ -1877,7 +1873,7 @@ public class VKontakteRu extends PluginForDecrypt {
                          * Override previously set content URL as this really is the direct link to the picture which works fine via
                          * browser.
                          */
-                        photodl.setContentUrl("https://vk.com/photo" + owner_id + "_" + content_id);
+                        photodl.setContentUrl("https://vk.ru/photo" + owner_id + "_" + content_id);
                         if (isContentFromWall) {
                             photodl.setProperty("postID", wall_post_content_id);
                             photodl.setProperty(VKontakteRuHoster.PROPERTY_GENERAL_owner_id, owner_id);
@@ -2050,7 +2046,7 @@ public class VKontakteRu extends PluginForDecrypt {
                                     final String[] wall_post_IDs = postIDs.split("_");
                                     wall_post_owner_id = wall_post_IDs[0];
                                     wall_post_content_id = wall_post_IDs[1];
-                                    wall_single_post_url = String.format("https://vk.com/wall%s%s", wall_post_owner_id, wall_post_content_id);
+                                    wall_single_post_url = String.format("https://vk.ru/wall%s%s", wall_post_owner_id, wall_post_content_id);
                                 }
                             }
                         } else {
@@ -2065,7 +2061,7 @@ public class VKontakteRu extends PluginForDecrypt {
                         if (!isPostContentURLGivenAndTheSameForAllItems) {
                             /* Try to find post_id - if this goes wrong we might not be able to download the content later on. */
                             final String tag_id = new Regex(photo_list_id, "(-?\\d+)$").getMatch(0);
-                            single_photo_content_url = String.format("https://vk.com/photo%s?tag=%s", photoContentStr, tag_id);
+                            single_photo_content_url = String.format("https://vk.ru/photo%s?tag=%s", photoContentStr, tag_id);
                         }
                     }
                     if (photoInfoArray.length >= 3) {
@@ -2093,7 +2089,7 @@ public class VKontakteRu extends PluginForDecrypt {
                                     final String[] wall_post_IDs = postIDs.split("_");
                                     wall_post_owner_id = wall_post_IDs[0];
                                     wall_post_content_id = wall_post_IDs[1];
-                                    wall_single_post_url = String.format("https://vk.com/wall%s%s", wall_post_owner_id, wall_post_content_id);
+                                    wall_single_post_url = String.format("https://vk.ru/wall%s%s", wall_post_owner_id, wall_post_content_id);
                                 }
                             }
                         } else {
@@ -2108,7 +2104,7 @@ public class VKontakteRu extends PluginForDecrypt {
                         if (!isPostContentURLGivenAndTheSameForAllItems) {
                             /* Try to find post_id - if this goes wrong we might not be able to download the content later on. */
                             final String tag_id = new Regex(photo_list_id, "(-?\\d+)$").getMatch(0);
-                            single_photo_content_url = String.format("https://vk.com/photo%s?tag=%s", photoContentStr, tag_id);
+                            single_photo_content_url = String.format("https://vk.ru/photo%s?tag=%s", photoContentStr, tag_id);
                         }
                     }
                 }
@@ -2511,7 +2507,7 @@ public class VKontakteRu extends PluginForDecrypt {
                     /* 2023-11-17: I have no idea what I'm doing lol */
                     // albumID = albumID.replace("-6", "0");
                     // albumID = albumID.replace("-7", "00");
-                    final String url = "https://vk.com/album" + photoalbum.get("owner_id") + "_" + albumID;
+                    final String url = "https://vk.ru/album" + photoalbum.get("owner_id") + "_" + albumID;
                     final DownloadLink albumdl = this.createDownloadlink(url);
                     ret.add(albumdl);
                 }
@@ -2530,7 +2526,7 @@ public class VKontakteRu extends PluginForDecrypt {
                     /*
                      * Override previously set content URL as this really is the direct link to the picture which works fine via browser.
                      */
-                    photodl.setContentUrl("https://vk.com/photo" + owner_id + "_" + content_id);
+                    photodl.setContentUrl("https://vk.ru/photo" + owner_id + "_" + content_id);
                     if (isContentFromWall) {
                         photodl.setProperty("postID", wall_post_content_id);
                         photodl.setProperty(VKontakteRuHoster.PROPERTY_GENERAL_owner_id, owner_id);
@@ -2715,7 +2711,7 @@ public class VKontakteRu extends PluginForDecrypt {
             }
             final String filename = stringdata[1];
             final String content_ID = new Regex(docinfo, "^(?:\\[)?(\\d+)").getMatch(0);
-            final DownloadLink dl = this.createDownloadlink("https://vk.com/doc" + owner_ID + "_" + content_ID);
+            final DownloadLink dl = this.createDownloadlink("https://vk.ru/doc" + owner_ID + "_" + content_ID);
             dl.setContentUrl(param.getCryptedUrl());
             dl.setName(Encoding.htmlDecode(filename));
             dl.setDownloadSize(SizeFormatter.getSize(filesize));
@@ -2994,7 +2990,7 @@ public class VKontakteRu extends PluginForDecrypt {
                 VKontakteRuHoster.handleTooManyRequests(plugin, br);
                 redirect = br.getRedirectLocation();
                 if (redirect != null) {
-                    if (redirect.contains("act=security_check") || redirect.contains("login.vk.com/?role=fast")) {
+                    if (redirect.contains("act=security_check") || redirect.contains("login.vk.ru/?role=fast")) {
                         if (siteHandleSecurityCheck(plugin, account, br, redirect)) {
                             VKontakteRuHoster.handleTooManyRequests(plugin, br);
                         } else {
@@ -3155,7 +3151,7 @@ public class VKontakteRu extends PluginForDecrypt {
                     }
                     phone = code;
                     code = code.substring(start.length(), code.length() - end.length());
-                    ajaxBR.postPage(getBaseURL() + "/login.php", "act=security_check&al=1&al_page=3&code=" + code + "&hash=" + Encoding.urlEncode(hash) + "&to=" + Encoding.urlEncode(to));
+                    ajaxBR.postPage(VKontakteRuHoster.getBaseURL(account) + "/login.php", "act=security_check&al=1&al_page=3&code=" + code + "&hash=" + Encoding.urlEncode(hash) + "&to=" + Encoding.urlEncode(to));
                     if (!ajaxBR.containsHTML(">Unfortunately, the numbers you have entered are incorrect")) {
                         hasPassed = true;
                         account.setProperty("phone", phone);
@@ -3180,7 +3176,7 @@ public class VKontakteRu extends PluginForDecrypt {
                         return false;
                     }
                     final String code = UserIO.getInstance().requestInputDialog("Enter the last 4 digits of your phone number for vkontakte.ru :");
-                    ajaxBR.postPage(getBaseURL() + "/login.php", "act=security_check&al=1&al_page=3&code=" + code + "&hash=" + Encoding.urlEncode(hash) + "&to=" + Encoding.urlEncode(to));
+                    ajaxBR.postPage(VKontakteRuHoster.getBaseURL(account) + "/login.php", "act=security_check&al=1&al_page=3&code=" + code + "&hash=" + Encoding.urlEncode(hash) + "&to=" + Encoding.urlEncode(to));
                     if (!ajaxBR.containsHTML(">Unfortunately, the numbers you have entered are incorrect")) {
                         hasPassed = true;
                         break;
@@ -3245,7 +3241,7 @@ public class VKontakteRu extends PluginForDecrypt {
             throw new AccountRequiredException("Only logged in users can see this profile");
         } else if (br.containsHTML(">\\s*Access denied|>\\s*You do not have permission to do this")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.getRedirectLocation() != null && br.getRedirectLocation().contains("vk.com/blank.php")) {
+        } else if (br.getRedirectLocation() != null && br.getRedirectLocation().contains("vk.ru/blank.php")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML(">\\s*This content is blocked in your country") || br.containsHTML(">\\s*This video is not available in your country")) {
             /* 2022-06-01 */
@@ -3312,15 +3308,15 @@ public class VKontakteRu extends PluginForDecrypt {
     }
 
     public static String generateContentURLVideo(final String ownerID, final String contentID) {
-        return "https://vk.com/video" + ownerID + "_" + contentID;
+        return "https://vk.ru/video" + ownerID + "_" + contentID;
     }
 
     private static String generateContentURLPhoto(final String ownerID, final String contentID) {
-        return getProtocol() + "vk.com/photo" + ownerID + "_" + contentID;
+        return getProtocol() + "vk.ru/photo" + ownerID + "_" + contentID;
     }
 
     private static String generateContentURLAudio(final String ownerID, final String contentID) {
-        return getProtocol() + "vk.com/audio" + ownerID + "_" + contentID;
+        return getProtocol() + "vk.ru/audio" + ownerID + "_" + contentID;
     }
 
     @Override

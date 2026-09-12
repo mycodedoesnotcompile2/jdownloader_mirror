@@ -79,50 +79,7 @@
   "installed":{
     "changes":"2.0.0\t: ## Changes\r\n- Fix broken animations\r\n\r\n**Full Changelog**: https://github.com/weisJ/jsvg/compare/v1.7.1-rc1...v1.7.2-rc1",
     "date":"2025-04-26T20:02:00.459+02:00",
-    "dependencies":[
-      {
-        "groupId":"org.junit.jupiter",
-        "artifactId":"junit-jupiter-api",
-        "version":"5.6.2",
-        "scope":"runtime",
-        "optional":"true"
-      },
-      {
-        "groupId":"org.apache.xmlgraphics",
-        "artifactId":"batik-swing",
-        "version":"1.19",
-        "scope":"runtime",
-        "optional":"true"
-      },
-      {
-        "groupId":"org.apache.xmlgraphics",
-        "artifactId":"batik-anim",
-        "version":"1.19",
-        "scope":"runtime",
-        "optional":"true"
-      },
-      {
-        "groupId":"org.apache.xmlgraphics",
-        "artifactId":"batik-transcoder",
-        "version":"1.19",
-        "scope":"runtime",
-        "optional":"true"
-      },
-      {
-        "groupId":"org.apache.xmlgraphics",
-        "artifactId":"batik-util",
-        "version":"1.19",
-        "scope":"runtime",
-        "optional":"true"
-      },
-      {
-        "groupId":"com.github.weisj",
-        "artifactId":"image-comparison",
-        "version":"1.0.0",
-        "scope":"runtime",
-        "optional":"true"
-      }
-    ],
+    "dependencies":null,
     "description":"A lightweight Java2D SVG renderer",
     "files":[
       "",

@@ -64,18 +64,19 @@ public final class WindowsExecuter {
 
     /**
      * Resolves the user token for {@link ExecuteOptions#isRunInActiveSession()} / SID flows (non-LocalSystem). If
-     * {@link ExecuteOptions#getWtsSessionId()} is set, uses {@link WindowsUtils#getUserTokenForSessionId(int)}; otherwise falls back to
-     * {@link WindowsUtils#getActiveConsoleUserToken()}.
+     * {@link ExecuteOptions#getWtsSessionId()} is set, uses {@link WindowsUtils#getUserTokenForSessionId(int)}; otherwise uses
+     * {@link WindowsUtils#getInteractiveOwnerUserToken()} (interactive desktop owner — not {@code WTSGetActiveConsoleSessionId}).
      */
     private static HANDLE resolveInteractiveSessionUserToken(ExecuteOptions options) {
         String sessionStr = options.getWtsSessionId();
         if (sessionStr != null && sessionStr.trim().length() > 0) {
             return requireUserTokenForWtsSessionIdString(sessionStr);
         }
-        HANDLE h = WindowsUtils.getActiveConsoleUserToken();
+        // Interactive owner (Explorer / WTSActive under LocalSystem), not WTSGetActiveConsoleSessionId.
+        HANDLE h = WindowsUtils.getInteractiveOwnerUserToken();
         if (h == null) {
             throw new IllegalStateException(
-                    "No active console user token; pass wtsSessionId (decimal) from the target interactive session (e.g. WindowsUtils.getCurrentProcessSessionId()).");
+                    "No interactive owner user token; pass wtsSessionId (decimal) from the target interactive session (e.g. WindowsUtils.getCurrentProcessSessionId() or InteractiveSessionOwner.resolveOwnerSessionIdForCurrentProcess()).");
         }
         return h;
     }
@@ -129,8 +130,8 @@ public final class WindowsExecuter {
      * LocalSystem, {@link ExecuteOptions#getWtsSessionId()} is mandatory (decimal string, e.g. from
      * {@link org.appwork.utils.os.WindowsUtils#getCurrentProcessSessionId()} before IPC); active-console auto-selection is not used. For
      * non-LocalSystem, if {@link ExecuteOptions#isRunInActiveSession()} is true or a {@link ExecuteOptions#getSid() SID} is set, an interactive
-     * user token is required via {@code wtsSessionId} or the active physical console session. There is no Safer fallback in those cases;
-     * failure throws {@link IllegalStateException} or {@link Win32Exception}.
+     * user token is required via {@code wtsSessionId} or {@link WindowsUtils#getInteractiveOwnerUserToken()} (not the physical console
+     * session). There is no Safer fallback in those cases; failure throws {@link IllegalStateException} or {@link Win32Exception}.
      *
      * @param options
      *            command, working dir, waitFor, env

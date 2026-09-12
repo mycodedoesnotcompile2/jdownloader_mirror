@@ -38,8 +38,8 @@ import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 
+import org.appwork.exceptions.ThrowUncheckedException;
 import org.appwork.utils.DebugMode;
-import org.appwork.utils.Exceptions;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.httpconnection.IllegalSSLHostnameException;
 import org.appwork.utils.net.httpconnection.SSLSocketStreamFactory;
@@ -353,7 +353,7 @@ public class BCSSLSocketStreamFactory implements SSLSocketStreamFactory {
                     // on resume, no new handshake is done, so we check the peer(server) certificate from session
                     checkTrust(paramTlsSession.exportSessionParameters().getPeerCertificate(), true);
                 } catch (IOException e) {
-                    Exceptions.throwUncheckedException(e);
+                    ThrowUncheckedException.throwUncheckedException(e);
                 }
             }
         }
@@ -453,41 +453,41 @@ public class BCSSLSocketStreamFactory implements SSLSocketStreamFactory {
         return new BCSSLSocketStreamInterface() {
             final KeyManager[] keyManager = trustCallback.getKeyManager();
             final InputStream  is         = new InputStream() {
-                                              final InputStream is = protocol.getInputStream();
+                final InputStream is = protocol.getInputStream();
 
-                                              @Override
-                                              public int read() throws IOException {
-                                                  final byte[] buf = new byte[1];
-                                                  final int ret = read(buf, 0, 1);
-                                                  return ret <= 0 ? -1 : buf[0] & 0xFF;
-                                              }
+                @Override
+                public int read() throws IOException {
+                    final byte[] buf = new byte[1];
+                    final int ret = read(buf, 0, 1);
+                    return ret <= 0 ? -1 : buf[0] & 0xFF;
+                }
 
-                                              private boolean eof = false;
+                private boolean eof = false;
 
-                                              @Override
-                                              public int read(byte[] buf, int off, int len) throws IOException {
-                                                  if (eof) {
-                                                      return -1;
-                                                  }
-                                                  try {
-                                                      return is.read(buf, off, len);
-                                                  } catch (TlsNoCloseNotifyException ignore) {
-                                                      LogController.CL().log(ignore);
-                                                      eof = true;
-                                                      return -1;
-                                                  }
-                                              }
+                @Override
+                public int read(byte[] buf, int off, int len) throws IOException {
+                    if (eof) {
+                        return -1;
+                    }
+                    try {
+                        return is.read(buf, off, len);
+                    } catch (TlsNoCloseNotifyException ignore) {
+                        LogController.CL().log(ignore);
+                        eof = true;
+                        return -1;
+                    }
+                }
 
-                                              @Override
-                                              public int available() throws IOException {
-                                                  return is.available();
-                                              }
+                @Override
+                public int available() throws IOException {
+                    return is.available();
+                }
 
-                                              @Override
-                                              public void close() throws IOException {
-                                                  is.close();
-                                              }
-                                          };
+                @Override
+                public void close() throws IOException {
+                    is.close();
+                }
+            };
 
             @Override
             public Socket getSocket() {
