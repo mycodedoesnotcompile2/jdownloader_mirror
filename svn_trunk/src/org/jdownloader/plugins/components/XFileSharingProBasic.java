@@ -93,7 +93,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 53185 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53395 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1688,15 +1688,25 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "realFUID:" + realFUID);
             }
             /* Success! */
+            final String mainPage;
+            if (isShortURLHostOnly(link)) {
+                mainPage = getMainPage(null, br._getURL());
+            } else {
+                mainPage = getMainPage(link);
+            }
             final String urlNew;
             if (URL_TYPE.FILE.equals(type)) {
-                urlNew = URLHelper.parseLocation(new URL(this.getMainPage(link)), buildNormalFileURLPath(link, realFUID));
+                urlNew = URLHelper.parseLocation(new URL(mainPage), buildNormalFileURLPath(link, realFUID));
             } else {
-                urlNew = URLHelper.parseLocation(new URL(this.getMainPage(link)), buildNormalURLPath(link, realFUID));
+                urlNew = URLHelper.parseLocation(new URL(mainPage), buildNormalURLPath(link, realFUID));
             }
             logger.info("resolve URL|old: " + contentURL + "|new:" + urlNew);
             link.setPluginPatternMatcher(urlNew);
         }
+    }
+
+    protected boolean isShortURLHostOnly(DownloadLink link) {
+        return false;
     }
 
     /**

@@ -18,6 +18,7 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.Regex;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
@@ -26,7 +27,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 45850 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53397 $", interfaceVersion = 3, names = {}, urls = {})
 public class Hot4shareCom extends XFileSharingProBasic {
     public Hot4shareCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -49,6 +50,19 @@ public class Hot4shareCom extends XFileSharingProBasic {
 
     public static String[] getAnnotationNames() {
         return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] scanInfo(String html, String[] fileInfo) {
+        // remove premium ads
+        while (true) {
+            final String before = html;
+            html = removeDiv(this, html, new Regex(html, "(<div[^>]*class\\s*=\\s*\"premiumPlan\"[^>]*>)").getMatch(0));
+            if (before.equals(html)) {
+                break;
+            }
+        }
+        return super.scanInfo(html, fileInfo);
     }
 
     @Override

@@ -58,7 +58,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53269 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53394 $", interfaceVersion = 2, names = {}, urls = {})
 public class FilerNet extends PluginForHost {
     private static final int    STATUSCODE_APIDISABLED                             = 400;
     private static final String ERRORMESSAGE_APIDISABLEDTEXT                       = "API is disabled, please wait or use filer.net in your browser";
@@ -406,7 +406,7 @@ public class FilerNet extends PluginForHost {
         dl.startDownload();
     }
 
-    private void errorNoFreeSlotsAvailable() throws PluginException {
+    protected void errorNoFreeSlotsAvailable() throws PluginException {
         final int waitMinutes = this.getPluginConfig().getIntegerProperty(SETTING_WAIT_MINUTES_ON_ERROR_NO_FREE_SLOTS, defaultSETTING_WAIT_MINUTES_ON_ERROR_NO_FREE_SLOTS);
         throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "No free slots available, wait or buy premium!", waitMinutes * 60 * 1000l);
     }
@@ -490,7 +490,7 @@ public class FilerNet extends PluginForHost {
         if (trafficLeft >= 0) {
             return;
         }
-        final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
+        final SIZEUNIT maxSizeUnit = CFG_GUI.MAX_SIZE_UNIT.getValue();
         final long negativeTrafficBytes = Math.abs(trafficLeft);
         final String negativeTrafficFormatted = SIZEUNIT.formatValue(maxSizeUnit, negativeTrafficBytes);
         /* Calculate how long we need to wait until the account has positive traffic again. */
@@ -580,6 +580,91 @@ public class FilerNet extends PluginForHost {
         return ret;
     }
 
+    private enum Error {
+        hour_download_limit_reached {
+            @Override
+            protected void handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                final Map<String, Object> data = (Map<String, Object>) entries.get("data");
+                final Number wait;
+                if (data != null && data.get("wait") instanceof Number) {
+                    wait = ((Number) data.get("wait"));
+                } else {
+                    wait = 300;
+                }
+                // Waittime too small->Don't reconnect
+                if (wait.intValue() < 61) {
+                    throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Wait before starting new downloads...", wait.intValue() * 1000l);
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, wait.intValue() * 1000l);
+                }
+            }
+
+            @Override
+            protected boolean matches(Map<String, Object> entries) {
+                return "hour download limit reached".equals(entries.get("status"));
+            }
+        },
+        user_download_slots_filled {
+            @Override
+            protected boolean matches(Map<String, Object> entries) {
+                return "user download slots filled".equals(entries.get("status"));
+            }
+
+            @Override
+            protected void handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                plugin.errorNoFreeSlotsAvailable();
+            }
+        },
+        account_suspended {
+            // {"code":403,"status":"account suspended","data":{}}
+            @Override
+            protected boolean matches(Map<String, Object> entries) {
+                return "account suspended".equals(entries.get("status"));
+            }
+
+            @Override
+            protected void handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                if (account != null) {
+                    throw new AccountInvalidException("Account suspended, please contact filer.net support!");
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unexpected API error " + entries);
+                }
+            }
+        },
+        file_not_found {
+            /* {"code":"505","status":"file not found","data":[]} */
+            @Override
+            protected boolean matches(Map<String, Object> entries) {
+                return "file not found".equals(entries.get("status")) || "505".equals(String.valueOf(entries.get("code")));
+            }
+
+            @Override
+            protected void handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+        },
+        download_not_allowed {
+            // {"code":403,"status":"download not allowed","data":{}}
+            @Override
+            protected boolean matches(Map<String, Object> entries) {
+                return "download not allowed".equals(entries.get("status"));
+            }
+
+            @Override
+            protected void handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                if (account != null) {
+                    throw new AccountUnavailableException("Download currently not possible", TimeUnit.MINUTES.toMillis(5));
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unexpected API error " + entries);
+                }
+            }
+        };
+
+        protected abstract boolean matches(Map<String, Object> entries);
+
+        protected abstract void handle(FilerNet plugin, Map<String, Object> entries, final Account account) throws Exception;
+    }
+
     private Object checkErrorsAPI(final Account account) throws Exception {
         final Map<String, Object> entries;
         try {
@@ -617,21 +702,9 @@ public class FilerNet extends PluginForHost {
         }
         if (status != null) {
             if ("hour download limit reached".equals(status)) {
-                final Map<String, Object> data = (Map<String, Object>) entries.get("data");
-                final Number wait;
-                if (data != null && data.get("wait") instanceof Number) {
-                    wait = ((Number) data.get("wait"));
-                } else {
-                    wait = 300;
-                }
-                // Waittime too small->Don't reconnect
-                if (wait.intValue() < 61) {
-                    throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Wait before starting new downloads...", wait.intValue() * 1000l);
-                } else {
-                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, wait.intValue() * 1000l);
-                }
+                Error.hour_download_limit_reached.handle(this, entries, account);
             } else if ("user download slots filled".equals(status)) {
-                errorNoFreeSlotsAvailable();
+                Error.user_download_slots_filled.handle(this, entries, account);
             } else if ("file captcha input needed".equals(status)) {
                 /* No error */
                 /* 202 = file captcha input needed */
@@ -641,36 +714,38 @@ public class FilerNet extends PluginForHost {
                 /* 203 = file wait needed */
                 return entries;
             } else if ("account suspended".equals(status)) {
-                // {"code":403,"status":"account suspended","data":{}}
-                if (account != null) {
-                    throw new AccountInvalidException("Account suspended, please contact filer.net support!");
-                } else {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unexpected API error " + entries);
-                }
+                Error.account_suspended.handle(this, entries, account);
             } else if ("file not found".equals(status)) {
-                /* {"code":"505","status":"file not found","data":[]} */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                Error.file_not_found.handle(this, entries, account);
             }
         }
         if (code != null) {
             final int statusCode = code.intValue();
             switch (statusCode) {
             case 403:
-                if (account != null) {
-                    /* e.g. {"code":403,"status":"account suspended","data":{}} */
-                    throw new AccountInvalidException("Account suspended, please contact filer.net support!");
+                if ("account suspended".equals(statusObject)) {
+                    Error.account_suspended.handle(this, entries, account);
+                } else if ("hour download limit reached".equals(status)) {
+                    Error.hour_download_limit_reached.handle(this, entries, account);
+                } else if ("user download slots filled".equals(status)) {
+                    Error.user_download_slots_filled.handle(this, entries, account);
+                } else if ("download not allowed".equals(statusObject)) {
+                    Error.download_not_allowed.handle(this, entries, account);
                 } else {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unexpected API error " + entries);
                 }
             case STATUSCODE_APIDISABLED:
                 throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, ERRORMESSAGE_APIDISABLEDTEXT, 2 * 60 * 60 * 1000l);
             case 505:
-                /* {"code":"505","status":"file not found","data":[]} */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                Error.file_not_found.handle(this, entries, account);
             case STATUSCODE_DOWNLOADTEMPORARILYDISABLED:
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, ERRORMESSAGE_DOWNLOADTEMPORARILYDISABLEDTEXT, 2 * 60 * 60 * 1000l);
             case 504:
-                if (account == null || AccountType.FREE.equals(account.getType())) {
+                if ("hour download limit reached".equals(status)) {
+                    Error.hour_download_limit_reached.handle(this, entries, account);
+                } else if ("user download slots filled".equals(status)) {
+                    Error.user_download_slots_filled.handle(this, entries, account);
+                } else if (account == null || AccountType.FREE.equals(account.getType())) {
                     throw new AccountRequiredException(status);
                 } else {
                     /*

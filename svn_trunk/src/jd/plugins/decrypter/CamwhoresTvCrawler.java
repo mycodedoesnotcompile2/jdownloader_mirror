@@ -19,6 +19,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.utils.Regex;
+import org.appwork.utils.os.CrossSystem;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
@@ -27,12 +32,7 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.hoster.CamwhoresTv;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.utils.Regex;
-import org.appwork.utils.os.CrossSystem;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 52642 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53394 $", interfaceVersion = 3, names = {}, urls = {})
 public class CamwhoresTvCrawler extends PornEmbedParser {
     public CamwhoresTvCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -57,8 +57,7 @@ public class CamwhoresTvCrawler extends PornEmbedParser {
     public Browser createNewBrowserInstance() {
         final Browser ret = super.createNewBrowserInstance();
         if (CrossSystem.isWindows()) {
-            // version 76.0 is blocked for windows os
-            ret.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, Request.getSuggestedUserAgent("77.0"));
+            ret.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, Request.getSuggestedUserAgent("154.0"));
         }
         return ret;
     }
