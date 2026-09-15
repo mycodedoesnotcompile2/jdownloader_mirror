@@ -18,16 +18,15 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
-import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 53396 $", interfaceVersion = 3, names = {}, urls = {})
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 53401 $", interfaceVersion = 3, names = {}, urls = {})
 public class DownupSpace extends XFileSharingProBasic {
     public DownupSpace(final PluginWrapper wrapper) {
         super(wrapper);
@@ -49,27 +48,10 @@ public class DownupSpace extends XFileSharingProBasic {
     }
 
     @Override
-    protected boolean isShortURLHostOnly(DownloadLink link) {
-        final String url = getContentURL(link);
-        return "dwp.la".equals(Browser.getHost(url));
-    }
-
-    @Override
     protected List<String> getDeadDomains() {
         final ArrayList<String> deadDomains = new ArrayList<String>();
         deadDomains.add("downup.space");
         return deadDomains;
-    }
-
-    @Override
-    protected void resolveShortURL(final Browser br, final DownloadLink link, final Account account) throws Exception {
-        super.resolveShortURL(br, link, account);
-        String url = link.getPluginPatternMatcher();
-        if (!"dwp.la".equals(Browser.getHost(url)) || isShortURL(link)) {
-            return;
-        }
-        url = url.replaceFirst("dwp.la/", getHost() + "/");
-        link.setPluginPatternMatcher(url);
     }
 
     @Override

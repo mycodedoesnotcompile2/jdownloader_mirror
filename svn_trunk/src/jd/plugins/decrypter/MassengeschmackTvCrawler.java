@@ -48,7 +48,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 45506 $", interfaceVersion = 3, names = { "massengeschmack.tv" }, urls = { "https?://(?:www\\.)?massengeschmack\\.tv/((?:play|clip)/|index_single\\.php\\?id=)[a-z0-9\\-]+|https?://(?:www\\.)?massengeschmack\\.tv/live/[a-z0-9\\-]+" })
+@DecrypterPlugin(revision = "$Revision: 53401 $", interfaceVersion = 3, names = { "massengeschmack.tv" }, urls = { "https?://(?:www\\.)?massengeschmack\\.tv/((?:play|clip)/|index_single\\.php\\?id=)[a-z0-9\\-]+|https?://(?:www\\.)?massengeschmack\\.tv/live/[a-z0-9\\-]+" })
 public class MassengeschmackTvCrawler extends PluginForDecrypt {
     public MassengeschmackTvCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -482,7 +482,7 @@ public class MassengeschmackTvCrawler extends PluginForDecrypt {
             dl.setDownloadSize(filesizeCurrent);
             dl.setAvailable(true);
         }
-        String filename_temp = MassengeschmackTv.getMassengeschmack_other_FormattedFilename(dl, variant);
+        String filename_temp = MassengeschmackTv.getMassengeschmack_other_FormattedFilename(this, dl, variant);
         if (filename_temp == null) {
             /* TODO: Make sure this works and we never get any 'nulls' in our filename! */
             filename_temp = MassengeschmackTv.getFilenameLastChance(variant.getUrl(), url_videoid);

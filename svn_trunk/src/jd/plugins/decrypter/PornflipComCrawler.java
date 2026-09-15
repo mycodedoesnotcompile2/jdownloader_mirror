@@ -22,11 +22,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map.Entry;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.controlling.UniqueAlltimeID;
-import org.jdownloader.plugins.components.hds.HDSContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
@@ -48,7 +43,12 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.PornflipCom;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 51184 $", interfaceVersion = 3, names = { "playvids.com", "pornflip.com" }, urls = { "https?://(?:www\\.)?playvids\\.com/(?:[a-z]{2}/)?v/[A-Za-z0-9\\-_]+|https?://(?:www\\.)?playvids\\.com/(?:[a-z]{2}/)?[A-Za-z0-9\\-_]+/[A-Za-z0-9\\-_]+", "https?://(?:www\\.)?pornflip\\.com/(?:[a-z]{2}/)?v/[A-Za-z0-9\\-_]+|https?://(?:www\\.)?pornflip\\.com/(?:[a-z]{2}/)?[A-Za-z0-9\\-_]+/[A-Za-z0-9\\-_]+" })
+import org.appwork.utils.StringUtils;
+import org.jdownloader.controlling.UniqueAlltimeID;
+import org.jdownloader.plugins.components.hds.HDSContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 53400 $", interfaceVersion = 3, names = { "playvids.com", "pornflip.com" }, urls = { "https?://(?:www\\.)?playvids\\.com/(?:[a-z]{2}/)?v/[A-Za-z0-9\\-_]+|https?://(?:www\\.)?playvids\\.com/(?:[a-z]{2}/)?[A-Za-z0-9\\-_]+/[A-Za-z0-9\\-_]+", "https?://(?:www\\.)?pornflip\\.com/(?:[a-z]{2}/)?v/[A-Za-z0-9\\-_]+|https?://(?:www\\.)?pornflip\\.com/(?:[a-z]{2}/)?[A-Za-z0-9\\-_]+/[A-Za-z0-9\\-_]+" })
 public class PornflipComCrawler extends PluginForDecrypt {
     public PornflipComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -139,7 +139,7 @@ public class PornflipComCrawler extends PluginForDecrypt {
         }
         /** Decrypt qualities END */
         /** Decrypt qualities, selected by the user */
-        final SubConfiguration cfg = SubConfiguration.getConfig(this.getHost());
+        final SubConfiguration cfg = getPluginConfig();
         final boolean best = cfg.getBooleanProperty(ALLOW_BEST, false);// currently the help text to best doesn't imply that it works on
         // selected resolutions only, maybe add another option for this
         final boolean q360p = cfg.getBooleanProperty(PornflipCom.ALLOW_360P, true);
@@ -264,7 +264,7 @@ public class PornflipComCrawler extends PluginForDecrypt {
                 if (videoID != null) {
                     dl.setLinkID(getHost() + "//" + videoID + "/" + qualityValue);
                 }
-                if (SubConfiguration.getConfig(this.getHost()).getBooleanProperty(FASTLINKCHECK, false)) {
+                if (getPluginConfig().getBooleanProperty(FASTLINKCHECK, false)) {
                     dl.setAvailable(true);
                 }
                 ret.add(dl);

@@ -23,11 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -43,7 +38,12 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.ImageFap;
 
-@DecrypterPlugin(revision = "$Revision: 53026 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 53400 $", interfaceVersion = 2, names = {}, urls = {})
 public class ImageFapCrawler extends PluginForDecrypt {
     public ImageFapCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -102,7 +102,7 @@ public class ImageFapCrawler extends PluginForDecrypt {
 
     @Override
     public void init() {
-        ImageFap.setRequestIntervalLimitGlobal();
+        ImageFap.setRequestIntervalLimitGlobal(this);
     }
 
     @Override
@@ -330,7 +330,7 @@ public class ImageFapCrawler extends PluginForDecrypt {
                     link.setProperty(ImageFap.PROPERTY_PHOTO_GALLERY_TITLE, galleryName);
                     link.setProperty(ImageFap.PROPERTY_USERNAME, authorsName);
                     link.setProperty(ImageFap.PROPERTY_PHOTO_INDEX, (counter - 1));
-                    link.setName(ImageFap.getFormattedFilename(link));
+                    link.setName(ImageFap.getFormattedFilename(this, link));
                     link.setAvailable(true);
                     ret.add(link);
                     distribute(link);
@@ -340,8 +340,8 @@ public class ImageFapCrawler extends PluginForDecrypt {
             }
             if (page == maxPage) {
                 /**
-                 * Find new max page value if it looks like we're currently on the last page. </br>
-                 * E.g. if we are on page one, highest page number we can see is 10 even though the item may have 20+ pages.
+                 * Find new max page value if it looks like we're currently on the last page. </br> E.g. if we are on page one, highest page
+                 * number we can see is 10 even though the item may have 20+ pages.
                  */
                 final int maxPageValueOfCurrentPage = findMaxPage(br);
                 if (maxPageValueOfCurrentPage > maxPage) {

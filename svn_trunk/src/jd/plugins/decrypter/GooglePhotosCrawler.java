@@ -18,7 +18,6 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 
 import jd.PluginWrapper;
-import jd.config.SubConfiguration;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -33,7 +32,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 49591 $", interfaceVersion = 3, names = { "photos.google.com" }, urls = { "https?://photos\\.google\\.com/share/[A-Za-z0-9\\-_]+\\?key=[A-Za-z0-9\\-_]+|https?://photos\\.app\\.goo\\.gl/[A-Za-z0-9]+" })
+@DecrypterPlugin(revision = "$Revision: 53400 $", interfaceVersion = 3, names = { "photos.google.com" }, urls = { "https?://photos\\.google\\.com/share/[A-Za-z0-9\\-_]+\\?key=[A-Za-z0-9\\-_]+|https?://photos\\.app\\.goo\\.gl/[A-Za-z0-9]+" })
 public class GooglePhotosCrawler extends PluginForDecrypt {
     public GooglePhotosCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -77,7 +76,7 @@ public class GooglePhotosCrawler extends PluginForDecrypt {
             title = idMAIN;
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final boolean fastlinkcheck = SubConfiguration.getConfig(this.getHost()).getBooleanProperty(jd.plugins.hoster.GooglePhotos.FAST_LINKCHECK, true);
+        final boolean fastlinkcheck = getPluginConfig().getBooleanProperty(jd.plugins.hoster.GooglePhotos.FAST_LINKCHECK, true);
         for (final String idSINGLE : ids) {
             final String finallink = "https://photos.google.com/share/" + idMAIN + "/photo/" + idSINGLE + "?key=" + key;
             final DownloadLink dl = createDownloadlink(finallink);

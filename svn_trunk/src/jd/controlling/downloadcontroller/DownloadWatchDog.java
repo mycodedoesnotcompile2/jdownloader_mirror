@@ -4102,13 +4102,6 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
     }
 
     /**
-     * EXPERIMENTAL test toggle: when enabled, long paths are assumed to be supported by the OS/JVM (e.g. Windows LongPathsEnabled together
-     * with a longPathAware runtime). The classic total MAX_PATH limit is then irrelevant and only the per-segment limit (255 characters per
-     * path component on NTFS) constrains the filename length. Set to false for the classic MAX_PATH (260) behaviour.
-     */
-    public static volatile boolean longWindowsPathsAllowed = true;
-
-    /**
      * Builds a non-existing "jd_accessCheck_..." file inside the given folder whose name has exactly {@code targetNameLength} characters
      * (but at least "jd_accessCheck_" + 4 random digits, regardless of {@code targetNameLength}). </br>
      * The random digits both provide uniqueness and are used to pad the name to the requested length. </br>
@@ -4134,13 +4127,13 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
 
     /**
      * @return the maximum allowed filename length (number of characters) for a file placed directly inside the given parent folder on
-     *         Windows, honouring {@link #longWindowsPathsAllowed}. </br>
+     *         Windows, honouring {@link GeneralSettings#isLongWindowsPathsAllowed()}. </br>
      *         May be &lt;= 0 when the parent folder path alone already exhausts the classic MAX_PATH limit.
      */
     private static int getMaxWindowsFilenameLength(final File parentFolder) {
         final int maxPathLengthWindows = 259; // 260 but only 259 usable
         final int maxSegmentLength = 255; // NTFS per-segment limit; a hard filesystem limit that ALWAYS applies to a single filename.
-        if (longWindowsPathsAllowed) {
+        if (JsonConfig.create(GeneralSettings.class).isLongWindowsPathsAllowed()) {
             /* Long paths allowed -> the total path length is not the limit; only the per-segment limit applies to the filename. */
             return maxSegmentLength;
         }
@@ -4976,6 +4969,13 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
         if (source == dest) {
             return;
         }
+        if (new File(source.getDownloadDirectory()).equals(new File(dest.getDownloadDirectory()))) {
+            /*
+             * Both packages resolve to the same download directory -> no file needs to be moved. Skip the whole per-link iteration
+             * (and its disk IO) instead of testing every single link.
+             */
+            return;
+        }
         enqueueJob(new DownloadWatchDogJob() {
             //
             @Override
@@ -5047,21 +5047,31 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
 
     protected void move(DownloadLink downloadLink, String oldDir, String oldName, String newDir, String newName) {
         try {
-            ArrayList<DownloadLinkCandidate> lst = new ArrayList<DownloadLinkCandidate>();
+            /*
+             * Decide whether anything actually needs to happen BEFORE touching the filesystem (disk space check). Moving many links between
+             * packages must not trigger per-link IO when no move/rename is going to happen.
+             */
+            final boolean sameDir = new File(oldDir).equals(new File(newDir));
+            final boolean sameName = StringUtils.equals(oldName, newName);
+            if (sameDir && (newName == null || sameName)) {
+                /* Neither directory nor name changed -> nothing to move or rename. */
+                return;
+            }
+            if (!sameDir && !CFG_GENERAL.CFG.isMoveFilesIfDownloadDestinationChangesEnabled()) {
+                logger.info("Cancel isMoveFilesIfDownloadDestinationChanges is false");
+                return;
+            }
+            if (sameDir && !sameName && !CFG_GENERAL.CFG.isRenameFilesIfDownloadLinkNameChangesEnabled()) {
+                logger.info("Cancel isRenameFilesIfDownloadLinkNameChangesEnabled is false");
+                return;
+            }
+            final ArrayList<DownloadLinkCandidate> lst = new ArrayList<DownloadLinkCandidate>();
             lst.add(new DownloadLinkCandidate(downloadLink, true));
             if (DISKSPACERESERVATIONRESULT.FAILED.equals(validateDiskFree(lst))) {
                 throw new IOException(_GUI.T.DownloadWatchDog_move_exception_disk_full(downloadLink.getFileOutput()));
             }
             logger.info("Move " + downloadLink);
             logger.info("From " + oldDir + "/" + oldName + " to " + newDir + "/" + newName);
-            if (!new File(oldDir).equals(new File(newDir)) && !CFG_GENERAL.CFG.isMoveFilesIfDownloadDestinationChangesEnabled()) {
-                logger.info("Cancel isMoveFilesIfDownloadDestinationChanges is false");
-                return;
-            }
-            if (new File(oldDir).equals(new File(newDir)) && !oldName.equals(newName) && !CFG_GENERAL.CFG.isRenameFilesIfDownloadLinkNameChangesEnabled()) {
-                logger.info("Cancel isRenameFilesIfDownloadLinkNameChangesEnabled is false");
-                return;
-            }
             downloadLink.getDefaultPlugin().move(downloadLink, oldDir, oldName, newDir, newName);
             return;
         } catch (Throwable e) {

@@ -16,15 +16,6 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.ProgressController;
@@ -45,7 +36,16 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ORFMediathek;
 
-@DecrypterPlugin(revision = "$Revision: 53304 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 53400 $", interfaceVersion = 2, names = {}, urls = {})
 public class OrfAt extends PluginForDecrypt {
     public OrfAt(PluginWrapper wrapper) {
         super(wrapper);
@@ -53,7 +53,7 @@ public class OrfAt extends PluginForDecrypt {
 
     public void init() {
         super.init();
-        this.cfg = SubConfiguration.getConfig("orf.at");
+        this.cfg = getPluginConfig();
     }
 
     @Override
@@ -993,8 +993,7 @@ public class OrfAt extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         /**
-         * Add more properties which are the same for all results. </br>
-         * It is important that all items run through this loop!
+         * Add more properties which are the same for all results. </br> It is important that all items run through this loop!
          */
         for (final DownloadLink result : ret) {
             if (!result.hasProperty(ORFMediathek.PROPERTY_CONTENT_TYPE)) {
@@ -1695,7 +1694,7 @@ public class OrfAt extends PluginForDecrypt {
             /* Use new handling */
             return this.crawlOrfmediathekNewEncryptedID(encrypted_id, null);
         }
-        final SubConfiguration cfg = SubConfiguration.getConfig("orf.at");
+        final SubConfiguration cfg = getPluginConfig();
         // if(Boolean.TRUE.equals(episode.get("is_drm_protected"))) {
         //
         // }

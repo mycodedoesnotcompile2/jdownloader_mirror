@@ -3567,6 +3567,16 @@ public class WindowsUtils {
         if (file == null) {
             return false;
         }
+        final String path = file.getAbsolutePath();
+        if (path.startsWith("\\\\")) {
+            /*
+             * UNC/network path: SHParseDisplayName parses shell display names, not file-system paths, so it does not accept the "\\?\UNC\"
+             * extended-length prefix; a plain UNC path in turn stays bound by MAX_PATH. This reveal therefore cannot work for long network
+             * paths -> bail out early and let the caller fall back. (Mapped network drives appear as "X:\" and are not affected by this
+             * check.)
+             */
+            return false;
+        }
         // SHOpenFolderAndSelectItems requires COM to be initialized on the calling thread.
         final HRESULT coInit = Ole32.INSTANCE.CoInitializeEx(null, Ole32.COINIT_APARTMENTTHREADED);
         // S_OK (0) = we initialized it; S_FALSE (1) = already initialized on this thread (still must be balanced by CoUninitialize).
@@ -3582,7 +3592,7 @@ public class WindowsUtils {
              * old path-based Win32 layer used by explorer.exe /select. (ILCreateFromPath would be the only alternative, but it is just
              * another "path -> PIDL" step, not a way to omit this one, and is the older/less robust variant without an HRESULT.)
              */
-            final HRESULT parse = Shell32Ext.INSTANCE.SHParseDisplayName(file.getAbsolutePath(), null, ppidl, 0, null);
+            final HRESULT parse = Shell32Ext.INSTANCE.SHParseDisplayName(path, null, ppidl, 0, null);
             if (parse == null || parse.intValue() != WinError.S_OK.intValue()) {
                 return false;
             }

@@ -27,12 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
@@ -52,10 +46,17 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.SaveTv;
 
-@DecrypterPlugin(revision = "$Revision: 52997 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(www\\.)?save\\.tv/STV/M/obj/archive/(?:Horizontal)?VideoArchive\\.cfm.*" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 53400 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(www\\.)?save\\.tv/STV/M/obj/archive/(?:Horizontal)?VideoArchive\\.cfm.*" })
 public class SaveTvDecrypter extends PluginForDecrypt {
     public SaveTvDecrypter(PluginWrapper wrapper) {
         super(wrapper);
+        cfg = getPluginConfig();
     }
 
     @Override
@@ -68,7 +69,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
 
     /* Settings stuff */
     @SuppressWarnings("deprecation")
-    private final SubConfiguration cfg                                          = SubConfiguration.getConfig("save.tv");
+    private final SubConfiguration cfg;
     private final String           CRAWLER_ONLY_ADD_NEW_IDS                     = "CRAWLER_ONLY_ADD_NEW_IDS";
     private final String           CRAWLER_ACTIVATE                             = "CRAWLER_ACTIVATE";
     private static final String    CRAWLER_PROPERTY_TELECASTIDS_ADDED           = "CRAWLER_PROPERTY_TELECASTIDS_ADDED";
@@ -383,8 +384,8 @@ public class SaveTvDecrypter extends PluginForDecrypt {
         }
         final DownloadLink link = createStvDownloadlink(account, telecast_id);
         link.setAvailable(true);
-        jd.plugins.hoster.SaveTv.parseFilenameInformation_api(link, entries, true);
-        jd.plugins.hoster.SaveTv.parseQualityTagAPI(link, jd.plugins.hoster.SaveTv.jsonGetFormatArrayAPI(entries));
+        jd.plugins.hoster.SaveTv.parseFilenameInformation_api(this, link, entries, true);
+        jd.plugins.hoster.SaveTv.parseQualityTagAPI(this, link, jd.plugins.hoster.SaveTv.jsonGetFormatArrayAPI(entries));
         if (telecastID_IS_Allowed(link)) {
             link.setName(jd.plugins.hoster.SaveTv.getFilename(this, link));
             distribute(link);
@@ -408,8 +409,8 @@ public class SaveTvDecrypter extends PluginForDecrypt {
         if (fast_linkcheck) {
             link.setAvailable(true);
         }
-        jd.plugins.hoster.SaveTv.parseFilenameInformation_site(link, entries);
-        jd.plugins.hoster.SaveTv.parseQualityTagWebsite(link, (List) entries.get("ARRALLOWDDOWNLOADFORMATS"));
+        jd.plugins.hoster.SaveTv.parseFilenameInformation_site(this, link, entries);
+        jd.plugins.hoster.SaveTv.parseQualityTagWebsite(this, link, (List) entries.get("ARRALLOWDDOWNLOADFORMATS"));
         if (telecastID_IS_Allowed(link)) {
             link.setName(jd.plugins.hoster.SaveTv.getFilename(this, link));
             distribute(link);

@@ -61,7 +61,7 @@ import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.downloader.hls.M3U8Playlist;
 import org.jdownloader.downloader.hls.M3U8Playlist.M3U8Segment;
 
-@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 2, names = { "twitch.tv" }, urls = { "http://twitchdecrypted\\.tv/\\d+" })
+@HostPlugin(revision = "$Revision: 53400 $", interfaceVersion = 2, names = { "twitch.tv" }, urls = { "http://twitchdecrypted\\.tv/\\d+" })
 public class TwitchTv extends PluginForHost {
     public TwitchTv(PluginWrapper wrapper) {
         super(wrapper);
@@ -104,7 +104,7 @@ public class TwitchTv extends PluginForHost {
         dllink = downloadLink.getStringProperty("plain_directlink", downloadLink.getStringProperty("m3u", null));
         if (dllink == null && isChatDownload(downloadLink)) {
             // incase the user updates the formatting in configs between decrypter and download.
-            downloadLink.setName(getFormattedFilename(downloadLink));
+            downloadLink.setName(getFormattedFilename(this, downloadLink));
             return AvailableStatus.TRUE;
         }
         if (downloadLink.getBooleanProperty("offline", false) || dllink == null) {
@@ -163,7 +163,7 @@ public class TwitchTv extends PluginForHost {
                     }
                 }
                 downloadLink.setProperty("extension", extension);
-                downloadLink.setName(getFormattedFilename(downloadLink));
+                downloadLink.setName(getFormattedFilename(this, downloadLink));
                 return AvailableStatus.TRUE;
             }
         } else {
@@ -185,7 +185,7 @@ public class TwitchTv extends PluginForHost {
                 } catch (Throwable e) {
                 }
             }
-            final String formattedFilename = getFormattedFilename(downloadLink);
+            final String formattedFilename = getFormattedFilename(this, downloadLink);
             downloadLink.setFinalFileName(formattedFilename);
             return AvailableStatus.TRUE;
         }
@@ -480,9 +480,9 @@ public class TwitchTv extends PluginForHost {
     }
 
     @SuppressWarnings("deprecation")
-    public static String getFormattedFilename(final DownloadLink downloadLink) throws ParseException {
+    public static String getFormattedFilename(Plugin plugin, final DownloadLink downloadLink) throws ParseException {
         String videoName = downloadLink.getStringProperty("plainfilename", null);
-        final SubConfiguration cfg = SubConfiguration.getConfig("twitch.tv");
+        final SubConfiguration cfg = plugin.getPluginConfig();
         String formattedFilename = downloadLink.getStringProperty("m3u", null) != null ? cfg.getStringProperty(CUSTOM_FILENAME_4, defaultCustomFilenameHls) : cfg.getStringProperty(CUSTOM_FILENAME_3, defaultCustomFilenameWeb);
         if (formattedFilename == null || formattedFilename.equals("")) {
             formattedFilename = downloadLink.getStringProperty("m3u", null) != null ? defaultCustomFilenameHls : defaultCustomFilenameWeb;

@@ -51,7 +51,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 52482 $", interfaceVersion = 2, names = { "nicovideo.jp" }, urls = { "https?://(?:www\\.)?nicovideo\\.jp/watch/(?:sm|so|nm)?(\\d+)" })
+@HostPlugin(revision = "$Revision: 53400 $", interfaceVersion = 2, names = { "nicovideo.jp" }, urls = { "https?://(?:www\\.)?nicovideo\\.jp/watch/(?:sm|so|nm)?(\\d+)" })
 public class NicoVideoJp extends PluginForHost {
     private static final String  CUSTOM_DATE               = "CUSTOM_DATE";
     private static final String  CUSTOM_FILENAME           = "CUSTOM_FILENAME";
@@ -454,7 +454,7 @@ public class NicoVideoJp extends PluginForHost {
 
     @SuppressWarnings("deprecation")
     private String getFormattedFilename(final DownloadLink link) throws ParseException {
-        final SubConfiguration cfg = SubConfiguration.getConfig(this.getHost());
+        final SubConfiguration cfg = getPluginConfig();
         String formattedFilename = cfg.getStringProperty(CUSTOM_FILENAME, defaultCustomFilename);
         if (StringUtils.isEmpty(formattedFilename)) {
             /* Fallback */

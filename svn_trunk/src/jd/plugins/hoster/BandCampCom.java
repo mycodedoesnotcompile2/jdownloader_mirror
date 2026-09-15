@@ -25,13 +25,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -45,11 +38,19 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BandCampComDecrypter;
 
-@HostPlugin(revision = "$Revision: 50407 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 53400 $", interfaceVersion = 2, names = {}, urls = {})
 public class BandCampCom extends PluginForHost {
     public BandCampCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -206,7 +207,7 @@ public class BandCampCom extends PluginForHost {
         parseAndSetAlbumInfo(link, br);
         parseAndSetSingleTrackInfo(link, br, trackIndex);
         dllink = link.getStringProperty(PROPERTY_DIRECTURL);
-        final String filename = getFormattedFilename(link);
+        final String filename = getFormattedFilename(this, link);
         link.setFinalFileName(filename);
         if (dllink != null && !link.isSizeSet() && !isDownload) {
             basicLinkCheck(br.cloneBrowser(), br.createGetRequest(dllink), link, filename, null);
@@ -335,10 +336,10 @@ public class BandCampCom extends PluginForHost {
         dl.startDownload();
     }
 
-    public static String getFormattedFilename(final DownloadLink link) throws ParseException {
+    public static String getFormattedFilename(Plugin plugin, final DownloadLink link) throws ParseException {
         final String video_width = link.getStringProperty(PROPERTY_VIDEO_WIDTH);
         final String video_height = link.getStringProperty(PROPERTY_VIDEO_HEIGHT);
-        final SubConfiguration cfg = SubConfiguration.getConfig("bandcamp.com");
+        final SubConfiguration cfg = plugin.getPluginConfig();
         String formatString;
         if (video_height != null || video_width != null) {
             formatString = cfg.getStringProperty(CUSTOM_VIDEO_FILENAME_PATTERN, defaultCustomVideoFilename);
@@ -351,7 +352,7 @@ public class BandCampCom extends PluginForHost {
                 formatString = defaultCustomFilename;
             }
         }
-        String formattedFilename = getFormattedBaseString(link, formatString);
+        String formattedFilename = getFormattedBaseString(plugin, link, formatString);
         if (cfg.getBooleanProperty(BandCampCom.FILENAMELOWERCASE, defaultFILENAMELOWERCASE)) {
             formattedFilename = formattedFilename.toLowerCase(Locale.ENGLISH);
         }
@@ -361,7 +362,7 @@ public class BandCampCom extends PluginForHost {
         return formattedFilename;
     }
 
-    public static String getFormattedBaseString(final DownloadLink link, String formattedBaseString) {
+    public static String getFormattedBaseString(Plugin plugin, final DownloadLink link, String formattedBaseString) {
         final String content_id = link.getStringProperty(PROPERTY_CONTENT_ID);
         final String songTitle = link.getStringProperty(PROPERTY_TITLE);
         final String tracknumberFormatted = getFormattedTrackNumber(link);
@@ -371,7 +372,7 @@ public class BandCampCom extends PluginForHost {
         final String album = link.getStringProperty(PROPERTY_ALBUM_TITLE);
         final String video_width = link.getStringProperty(PROPERTY_VIDEO_WIDTH);
         final String video_height = link.getStringProperty(PROPERTY_VIDEO_HEIGHT);
-        final SubConfiguration cfg = SubConfiguration.getConfig("bandcamp.com");
+        final SubConfiguration cfg = plugin.getPluginConfig();
         String ext = link.getStringProperty(PROPERTY_FILE_TYPE);
         if (ext != null) {
             ext = "." + ext;

@@ -74,7 +74,7 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 52814 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https://(?:www\\.)?soundclouddecrypted\\.com/[A-Za-z\\-_0-9]+/[A-Za-z\\-_0-9]+(/[A-Za-z\\-_0-9]+)?" })
+@HostPlugin(revision = "$Revision: 53400 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https://(?:www\\.)?soundclouddecrypted\\.com/[A-Za-z\\-_0-9]+/[A-Za-z\\-_0-9]+(/[A-Za-z\\-_0-9]+)?" })
 public class SoundcloudCom extends PluginForHost {
     public SoundcloudCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -324,7 +324,7 @@ public class SoundcloudCom extends PluginForHost {
                  */
                 isOnlyPreviewDownloadable = true;
             }
-            final AudioQualitySelectionMode mode = getAudioQualitySelectionMode();
+            final AudioQualitySelectionMode mode = getAudioQualitySelectionMode(this);
             if (mode == AudioQualitySelectionMode.ONLY_OFFICIAL_DOWNLOADS && !looksLikeOfficiallyDownloadable) {
                 /* User only wants to download only officially downloadable items but this one is not officially downloadable. */
                 throw new PluginException(LinkStatus.ERROR_FATAL, getPhrase("ERROR_NOT_OFFICIALLY_DOWNLOADABLE"));
@@ -444,13 +444,13 @@ public class SoundcloudCom extends PluginForHost {
         final boolean looksLikeOfficiallyDownloadable = looksLikeOfficiallyDownloadable(track);
         /* Do this so PROPERTY_chosen_quality will get set for correct filesize calculation. */
         getDirectlink(plugin, link, account, null, track);
-        if (looksLikeOfficiallyDownloadable && userPrefersOfficialDownload()) {
+        if (looksLikeOfficiallyDownloadable && userPrefersOfficialDownload(this)) {
             /* File is officially downloadable */
             /**
              * Only set calculated filesize if wanted by user. </br> Officially downloadable files could come in any bitrate thus we do by
              * default not calculate the filesize for such items based on an assumed bitrate.
              */
-            if (userEnforcesFilesizeEstimationEvenForNonStreamDownloads()) {
+            if (userEnforcesFilesizeEstimationEvenForNonStreamDownloads(this)) {
                 link.setDownloadSize(calculateFilesize(link));
             }
         } else {
@@ -470,7 +470,7 @@ public class SoundcloudCom extends PluginForHost {
             link.setProperty(PROPERTY_secret_token, secret_token);
         }
         link.setProperty(PROPERTY_url_username, user_permalink);
-        final String formattedfilename = getFormattedFilename(link);
+        final String formattedfilename = getFormattedFilename(this, link);
         link.setFinalFileName(formattedfilename);
         link.setProperty(PROPERTY_STATE, track.get("state"));
         return AvailableStatus.TRUE;
@@ -555,11 +555,11 @@ public class SoundcloudCom extends PluginForHost {
         }
         final LinkedHashSet<PreferredStreamCodec> codecs = new LinkedHashSet<PreferredStreamCodec>();
         try {
-            codecs.add(PreferredStreamCodec.valueOf(link.getStringProperty(PROPERTY_chosen_codec, getPreferredStreamCodec().name())));
+            codecs.add(PreferredStreamCodec.valueOf(link.getStringProperty(PROPERTY_chosen_codec, getPreferredStreamCodec(this).name())));
         } catch (Exception e) {
             getLogger().log(e);
         }
-        codecs.add(getPreferredStreamCodec());
+        codecs.add(getPreferredStreamCodec(this));
         codecs.addAll(Arrays.asList(PreferredStreamCodec.values()));
         final List<Map<String, Object>> allowedTranscodings = new ArrayList<Map<String, Object>>();
         for (PreferredStreamCodec codec : codecs) {
@@ -664,7 +664,7 @@ public class SoundcloudCom extends PluginForHost {
         if (!StringUtils.isEmpty(secret_token)) {
             basicQuery.append("secret_token", secret_token, true);
         }
-        if (looksLikeOfficiallyDownloadable && userPrefersOfficialDownload() && (account != null || ACCOUNT_NEEDED_FOR_OFFICIAL_DOWNLOADS == false)) {
+        if (looksLikeOfficiallyDownloadable && userPrefersOfficialDownload(this) && (account != null || ACCOUNT_NEEDED_FOR_OFFICIAL_DOWNLOADS == false)) {
             /* Official download via official download button */
             /* Track is officially downloadable (download version = highest quality) */
             if (br == null) {
@@ -931,7 +931,7 @@ public class SoundcloudCom extends PluginForHost {
         handleDownload(link, account);
     }
 
-    public static String getFormattedFilename(final DownloadLink link) throws ParseException {
+    public static String getFormattedFilename(Plugin plugin, final DownloadLink link) throws ParseException {
         final String url_username = link.getStringProperty(PROPERTY_url_username);
         String songTitle = link.getStringProperty(PROPERTY_title);
         final String titleExtension = getFileNameExtensionFromString(songTitle);
@@ -939,7 +939,7 @@ public class SoundcloudCom extends PluginForHost {
             // remove audio extension from song title
             songTitle = songTitle.replaceFirst(Pattern.quote(titleExtension) + "$", "");
         }
-        final SubConfiguration cfg = SubConfiguration.getConfig("soundcloud.com");
+        final SubConfiguration cfg = plugin.getPluginConfig();
         String formattedFilename = cfg.getStringProperty(CUSTOM_FILENAME_2, defaultCustomFilename);
         if (StringUtils.isEmpty(formattedFilename)) {
             formattedFilename = defaultCustomFilename;
@@ -1163,8 +1163,8 @@ public class SoundcloudCom extends PluginForHost {
         return ret;
     }
 
-    public static AudioQualitySelectionMode getAudioQualitySelectionMode() {
-        final int arrayPos = SubConfiguration.getConfig("soundcloud.com").getIntegerProperty(AUDIO_QUALITY_SELECTION_MODE, defaultArrayPosAUDIO_QUALITY_SELECTION_MODE);
+    public static AudioQualitySelectionMode getAudioQualitySelectionMode(Plugin plugin) {
+        final int arrayPos = plugin.getPluginConfig().getIntegerProperty(AUDIO_QUALITY_SELECTION_MODE, defaultArrayPosAUDIO_QUALITY_SELECTION_MODE);
         if (arrayPos >= 0 && arrayPos < AudioQualitySelectionMode.values().length) {
             return AudioQualitySelectionMode.values()[arrayPos];
         } else {
@@ -1172,8 +1172,8 @@ public class SoundcloudCom extends PluginForHost {
         }
     }
 
-    public static PreferredStreamCodec getPreferredStreamCodec() {
-        final int arrayPos = SubConfiguration.getConfig("soundcloud.com").getIntegerProperty(AUDIO_PREFERRED_STREAM_CODEC, defaultArrayPosAUDIO_PREFERRED_STREAM_CODEC);
+    public static PreferredStreamCodec getPreferredStreamCodec(Plugin plugin) {
+        final int arrayPos = plugin.getPluginConfig().getIntegerProperty(AUDIO_PREFERRED_STREAM_CODEC, defaultArrayPosAUDIO_PREFERRED_STREAM_CODEC);
         if (arrayPos >= 0 && arrayPos < PreferredStreamCodec.values().length) {
             return PreferredStreamCodec.values()[arrayPos];
         } else {
@@ -1181,13 +1181,13 @@ public class SoundcloudCom extends PluginForHost {
         }
     }
 
-    public static boolean userPrefersOfficialDownload() {
-        final AudioQualitySelectionMode mode = getAudioQualitySelectionMode();
+    public static boolean userPrefersOfficialDownload(Plugin plugin) {
+        final AudioQualitySelectionMode mode = getAudioQualitySelectionMode(plugin);
         return mode == AudioQualitySelectionMode.BEST || mode == AudioQualitySelectionMode.ONLY_OFFICIAL_DOWNLOADS;
     }
 
-    public static boolean userEnforcesFilesizeEstimationEvenForNonStreamDownloads() {
-        return SubConfiguration.getConfig("soundcloud.com").getBooleanProperty(ENFORCE_FILESIZE_CALCULATION_EVEN_FOR_OFFICIALLY_DOWNLOADABLE_CONTENT, defaultENFORCE_FILESIZE_CALCULATION_EVEN_FOR_OFFICIALLY_DOWNLOADABLE_CONTENT);
+    public static boolean userEnforcesFilesizeEstimationEvenForNonStreamDownloads(Plugin plugin) {
+        return plugin.getPluginConfig().getBooleanProperty(ENFORCE_FILESIZE_CALCULATION_EVEN_FOR_OFFICIALLY_DOWNLOADABLE_CONTENT, defaultENFORCE_FILESIZE_CALCULATION_EVEN_FOR_OFFICIALLY_DOWNLOADABLE_CONTENT);
     }
 
     private static final int     defaultArrayPosAUDIO_QUALITY_SELECTION_MODE                                  = 0;

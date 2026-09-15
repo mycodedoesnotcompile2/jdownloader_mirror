@@ -1,8 +1,11 @@
 package jd.gui.swing.jdgui.views.settings.panels.packagizer;
 
 import java.awt.Component;
+import java.awt.Container;
 import java.awt.Dialog.ModalityType;
 import java.awt.event.ActionEvent;
+import java.awt.event.ItemEvent;
+import java.awt.event.ItemListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
@@ -28,8 +31,6 @@ import javax.swing.JToggleButton;
 import javax.swing.ListCellRenderer;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingUtilities;
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ChangeListener;
 import javax.swing.text.JTextComponent;
 
 import org.appwork.swing.MigPanel;
@@ -213,6 +214,11 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
     private ExtTextField   txtComment;
     private ExtTextField   txtRename;
     private ButtonGroup    group;
+    /* The content MigPanel holding the condition rows (kept separately because the dialog's panel field ends up being the surrounding JScrollPane). */
+    private MigPanel       conditionPanel;
+    /* Index range (within conditionPanel) of the condition rows located below the "matches always" checkbox. */
+    private int            conditionComponentsStartIndex = -1;
+    private int            conditionComponentsEndIndex   = -1;
 
     private PackagizerFilterRuleDialog(PackagizerRule filterRule) {
         super();
@@ -225,6 +231,14 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
         cbAlways = new ExtCheckBox();
         panel.add(cbAlways);
         panel.add(new JLabel(_GUI.T.FilterRuleDialog_layoutDialogContent_lbl_always()), "spanx");
+        /* Remember where the condition rows begin so they can be greyed out when "matches always" is active. */
+        conditionComponentsStartIndex = panel.getComponentCount();
+        cbAlways.addItemListener(new ItemListener() {
+            @Override
+            public void itemStateChanged(ItemEvent e) {
+                updateConditionsEnabledState();
+            }
+        });
     }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
@@ -323,6 +337,51 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
         }
     }
 
+    /**
+     * Greys out all condition rows located below the "matches always" checkbox while that checkbox is selected. When it is not
+     * selected the normal per-condition state is restored, i.e. each condition's input fields stay disabled unless its own
+     * checkbox is checked.
+     */
+    private void updateConditionsEnabledState() {
+        if (conditionPanel == null || conditionComponentsStartIndex < 0 || conditionComponentsEndIndex < 0) {
+            return;
+        }
+        if (rule.isStaticRule()) {
+            /* Static/Default rules are fully disabled anyway. */
+            return;
+        }
+        final boolean enabled = !cbAlways.isSelected();
+        for (int i = conditionComponentsStartIndex; i < conditionComponentsEndIndex; i++) {
+            setConditionComponentEnabled(conditionPanel.getComponent(i), enabled);
+        }
+        if (enabled) {
+            /* Restore dependency-driven state: input fields are only enabled when their own condition checkbox is checked. */
+            for (int i = conditionComponentsStartIndex; i < conditionComponentsEndIndex; i++) {
+                refreshConditionDependencies(conditionPanel.getComponent(i));
+            }
+        }
+    }
+
+    private void setConditionComponentEnabled(Component c, boolean enabled) {
+        c.setEnabled(enabled);
+        if (c instanceof Container) {
+            for (Component child : ((Container) c).getComponents()) {
+                setConditionComponentEnabled(child, enabled);
+            }
+        }
+    }
+
+    private void refreshConditionDependencies(Component c) {
+        if (c instanceof ExtCheckBox) {
+            ((ExtCheckBox) c).updateDependencies();
+        }
+        if (c instanceof Container) {
+            for (Component child : ((Container) c).getComponents()) {
+                refreshConditionDependencies(child);
+            }
+        }
+    }
+
     private void focusHelp(final ExtTextField comp, final String help) {
         comp.addMouseListener(new MouseAdapter() {
             @Override
@@ -361,6 +420,9 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
     @Override
     public JComponent layoutDialogContent() {
         MigPanel ret = (MigPanel) super.layoutDialogContent();
+        /* All condition rows have been added by the super implementation; remember the panel and the end boundary of that range. */
+        conditionPanel = ret;
+        conditionComponentsEndIndex = ret.getComponentCount();
         /* THEN SET */
         ret.add(createHeader(_GUI.T.PackagizerFilterRuleDialog_layoutDialogContent_then()), "gaptop 10, spanx,growx,pushx");
         lblDest = createLbl(_GUI.T.PackagizerFilterRuleDialog_layoutDialogContent_dest());
@@ -641,58 +703,6 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
         focusHelp(fpDest.getTxt(), _GUI.T.PackagizerFilterRuleDialog_layoutDialogContent_help_dynamic_variables());
         focusHelp(fpMove.getTxt(), _GUI.T.PackagizerFilterRuleDialog_layoutDialogContent_help_dynamic_variables());
         cbRename = new ExtCheckBox(txtRename);
-        ChangeListener al = new ChangeListener() {
-            private boolean wasSelectedCrawlerSource = false;
-            private boolean wasSelectedSource        = false;
-
-            @Override
-            public void stateChanged(ChangeEvent e) {
-                if (lblSource.isEnabled() && (cbRename.isSelected() || cbMove.isSelected())) {
-                    wasSelectedSource = cbSource.isSelected();
-                    cbSource.setSelected(false);
-                    wasSelectedCrawlerSource = cbCrawlerSource.isSelected();
-                    if (wasSelectedCrawlerSource || wasSelectedSource) {
-                        JDGui.help(_GUI.T.PackagizerFilterRuleDialog_layoutDialogContent_help_title(), _GUI.T.PackagizerFilterRuleDialog_layoutDialogContent_help_msg(), NewTheme.I().getIcon(IconKey.ICON_RAR, 32));
-                    }
-                    cbCrawlerSource.setSelected(false);
-                    cbSource.setEnabled(false);
-                    cobSource.setEnabled(false);
-                    txtSource.setEnabled(false);
-                    lblSource.setEnabled(false);
-                    cbCrawlerSource.setEnabled(false);
-                    cobCrawlerSource.setEnabled(false);
-                    cobCrawlerSourceOptions.setEnabled(false);
-                    lblCrawlerSource.setEnabled(false);
-                    cbSource.setToolTipText(_GUI.T.PackagizerFilterRuleDialog_stateChanged_tt_disabled_archive());
-                    cobSource.setToolTipText(_GUI.T.PackagizerFilterRuleDialog_stateChanged_tt_disabled_archive());
-                    txtSource.setToolTipText(_GUI.T.PackagizerFilterRuleDialog_stateChanged_tt_disabled_archive());
-                    lblSource.setToolTipText(_GUI.T.PackagizerFilterRuleDialog_stateChanged_tt_disabled_archive());
-                    cbCrawlerSource.setToolTipText(_GUI.T.PackagizerFilterRuleDialog_stateChanged_tt_disabled_archive());
-                    cobCrawlerSource.setToolTipText(_GUI.T.PackagizerFilterRuleDialog_stateChanged_tt_disabled_archive());
-                    cobCrawlerSourceOptions.setToolTipText(_GUI.T.PackagizerFilterRuleDialog_stateChanged_tt_disabled_archive());
-                    lblCrawlerSource.setToolTipText(_GUI.T.PackagizerFilterRuleDialog_stateChanged_tt_disabled_archive());
-                } else if (!lblSource.isEnabled() && !cbRename.isSelected() && !cbMove.isSelected()) {
-                    cbSource.setSelected(wasSelectedSource);
-                    cobSource.setEnabled(cbSource.isSelected());
-                    txtSource.setEnabled(cbSource.isSelected());
-                    lblSource.setEnabled(cbSource.isSelected());
-                    cbCrawlerSource.setSelected(wasSelectedCrawlerSource);
-                    cobCrawlerSource.setEnabled(cbCrawlerSource.isSelected());
-                    cobCrawlerSourceOptions.setEnabled(cbCrawlerSource.isSelected());
-                    lblCrawlerSource.setEnabled(cbCrawlerSource.isSelected());
-                    cbSource.setToolTipText(null);
-                    cobSource.setToolTipText(null);
-                    txtSource.setToolTipText(null);
-                    lblSource.setToolTipText(null);
-                    cbCrawlerSource.setToolTipText(null);
-                    cobCrawlerSource.setToolTipText(null);
-                    cobCrawlerSourceOptions.setToolTipText(null);
-                    lblCrawlerSource.setToolTipText(null);
-                }
-            }
-        };
-        cbRename.addChangeListener(al);
-        cbMove.addChangeListener(al);
         ret.add(cbRename);
         ret.add(lblRename, "spanx 2");
         ret.add(txtRename, "spanx,pushx,growx");
@@ -703,6 +713,7 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
         panel.add(cbStopAfterThisRule);
         panel.add(new JLabel("Stop processing further rules"), "spanx");
         updateGUI();
+        updateConditionsEnabledState();
         if (rule.isStaticRule()) {
             /* Static/Default rules cannot be modified */
             okButton.setEnabled(false);

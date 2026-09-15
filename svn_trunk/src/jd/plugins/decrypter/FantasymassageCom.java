@@ -17,9 +17,6 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
@@ -37,7 +34,10 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 45822 $", interfaceVersion = 2, names = { "fantasymassage.com" }, urls = { "https?://members\\.fantasymassage\\.com/[a-z]{2}/(?:video|picture)//[A-Za-z0-9\\-_]+/\\d+|https?://members\\.fantasymassage\\.com/[a-z]{2}/pornstar//\\d+/[A-Za-z0-9\\-_]+" })
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 53400 $", interfaceVersion = 2, names = { "fantasymassage.com" }, urls = { "https?://members\\.fantasymassage\\.com/[a-z]{2}/(?:video|picture)//[A-Za-z0-9\\-_]+/\\d+|https?://members\\.fantasymassage\\.com/[a-z]{2}/pornstar//\\d+/[A-Za-z0-9\\-_]+" })
 public class FantasymassageCom extends PluginForDecrypt {
     public FantasymassageCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -62,7 +62,7 @@ public class FantasymassageCom extends PluginForDecrypt {
         final String url_filename = url_title + "_" + fid;
         final String urlpart = url_title + "/" + fid;
         final String url_decrypted = "http://fantasymassagedecrypted";
-        final SubConfiguration cfg = SubConfiguration.getConfig(this.getHost());
+        final SubConfiguration cfg = getPluginConfig();
         // Login if possible
         if (!getUserLogin(false)) {
             logger.info("No account present --> Cannot decrypt anything!");

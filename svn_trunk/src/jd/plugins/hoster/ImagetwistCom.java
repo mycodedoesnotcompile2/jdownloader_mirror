@@ -20,16 +20,20 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.Regex;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.parser.html.Form;
+import jd.parser.html.Form.MethodType;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52985 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 53413 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImagetwistCom extends XFileSharingProBasic {
     public ImagetwistCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -79,7 +83,8 @@ public class ImagetwistCom extends XFileSharingProBasic {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
             String regex = "https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/[a-z0-9]{12}(/[^/#]+)?";
-            regex += "|https?://i(?:mg)?\\d+\\." + buildHostsPatternPart(domains) + PATTERN_THUMBNAIL.pattern();
+            // dot is optional, for example i6phun.imagetwist.com
+            regex += "|https?://i(?:mg)?\\d+\\.?" + buildHostsPatternPart(domains) + PATTERN_THUMBNAIL.pattern();
             ret.add(regex);
         }
         return ret.toArray(new String[0]);
@@ -88,6 +93,32 @@ public class ImagetwistCom extends XFileSharingProBasic {
     @Override
     protected boolean supports_availablecheck_filesize_html() {
         return false;
+    }
+
+    @Override
+    protected String getDllinkImagehost(DownloadLink link, Account account, Browser br, final String src) {
+        String dllink = super.getDllinkImagehost(link, account, br, src);
+        if (StringUtils.isEmpty(dllink)) {
+            // phun.imagetwist.com
+            dllink = new Regex(src, "src\\s*=\\s*\"(https?://[^\"]+)\"[^>]*class\\s*=\\s*\"pic").getMatch(0);
+        }
+        return dllink;
+    }
+
+    @Override
+    public Form findImageForm(Browser br) {
+        final Form ret = super.findImageForm(br);
+        if (ret != null) {
+            return ret;
+        }
+        if (br.containsHTML(">\\s*Continue to your image\\s*<")) {
+            // phun.imagetwist.com
+            final Form con = new Form();
+            con.setMethod(MethodType.GET);
+            con.setAction(br.getURL());
+            return con;
+        }
+        return null;
     }
 
     @Override

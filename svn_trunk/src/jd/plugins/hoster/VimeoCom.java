@@ -83,7 +83,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 2, names = { "vimeo.com" }, urls = { "decryptedforVimeoHosterPlugin://.+" })
+@HostPlugin(revision = "$Revision: 53400 $", interfaceVersion = 2, names = { "vimeo.com" }, urls = { "decryptedforVimeoHosterPlugin://.+" })
 public class VimeoCom extends PluginForHost {
     /* Skip HLS because of unsupported split video/audio. */
     public static final boolean  ALLOW_HLS                       = false;
@@ -199,13 +199,13 @@ public class VimeoCom extends PluginForHost {
                 final int responseCode = con.getResponseCode();
                 final String contentType = con.getContentType();
                 if (responseCode == 200 && LinkCrawlerDeepInspector.looksLikeMpegURL(con) && isHLS) {
-                    link.setFinalFileName(getFormattedFilename(link));
+                    link.setFinalFileName(getFormattedFilename(this, link));
                     return AvailableStatus.TRUE;
                 } else if (responseCode == 200 && StringUtils.containsIgnoreCase(contentType, "vtt") && isSubtitle) {
                     if (con.getLongContentLength() > 0) {
                         link.setVerifiedFileSize(con.getLongContentLength());
                     }
-                    link.setFinalFileName(getFormattedFilename(link));
+                    link.setFinalFileName(getFormattedFilename(this, link));
                     return AvailableStatus.TRUE;
                 } else if (looksLikeDownloadableContent(con)) {
                     if (con.getLongContentLength() > 0) {
@@ -227,7 +227,7 @@ public class VimeoCom extends PluginForHost {
                             }
                         }
                     }
-                    link.setFinalFileName(getFormattedFilename(link));
+                    link.setFinalFileName(getFormattedFilename(this, link));
                     return AvailableStatus.TRUE;
                 } else {
                     brc.followConnection(true);
@@ -398,7 +398,7 @@ public class VimeoCom extends PluginForHost {
             if (!link.hasProperty("videoTitle") && !StringUtils.isEmpty(videoTitle)) {
                 link.setProperty("videoTitle", videoTitle);
             }
-            link.setFinalFileName(getFormattedFilename(link));
+            link.setFinalFileName(getFormattedFilename(this, link));
             return AvailableStatus.TRUE;
         }
     }
@@ -1528,10 +1528,10 @@ public class VimeoCom extends PluginForHost {
     }
 
     @SuppressWarnings("deprecation")
-    public static String getFormattedFilename(final DownloadLink link) throws Exception {
+    public static String getFormattedFilename(Plugin plugin, final DownloadLink link) throws Exception {
         final VimeoContainer vvc = getVimeoVideoContainer(link, true);
         String videoTitle = link.getStringProperty("videoTitle", null);
-        final SubConfiguration cfg = SubConfiguration.getConfig("vimeo.com");
+        final SubConfiguration cfg = plugin.getPluginConfig();
         String formattedFilename = cfg.getStringProperty(CUSTOM_FILENAME, defaultCustomFilename);
         if (formattedFilename == null || formattedFilename.equals("")) {
             formattedFilename = defaultCustomFilename;

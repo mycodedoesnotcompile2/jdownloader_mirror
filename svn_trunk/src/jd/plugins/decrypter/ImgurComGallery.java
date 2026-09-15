@@ -38,6 +38,7 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
@@ -49,7 +50,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 /*Only accept single-imag URLs with an LID-length or either 5 OR 7 - everything else are invalid links or thumbnails*/
-@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53400 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImgurComGallery extends PluginForDecrypt {
     public ImgurComGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -132,7 +133,7 @@ public class ImgurComGallery extends PluginForDecrypt {
 
     @SuppressWarnings("deprecation")
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        final SubConfiguration cfg = SubConfiguration.getConfig(this.getHost());
+        final SubConfiguration cfg = getPluginConfig();
         contenturl = param.getCryptedUrl().replace("://m.", "://").replaceFirst("(?i)http://", "https://").replaceFirst("/all$", "");
         if (this.contenturl.matches(type_single_direct)) {
             itemID = new Regex(contenturl, type_single_direct).getMatch(0);
@@ -142,7 +143,7 @@ public class ImgurComGallery extends PluginForDecrypt {
         }
         this.prepBRWebsite(this.br);
         grabVideoSource = cfg.getBooleanProperty(ImgurComHoster.SETTING_GRAB_SOURCE_URL_VIDEO, ImgurComHoster.defaultSOURCEVIDEO);
-        final boolean useAPI = ImgurComHoster.isAPIEnabled();
+        final boolean useAPI = ImgurComHoster.isAPIEnabled(this);
         synchronized (CTRLLOCK) {
             if (contenturl.matches(type_subreddit_single_post)) {
                 /* Single "reddit-style" posts can contain multiple images */
@@ -175,8 +176,8 @@ public class ImgurComGallery extends PluginForDecrypt {
 
     /** Call this once before attempting any API requests! */
     private void prepareAPIUsage() throws Exception {
-        final SubConfiguration cfg = SubConfiguration.getConfig(this.getHost());
-        if (!ImgurComHoster.canUseAPI()) {
+        final SubConfiguration cfg = getPluginConfig();
+        if (!ImgurComHoster.canUseAPI(this)) {
             logger.info("API usage is impossible");
             ImgurComHoster.showAPIPreparationInformation();
             throw new DecrypterException("API usage not possible but required");
@@ -184,7 +185,7 @@ public class ImgurComGallery extends PluginForDecrypt {
         final boolean useAPIInAnonymousMode = cfg.getBooleanProperty(ImgurComHoster.SETTING_USE_API_IN_ANONYMOUS_MODE, ImgurComHoster.defaultSETTING_USE_API_IN_ANONYMOUS_MODE);
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
         if (useAPIInAnonymousMode || account == null) {
-            br.getHeaders().put("Authorization", ImgurComHoster.getAuthorization());
+            br.getHeaders().put("Authorization", ImgurComHoster.getAuthorization(this));
         } else {
             final ImgurComHoster hostPlg = (ImgurComHoster) this.getNewPluginForHostInstance(this.getHost());
             hostPlg.loginAPI(this.br, account, false);
@@ -248,7 +249,7 @@ public class ImgurComGallery extends PluginForDecrypt {
         this.author = (String) data.get("account_url");
         final String galleryTitle = (String) data.get("title");
         this.fp = FilePackage.getInstance();
-        this.fp.setName(getFormattedPackagename(this.author, galleryTitle, this.itemID));
+        this.fp.setName(getFormattedPackagename(this, this.author, galleryTitle, this.itemID));
         final int imgcount = ((Number) data.get("images_count")).intValue();
         final List<Map<String, Object>> items = (List<Map<String, Object>>) data.get("images");
         final int padLength = getPadLength(imgcount);
@@ -261,7 +262,7 @@ public class ImgurComGallery extends PluginForDecrypt {
             if (galleryID != null) {
                 dl.setProperty(ImgurComHoster.PROPERTY_DOWNLOADLINK_GALLERY_ID, galleryID);
             }
-            final String filename = ImgurComHoster.getFormattedFilename(dl);
+            final String filename = ImgurComHoster.getFormattedFilename(this, dl);
             dl.setFinalFileName(filename);
             ret.add(dl);
         }
@@ -286,7 +287,7 @@ public class ImgurComGallery extends PluginForDecrypt {
             if ((size == null && size_mp4 == null) || filetype == null) {
                 throw new DecrypterException("Decrypter broken for link: " + contenturl);
             }
-            final boolean user_prefers_mp4 = ImgurComHoster.userPrefersMp4();
+            final boolean user_prefers_mp4 = ImgurComHoster.userPrefersMp4(this);
             if (filetype.matches("image/[A-Za-z0-9]+")) {
                 /* E.g. 'image/gif' --> 'gif' */
                 filetype = filetype.split("/")[1];
@@ -319,7 +320,7 @@ public class ImgurComGallery extends PluginForDecrypt {
             if (!StringUtils.isEmpty(description)) {
                 dl.setComment(description);
             }
-            final String filename = ImgurComHoster.getFormattedFilename(dl);
+            final String filename = ImgurComHoster.getFormattedFilename(this, dl);
             dl.setFinalFileName(filename);
             dl.setDownloadSize(filesize);
             dl.setContentUrl(ImgurComHoster.getURLContent(imgUID));
@@ -394,7 +395,7 @@ public class ImgurComGallery extends PluginForDecrypt {
                     /* Set original contentURL so user has the same URLs when copying one as in browser. */
                     dl.setContentUrl(this.contenturl + "/" + contentID);
                     dl.setAvailable(true);
-                    final String filename = ImgurComHoster.getFormattedFilename(dl);
+                    final String filename = ImgurComHoster.getFormattedFilename(this, dl);
                     if (filename != null) {
                         dl.setName(filename);
                     }
@@ -457,7 +458,7 @@ public class ImgurComGallery extends PluginForDecrypt {
                 final DownloadLink dl = apiCrawlJsonSingleItem(item);
                 final String itemnumber_formatted = String.format(Locale.ROOT, "%0" + padLength + "d", index);
                 dl.setProperty(ImgurComHoster.PROPERTY_DOWNLOADLINK_ORDERID, itemnumber_formatted);
-                final String filename = ImgurComHoster.getFormattedFilename(dl);
+                final String filename = ImgurComHoster.getFormattedFilename(this, dl);
                 dl.setFinalFileName(filename);
                 ret.add(dl);
                 index++;
@@ -527,7 +528,7 @@ public class ImgurComGallery extends PluginForDecrypt {
                 /* Set original contentURL so user has the same URLs when copying one as in browser. */
                 dl.setContentUrl(this.contenturl + "/" + contentID);
                 dl.setAvailable(true);
-                final String filename = ImgurComHoster.getFormattedFilename(dl);
+                final String filename = ImgurComHoster.getFormattedFilename(this, dl);
                 if (filename != null) {
                     dl.setName(filename);
                 }
@@ -569,7 +570,7 @@ public class ImgurComGallery extends PluginForDecrypt {
             plg.setBrowser(brc);
             final DownloadLink single = this.createDownloadlink(generateUrlDownload(albumID));
             ((jd.plugins.hoster.ImgurComHoster) plg).websiteParseAndSetData(single);
-            final String tempFilename = ImgurComHoster.getFormattedFilename(single);
+            final String tempFilename = ImgurComHoster.getFormattedFilename(this, single);
             if (tempFilename != null) {
                 single.setName(tempFilename);
             }
@@ -678,7 +679,7 @@ public class ImgurComGallery extends PluginForDecrypt {
             title = itemID;
         }
         title = Encoding.htmlOnlyDecode(title);
-        return getFormattedPackagename(""/* username is only available via api */, title, itemID);
+        return getFormattedPackagename(this, ""/* username is only available via api */, title, itemID);
     }
 
     /** Website- and API json are very similar. Keep the crawlers in separate methods nonetheless!! */
@@ -695,7 +696,7 @@ public class ImgurComGallery extends PluginForDecrypt {
             if (galleryID != null) {
                 dl.setProperty(ImgurComHoster.PROPERTY_DOWNLOADLINK_GALLERY_ID, galleryID);
             }
-            final String filename = ImgurComHoster.getFormattedFilename(dl);
+            final String filename = ImgurComHoster.getFormattedFilename(this, dl);
             /*
              * 2020-10-08: Do NOT set final filename here as website json is often missing information compared to API. This way, extended
              * check will be allowed in host plugin!
@@ -707,7 +708,7 @@ public class ImgurComGallery extends PluginForDecrypt {
     }
 
     private DownloadLink websiteCrawlJsonSingleItem(final Map<String, Object> entries) throws ParseException {
-        final boolean user_prefers_mp4 = ImgurComHoster.userPrefersMp4();
+        final boolean user_prefers_mp4 = ImgurComHoster.userPrefersMp4(this);
         String title = (String) entries.get("title");
         final long filesize = JavaScriptEngineFactory.toLong(entries.get("size"), 0);
         final String imgUID = (String) entries.get("hash");
@@ -758,7 +759,7 @@ public class ImgurComGallery extends PluginForDecrypt {
         if (!StringUtils.isEmpty(dateFormatted)) {
             dl.setProperty(ImgurComHoster.PROPERTY_DOWNLOADLINK_DATE, dateFormatted);
         }
-        final String filename = ImgurComHoster.getFormattedFilename(dl);
+        final String filename = ImgurComHoster.getFormattedFilename(this, dl);
         /*
          * 2020-10-08: Do NOT set final filename here as website json is often missing information compared to API. This way, extended check
          * will be allowed in host plugin!
@@ -795,8 +796,8 @@ public class ImgurComGallery extends PluginForDecrypt {
 
     /** Returns user defined packagename. */
     @SuppressWarnings("deprecation")
-    public static String getFormattedPackagename(final String... params) throws ParseException {
-        final SubConfiguration cfg = SubConfiguration.getConfig("imgur.com");
+    public static String getFormattedPackagename(Plugin plugin, final String... params) throws ParseException {
+        final SubConfiguration cfg = plugin.getPluginConfig();
         String username = params[0];
         String title = params[1];
         String galleryid = params[2];

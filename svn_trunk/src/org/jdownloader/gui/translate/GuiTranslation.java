@@ -255,6 +255,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Done." })
     String MarkExistingOnDiskAsFinishedAction_working_done();
 
+    @Default(lngs = { "en" }, values = { "File size must match" })
+    String MarkExistingOnDiskAsFinishedAction_setting_filesizemustmatch();
+
     @Default(lngs = { "en" }, values = { "Stop after this download" })
     String gui_table_contextmenu_stopmark_set();
 
@@ -2902,6 +2905,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "finished" })
     String lit_finished();
 
+    @Default(lngs = { "en" }, values = { "file missing" })
+    String lit_file_missing();
+
     @Default(lngs = { "en" }, values = { "Delete Selected Links" })
     String GenericDeleteSelectedToolbarAction_updateName_object_selected_all();
 
@@ -4155,15 +4161,6 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "It seems that your Tray Icon has been disabled by accident.\r\nDo you want to enable it now?" })
     String JDGui_tray_msg();
-
-    @Default(lngs = { "en" }, values = { "This condition cannot be used to trigger 'After Extraction' Actions!" })
-    String PackagizerFilterRuleDialog_stateChanged_tt_disabled_archive();
-
-    @Default(lngs = { "en" }, values = { "Condition - Trigger Conflict!" })
-    String PackagizerFilterRuleDialog_layoutDialogContent_help_title();
-
-    @Default(lngs = { "en" }, values = { "You cannot use the Source or the Origin Condition to trigger this 'After Extraction' Action" })
-    String PackagizerFilterRuleDialog_layoutDialogContent_help_msg();
 
     @Default(lngs = { "en" }, values = { "Archive Extraction" })
     String ExtractorToolTip_ExtractorToolTip_title();

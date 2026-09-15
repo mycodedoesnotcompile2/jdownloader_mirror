@@ -78,7 +78,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.TwitterCom;
 
-@DecrypterPlugin(revision = "$Revision: 53005 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53415 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterComCrawler extends PluginForDecrypt {
     private String  resumeURL                                     = null;
     private Number  maxTweetsToCrawl                              = null;
@@ -126,13 +126,14 @@ public class TwitterComCrawler extends PluginForDecrypt {
         Browser.setRequestIntervalLimitGlobal("twimg.com", true, cfg.getGlobalRequestIntervalLimitTwimgComMilliseconds());
     }
 
-    private static final Pattern           PATTERN_I_CARD                                                   = Pattern.compile("/i/cards/tfw/v1/(\\d+)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern           PATTERN_I_USER_VIA_USER_ID                                       = Pattern.compile("/i/user/(\\d+)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern           PATTERN_I_VIDEOS_BY_SINGLE_TWEET                                 = Pattern.compile("/i/videos/tweet/(\\d+)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern           PATTERN_SINGLE_TWEET                                             = Pattern.compile("/([A-Za-z0-9_-]+)/status/(\\d+).*?", Pattern.CASE_INSENSITIVE);
-    private static final Pattern           TYPE_USER_ALL                                                    = Pattern.compile("/([A-Za-z0-9_-]+)(?:/(?:media|likes))?(\\?.*)?", Pattern.CASE_INSENSITIVE);
-    private static final Pattern           TYPE_USER_LIKES                                                  = Pattern.compile("/([A-Za-z0-9_-]+)/likes.*", Pattern.CASE_INSENSITIVE);
-    private static final Pattern           TYPE_USER_MEDIA                                                  = Pattern.compile("/([A-Za-z0-9_-]+)/media.*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern           PATTERN_I_CARD                                                   = Pattern.compile("/(?:i/)?cards/tfw/v1/(\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern           PATTERN_I_OWN_LIKES                                              = Pattern.compile("/(?:i/)?history/likes", Pattern.CASE_INSENSITIVE);
+    private static final Pattern           PATTERN_I_USER_VIA_USER_ID                                       = Pattern.compile("/(?:i/)?user/(\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern           PATTERN_I_VIDEOS_BY_SINGLE_TWEET                                 = Pattern.compile("/(?:i/)?videos/tweet/(\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern           PATTERN_SINGLE_TWEET                                             = Pattern.compile("/(?:i/)?([A-Za-z0-9_-]+)/status/(\\d+).*?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern           TYPE_USER_ALL                                                    = Pattern.compile("/(?:i/)?([A-Za-z0-9_-]+)(?:/(?:media|likes))?(\\?.*)?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern           TYPE_USER_LIKES                                                  = Pattern.compile("/(?:i/)?([A-Za-z0-9_-]+)/likes.*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern           TYPE_USER_MEDIA                                                  = Pattern.compile("/(?:i/)?([A-Za-z0-9_-]+)/media.*", Pattern.CASE_INSENSITIVE);
     // private ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
     private static AtomicReference<String> GUEST_TOKEN                                                      = new AtomicReference<String>();
     private static AtomicLong              GUEST_TOKEN_TS                                                   = new AtomicLong(-1);
@@ -192,6 +193,8 @@ public class TwitterComCrawler extends PluginForDecrypt {
             String regex = "https?://(?:(?:www|mobile)\\.)?" + buildHostsPatternPart(domains);
             regex += "(";
             regex += PATTERN_I_CARD.pattern();
+            regex += "|";
+            regex += PATTERN_I_OWN_LIKES.pattern();
             regex += "|";
             regex += PATTERN_I_USER_VIA_USER_ID.pattern();
             regex += "|";
@@ -618,12 +621,19 @@ public class TwitterComCrawler extends PluginForDecrypt {
 
     private ArrayList<DownloadLink> crawlUser(final CryptedLink param, final Account account, final String contenturl) throws Exception {
         final String path = new URL(contenturl).getPath();
-        final String username = new Regex(path, TYPE_USER_ALL).getMatch(0);
+        String username = new Regex(path, TYPE_USER_ALL).getMatch(0);
         if (StringUtils.isEmpty(username)) {
             throw new IllegalArgumentException();
         }
         final ProfileCrawlMode mode;
-        if (contenturl.contains("/likes")) {
+        if (new Regex(path, "/history/likes").patternFind()) {
+            /* User wants to crawl his own likes */
+            if (account == null) {
+                throw new AccountRequiredException("Account required to crawl your own likes");
+            }
+            username = account.getUser();
+            mode = ProfileCrawlMode.LIKES;
+        } else if (contenturl.contains("/likes")) {
             mode = ProfileCrawlMode.LIKES;
         } else if (contenturl.contains("/media")) {
             mode = ProfileCrawlMode.MEDIA;

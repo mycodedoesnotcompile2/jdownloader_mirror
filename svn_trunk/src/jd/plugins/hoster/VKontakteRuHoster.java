@@ -30,24 +30,9 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.config.annotations.LabelInterface;
-import org.appwork.utils.Hash;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.logging2.LogSource;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.logging.LogController;
-import org.jdownloader.plugins.SkipReasonException;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
-import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
 import jd.controlling.faviconcontroller.FavIcons;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -79,8 +64,22 @@ import jd.plugins.decrypter.VKontakteRu;
 import jd.utils.JDUtilities;
 import jd.utils.locale.JDL;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.storage.config.annotations.LabelInterface;
+import org.appwork.utils.Hash;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.logging2.LogSource;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.logging.LogController;
+import org.jdownloader.plugins.SkipReasonException;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 @PluginDependencies(dependencies = { VKontakteRu.class })
-@HostPlugin(revision = "$Revision: 53394 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53400 $", interfaceVersion = 2, names = {}, urls = {})
 /* Most of all links are coming from a crawler plugin. */
 public class VKontakteRuHoster extends PluginForHost {
     /* Current main domain */
@@ -192,12 +191,12 @@ public class VKontakteRuHoster extends PluginForHost {
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
-        prepBrowser(br);
+        prepBrowser(this, br);
         return br;
     }
 
-    public static Browser prepBrowser(final Browser br) {
-        final String useragent = SubConfiguration.getConfig("vk.rz").getStringProperty(VKADVANCED_USER_AGENT, default_VKADVANCED_USER_AGENT);
+    public static Browser prepBrowser(Plugin plugin, final Browser br) {
+        final String useragent = plugin.getPluginConfig().getStringProperty(VKADVANCED_USER_AGENT, default_VKADVANCED_USER_AGENT);
         if (!StringUtils.isEmpty(useragent) && !StringUtils.equals(useragent, default_VKADVANCED_USER_AGENT)) {
             br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, useragent);
         } else {
@@ -383,7 +382,7 @@ public class VKontakteRuHoster extends PluginForHost {
                         /*
                          * No way to easily get the needed info directly --> Load the complete audio album and find a fresh directlink for
                          * our ID.
-                         *
+                         * 
                          * E.g. get-play-link: https://vk.com/audio?id=<ownerID>&audio_id=<contentID>
                          */
                         /*
@@ -686,8 +685,7 @@ public class VKontakteRuHoster extends PluginForHost {
     }
 
     /**
-     * Modifies final download-URL. </br>
-     * This can be used to e.g. download original images via 'magic trick'.
+     * Modifies final download-URL. </br> This can be used to e.g. download original images via 'magic trick'.
      */
     private String modifyFinalDownloadurl(final String input) {
         final Regex photo_url_regex;
@@ -1225,38 +1223,43 @@ public class VKontakteRuHoster extends PluginForHost {
     public void login(final Browser br, final Account account, final boolean forceCookieCheck) throws Exception {
         synchronized (account) {
             br.setCookiesExclusive(true);
-            final Cookies userCookies = account.loadUserCookies();
-            if (userCookies != null) {
-                logger.info("Attempting user cookie login");
-                setCookies(br, userCookies);
-                if (!forceCookieCheck) {
-                    /* Do not validate login cookies */
-                    return;
-                }
-                if (checkCookieLogin(br, account, userCookies)) {
-                    /* Success! */
-                    return;
-                }
-                /* Failure */
-                if (account.hasEverBeenValid()) {
-                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
-                } else {
-                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
-                }
-            }
             final Cookies cookies = account.loadCookies("");
             if (cookies != null) {
-                logger.info("Attempting cookie login");
+                logger.info("Attempting last cookie login");
                 setCookies(br, cookies);
                 if (!forceCookieCheck) {
                     /* Do not validate login cookies */
                     return;
                 }
                 if (checkCookieLogin(br, account, cookies)) {
+                    /* Refresh timestamp */
+                    account.saveCookies(br.getCookies(br.getHost()), "");
                     return;
                 } else {
                     br.clearCookies(null);
                     account.clearCookies("");
+                }
+            }
+            final Cookies userCookies = account.loadUserCookies();
+            if (userCookies != null) {
+                setCookies(br, userCookies);
+                logger.info("Attempting user cookie login");
+                if (!forceCookieCheck) {
+                    /* Do not validate login cookies */
+                    return;
+                }
+                if (checkCookieLogin(br, account, userCookies)) {
+                    /* Refresh timestamp */
+                    account.saveCookies(br.getCookies(br.getHost()), "");
+                    /* Success! */
+                    return;
+                }
+                account.clearCookies("");
+                /* Failure */
+                if (account.hasEverBeenValid()) {
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
+                } else {
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
                 }
             }
             logger.info("Performing full login");
@@ -1367,8 +1370,6 @@ public class VKontakteRuHoster extends PluginForHost {
                 }
                 // language set in user profile, so after 'login' OR 'login check' it could be changed!
                 setCookie(br, "remixlang", "3");
-                /* Refresh timestamp */
-                account.saveCookies(br.getCookies(br.getHost()), "");
                 if (br.getHost().equalsIgnoreCase("vkvideo.ru")) {
                     account.setProperty(PROPERTY_ACCOUNT_VK_VIDEO_SUPPORT, true);
                 } else {
@@ -1935,17 +1936,17 @@ public class VKontakteRuHoster extends PluginForHost {
         return ret;
     }
 
-    public static QualitySelectionMode getSelectedVideoQualitySelectionMode() {
-        final int index = SubConfiguration.getConfig("vk.ru").getIntegerProperty(VIDEO_QUALITY_SELECTION_MODE, default_VIDEO_QUALITY_SELECTION_MODE);
+    public static QualitySelectionMode getSelectedVideoQualitySelectionMode(Plugin plugin) {
+        final int index = plugin.getPluginConfig().getIntegerProperty(VIDEO_QUALITY_SELECTION_MODE, default_VIDEO_QUALITY_SELECTION_MODE);
         return QualitySelectionMode.values()[Math.min(QualitySelectionMode.values().length - 1, index)];
     }
 
-    public static boolean getConfigPreferHLS() {
-        return SubConfiguration.getConfig("vk.ru").getBooleanProperty(CONFIG_PREFER_HLS, default_CONFIG_PREFER_HLS);
+    public static boolean getConfigPreferHLS(Plugin plugin) {
+        return plugin.getPluginConfig().getBooleanProperty(CONFIG_PREFER_HLS, default_CONFIG_PREFER_HLS);
     }
 
-    public static String getPreferredQualityString() {
-        final int index = SubConfiguration.getConfig("vk.ru").getIntegerProperty(PREFERRED_VIDEO_QUALITY, default_PREFERRED_VIDEO_QUALITY);
+    public static String getPreferredQualityString(Plugin plugin) {
+        final int index = plugin.getPluginConfig().getIntegerProperty(PREFERRED_VIDEO_QUALITY, default_PREFERRED_VIDEO_QUALITY);
         final Quality quality = Quality.values()[Math.min(Quality.values().length - 1, index)];
         switch (quality) {
         case Q2160:

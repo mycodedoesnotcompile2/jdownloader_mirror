@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 
 import jd.PluginWrapper;
-import jd.config.SubConfiguration;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -42,7 +41,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.URLEncode;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 52228 $", interfaceVersion = 3, names = { "cloud.mail.ru" }, urls = { "https?://(?:www\\.)?cloud\\.mail\\.ru((?:/|%2F)public(?:/|%2F)[a-z0-9]+(?:/|%2F)[^<>\"]+|(?:/|%2F)(?:files(?:/|%2F))?[A-Z0-9]{32})" })
+@DecrypterPlugin(revision = "$Revision: 53400 $", interfaceVersion = 3, names = { "cloud.mail.ru" }, urls = { "https?://(?:www\\.)?cloud\\.mail\\.ru((?:/|%2F)public(?:/|%2F)[a-z0-9]+(?:/|%2F)[^<>\"]+|(?:/|%2F)(?:files(?:/|%2F))?[A-Z0-9]{32})" })
 public class CloudMailRuDecrypter extends PluginForDecrypt {
     public CloudMailRuDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -198,7 +197,7 @@ public class CloudMailRuDecrypter extends PluginForDecrypt {
                 ret.add(dl);
             }
         }
-        if (ret.size() > 1 && completeFolderSize <= MAX_ZIP_FILESIZE * 1024 && SubConfiguration.getConfig("cloud.mail.ru").getBooleanProperty(DOWNLOAD_ZIP, false)) {
+        if (ret.size() > 1 && completeFolderSize <= MAX_ZIP_FILESIZE * 1024 && getPluginConfig().getBooleanProperty(DOWNLOAD_ZIP, false)) {
             /* = all files (links) of the folder as .zip archive */
             final DownloadLink main = createDownloadlink(parameter);
             if (!StringUtils.isEmpty(title_of_current_folder)) {

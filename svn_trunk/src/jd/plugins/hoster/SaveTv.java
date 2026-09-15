@@ -27,22 +27,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.regex.Pattern;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.os.CrossSystem;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.images.AbstractIcon;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-import org.jdownloader.translate._JDT;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -70,7 +54,23 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SyncSaveTvToolbarAction;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 53055 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+import org.jdownloader.translate._JDT;
+
+@HostPlugin(revision = "$Revision: 53400 $", interfaceVersion = 3, names = {}, urls = {})
 public class SaveTv extends PluginForHost {
     /* Static information */
     /* API functions developed for API version 3.0.0.1631 */
@@ -377,8 +377,8 @@ public class SaveTv extends PluginForHost {
         }
         final List<Object> sourcelist = jsonGetVideoSourcelist(entries);
         entries = (Map<String, Object>) entries.get("TELECASTDETAILS");
-        parseFilenameInformation_site(link, entries);
-        parseQualityTagWebsite(link, sourcelist);
+        parseFilenameInformation_site(this, link, entries);
+        parseQualityTagWebsite(this, link, sourcelist);
         link.setAvailable(true);
     }
 
@@ -430,8 +430,8 @@ public class SaveTv extends PluginForHost {
         if (existsRecord) {
             qualityList = jsonGetFormatArrayAPI(entries);
         }
-        parseFilenameInformation_api(link, entries, existsRecord);
-        parseQualityTagAPI(link, qualityList);
+        parseFilenameInformation_api(this, link, entries, existsRecord);
+        parseQualityTagAPI(this, link, qualityList);
         if (!existsRecord) {
             if (link.getLongProperty(PROPERTY_originaldate_end, 0) < System.currentTimeMillis()) {
                 /*
@@ -774,7 +774,7 @@ public class SaveTv extends PluginForHost {
          * No custom filename if not all required tags are given, if the user prefers original filenames or if custom user regexes for
          * specified series or movies match to force original filenames
          */
-        final SubConfiguration cfg = SubConfiguration.getConfig(plugin.getHost());
+        final SubConfiguration cfg = plugin.getPluginConfig();
         final boolean force_original_general = (cfg.getBooleanProperty(PROPERTY_USEORIGINALFILENAME, defaultPROPERTY_USEORIGINALFILENAME) || link.getLongProperty(PROPERTY_category_id, 0) == 0);
         final String site_title = link.getStringProperty(PROPERTY_plainfilename);
         final String server_filename = link.getStringProperty(PROPERTY_server_filename, null);
@@ -830,7 +830,7 @@ public class SaveTv extends PluginForHost {
      * Their json is crazy regarding data types thus we have a lot of type conversions here ...
      */
     @Deprecated
-    public static void parseFilenameInformation_site(final DownloadLink link, final Map<String, Object> sourcemap) throws PluginException {
+    public static void parseFilenameInformation_site(Plugin plugin, final DownloadLink link, final Map<String, Object> sourcemap) throws PluginException {
         /*
          * Caution with data types - if e.g. a movie is named "1987" they will actually use a double- or long value - this is totally crazy
          * as everything can happen here. Imagine a movie is named "true" ...
@@ -880,25 +880,25 @@ public class SaveTv extends PluginForHost {
         setFilenameInformationSeasonnumberEpisodenumberUniversal(link, season_episode_information);
         /* Sometimes episodetitle == episodenumber (double) --> Do NOT set it as episodetitle is NOT given in this case! */
         if (episodename != null && !episodename.matches("\\d+\\.\\d+")) {
-            link.setProperty(PROPERTY_episodename, correctData(link.getHost(), episodename));
+            link.setProperty(PROPERTY_episodename, correctData(plugin, episodename));
         }
         /* Add other information */
         if (!produceyear.equals("0")) {
             link.setProperty(PROPERTY_produceyear, produceyear);
         }
         if (genre != null) {
-            link.setProperty(PROPERTY_genre, correctData(link.getHost(), genre));
+            link.setProperty(PROPERTY_genre, correctData(plugin, genre));
         }
         if (producecountry != null) {
-            link.setProperty(PROPERTY_producecountry, correctData(link.getHost(), producecountry));
+            link.setProperty(PROPERTY_producecountry, correctData(plugin, producecountry));
             link.setProperty(PROPERTY_producecountry_short, getProduceCountryShort(producecountry));
         }
         if (tv_station != null) {
-            link.setProperty(PROPERTY_plain_tv_station, correctData(link.getHost(), tv_station));
+            link.setProperty(PROPERTY_plain_tv_station, correctData(plugin, tv_station));
         }
         parseCategoryID(link, category, episodename);
         if (site_title != null) {
-            link.setProperty(PROPERTY_plainfilename, correctData(link.getHost(), site_title));
+            link.setProperty(PROPERTY_plainfilename, correctData(plugin, site_title));
         }
         link.setProperty(PROPERTY_originaldate, datemillis);
         link.setProperty(PROPERTY_originaldate_end, runtime_end_long);
@@ -917,7 +917,7 @@ public class SaveTv extends PluginForHost {
      *            : For downloadable telecastIDs we're not yet at the telecastMap which is why we have to grab it (this is set to true)!
      */
     @SuppressWarnings("unchecked")
-    public static void parseFilenameInformation_api(final DownloadLink link, Map<String, Object> entries, final boolean hasToGrabTelecastMap) throws PluginException {
+    public static void parseFilenameInformation_api(Plugin plugin, final DownloadLink link, Map<String, Object> entries, final boolean hasToGrabTelecastMap) throws PluginException {
         if (entries == null) {
             return;
         }
@@ -966,26 +966,26 @@ public class SaveTv extends PluginForHost {
         /* Add series information */
         setFilenameInformationSeasonnumberEpisodenumberUniversal(link, season_episode_information);
         if (episodename != null) {
-            link.setProperty(PROPERTY_episodename, correctData(link.getHost(), episodename));
+            link.setProperty(PROPERTY_episodename, correctData(plugin, episodename));
         }
         if (!produceyear.equals("0")) {
-            link.setProperty(PROPERTY_produceyear, correctData(link.getHost(), produceyear));
+            link.setProperty(PROPERTY_produceyear, correctData(plugin, produceyear));
         }
         /* Add other information */
         if (genre != null) {
-            link.setProperty(PROPERTY_genre, correctData(link.getHost(), genre));
+            link.setProperty(PROPERTY_genre, correctData(plugin, genre));
         }
         if (producecountry != null) {
-            link.setProperty(PROPERTY_producecountry, correctData(link.getHost(), producecountry));
+            link.setProperty(PROPERTY_producecountry, correctData(plugin, producecountry));
             link.setProperty(PROPERTY_producecountry_short, getProduceCountryShort(producecountry));
         }
         if (tv_station != null) {
-            link.setProperty(PROPERTY_plain_tv_station, correctData(link.getHost(), tv_station));
+            link.setProperty(PROPERTY_plain_tv_station, correctData(plugin, tv_station));
         }
         parseCategoryID(link, category, episodename);
         if (site_title != null) {
             /* This should actually never be null */
-            link.setProperty(PROPERTY_plainfilename, correctData(link.getHost(), site_title));
+            link.setProperty(PROPERTY_plainfilename, correctData(plugin, site_title));
         }
         /*
          * Set ad-free state on DownloadLink for e.g. usage in filename later.
@@ -1048,8 +1048,8 @@ public class SaveTv extends PluginForHost {
 
     /** Sets available quality as PROPERTY_quality and sets filesize. */
     @Deprecated
-    public static void parseQualityTagWebsite(final DownloadLink link, final List<Object> sourcelist) {
-        final int selected_video_format = getConfiguredVideoFormatID(link);
+    public static void parseQualityTagWebsite(Plugin plugin, final DownloadLink link, final List<Object> sourcelist) {
+        final int selected_video_format = getConfiguredVideoFormatID(plugin, link);
         /*
          * If we have no source, we can select HQ if the user chose HQ because it is always available. If the user selects any other quality
          * we need to know whether it exists or not and then set the data.
@@ -1085,15 +1085,15 @@ public class SaveTv extends PluginForHost {
             }
         }
         link.setProperty(PROPERTY_quality, finalQualityStr);
-        link.setDownloadSize(calculateFilesize(link, finalQualityStr));
+        link.setDownloadSize(calculateFilesize(plugin, link, finalQualityStr));
     }
 
     /**
      * Sets available quality as PROPERTY_quality and sets filesize. <br />
      * Has fallback for all possible errorcases!
      */
-    public static void parseQualityTagAPI(final DownloadLink link, final List<Object> sourcelist) {
-        final int selected_video_format = getConfiguredVideoFormatID(link);
+    public static void parseQualityTagAPI(Plugin plugin, final DownloadLink link, final List<Object> sourcelist) {
+        final int selected_video_format = getConfiguredVideoFormatID(plugin, link);
         /*
          * If we have no source, we can select HQ if the user chose HQ because it is always available. If the user selects any other quality
          * we need to know whether it exists or not and then set the data.
@@ -1132,7 +1132,7 @@ public class SaveTv extends PluginForHost {
         /* Set download file size based on given format information. */
         try {
             final int finalFormat = convertQualityStringToInternalID(finalQualityStr);
-            final boolean user_prefers_adsfree = getPreferAdsFree(link);
+            final boolean user_prefers_adsfree = getPreferAdsFree(plugin, link);
             for (final Object formatO : sourcelist) {
                 final Map<String, Object> entries = (Map<String, Object>) formatO;
                 final Map<String, Object> recordFormat = (Map<String, Object>) entries.get("recordFormat");
@@ -1143,8 +1143,7 @@ public class SaveTv extends PluginForHost {
                 }
                 /**
                  * 2021-02-11: Both serverside given filesizes are very vague. For downloads with ads we use the serverside given
-                 * information. </br>
-                 * For ad-free downloads we'll calculate it on our own as that is more precise! </br>
+                 * information. </br> For ad-free downloads we'll calculate it on our own as that is more precise! </br>
                  * duration_seconds_adsfree == 0 if adFree is unavailable while cutVideoSize == uncutVideoSize (which is of course not true,
                  * that's just what their backend does with that here).
                  */
@@ -1197,7 +1196,7 @@ public class SaveTv extends PluginForHost {
     @SuppressWarnings({ "unchecked" })
     @Deprecated
     public void handlePremiumWebsite(final DownloadLink link, final Account account) throws Exception {
-        boolean preferAdsFree = getPreferAdsFree(link);
+        boolean preferAdsFree = getPreferAdsFree(this, link);
         /* Check if ads-free version is available */
         final String ad_Free_availability = PluginJSonUtils.getJsonValue(br, "BADFREEAVAILABLE");
         final boolean isAdsFreeAvailable;
@@ -1216,7 +1215,7 @@ public class SaveTv extends PluginForHost {
         Map<String, Object> entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(br.getRequest().getHtmlCode());
         final List<Object> sourcelist = jsonGetVideoSourcelist(entries);
         final int best_quality_id = jsonGetBestQualityIdWebsite(sourcelist);
-        int stv_request_selected_format_id_value = getConfiguredVideoFormatID(link);
+        int stv_request_selected_format_id_value = getConfiguredVideoFormatID(this, link);
         final boolean desired_format_is_available = jsonIsDesiredFormatAvailableWebsite(sourcelist, stv_request_selected_format_id_value);
         if (!desired_format_is_available) {
             logger.info("Desired format is not available - falling back to highest format/quality possible");
@@ -1255,8 +1254,8 @@ public class SaveTv extends PluginForHost {
     @SuppressWarnings("unchecked")
     public void handlePremiumAPI(final DownloadLink link, final Account account) throws Exception {
         Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final boolean preferAdsFree = getPreferAdsFree(link);
-        int formatIDselected = getConfiguredVideoFormatID(link);
+        final boolean preferAdsFree = getPreferAdsFree(this, link);
+        int formatIDselected = getConfiguredVideoFormatID(this, link);
         int formatIDFallback = getDefaultFormatID();
         int formatIDtemp;
         boolean selectedFormatIsAvailable = false;
@@ -1321,7 +1320,7 @@ public class SaveTv extends PluginForHost {
              * change but probably won't -> If defined by user, force version with ads after a user defined amount of retries.
              */
             logger.info("Ad-free version is unavailable");
-            final SubConfiguration cfg = SubConfiguration.getConfig(getHost());
+            final SubConfiguration cfg = getPluginConfig();
             final long userDefinedWaitHours = cfg.getLongProperty(ADS_FREE_UNAVAILABLE_HOURS, SaveTv.defaultADS_FREE_UNAVAILABLE_HOURS);
             final long timestamp_releasedate = link.getLongProperty(PROPERTY_originaldate_end, 0);
             final long timestamp_with_ads_allowed = getTimestampWhenDownloadWithAdsIsAllowed(link);
@@ -1364,7 +1363,7 @@ public class SaveTv extends PluginForHost {
 
     /** Handles download for API- and website mode */
     private void handleDownload(final DownloadLink link, final Account account, final String dllink) throws Exception {
-        final SubConfiguration cfg = SubConfiguration.getConfig(getHost());
+        final SubConfiguration cfg = getPluginConfig();
         if (StringUtils.isEmpty(dllink)) {
             /* This should never happen! */
             logger.warning("Final downloadlink is null");
@@ -1385,7 +1384,7 @@ public class SaveTv extends PluginForHost {
         }
         if (dl.getConnection().getCompleteContentLength() <= 1048576l) {
             /* Guard: avoid downloading (too small) trash data. */
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Serverfehler: Datei vom Server zu klein: " + SIZEUNIT.formatValue((SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue(), dl.getConnection().getCompleteContentLength()), 60 * 60 * 1000l);
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Serverfehler: Datei vom Server zu klein: " + SIZEUNIT.formatValue(CFG_GUI.MAX_SIZE_UNIT.getValue(), dl.getConnection().getCompleteContentLength()), 60 * 60 * 1000l);
         }
         /* This is for checking server speed. */
         final String previouscomment = link.getComment();
@@ -1472,7 +1471,7 @@ public class SaveTv extends PluginForHost {
      * Returns whether user wants to download the ads-free version or the version with ads. <br />
      * Parameters inside the user-added URL can override his basic plugin settings. This function respects that.
      */
-    public static boolean getPreferAdsFree(final DownloadLink link) {
+    public static boolean getPreferAdsFree(Plugin plugin, final DownloadLink link) {
         final Boolean preferAdsFreeStored = (Boolean) link.getProperty(PROPERTY_download_ads_free);
         if (preferAdsFreeStored != null) {
             /*
@@ -1487,7 +1486,7 @@ public class SaveTv extends PluginForHost {
             /* Parameters in urls can override plugin settings! */
             preferAdsFree = Boolean.parseBoolean(preferAdsFreeUrl);
         } else {
-            preferAdsFree = getPreferAdsFreePluginConfig();
+            preferAdsFree = getPreferAdsFreePluginConfig(plugin);
         }
         return preferAdsFree;
     }
@@ -1496,8 +1495,8 @@ public class SaveTv extends PluginForHost {
      * Returns whether user wants to download the ads-free version or the version with ads. <br />
      * Only based on users' config!!
      */
-    public static boolean getPreferAdsFreePluginConfig() {
-        final SubConfiguration cfg = SubConfiguration.getConfig(HOST_STATIC);
+    public static boolean getPreferAdsFreePluginConfig(Plugin plugin) {
+        final SubConfiguration cfg = plugin.getPluginConfig();
         final boolean preferAdsFreeConfig = cfg.getBooleanProperty(PROPERTY_PREFERADSFREE, defaultPROPERTY_PREFERADSFREE);
         return preferAdsFreeConfig;
     }
@@ -1598,15 +1597,15 @@ public class SaveTv extends PluginForHost {
                 package_name = ACCOUNTTYPE_UNKNOWN;
             }
             final String runtime = new Regex(package_name, "(\\d+ Monate)").getMatch(0);
-            account.setProperty(PROPERTY_acc_package, correctData(account.getHoster(), package_name));
+            account.setProperty(PROPERTY_acc_package, correctData(this, package_name));
             if (price != null) {
-                account.setProperty(PROPERTY_acc_price, correctData(account.getHoster(), price));
+                account.setProperty(PROPERTY_acc_price, correctData(this, price));
             }
             if (runtime != null) {
-                account.setProperty(PROPERTY_acc_runtime, correctData(account.getHoster(), runtime));
+                account.setProperty(PROPERTY_acc_runtime, correctData(this, runtime));
             }
             if (acc_username != null) {
-                account.setProperty(PROPERTY_acc_username, correctData(account.getHoster(), acc_username));
+                account.setProperty(PROPERTY_acc_username, correctData(this, acc_username));
             }
             br.getPage("https://www." + this.getHost() + "/STV/M/obj/archive/JSON/VideoArchiveApi.cfm?iEntriesPerPage=1");
             final String totalLinks = PluginJSonUtils.getJsonValue(br, "ITOTALENTRIES");
@@ -1990,15 +1989,15 @@ public class SaveTv extends PluginForHost {
     }
 
     private long getTimestampWhenDownloadWithAdsIsAllowed(final DownloadLink link) {
-        final SubConfiguration cfg = SubConfiguration.getConfig(getHost());
+        final SubConfiguration cfg = getPluginConfig();
         final long userDefinedWaitHours = cfg.getLongProperty(ADS_FREE_UNAVAILABLE_HOURS, SaveTv.defaultADS_FREE_UNAVAILABLE_HOURS);
         final long timestamp_releasedate = link.getLongProperty(PROPERTY_originaldate_end, 0);
         final long timestamp_with_ads_allowed = timestamp_releasedate + userDefinedWaitHours * 60 * 60 * 1000;
         return timestamp_with_ads_allowed;
     }
 
-    public static long calculateFilesize(final DownloadLink link, final String formatString) {
-        return calculateFilesize(link, convertQualityStringToInternalID(formatString));
+    public static long calculateFilesize(final Plugin plugin, final DownloadLink link, final String formatString) {
+        return calculateFilesize(plugin, link, convertQualityStringToInternalID(formatString));
     }
 
     /**
@@ -2006,8 +2005,8 @@ public class SaveTv extends PluginForHost {
      * Especially useful whenever filesize is not given via website / API but still 'nice to have'. <br />
      * Keep in mind that this calculation must not be very accurate.
      */
-    public static long calculateFilesize(final DownloadLink link, final int formatID) {
-        final int duration_relevant = getDurationDependingOnUserSettings(link);
+    public static long calculateFilesize(final Plugin plugin, final DownloadLink link, final int formatID) {
+        final int duration_relevant = getDurationDependingOnUserSettings(plugin, link);
         final double mb_per_second = getBitrateForFormat(formatID);
         final double calculated_filesize = mb_per_second * duration_relevant * 1024 * 1024;
         return (long) calculated_filesize;
@@ -2027,11 +2026,11 @@ public class SaveTv extends PluginForHost {
     }
 
     /** AdsFree duration < Duration of video with ads */
-    public static int getDurationDependingOnUserSettings(final DownloadLink link) {
+    public static int getDurationDependingOnUserSettings(Plugin plugin, final DownloadLink link) {
         final int duration_seconds_adsfree = link.getIntegerProperty(PROPERTY_site_runtime_seconds_adsfree, 0);
         final int duration_seconds_withads = link.getIntegerProperty(PROPERTY_site_runtime_seconds_withads, 0);
         final int duration_relevant;
-        final boolean user_prefers_adsfree = getPreferAdsFree(link);
+        final boolean user_prefers_adsfree = getPreferAdsFree(plugin, link);
         if (user_prefers_adsfree && duration_seconds_adsfree > 0) {
             duration_relevant = duration_seconds_adsfree;
         } else {
@@ -2049,7 +2048,7 @@ public class SaveTv extends PluginForHost {
      * Returns selected quality id. <br />
      * This is only that complicated because the user selection can be overridden via parameters inside the URL.
      */
-    public static int getConfiguredVideoFormatID(final DownloadLink link) {
+    public static int getConfiguredVideoFormatID(Plugin plugin, final DownloadLink link) {
         final int videoformatStored = link.getIntegerProperty(PROPERTY_download_format_id, -1);
         if (videoformatStored != -1) {
             /*
@@ -2062,7 +2061,7 @@ public class SaveTv extends PluginForHost {
         if (videoformatURL != -1 && isKnownFormatID(videoformatURL)) {
             return videoformatURL;
         }
-        return getConfiguredVideoFormatConfig();
+        return getConfiguredVideoFormatConfig(plugin);
     }
 
     /** Returns default formatID. 2017-08-11: Returns ID for HQ format --> Website-default */
@@ -2092,8 +2091,8 @@ public class SaveTv extends PluginForHost {
 
     /** Returns user selected formatID based on PluginConfiguration */
     @SuppressWarnings("deprecation")
-    public static int getConfiguredVideoFormatConfig() {
-        switch (SubConfiguration.getConfig(HOST_STATIC).getIntegerProperty(SELECTED_VIDEO_FORMAT, defaultSELECTED_VIDEO_FORMAT)) {
+    public static int getConfiguredVideoFormatConfig(Plugin plugin) {
+        switch (plugin.getPluginConfig().getIntegerProperty(SELECTED_VIDEO_FORMAT, defaultSELECTED_VIDEO_FORMAT)) {
         case 0:
             return SITE_FORMAT_HD;
         case 1:
@@ -2131,7 +2130,7 @@ public class SaveTv extends PluginForHost {
     @SuppressWarnings("unused")
     private double site_get_calculated_runtime_minutes(final DownloadLink link, final long page_size_mb) {
         double run_time_calculated = 0;
-        final int selected_video_format = getConfiguredVideoFormatID(link);
+        final int selected_video_format = getConfiguredVideoFormatID(this, link);
         switch (selected_video_format) {
         case SITE_FORMAT_HD:
             run_time_calculated = page_size_mb / QUALITY_HD_MB_PER_SECOND;
@@ -2313,12 +2312,12 @@ public class SaveTv extends PluginForHost {
 
     /** Corrects all kinds of Strings which Stv provides, also makes filenames look nicer. */
     @SuppressWarnings("deprecation")
-    public static String correctData(final String host, final String input) {
+    public static String correctData(Plugin plugin, final String input) {
         String output = Encoding.htmlDecode(input);
         output = output.replace("_", " ");
         output = output.trim();
         output = output.replaceAll("(\r|\n)", "");
-        output = output.replace("/", SubConfiguration.getConfig(host).getStringProperty(CUSTOM_FILENAME_SEPARATION_MARK, defaultCUSTOM_FILENAME_SEPARATION_MARK));
+        output = output.replace("/", plugin.getPluginConfig().getStringProperty(CUSTOM_FILENAME_SEPARATION_MARK, defaultCUSTOM_FILENAME_SEPARATION_MARK));
         /* Correct spaces */
         final String[] unneededSpaces = new Regex(output, ".*?([ ]{2,}).*?").getColumn(0);
         if (unneededSpaces != null && unneededSpaces.length != 0) {
@@ -2358,8 +2357,8 @@ public class SaveTv extends PluginForHost {
 
     @SuppressWarnings("deprecation")
     public static String getFormattedFilename(final Plugin plugin, final DownloadLink link) throws ParseException {
-        final SubConfiguration cfg = SubConfiguration.getConfig(plugin.getHost());
-        final String customStringForEmptyTags = getCustomStringForEmptyTags(plugin.getHost());
+        final SubConfiguration cfg = plugin.getPluginConfig();
+        final String customStringForEmptyTags = getCustomStringForEmptyTags(plugin, plugin.getHost());
         final String acc_username = getDownloadableViaUsername(link);
         final String server_filename = link.getStringProperty(PROPERTY_server_filename, customStringForEmptyTags);
         final String site_title = link.getStringProperty(PROPERTY_plainfilename, customStringForEmptyTags);
@@ -2420,7 +2419,7 @@ public class SaveTv extends PluginForHost {
             final String episodename = link.getStringProperty(PROPERTY_episodename, customStringForEmptyTags);
             final int seasonnumber = getSeasonNumber(link);
             final int episodenumber = getEpisodeNumber(link);
-            final String seasonAndEpisodenumber = getSeasonnumberAndEpisodenumber(seasonnumber, episodenumber);
+            final String seasonAndEpisodenumber = getSeasonnumberAndEpisodenumber(plugin, seasonnumber, episodenumber);
             formattedFilename = cfg.getStringProperty(CUSTOM_FILENAME_SERIES, defaultCUSTOM_FILENAME_SERIES);
             if (formattedFilename == null || formattedFilename.equals("")) {
                 formattedFilename = defaultCUSTOM_FILENAME_SERIES;
@@ -2486,7 +2485,7 @@ public class SaveTv extends PluginForHost {
             /* Server = already original filename - no need to 'fake' anything */
             formattedFilename += EXTENSION_default;
         } else {
-            final String title = convertNormalDataToServer(link.getStringProperty(PROPERTY_plainfilename, getCustomStringForEmptyTags(plugin.getHost())));
+            final String title = convertNormalDataToServer(link.getStringProperty(PROPERTY_plainfilename, getCustomStringForEmptyTags(plugin, plugin.getHost())));
             String episodename = link.getStringProperty(PROPERTY_episodename, null);
             final int episodenumber = getEpisodeNumber(link);
             formattedFilename = title + "_";
@@ -2524,7 +2523,7 @@ public class SaveTv extends PluginForHost {
      * If only the episodenumber is available (which is often the case), it will only returns e.g. 'E00' [same for season only but I've
      * never seen this case]!
      */
-    private static String getSeasonnumberAndEpisodenumber(final int seasonnumber, final int episodenumber) {
+    private static String getSeasonnumberAndEpisodenumber(Plugin plugin, final int seasonnumber, final int episodenumber) {
         String result;
         if (seasonnumber > -1 || episodenumber > -1) {
             result = "";
@@ -2535,7 +2534,7 @@ public class SaveTv extends PluginForHost {
                 result += String.format(Locale.ROOT, "E%02d", episodenumber);
             }
         } else {
-            result = getCustomStringForEmptyTags(HOST_STATIC);
+            result = getCustomStringForEmptyTags(plugin, HOST_STATIC);
         }
         return result;
     }
@@ -2574,8 +2573,8 @@ public class SaveTv extends PluginForHost {
      * CUSTOM_FILENAME_EMPTY_TAG_STRING will be used instead.
      */
     @SuppressWarnings("deprecation")
-    public static String getCustomStringForEmptyTags(final String host) {
-        final SubConfiguration cfg = SubConfiguration.getConfig(host);
+    public static String getCustomStringForEmptyTags(Plugin plugin, final String host) {
+        final SubConfiguration cfg = plugin.getPluginConfig();
         final String customStringForEmptyTags = cfg.getStringProperty(CUSTOM_FILENAME_EMPTY_TAG_STRING, defaultCUSTOM_FILENAME_EMPTY_TAG_STRING);
         return customStringForEmptyTags;
     }

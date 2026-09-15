@@ -20,7 +20,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 53356 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53400 $", interfaceVersion = 2, names = {}, urls = {})
 public class JoyReactor extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -90,6 +90,9 @@ public class JoyReactor extends PluginForDecrypt {
                     ret.add(createDownloadlink(iframe));
                     return ret;
                 }
+            }
+            if (!br.containsHTML("\"insertId\"\\s*:")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             // Unsafe content - only for registered users (google translate)
             if (br.containsHTML("Небезопасный контент - только для зарегистрированных пользователей|joyreactor\\.cc/images/unsafe_ru\\.gif")) {

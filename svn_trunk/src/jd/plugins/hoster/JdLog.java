@@ -22,6 +22,14 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
+import org.jdownloader.auth.AuthenticationController;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.jdserv.JDServUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.downloadcontroller.DownloadSession;
 import jd.controlling.downloadcontroller.DownloadWatchDog;
@@ -37,21 +45,13 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.URLHelper;
-import org.jdownloader.auth.AuthenticationController;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.images.AbstractIcon;
-import org.jdownloader.jdserv.JDServUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 /**
  * Alternative AppWork log downloader for internal use
  *
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 51793 $", interfaceVersion = 3, names = { "jdlog" }, urls = { "jdlog://(\\d+)" })
+@HostPlugin(revision = "$Revision: 53409 $", interfaceVersion = 3, names = { "jdlog" }, urls = { "jdlog://(\\d+)" })
 public class JdLog extends PluginForHost {
     @Override
     public String getAGBLink() {
@@ -84,15 +84,15 @@ public class JdLog extends PluginForHost {
         return Integer.MAX_VALUE;
     }
 
-    // @Override
-    // public String getLinkID(final DownloadLink link) {
-    // final String linkid = getFID(link);
-    // if (linkid != null) {
-    // return "jdlog://" + linkid;
-    // } else {
-    // return super.getLinkID(link);
-    // }
-    // }
+    @Override
+    public String getLinkID(final DownloadLink link) {
+        final String linkid = getFID(link);
+        if (linkid != null) {
+            return "jdlog://" + linkid;
+        } else {
+            return super.getLinkID(link);
+        }
+    }
 
     private String getFID(final DownloadLink link) {
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
@@ -179,7 +179,7 @@ public class JdLog extends PluginForHost {
                         return false;
                     }
                 });
-                throw new PluginException(LinkStatus.ERROR_FATAL, "Log too small (between 51 and <125 bytes)");
+                throw new PluginException(LinkStatus.ERROR_FATAL, "Log too small (between 51 and 125 bytes)");
             }
         }
     }

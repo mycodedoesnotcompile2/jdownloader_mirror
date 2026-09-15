@@ -22,9 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.ProgressController;
@@ -38,7 +35,10 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 45837 $", interfaceVersion = 3, names = { "music.163.com" }, urls = { "https?://(?:www\\.)?music\\.163\\.com/(?:#/)?(?:album\\?id=|artist/album\\?id=|playlist\\?id=)\\d+" })
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 53401 $", interfaceVersion = 3, names = { "music.163.com" }, urls = { "https?://(?:www\\.)?music\\.163\\.com/(?:#/)?(?:album\\?id=|artist/album\\?id=|playlist\\?id=)\\d+" })
 public class Music163Com extends PluginForDecrypt {
     public Music163Com(PluginWrapper wrapper) {
         super(wrapper);
@@ -65,7 +65,7 @@ public class Music163Com extends PluginForDecrypt {
         final String parameter = param.toString();
         final String lid = new Regex(parameter, "(\\d+)$").getMatch(0);
         String formattedDate = null;
-        final SubConfiguration cfg = SubConfiguration.getConfig("music.163.com");
+        final SubConfiguration cfg = getPluginConfig();
         final boolean fastcheck = cfg.getBooleanProperty(FAST_LINKCHECK, false);
         final String[] qualities = jd.plugins.hoster.Music163Com.audio_qualities;
         Map<String, Object> entries = null;
@@ -173,7 +173,7 @@ public class Music163Com extends PluginForDecrypt {
                 if (publishedTimestamp > 0) {
                     dl.setProperty("originaldate", publishedTimestamp);
                 }
-                final String name_song = jd.plugins.hoster.Music163Com.getFormattedFilename(dl);
+                final String name_song = jd.plugins.hoster.Music163Com.getFormattedFilename(this, dl);
                 dl.setName(name_song);
                 dl.setAvailable(true);
                 dl.setDownloadSize(filesize);
@@ -200,7 +200,7 @@ public class Music163Com extends PluginForDecrypt {
                 if (publishedTimestamp > 0) {
                     dlcover.setProperty("originaldate", publishedTimestamp);
                 }
-                final String name_cover = jd.plugins.hoster.Music163Com.getFormattedFilename(dlcover);
+                final String name_cover = jd.plugins.hoster.Music163Com.getFormattedFilename(this, dlcover);
                 dlcover.setName(name_cover);
                 decryptedLinks.add(dlcover);
             }

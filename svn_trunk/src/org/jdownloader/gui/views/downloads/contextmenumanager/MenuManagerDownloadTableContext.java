@@ -129,6 +129,7 @@ public class MenuManagerDownloadTableContext extends ContextMenuManager<FilePack
         delete.add(setIconKey(new ActionData(GenericDeleteFromDownloadlistContextAction.class).putSetup(GenericDeleteFromDownloadlistAction.DELETE_FAILED, true), IconKey.ICON_REMOVE_FAILED));
         delete.add(setIconKey(new ActionData(GenericDeleteFromDownloadlistContextAction.class).putSetup(GenericDeleteFromDownloadlistAction.DELETE_FINISHED, true), IconKey.ICON_REMOVE_OK));
         delete.add(setIconKey(new ActionData(GenericDeleteFromDownloadlistContextAction.class).putSetup(GenericDeleteFromDownloadlistAction.DELETE_OFFLINE, true), IconKey.ICON_REMOVE_OFFLINE));
+        delete.add(setIconKey(new ActionData(GenericDeleteFromDownloadlistContextAction.class).putSetup(GenericDeleteFromDownloadlistAction.DELETE_FILE_MISSING, true), IconKey.ICON_HARDDISK));
         delete.add(setIconKey(new ActionData(GenericDeleteFromDownloadlistContextAction.class).putSetup(GenericDeleteFromDownloadlistContextAction.DELETE_ALL, true).putSetup(IncludedSelectionSetup.INCLUDE_UNSELECTED_LINKS, true).putSetup(IncludedSelectionSetup.INCLUDE_SELECTED_LINKS, false), IconKey.ICON_OK));
         delete.add(setIconKey(new ActionData(GenericDeleteFromDownloadlistContextAction.class).putSetup(GenericDeleteFromDownloadlistContextAction.DELETE_ALL, true).putSetup(GenericDeleteFromDownloadlistAction.DELETE_MODE, DeleteFileOptions.REMOVE_LINKS_AND_RECYCLE_FILES.name()), IconKey.ICON_DELETE));
         // mr.add(setAccelerator(new MenuItemData(setName(setIconKey(new

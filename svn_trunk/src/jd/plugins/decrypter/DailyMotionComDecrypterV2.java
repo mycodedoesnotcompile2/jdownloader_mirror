@@ -34,7 +34,7 @@ import jd.plugins.hoster.DailyMotionComV2;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 //Decrypts embedded videos from dailymotion
-@DecrypterPlugin(revision = "$Revision: 52878 $", interfaceVersion = 3, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
+@DecrypterPlugin(revision = "$Revision: 53401 $", interfaceVersion = 3, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
 public class DailyMotionComDecrypterV2 extends DailyMotionComDecrypter {
     public DailyMotionComDecrypterV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -88,7 +88,7 @@ public class DailyMotionComDecrypterV2 extends DailyMotionComDecrypter {
             // variantLink.setFinalFileName(formattedFilename);
             variantLink.setVariantSupport(true);
             variantLink.setLinkID("dailymotioncom" + variantLink.getStringProperty(DailyMotionCom.PROPERTY_VIDEO_ID) + "_" + bestVi.getqName());
-            DailyMotionComV2.setActiveVariant(variantLink, bestVi);
+            DailyMotionComV2.setActiveVariant(this, variantLink, bestVi);
             if (cfg == null || cfg.getBooleanProperty(DailyMotionCom.ALLOW_AUDIO, defaultAllowAudio)) {
                 final DownloadLink audio = createDownloadlink(variantLink.getPluginPatternMatcher());
                 audio.setDefaultPlugin(variantLink.getDefaultPlugin());// avoid processing of same link (www vs no www)
@@ -110,9 +110,9 @@ public class DailyMotionComDecrypterV2 extends DailyMotionComDecrypter {
                 audio.setProperty("qualityname", chosenVariant.getqName());
                 audio.setLinkID("dailymotioncom" + variantLink.getStringProperty(DailyMotionCom.PROPERTY_VIDEO_ID) + "_" + chosenVariant.getDisplayName());
                 variantLink.getFilePackage().add(audio);
-                final String formattedFilename = jd.plugins.hoster.DailyMotionCom.getFormattedFilename(audio);
+                final String formattedFilename = jd.plugins.hoster.DailyMotionCom.getFormattedFilename(this, audio);
                 audio.setFinalFileName(formattedFilename);
-                DailyMotionComV2.setActiveVariant(audio, chosenVariant);
+                DailyMotionComV2.setActiveVariant(this, audio, chosenVariant);
                 ret.add(audio);
             }
         }

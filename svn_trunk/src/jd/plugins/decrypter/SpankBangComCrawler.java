@@ -22,12 +22,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
@@ -54,7 +48,13 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.SpankBangCom;
 
-@DecrypterPlugin(revision = "$Revision: 52320 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 53400 $", interfaceVersion = 2, names = {}, urls = {})
 public class SpankBangComCrawler extends PluginForDecrypt {
     public SpankBangComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -215,7 +215,7 @@ public class SpankBangComCrawler extends PluginForDecrypt {
     private ArrayList<DownloadLink> parseCrawlSingleVideo(final Browser br) throws Exception {
         checkErrors(br);
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final SubConfiguration cfg = SubConfiguration.getConfig(this.getHost());
+        final SubConfiguration cfg = getPluginConfig();
         final boolean fastcheck = cfg.getBooleanProperty(SpankBangCom.FASTLINKCHECK, SpankBangCom.default_FASTLINKCHECK);
         final String currenturl = br.getURL();
         if (isPrivate(this.br)) {

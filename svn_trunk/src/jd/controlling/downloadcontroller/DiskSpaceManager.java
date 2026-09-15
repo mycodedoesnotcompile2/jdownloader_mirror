@@ -34,69 +34,78 @@ public class DiskSpaceManager {
         return checkAndReserve(reservation, null);
     }
 
-    private DISKSPACERESERVATIONRESULT handle(final DiskSpaceChecker checker, final DISKSPACERESERVATIONRESULT result, final Long requestedDiskSpace) {
+    private DISKSPACERESERVATIONRESULT handle(final DiskSpaceChecker checker, final DISKSPACERESERVATIONRESULT result, final Long requestedDiskSpace, final Long usableSpace) {
         final DiskSpaceReservation reservation = checker.getDiskSpaceReservation();
         final LogInterface logger = reservation.getLogger();
-        logger.info("DiskSpaceManager:Result:" + result + "|File:" + reservation.getDestination() + "|Root(s):" + checker.getRoots() + "|Requestor:" + checker.getRequestor() + "|RequestedSpace:" + (requestedDiskSpace != null ? SizeFormatter.formatBytes(requestedDiskSpace.longValue()) : null) + "|UsableSpace:" + SizeFormatter.formatBytes(checker.getUsableSpace()));
+        logger.info("DiskSpaceManager:Result:" + result + "|File:" + reservation.getDestination() + "|Root(s):" + checker.getRoots() + "|Requestor:" + checker.getRequestor() + "|RequestedSpace:" + (requestedDiskSpace != null ? SizeFormatter.formatBytes(requestedDiskSpace.longValue()) : null) + "|UsableSpace:" + (usableSpace != null ? SizeFormatter.formatBytes(usableSpace.longValue()) : null));
         return result;
+    }
+
+    /**
+     * Returns true if the checker resolved to a valid root: a root that is an existing directory, or that equals the reservation
+     * destination itself.
+     */
+    private boolean isValidRoot(final DiskSpaceChecker checker) {
+        final String bestRootMatch = checker.getRoot();
+        if (bestRootMatch == null) {
+            return false;
+        }
+        final File rootFile = new File(bestRootMatch);
+        return rootFile.isDirectory() || rootFile.equals(checker.getDiskSpaceReservation().getDestination());
     }
 
     public synchronized DISKSPACERESERVATIONRESULT checkAndReserve(final DiskSpaceReservation reservation, final Object requestor) {
         if (reservation == null) {
             throw new IllegalArgumentException("reservation must not be null!");
+        }
+        final DiskSpaceChecker checker;
+        if (JVMVersion.isMinimum(JVMVersion.JAVA_1_7)) {
+            checker = new DiskSpaceChecker17(reservation, requestor);
         } else {
-            final DiskSpaceChecker checker;
-            if (JVMVersion.isMinimum(JVMVersion.JAVA_1_7)) {
-                checker = new DiskSpaceChecker17(reservation, requestor);
-            } else {
-                checker = new DiskSpaceChecker(reservation, requestor);
-            }
-            if (false) {
-                return handle(checker, DISKSPACERESERVATIONRESULT.UNSUPPORTED, null);
-            } else if (!config.isFreeSpaceCheckEnabled()) {
-                return handle(checker, DISKSPACERESERVATIONRESULT.OK, null);
-            } else if (reservation.getDestination() == null) {
-                return handle(checker, DISKSPACERESERVATIONRESULT.INVALIDDESTINATION, null);
-            } else {
-                final String bestRootMatch = checker.getRoot();
-                if (bestRootMatch == null || (!new File(bestRootMatch).isDirectory() && !new File(bestRootMatch).equals(reservation.getDestination()))) {
-                    return handle(checker, DISKSPACERESERVATIONRESULT.INVALIDDESTINATION, null);
-                }
-                try {
-                    final HardwareTypeInterface hardwareType = HardwareType.getHardware();
-                    if (hardwareType != null && !ContainerRuntime.isInsideDocker()) {
-                        switch (hardwareType.getHardwareType()) {
-                        case QNAP:
-                        case SYNOLOGY:
-                            if (checker.isSameRoot("/")) {
-                                return handle(checker, DISKSPACERESERVATIONRESULT.INVALIDDESTINATION, null);
-                            }
-                            break;
-                        default:
-                            break;
-                        }
+            checker = new DiskSpaceChecker(reservation, requestor);
+        }
+        if (!config.isFreeSpaceCheckEnabled()) {
+            /* Free space check disabled in config. */
+            return handle(checker, DISKSPACERESERVATIONRESULT.OK, null, null);
+        } else if (reservation.getDestination() == null) {
+            return handle(checker, DISKSPACERESERVATIONRESULT.INVALIDDESTINATION, null, null);
+        }
+        if (!isValidRoot(checker)) {
+            return handle(checker, DISKSPACERESERVATIONRESULT.INVALIDDESTINATION, null, null);
+        }
+        try {
+            final HardwareTypeInterface hardwareType = HardwareType.getHardware();
+            if (hardwareType != null && !ContainerRuntime.isInsideDocker()) {
+                switch (hardwareType.getHardwareType()) {
+                case QNAP:
+                case SYNOLOGY:
+                    if (checker.isSameRoot("/")) {
+                        return handle(checker, DISKSPACERESERVATIONRESULT.INVALIDDESTINATION, null, null);
                     }
-                } catch (final Throwable e) {
-                    reservation.getLogger().log(e);
-                }
-                final long forcedFreeSpaceOnDisk = Math.max(0l, config.getForcedFreeSpaceOnDisk() * 1024l * 1024l);
-                long requestedDiskSpace = Math.max(0, reservation.getSize()) + forcedFreeSpaceOnDisk;
-                for (final DiskSpaceChecker reservedDiskSpace : reservations) {
-                    if (reservedDiskSpace.isSameRoot(checker)) {
-                        requestedDiskSpace += Math.max(0, reservedDiskSpace.getSize());
-                    }
-                }
-                final long freeDiskSpace = checker.getUsableSpace();
-                // freeDiskSpace <0 -> unlimited, for example a virtual (distributed) filesystem
-                if (freeDiskSpace >= 0 && freeDiskSpace < requestedDiskSpace) {
-                    return handle(checker, DISKSPACERESERVATIONRESULT.FAILED, requestedDiskSpace);
-                } else {
-                    if (requestor != null) {
-                        reservations.add(checker);
-                    }
-                    return handle(checker, DISKSPACERESERVATIONRESULT.OK, requestedDiskSpace);
+                    break;
+                default:
+                    break;
                 }
             }
+        } catch (final Throwable e) {
+            reservation.getLogger().log(e);
+        }
+        final long forcedFreeSpaceOnDisk = Math.max(0l, config.getForcedFreeSpaceOnDisk() * 1024l * 1024l);
+        long requestedDiskSpace = Math.max(0, reservation.getSize()) + forcedFreeSpaceOnDisk;
+        for (final DiskSpaceChecker reservedDiskSpace : reservations) {
+            if (reservedDiskSpace.isSameRoot(checker)) {
+                requestedDiskSpace += Math.max(0, reservedDiskSpace.getSize());
+            }
+        }
+        final long freeDiskSpace = checker.getUsableSpace();
+        // freeDiskSpace <0 -> unlimited, for example a virtual (distributed) filesystem
+        if (freeDiskSpace >= 0 && freeDiskSpace < requestedDiskSpace) {
+            return handle(checker, DISKSPACERESERVATIONRESULT.FAILED, requestedDiskSpace, freeDiskSpace);
+        } else {
+            if (requestor != null) {
+                reservations.add(checker);
+            }
+            return handle(checker, DISKSPACERESERVATIONRESULT.OK, requestedDiskSpace, freeDiskSpace);
         }
     }
 
@@ -128,18 +137,16 @@ public class DiskSpaceManager {
         } else {
             checker = new DiskSpaceChecker(reservation, requestor);
         }
-        final String bestRootMatch = checker.getRoot();
-        if (bestRootMatch == null || (!new File(bestRootMatch).isDirectory() && !new File(bestRootMatch).equals(reservation.getDestination()))) {
+        if (!isValidRoot(checker)) {
             return -1;
-        } else {
-            long requestedDiskSpace = Math.max(0, reservation.getSize());
-            for (final DiskSpaceChecker reservedDiskSpace : reservations) {
-                if (reservedDiskSpace.isSameRoot(checker)) {
-                    requestedDiskSpace += Math.max(0, reservedDiskSpace.getSize());
-                }
-            }
-            return requestedDiskSpace;
         }
+        long requestedDiskSpace = Math.max(0, reservation.getSize());
+        for (final DiskSpaceChecker reservedDiskSpace : reservations) {
+            if (reservedDiskSpace.isSameRoot(checker)) {
+                requestedDiskSpace += Math.max(0, reservedDiskSpace.getSize());
+            }
+        }
+        return requestedDiskSpace;
     }
 
     public synchronized boolean free(final DiskSpaceReservation reservation, final Object requestor) {
@@ -172,11 +179,12 @@ public class DiskSpaceManager {
     }
 
     private synchronized DiskSpaceChecker getDiskSpaceChecker(final DiskSpaceReservation reservation) {
-        if (reservation != null) {
-            for (final DiskSpaceChecker reservedDiskSpace : reservations) {
-                if (reservedDiskSpace.getDiskSpaceReservation() == reservation) {
-                    return reservedDiskSpace;
-                }
+        if (reservation == null) {
+            return null;
+        }
+        for (final DiskSpaceChecker reservedDiskSpace : reservations) {
+            if (reservedDiskSpace.getDiskSpaceReservation() == reservation) {
+                return reservedDiskSpace;
             }
         }
         return null;

@@ -20,6 +20,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.StringUtils;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -41,9 +43,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.EPornerCom;
 
-import org.appwork.utils.StringUtils;
-
-@DecrypterPlugin(revision = "$Revision: 52649 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53409 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { EPornerCom.class })
 public class EPornerComGallery extends PluginForDecrypt {
     public EPornerComGallery(PluginWrapper wrapper) {
@@ -106,8 +106,14 @@ public class EPornerComGallery extends PluginForDecrypt {
         if (isAgeVerificationBlocked) {
             throw new DecrypterRetryException(RetryReason.AGE_VERIFICATION_REQUIRED, "Age verification required! Change your IP or add a verified eporner account.");
         }
-        final String numberofPhotosStr = br.getRegex("Photos:\\s*(\\d+)").getMatch(0);
-        final int numberofPhotos = Integer.parseInt(numberofPhotosStr);
+        final String numberofPhotosStr = br.getRegex("class=\"gallery-photo-number gallery-photo-number-long\" title=\"(\\d+)").getMatch(0);
+        final int numberofPhotos;
+        if (numberofPhotosStr != null) {
+            numberofPhotos = Integer.parseInt(numberofPhotosStr);
+        } else {
+            logger.info("Failed to find total number of photos");
+            numberofPhotos = -1;
+        }
         final boolean crawlByThumbnail = false;
         final HashSet<String> dupes = new HashSet<String>();
         if (crawlByThumbnail) {
@@ -166,7 +172,7 @@ public class EPornerComGallery extends PluginForDecrypt {
             fp.setComment(Encoding.htmlDecode(albumDescription).trim());
         }
         fp.addLinks(ret);
-        if (ret.size() < numberofPhotos) {
+        if (numberofPhotos != -1 && ret.size() < numberofPhotos) {
             logger.warning("Failed to find some photos or website contained duplicates");
         }
         return ret;

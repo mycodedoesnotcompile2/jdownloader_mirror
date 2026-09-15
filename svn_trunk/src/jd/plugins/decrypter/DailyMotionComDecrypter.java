@@ -63,7 +63,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 //Decrypts embedded videos from dailymotion
-@DecrypterPlugin(revision = "$Revision: 52878 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
+@DecrypterPlugin(revision = "$Revision: 53401 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
 public class DailyMotionComDecrypter extends PluginForDecrypt {
     public DailyMotionComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -140,7 +140,7 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
             if (contenturl.matches(TYPE_PLAYLIST)) {
                 return crawlPlaylist(contenturl);
             } else if (contenturl.matches(TYPE_VIDEO)) {
-                return crawlSingleVideo(param, contenturl, SubConfiguration.getConfig(this.getHost()), false);
+                return crawlSingleVideo(param, contenturl, getPluginConfig(), false);
             } else if (contenturl.matches(TYPE_USER_SEARCH)) {
                 return crawlUserSearch(contenturl);
             } else if (username != null) {
@@ -191,7 +191,7 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
         }
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(username);
-        if (SubConfiguration.getConfig(this.getHost()).getBooleanProperty(DailyMotionCom.USER_PACKAGE, false)) {
+        if (getPluginConfig().getBooleanProperty(DailyMotionCom.USER_PACKAGE, false)) {
             fp.setAllowInheritance(true);
         }
         boolean has_more = false;
@@ -626,7 +626,7 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
                 // dl.setDefaultPlugin(dailymotionHosterplugin);
                 dl.setProperty(DailyMotionCom.PROPERTY_VIDEO_ID, videoID);
                 hlsquality.setPropertiesOnDownloadLink(dl);
-                final String formattedFilename = DailyMotionCom.getFormattedFilename(dl);
+                final String formattedFilename = DailyMotionCom.getFormattedFilename(this, dl);
                 dl.setName(formattedFilename);
                 dl.setAvailable(true);
                 dl.setContentUrl(contenturl);
@@ -673,7 +673,7 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
                         dl.setProperty("plain_ext", ".srt");
                         dl.setProperty("plain_videoid", videoID);
                         dl.setLinkID("dailymotioncom" + videoID + "_" + qualityname);
-                        final String formattedFilename = DailyMotionCom.getFormattedFilename(dl);
+                        final String formattedFilename = DailyMotionCom.getFormattedFilename(this, dl);
                         dl.setName(formattedFilename);
                         fpSub.add(dl);
                         ret.add(dl);
@@ -947,7 +947,7 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
             if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                 System.out.println("Linkid: " + "dailymotioncom" + videoID + "_" + qualityName);
             }
-            final String formattedFilename = DailyMotionCom.getFormattedFilename(dl);
+            final String formattedFilename = DailyMotionCom.getFormattedFilename(this, dl);
             dl.setName(formattedFilename);
             dl.setContentUrl(contenturl);
             dl.setAvailable(true);

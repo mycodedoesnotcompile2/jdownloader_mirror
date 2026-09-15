@@ -33,7 +33,7 @@ import jd.plugins.PluginException;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
-@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53413 $", interfaceVersion = 3, names = {}, urls = {})
 public class DepicMe extends XFileSharingProBasic {
     public DepicMe(final PluginWrapper wrapper) {
         super(wrapper);
@@ -135,7 +135,7 @@ public class DepicMe extends XFileSharingProBasic {
         /* 2020-10-08: Special */
         String dllink = super.getDllinkImagehost(link, account, br, src);
         if (StringUtils.isEmpty(dllink)) {
-            dllink = new Regex(src, "src=\"(https?://[^\"]+)\"[^>]*class=\"pic\"").getMatch(0);
+            dllink = new Regex(src, "src\\s*=\\s*\"(https?://[^\"]+)\"[^>]*class\\s*=\\s*\"pic").getMatch(0);
         }
         return dllink;
     }

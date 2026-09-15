@@ -22,14 +22,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-import org.jdownloader.translate._JDT;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -47,13 +39,22 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.VariantInfoMassengeschmackTv;
 import jd.utils.JDUtilities;
 
-@HostPlugin(revision = "$Revision: 50772 $", interfaceVersion = 3, names = { "massengeschmack.tv" }, urls = { "https?://massengeschmack\\.tv/dl.+|https?://[^/]+\\.massengeschmack\\.tv/deliver.+" })
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.jdownloader.translate._JDT;
+
+@HostPlugin(revision = "$Revision: 53400 $", interfaceVersion = 3, names = { "massengeschmack.tv" }, urls = { "https?://massengeschmack\\.tv/dl.+|https?://[^/]+\\.massengeschmack\\.tv/deliver.+" })
 public class MassengeschmackTv extends PluginForHost {
     public static final long trust_cookie_age = 300000l;
 
@@ -683,8 +684,8 @@ public class MassengeschmackTv extends PluginForHost {
     }
 
     @SuppressWarnings("deprecation")
-    public static String getMassengeschmack_other_FormattedFilename(final DownloadLink downloadLink, final VariantInfoMassengeschmackTv variant) {
-        final SubConfiguration cfg = SubConfiguration.getConfig(downloadLink.getHost());
+    public static String getMassengeschmack_other_FormattedFilename(Plugin plugin, final DownloadLink downloadLink, final VariantInfoMassengeschmackTv variant) {
+        final SubConfiguration cfg = plugin.getPluginConfig();
         String formattedFilename = cfg.getStringProperty(CUSTOM_FILENAME, defaultCustomFilename);
         if ((!formattedFilename.contains("*episodenumber*") && !formattedFilename.contains("*episodename*")) || !formattedFilename.contains("*ext*")) {
             formattedFilename = defaultCustomFilename;

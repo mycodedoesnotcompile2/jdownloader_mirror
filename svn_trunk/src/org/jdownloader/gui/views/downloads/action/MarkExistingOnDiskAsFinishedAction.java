@@ -3,7 +3,6 @@ package org.jdownloader.gui.views.downloads.action;
 import java.awt.event.ActionEvent;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -15,11 +14,15 @@ import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogNoAnswerException;
 import org.appwork.utils.swing.dialog.ProgressDialog;
 import org.appwork.utils.swing.dialog.ProgressDialog.ProgressGetter;
+import org.jdownloader.controlling.contextmenu.ActionContext;
 import org.jdownloader.controlling.contextmenu.CustomizableTableContextAppAction;
+import org.jdownloader.controlling.contextmenu.Customizer;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.plugins.FinalLinkState;
+import org.jdownloader.plugins.config.Order;
+import org.jdownloader.utils.FileIoCache;
 
 import jd.controlling.downloadcontroller.DownloadSession;
 import jd.controlling.downloadcontroller.DownloadWatchDog;
@@ -31,17 +34,35 @@ import jd.plugins.FilePackage;
 /**
  * "Mark as finished if file exists on disk" context menu action.
  *
- * Walks all selected {@link DownloadLink}s and marks each one as finished whose expected output file already exists on disk. A cache
- * of already-checked absolute paths keeps the number of {@link File#exists()} calls to a minimum, which also covers the case where the
- * same file (same path) is referenced by two different packages. The whole scan runs inside a cancelable {@link ProgressDialog}.
+ * Walks all selected {@link DownloadLink}s and marks each one as finished whose expected output file already exists on disk. A
+ * {@link FileIoCache} keeps the number of {@link File#exists()} calls to a minimum, which also covers the case where the same file
+ * (same path) is referenced by two different packages. The whole scan runs inside a cancelable {@link ProgressDialog}.
+ *
+ * When {@link #isFileSizeMustMatch()} is enabled, an existing file only counts when its size on disk matches the link's expected
+ * download size. Links without a known size are not size-checked (existence alone is enough).
  */
-public class MarkExistingOnDiskAsFinishedAction extends CustomizableTableContextAppAction<FilePackage, DownloadLink> {
+public class MarkExistingOnDiskAsFinishedAction extends CustomizableTableContextAppAction<FilePackage, DownloadLink> implements ActionContext {
     private static final long   serialVersionUID = 8087143123808363306L;
     private final static String NAME             = _GUI.T.gui_table_contextmenu_markexistingondiskasfinished();
+    private boolean             fileSizeMustMatch = false;
 
     public MarkExistingOnDiskAsFinishedAction() {
         setIconKey(IconKey.ICON_TRUE);
         setName(NAME);
+    }
+
+    public static String getTranslationFileSizeMustMatch() {
+        return _GUI.T.MarkExistingOnDiskAsFinishedAction_setting_filesizemustmatch();
+    }
+
+    @Customizer(link = "#getTranslationFileSizeMustMatch")
+    @Order(10)
+    public boolean isFileSizeMustMatch() {
+        return fileSizeMustMatch;
+    }
+
+    public void setFileSizeMustMatch(final boolean fileSizeMustMatch) {
+        this.fileSizeMustMatch = fileSizeMustMatch;
     }
 
     private void setFinished(final DownloadLink downloadlink) {
@@ -99,6 +120,8 @@ public class MarkExistingOnDiskAsFinishedAction extends CustomizableTableContext
         if (selection.size() == 0) {
             return;
         }
+        /* Snapshot the setting at trigger time so a later change does not affect a running scan. */
+        final boolean fileSizeMustMatch = isFileSizeMustMatch();
         new Thread("MarkExistingOnDiskAsFinishedAction") {
             public void run() {
                 /* Holds the text currently shown above the progress bar (e.g. "Working on: <filename>"). */
@@ -117,15 +140,8 @@ public class MarkExistingOnDiskAsFinishedAction extends CustomizableTableContext
 
                     @Override
                     public void run() throws Exception {
-                        /* Cache of absolute file path -> existence, to minimize File.exists calls for duplicate paths. */
-                        final HashMap<String, Boolean> existsCache = new HashMap<String, Boolean>();
-                        /*
-                         * Cache of parent directory path -> "may contain existing files". A single dir.list() call determines both
-                         * existence and emptiness of the directory: null means the directory does not exist, an empty array means it is
-                         * empty. In both cases none of the files inside can exist, so we can skip the per-file File.exists() call
-                         * entirely. This is correct on all platforms (no case-sensitivity assumptions).
-                         */
-                        final HashMap<String, Boolean> dirUsableCache = new HashMap<String, Boolean>();
+                        /* Caches File.exists()/dir.list() results to minimize disk IO for duplicate paths and shared directories. */
+                        final FileIoCache ioCache = new FileIoCache();
                         final List<DownloadLink> toMark = new ArrayList<DownloadLink>();
                         boolean canceled = false;
                         try {
@@ -148,10 +164,20 @@ public class MarkExistingOnDiskAsFinishedAction extends CustomizableTableContext
                                         errors++;
                                         continue;
                                     }
-                                    if (fileExists(fileOutput, existsCache, dirUsableCache)) {
-                                        toMark.add(link);
-                                        marked++;
+                                    final File file = new File(fileOutput);
+                                    if (!ioCache.exists(file)) {
+                                        /* Expected output file does not exist -> nothing to mark. */
+                                        continue;
                                     }
+                                    if (fileSizeMustMatch) {
+                                        final long knownSize = link.getKnownDownloadSize();
+                                        if (knownSize >= 0 && file.length() != knownSize) {
+                                            /* File exists but its size does not match the expected download size -> skip it. */
+                                            continue;
+                                        }
+                                    }
+                                    toMark.add(link);
+                                    marked++;
                                 } catch (final Throwable t) {
                                     t.printStackTrace();
                                     errors++;
@@ -188,40 +214,6 @@ public class MarkExistingOnDiskAsFinishedAction extends CustomizableTableContext
                             }
                         }
                         /* Returning from run() lets the ProgressDialog dispose itself. */
-                    }
-
-                    /**
-                     * Checks whether the given file path exists, using both a per-file existence cache and a per-directory cache. When
-                     * the parent directory is missing or empty, the result is derived from the (cached) directory listing without an
-                     * extra {@link File#exists()} call.
-                     */
-                    private boolean fileExists(final String fileOutput, final HashMap<String, Boolean> existsCache, final HashMap<String, Boolean> dirUsableCache) {
-                        final Boolean cachedExists = existsCache.get(fileOutput);
-                        if (cachedExists != null) {
-                            return cachedExists.booleanValue();
-                        }
-                        final File file = new File(fileOutput);
-                        final File parent = file.getParentFile();
-                        boolean exists;
-                        if (parent == null) {
-                            exists = file.exists();
-                        } else {
-                            final String parentPath = parent.getAbsolutePath();
-                            Boolean dirUsable = dirUsableCache.get(parentPath);
-                            if (dirUsable == null) {
-                                final String[] entries = parent.list();
-                                dirUsable = Boolean.valueOf(entries != null && entries.length > 0);
-                                dirUsableCache.put(parentPath, dirUsable);
-                            }
-                            if (dirUsable.booleanValue()) {
-                                exists = file.exists();
-                            } else {
-                                /* Parent directory is missing or empty -> the file cannot exist. */
-                                exists = false;
-                            }
-                        }
-                        existsCache.put(fileOutput, Boolean.valueOf(exists));
-                        return exists;
                     }
 
                     @Override

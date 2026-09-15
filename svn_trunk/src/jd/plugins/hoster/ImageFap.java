@@ -31,13 +31,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.ReflectionUtils;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -62,11 +55,19 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.ImageFapCrawler;
 
-@HostPlugin(revision = "$Revision: 53175 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 53400 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { ImageFapCrawler.class })
 public class ImageFap extends PluginForHost {
     public ImageFap(final PluginWrapper wrapper) {
         super(wrapper);
+        config = getPluginConfig();
         setConfigElements();
     }
 
@@ -99,7 +100,7 @@ public class ImageFap extends PluginForHost {
 
     @Override
     public void init() {
-        setRequestIntervalLimitGlobal();
+        setRequestIntervalLimitGlobal(this);
     }
 
     @Override
@@ -120,10 +121,10 @@ public class ImageFap extends PluginForHost {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX };
     }
 
-    public static void setRequestIntervalLimitGlobal() {
-        final int limit = SubConfiguration.getConfig(STATIC_HOST).getIntegerProperty(SETTING_REQUEST_LIMIT_MILLISECONDS, defaultSETTING_REQUEST_LIMIT_MILLISECONDS);
+    public static void setRequestIntervalLimitGlobal(Plugin plugin) {
+        final int limit = plugin.getPluginConfig().getIntegerProperty(SETTING_REQUEST_LIMIT_MILLISECONDS, defaultSETTING_REQUEST_LIMIT_MILLISECONDS);
         if (limit > 0) {
-            Browser.setRequestIntervalLimitGlobal(STATIC_HOST, limit);
+            Browser.setRequestIntervalLimitGlobal(plugin.getHost(), limit);
         }
     }
 
@@ -142,7 +143,6 @@ public class ImageFap extends PluginForHost {
         return "https://www." + getHost() + "/termsofservice.php";
     }
 
-    public static final String                STATIC_HOST                                 = "imagefap.com";
     /** Properties for plugin settings */
     private static final String               CUSTOM_FILENAME                             = "CUSTOM_FILENAME";
     private static final String               FORCE_RECONNECT_ON_RATELIMIT                = "FORCE_RECONNECT_ON_RATELIMIT";
@@ -192,7 +192,7 @@ public class ImageFap extends PluginForHost {
         final int photoIndex = link.getIntegerProperty(PROPERTY_PHOTO_INDEX, -1);
         final int photoPageNumber = link.getIntegerProperty(PROPERTY_PHOTO_PAGE_NUMBER, 0);
         if (photoID != null) {
-            String url = "https://www." + STATIC_HOST + "/photo/" + photoID + "/";
+            String url = "https://www." + getHost() + "/photo/" + photoID + "/";
             if (photoAlbumID != null) {
                 String pg_id = link.getStringProperty(PROPERTY_ALBUM_ID_2);
                 /**
@@ -301,7 +301,7 @@ public class ImageFap extends PluginForHost {
         return username;
     }
 
-    private final SubConfiguration config = SubConfiguration.getConfig(STATIC_HOST);
+    private final SubConfiguration config;
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
@@ -384,7 +384,7 @@ public class ImageFap extends PluginForHost {
             if (photoIndexFromHTML != null && !link.hasProperty(PROPERTY_PHOTO_INDEX)) {
                 link.setProperty(PROPERTY_PHOTO_INDEX, Integer.parseInt(photoIndexFromHTML));
             }
-            link.setFinalFileName(getFormattedFilename(link));
+            link.setFinalFileName(getFormattedFilename(this, link));
             /* Set FilePackage if not set yet so single added images can be auto merged into corresponding gallery-packages. */
             if (FilePackage.isDefaultFilePackage(link.getFilePackage())) {
                 final FilePackage fp = FilePackage.getInstance();
@@ -581,7 +581,7 @@ public class ImageFap extends PluginForHost {
                  * 2020-10-14: Captcha required. Solving it will remove the rate limit FOR THIS BROWSER SESSION! All other browser sessions
                  * (including new sessions) with the current IP will still be rate-limited until one captcha is solved.
                  */
-                if (SubConfiguration.getConfig(STATIC_HOST).getBooleanProperty(FORCE_RECONNECT_ON_RATELIMIT, defaultFORCE_RECONNECT_ON_RATELIMIT)) {
+                if (plugin.getPluginConfig().getBooleanProperty(FORCE_RECONNECT_ON_RATELIMIT, defaultFORCE_RECONNECT_ON_RATELIMIT)) {
                     throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Rate limit reached user prefers reconnect over captcha solving", 5 * 60 * 1000l);
                 }
                 Form captchaform = null;
@@ -651,8 +651,8 @@ public class ImageFap extends PluginForHost {
 
     /** Returns either the original server filename or one that is very similar to the original */
     @SuppressWarnings("deprecation")
-    public static String getFormattedFilename(final DownloadLink link) throws ParseException {
-        final SubConfiguration cfg = SubConfiguration.getConfig(STATIC_HOST);
+    public static String getFormattedFilename(Plugin plugin, final DownloadLink link) throws ParseException {
+        final SubConfiguration cfg = plugin.getPluginConfig();
         final String username = link.getStringProperty(PROPERTY_USERNAME, "-");
         String originalFilename = link.getStringProperty(PROPERTY_ORIGINAL_FILENAME);
         if (originalFilename == null) {

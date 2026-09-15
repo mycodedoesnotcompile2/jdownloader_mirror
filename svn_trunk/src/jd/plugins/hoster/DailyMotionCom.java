@@ -62,7 +62,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA;
 import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA.TYPE;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 52878 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://dailymotion\\.com/video/\\w+" })
+@HostPlugin(revision = "$Revision: 53400 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://dailymotion\\.com/video/\\w+" })
 public class DailyMotionCom extends PluginForHost {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -328,7 +328,7 @@ public class DailyMotionCom extends PluginForHost {
             /* Old/unsupported HTTP URLs. */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        link.setFinalFileName(getFormattedFilename(link));
+        link.setFinalFileName(getFormattedFilename(this, link));
         return AvailableStatus.TRUE;
     }
 
@@ -397,7 +397,7 @@ public class DailyMotionCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         br.getHeaders().put("Accept-Encoding", "identity");
-        link.setFinalFileName(getFormattedFilename(link));
+        link.setFinalFileName(getFormattedFilename(this, link));
         /*
          * They do allow resume and unlimited chunks but resuming or using more than 1 chunk causes problems, the file will then be
          * corrupted!
@@ -585,8 +585,8 @@ public class DailyMotionCom extends PluginForHost {
 
     final static String[][] REPLACES = { { "plain_date", "date", "Date when the video was uploaded" }, { "plain_videoid", "videoid", "ID of the video" }, { "plain_channel", "channelname", "The name of the channel/uploader" }, { "plain_ext", "ext", "Extension of the file (usually .mp4)" }, { "qualityname", "quality", "Quality of the video" }, { "plain_videoname", "videoname", "Name of the video" } };
 
-    public static String getFormattedFilename(final DownloadLink downloadLink) throws ParseException {
-        final SubConfiguration cfg = SubConfiguration.getConfig("dailymotion.com");
+    public static String getFormattedFilename(Plugin plugin, final DownloadLink downloadLink) throws ParseException {
+        final SubConfiguration cfg = plugin.getPluginConfig();
         String formattedFilename = cfg.getStringProperty(CUSTOM_FILENAME, defaultCustomFilename);
         if (!formattedFilename.contains("*videoname") && !formattedFilename.contains("*ext*") && !formattedFilename.contains("*videoid*") && !formattedFilename.contains("*channelname*")) {
             formattedFilename = defaultCustomFilename;

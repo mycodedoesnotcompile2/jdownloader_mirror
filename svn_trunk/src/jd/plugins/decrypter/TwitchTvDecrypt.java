@@ -50,7 +50,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 52202 $", interfaceVersion = 2, names = { "twitch.tv" }, urls = { "https?://((www\\.|[a-z]{2}\\.|secure\\.|m\\.)?(twitchtv\\.com|twitch\\.tv)/(?!directory)(?:[^<>/\"]+/(?:(b|c|v)/\\d+|videos(\\?page=\\d+)?|video/\\d+)|videos/\\d+)|(www\\.|secure\\.)?twitch\\.tv/archive/archive_popout\\?id=\\d+)|https?://(?:www\\.)?twitch\\.tv/[^/]+/clip/[A-Za-z0-9]+|https?://clips\\.twitch\\.tv/(embed\\?clip=)?[A-Za-z0-9]+" })
+@DecrypterPlugin(revision = "$Revision: 53401 $", interfaceVersion = 2, names = { "twitch.tv" }, urls = { "https?://((www\\.|[a-z]{2}\\.|secure\\.|m\\.)?(twitchtv\\.com|twitch\\.tv)/(?!directory)(?:[^<>/\"]+/(?:(b|c|v)/\\d+|videos(\\?page=\\d+)?|video/\\d+)|videos/\\d+)|(www\\.|secure\\.)?twitch\\.tv/archive/archive_popout\\?id=\\d+)|https?://(?:www\\.)?twitch\\.tv/[^/]+/clip/[A-Za-z0-9]+|https?://clips\\.twitch\\.tv/(embed\\?clip=)?[A-Za-z0-9]+" })
 public class TwitchTvDecrypt extends PluginForDecrypt {
     public TwitchTvDecrypt(PluginWrapper wrapper) {
         super(wrapper);
@@ -327,7 +327,7 @@ public class TwitchTvDecrypt extends PluginForDecrypt {
                         dlink.setProperty("channel", Encoding.htmlDecode(channelName.trim()));
                     }
                     dlink.setLinkID("twitch:" + vid + ":" + counter);
-                    final String formattedFilename = jd.plugins.hoster.TwitchTv.getFormattedFilename(dlink);
+                    final String formattedFilename = jd.plugins.hoster.TwitchTv.getFormattedFilename(this, dlink);
                     dlink.setName(formattedFilename);
                     if (cfg.getBooleanProperty(FASTLINKCHECK, false)) {
                         dlink.setAvailable(true);
@@ -603,7 +603,7 @@ public class TwitchTvDecrypt extends PluginForDecrypt {
                     dlink.setProperty("channel", Encoding.htmlDecode(channelName.trim()));
                 }
                 dlink.setProperty("extension", " - Chat History.txt");
-                final String formattedFilename = jd.plugins.hoster.TwitchTv.getFormattedFilename(dlink);
+                final String formattedFilename = jd.plugins.hoster.TwitchTv.getFormattedFilename(this, dlink);
                 dlink.setName(formattedFilename);
                 fp.add(dlink);
                 if (!desiredLinks.isEmpty()) {

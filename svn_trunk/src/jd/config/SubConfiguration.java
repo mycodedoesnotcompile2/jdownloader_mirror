@@ -41,20 +41,20 @@ import org.appwork.utils.IO.SYNC;
  *
  */
 public class SubConfiguration extends Property implements Serializable {
-    private static final long                                   serialVersionUID = 7803718581558607222L;
-    protected final String                                      name;
-    protected final File                                        file;
-    protected final AtomicLong                                  setMark          = new AtomicLong(0);
-    protected final AtomicLong                                  writeMark        = new AtomicLong(0);
-    protected static volatile HashMap<String, SubConfiguration> SUB_CONFIGS      = new HashMap<String, SubConfiguration>();
-    protected static final HashMap<String, AtomicInteger>       LOCKS            = new HashMap<String, AtomicInteger>();
-    protected static final byte[]                               KEY              = new byte[] { 0x01, 0x02, 0x11, 0x01, 0x01, 0x54, 0x01, 0x01, 0x01, 0x01, 0x12, 0x01, 0x01, 0x01, 0x22, 0x01 };
-    protected static final DelayedRunnable                      SAVEDELAYER      = new DelayedRunnable(5000, 30000) {
-                                                                                     @Override
-                                                                                     public void delayedrun() {
-                                                                                         saveAll();
-                                                                                     }
-                                                                                 };
+    private static final long                               serialVersionUID = 7803718581558607222L;
+    protected final String                                  name;
+    protected final File                                    file;
+    protected final AtomicLong                              setMark          = new AtomicLong(0);
+    protected final AtomicLong                              writeMark        = new AtomicLong(0);
+    protected static volatile Map<String, SubConfiguration> SUB_CONFIGS      = new HashMap<String, SubConfiguration>();
+    protected static final HashMap<String, AtomicInteger>   LOCKS            = new HashMap<String, AtomicInteger>();
+    protected static final byte[]                           KEY              = new byte[] { 0x01, 0x02, 0x11, 0x01, 0x01, 0x54, 0x01, 0x01, 0x01, 0x01, 0x12, 0x01, 0x01, 0x01, 0x22, 0x01 };
+    protected static final DelayedRunnable                  SAVEDELAYER      = new DelayedRunnable(5000, 30000) {
+        @Override
+        public void delayedrun() {
+            saveAll();
+        }
+    };
     static {
         ShutdownController.getInstance().addShutdownEvent(new ShutdownEvent() {
             @Override
@@ -75,8 +75,8 @@ public class SubConfiguration extends Property implements Serializable {
     }
 
     private static void saveAll() {
-        HashMap<String, SubConfiguration> localSubConfigs = SUB_CONFIGS;
-        Iterator<Entry<String, SubConfiguration>> it = localSubConfigs.entrySet().iterator();
+        final Map<String, SubConfiguration> localSubConfigs = SUB_CONFIGS;
+        final Iterator<Entry<String, SubConfiguration>> it = localSubConfigs.entrySet().iterator();
         while (it.hasNext()) {
             it.next().getValue().save();
         }
@@ -96,7 +96,7 @@ public class SubConfiguration extends Property implements Serializable {
         if (file.isFile()) {
             /* load existing file */
             try {
-                final Map<String, Object> load = JSonStorage.restoreFrom(this.file, false, KEY, TypeRef.HASHMAP, new HashMap<String, Object>());
+                final Map<String, Object> load = JSonStorage.restoreFrom(this.file, false, KEY, TypeRef.MAP, new HashMap<String, Object>());
                 if (load != null) {
                     load.remove("saveWorkaround");
                     super.setProperties(load);
@@ -206,7 +206,7 @@ public class SubConfiguration extends Property implements Serializable {
                     final SubConfiguration cfg = new SubConfiguration(name);
                     synchronized (LOCKS) {
                         /* global lock to replace the SUB_CONFIGS */
-                        final HashMap<String, SubConfiguration> newSUB_CONFIGS = new HashMap<String, SubConfiguration>(SUB_CONFIGS);
+                        final Map<String, SubConfiguration> newSUB_CONFIGS = new HashMap<String, SubConfiguration>(SUB_CONFIGS);
                         newSUB_CONFIGS.put(name, cfg);
                         SUB_CONFIGS = newSUB_CONFIGS;
                     }

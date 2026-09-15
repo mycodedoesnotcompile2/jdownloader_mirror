@@ -20,21 +20,22 @@ import java.io.IOException;
 import java.text.ParseException;
 import java.util.List;
 
+import jd.PluginWrapper;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.components.DailyMotionVariant;
+
 import org.jdownloader.controlling.ffmpeg.FFMpegProgress;
 import org.jdownloader.controlling.ffmpeg.FFmpeg;
 import org.jdownloader.controlling.linkcrawler.LinkVariant;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.translate._JDT;
 
-import jd.PluginWrapper;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.components.DailyMotionVariant;
-
-@HostPlugin(revision = "$Revision: 47865 $", interfaceVersion = 3, names = { "dailymotion.com" }, urls = { "https?://dailymotion\\.com/video/\\w+" })
+@HostPlugin(revision = "$Revision: 53401 $", interfaceVersion = 3, names = { "dailymotion.com" }, urls = { "https?://dailymotion\\.com/video/\\w+" })
 public class DailyMotionComV2 extends DailyMotionCom {
     public DailyMotionComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -135,7 +136,7 @@ public class DailyMotionComV2 extends DailyMotionCom {
         }
     }
 
-    public static void setActiveVariant(final DownloadLink link, final DailyMotionVariant dmv) {
+    public static void setActiveVariant(Plugin plugin, final DownloadLink link, final DailyMotionVariant dmv) {
         if (dmv == null) {
             return;
         }
@@ -146,7 +147,7 @@ public class DailyMotionComV2 extends DailyMotionCom {
             if (dmv.getConvertTo() != null) {
                 link.setProperty("plain_ext", "." + dmv.getConvertTo());
             }
-            final String formattedFilename = jd.plugins.hoster.DailyMotionCom.getFormattedFilename(link);
+            final String formattedFilename = jd.plugins.hoster.DailyMotionCom.getFormattedFilename(plugin, link);
             link.setFinalFileName(formattedFilename);
             link.setVariant(dmv);
             if (dmv.getConvertTo() != null) {
@@ -162,7 +163,7 @@ public class DailyMotionComV2 extends DailyMotionCom {
     @Override
     public void setActiveVariantByLink(DownloadLink downloadLink, LinkVariant variant) {
         if (variant != null && variant instanceof DailyMotionVariant) {
-            setActiveVariant(downloadLink, (DailyMotionVariant) variant);
+            setActiveVariant(this, downloadLink, (DailyMotionVariant) variant);
         } else if (variant != null) {
             super.setActiveVariantByLink(downloadLink, variant);
         }

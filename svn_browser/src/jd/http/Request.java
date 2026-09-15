@@ -91,6 +91,18 @@ public abstract class Request {
         return this.redirectOrigin;
     }
 
+    public Request getRedirectRoot() {
+        Request root = getRedirectOrigin();
+        while (root != null) {
+            final Request next = root.getRedirectOrigin();
+            if (next == null) {
+                break;
+            }
+            root = next;
+        }
+        return root;
+    }
+
     public void setRedirectOrigin(Request redirectOrigin) {
         if (redirectOrigin != this) {
             this.redirectOrigin = redirectOrigin;

@@ -17,15 +17,10 @@ package jd.plugins.hoster;
 
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
 import jd.config.Property;
-import jd.config.SubConfiguration;
 import jd.http.Browser;
 import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
@@ -44,7 +39,11 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 50777 $", interfaceVersion = 2, names = { "sendspace.com" }, urls = { "https?://(\\w+\\.)?sendspace\\.com/(file|pro/dl)/[0-9a-zA-Z]+" })
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+
+@HostPlugin(revision = "$Revision: 53400 $", interfaceVersion = 2, names = { "sendspace.com" }, urls = { "https?://(\\w+\\.)?sendspace\\.com/(file|pro/dl)/[0-9a-zA-Z]+" })
 public class SendspaceCom extends PluginForHost {
     public SendspaceCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -633,7 +632,7 @@ public class SendspaceCom extends PluginForHost {
         br.getPage(page);
     }
 
-    private static String fixLinkSSL(String link) {
+    private String fixLinkSSL(String link) {
         if (checkSsl()) {
             link = link.replace("http://", "https://");
         } else {
@@ -642,8 +641,8 @@ public class SendspaceCom extends PluginForHost {
         return link;
     }
 
-    private static boolean checkSsl() {
-        return SubConfiguration.getConfig("sendspace.com").getBooleanProperty(SSL_CONNECTION, false);
+    private boolean checkSsl() {
+        return getPluginConfig().getBooleanProperty(SSL_CONNECTION, false);
     }
 
     private void setConfigElements() {

@@ -42,7 +42,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.PluginForDecrypt;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 51747 $", interfaceVersion = 2, names = { "shahid.mbc.net" }, urls = { "https?://(?:www\\.)?(?:shahid\\.mbc\\.net/(?:media/video|ar/episode)/\\d+(/\\w+)?|bluefishtv\\.com/Store/[_a-zA-Z]+/\\d+/.*)" })
+@DecrypterPlugin(revision = "$Revision: 53400 $", interfaceVersion = 2, names = { "shahid.mbc.net", "bluefishtv.com" }, urls = { "https?://(?:www\\.)?shahid\\.mbc\\.net/(?:media/video|ar/episode)/\\d+(/\\w+)?", "https?://(?:www\\.)?bluefishtv\\.com/Store/[_a-zA-Z]+/\\d+/.*" })
 public class ShaHidMbcNetDecrypter extends PluginForDecrypt {
     public static enum Quality {
         ALLOW_HD("3f3f", "720p HD"),
@@ -70,7 +70,6 @@ public class ShaHidMbcNetDecrypter extends PluginForDecrypt {
 
     private String KEY     = "UzJpJCtQWCxYZiEsNXxeOA==";
     private String HASHKEY = "amEtPj5HQmNMa2E5P2hiVA==";
-    private String PROVIDER;
 
     public ShaHidMbcNetDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -89,11 +88,10 @@ public class ShaHidMbcNetDecrypter extends PluginForDecrypt {
             decryptedLinks.add(this.createOfflinelink(parameter));
             return decryptedLinks;
         }
-        PROVIDER = br.getHost().contains("mbc.net") ? "shahid.mbc.net" : "bluefishtv.com";
         FilePackage fp = FilePackage.getInstance();
         String fpName = null;
         final Account aa = AccountController.getInstance().getValidAccount(JDUtilities.getPluginForHost("shahid.mbc.net"));
-        if ("bluefishtv.com".equals(PROVIDER)) {
+        if ("bluefishtv.com".equals(getHost())) {
             if (br.containsHTML(">That product is not available at this time<") || this.br.getHttpConnection().getResponseCode() == 404) {
                 decryptedLinks.add(this.createDownloadlink(parameter));
                 return decryptedLinks;
@@ -128,7 +126,7 @@ public class ShaHidMbcNetDecrypter extends PluginForDecrypt {
         }
         String playerForm = br.getRegex("playerForm=(.*?)\\&").getMatch(0);
         String mediaId = br.getRegex("mediaId=(.*?)\\&").getMatch(0);
-        if ("bluefishtv.com".equals(PROVIDER)) {
+        if ("bluefishtv.com".equals(getHost())) {
             mediaId = br.getRegex("mediaId=([^\"]+)").getMatch(0);
         }
         if (playerForm == null || mediaId == null) {
@@ -141,7 +139,7 @@ public class ShaHidMbcNetDecrypter extends PluginForDecrypt {
         Map<String, String> qStr = new HashMap<String, String>();
         Map<String, String> links = new HashMap<String, String>();
         // processing plugin configuration
-        SubConfiguration cfg = SubConfiguration.getConfig(PROVIDER);
+        SubConfiguration cfg = getPluginConfig();
         Map<String, Object> shProperties = new LinkedHashMap<String, Object>();
         boolean completeSeason = false;
         if (cfg.getProperties() != null) {
@@ -224,11 +222,11 @@ public class ShaHidMbcNetDecrypter extends PluginForDecrypt {
             if (link.getKey() == null) {
                 continue;
             }
-            DownloadLink dl = createDownloadlink(PROVIDER + link.getKey());
+            DownloadLink dl = createDownloadlink(getHost() + link.getKey());
             if (dl.getName() == null) {
                 continue;
             }
-            if ("shahid.mbc.net".equals(PROVIDER)) {
+            if ("shahid.mbc.net".equals(getHost())) {
                 fpName = new Regex(dl.getName(), "(.*?)(_s\\d+|_?\\-?ep_?\\-?\\d+|_\\d+_vod)").getMatch(0);
             }
             fpName = fpName == null ? dl.getName() : fpName;

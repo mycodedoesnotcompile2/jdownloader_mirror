@@ -903,6 +903,9 @@ public interface JdownloaderTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Affected Links: Offline" })
     String GenericDeleteFromDownloadlistAction_getTranslationForDeleteOffline();
 
+    @Default(lngs = { "en" }, values = { "Affected Links: File missing on disk" })
+    String GenericDeleteFromDownloadlistAction_getTranslationForDeleteFileMissing();
+
     @Default(lngs = { "en" }, values = { "Exclude filtered Links" })
     String GenericDeleteFromDownloadlistAction_getTranslationForIgnoreFiltered();
 

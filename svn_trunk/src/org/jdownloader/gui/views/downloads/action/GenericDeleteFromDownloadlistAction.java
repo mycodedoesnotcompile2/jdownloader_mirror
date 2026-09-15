@@ -2,6 +2,7 @@ package org.jdownloader.gui.views.downloads.action;
 
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
+import java.io.File;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,6 +19,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.FilePackageProperty;
 
 import org.appwork.scheduler.DelayedRunnable;
+import org.appwork.utils.StringUtils;
 import org.appwork.swing.exttable.ExtTableEvent;
 import org.appwork.swing.exttable.ExtTableListener;
 import org.appwork.swing.exttable.ExtTableModelEventWrapper;
@@ -41,9 +43,11 @@ import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.
 import org.jdownloader.gui.views.downloads.table.DownloadsTable;
 import org.jdownloader.gui.views.downloads.table.DownloadsTableModel;
 import org.jdownloader.gui.views.linkgrabber.bottombar.IncludedSelectionSetup;
+import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.FinalLinkState;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.DeleteFileOptions;
 import org.jdownloader.translate._JDT;
+import org.jdownloader.utils.FileIoCache;
 
 public class GenericDeleteFromDownloadlistAction extends CustomizableAppAction implements ExtTableListener, ActionContext, DownloadControllerListener, ExtTableModelListener {
     public static final String                     DELETE_ALL                = "deleteAll";
@@ -51,6 +55,7 @@ public class GenericDeleteFromDownloadlistAction extends CustomizableAppAction i
     public static final String                     DELETE_FAILED             = "deleteFailed";
     public static final String                     DELETE_FINISHED           = "deleteFinished";
     public static final String                     DELETE_OFFLINE            = "deleteOffline";
+    public static final String                     DELETE_FILE_MISSING       = "deleteFileMissing";
     public static final String                     DELETE_MODE               = "deleteMode";
     /**
      *
@@ -62,6 +67,7 @@ public class GenericDeleteFromDownloadlistAction extends CustomizableAppAction i
     private boolean                                deleteFailed              = false;
     private boolean                                deleteFinished            = false;
     private boolean                                deleteOffline             = false;
+    private boolean                                deleteFileMissing         = false;
     private boolean                                ignoreFiltered            = true;
     protected volatile WeakReference<DownloadLink> lastLink                  = new WeakReference<DownloadLink>(null);
     private Modifier                               deleteFilesToggleModifier = null;
@@ -104,6 +110,8 @@ public class GenericDeleteFromDownloadlistAction extends CustomizableAppAction i
             case REMOVE_LINKS_AND_DELETE_FILES:
             case REMOVE_LINKS_AND_RECYCLE_FILES:
                 return DeleteFileOptions.REMOVE_LINKS_ONLY;
+            default:
+                return deleteMode;
             }
         }
         return deleteMode;
@@ -202,20 +210,25 @@ public class GenericDeleteFromDownloadlistAction extends CustomizableAppAction i
             public void onSelectionInfo(SelectionInfo<FilePackage, DownloadLink> selectionInfo) {
                 final List<DownloadLink> nodesToDelete = new ArrayList<DownloadLink>();
                 boolean createNewSelectionInfo = false;
+                /* Shared across the whole scan to minimize File.exists() calls for the "file missing on disk" criterion. */
+                final FileIoCache ioCache = new FileIoCache();
                 switch (selectionType) {
                 case NONE:
                     return;
                 case UNSELECTED:
                     createNewSelectionInfo = true;
-                    for (final DownloadLink child : selectionInfo.getUnselectedChildren()) {
-                        if (checkLink(child)) {
-                            nodesToDelete.add(child);
+                    final List<DownloadLink> unselectedChildren = selectionInfo.getUnselectedChildren();
+                    if (unselectedChildren != null) {
+                        for (final DownloadLink child : unselectedChildren) {
+                            if (checkLink(child, ioCache)) {
+                                nodesToDelete.add(child);
+                            }
                         }
                     }
                     break;
                 default:
                     for (final DownloadLink dl : selectionInfo.getChildren()) {
-                        if (checkLink(dl)) {
+                        if (checkLink(dl, ioCache)) {
                             nodesToDelete.add(dl);
                         } else {
                             createNewSelectionInfo = true;
@@ -259,6 +272,30 @@ public class GenericDeleteFromDownloadlistAction extends CustomizableAppAction i
     }
 
     public boolean checkLink(DownloadLink link) {
+        return checkLink(link, null);
+    }
+
+    /**
+     * Returns true if the given link matches at least one of the enabled deletion criteria.
+     *
+     * @param ioCache
+     *            optional cache for the {@link #isDeleteFileMissing()} criterion to minimize {@link File#exists()} calls across a whole
+     *            scan; may be null, in which case each existence check hits the file system directly.
+     */
+    public boolean checkLink(final DownloadLink link, final FileIoCache ioCache) {
+        if (checkLinkCheapCriteria(link)) {
+            return true;
+        } else if (isDeleteFileMissing() && isFileMissing(link, ioCache)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Evaluates all deletion criteria that can be answered from the link's in-memory state alone, i.e. without any disk IO.
+     */
+    private boolean checkLinkCheapCriteria(final DownloadLink link) {
         if (isDeleteAll()) {
             return true;
         } else if (isDeleteDisabled() && !link.isEnabled()) {
@@ -270,6 +307,52 @@ public class GenericDeleteFromDownloadlistAction extends CustomizableAppAction i
         } else if (isDeleteFinishedPackage() && link.getFilePackage().getView().isFinished()) {
             return true;
         } else if (isDeleteOffline() && (FinalLinkState.OFFLINE.equals(link.getFinalLinkState()) || AvailableStatus.FALSE.equals(link.getAvailableStatus()))) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Returns true if the link has a known output path whose file does not exist on disk. Links without a known output path are skipped
+     * (treated as not matching), so a link is never deleted just because its target path could not be determined.
+     *
+     * @param ioCache
+     *            optional existence cache; when null the check hits the file system directly.
+     */
+    private boolean isFileMissing(final DownloadLink link, final FileIoCache ioCache) {
+        try {
+            final String fileOutput = link.getFileOutput();
+            if (StringUtils.isEmpty(fileOutput)) {
+                return false;
+            }
+            final File file = new File(fileOutput);
+            if (ioCache != null) {
+                return !ioCache.exists(file);
+            } else {
+                return !file.exists();
+            }
+        } catch (final Throwable e) {
+            /*
+             * getFileOutput() can throw (e.g. a WTFException for a link whose package is no longer valid, which may happen when the link
+             * is removed concurrently). Treat such a link as not matching so a single problematic link does not abort the whole
+             * deletion.
+             */
+            LogController.CL(GenericDeleteFromDownloadlistAction.class).log(e);
+            return false;
+        }
+    }
+
+    /**
+     * Enable-state variant of {@link #checkLink(DownloadLink, FileIoCache)} used to decide whether the menu item is shown/enabled. It
+     * must never touch the file system in any way. The {@link #isDeleteFileMissing()} criterion is therefore evaluated purely
+     * optimistically: every link is treated as a possible candidate, without even resolving its output path. The real existence check
+     * (and the skipping of links without a known output path) happens later in {@link #actionPerformed(ActionEvent)}.
+     */
+    protected boolean checkLinkForEnabledState(final DownloadLink link) {
+        if (checkLinkCheapCriteria(link)) {
+            return true;
+        } else if (isDeleteFileMissing()) {
             return true;
         } else {
             return false;
@@ -345,6 +428,15 @@ public class GenericDeleteFromDownloadlistAction extends CustomizableAppAction i
                 first = false;
                 appendMissingSpace(sb);
                 sb.append(_GUI.T.lit_offline().trim());
+            }
+            if (isDeleteFileMissing()) {
+                if (!first) {
+                    appendMissingSpace(sb);
+                    sb.append("&");
+                }
+                first = false;
+                appendMissingSpace(sb);
+                sb.append(_GUI.T.lit_file_missing().trim());
             }
         }
         switch (getDeleteMode()) {
@@ -428,6 +520,15 @@ public class GenericDeleteFromDownloadlistAction extends CustomizableAppAction i
     @Customizer(link = "#getTranslationForDeleteOffline")
     public boolean isDeleteOffline() {
         return deleteOffline;
+    }
+
+    public static String getTranslationForDeleteFileMissing() {
+        return _JDT.T.GenericDeleteFromDownloadlistAction_getTranslationForDeleteFileMissing();
+    }
+
+    @Customizer(link = "#getTranslationForDeleteFileMissing")
+    public boolean isDeleteFileMissing() {
+        return deleteFileMissing;
     }
 
     @Override
@@ -523,6 +624,10 @@ public class GenericDeleteFromDownloadlistAction extends CustomizableAppAction i
         GenericDeleteFromDownloadlistAction.this.deleteOffline = deleteOffline;
     }
 
+    public void setDeleteFileMissing(final boolean deleteFileMissing) {
+        GenericDeleteFromDownloadlistAction.this.deleteFileMissing = deleteFileMissing;
+    }
+
     public void setIgnoreFiltered(final boolean ignoreFiltered) {
         GenericDeleteFromDownloadlistAction.this.ignoreFiltered = ignoreFiltered;
     }
@@ -557,14 +662,14 @@ public class GenericDeleteFromDownloadlistAction extends CustomizableAppAction i
         case UNSELECTED:
             final DownloadLink lastDownloadLink = lastLink.get();
             if (lastDownloadLink != null && !selectionInfo.contains(lastDownloadLink)) {
-                if (checkLink(lastDownloadLink)) {
+                if (checkLinkForEnabledState(lastDownloadLink)) {
                     setEnabled(true);
                     return;
                 }
             }
             if (selectionInfo.getUnselectedChildren() != null) {
                 for (final DownloadLink child : selectionInfo.getUnselectedChildren()) {
-                    if (checkLink(child)) {
+                    if (checkLinkForEnabledState(child)) {
                         setEnabled(true);
                         lastLink = new WeakReference<DownloadLink>(child);
                         return;
@@ -580,13 +685,13 @@ public class GenericDeleteFromDownloadlistAction extends CustomizableAppAction i
         } else {
             final DownloadLink lastDownloadLink = lastLink.get();
             if (lastDownloadLink != null && !selectionInfo.contains(lastDownloadLink)) {
-                if (checkLink(lastDownloadLink)) {
+                if (checkLinkForEnabledState(lastDownloadLink)) {
                     setEnabled(true);
                     return;
                 }
             }
             for (final DownloadLink child : selectionInfo.getChildren()) {
-                if (checkLink(child)) {
+                if (checkLinkForEnabledState(child)) {
                     lastLink = new WeakReference<DownloadLink>(child);
                     setEnabled(true);
                     return;

@@ -24,10 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -48,7 +44,11 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.VscoCo;
 
-@DecrypterPlugin(revision = "$Revision: 51420 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 53400 $", interfaceVersion = 3, names = {}, urls = {})
 public class VscoCoCrawler extends PluginForDecrypt {
     public VscoCoCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -227,7 +227,7 @@ public class VscoCoCrawler extends PluginForDecrypt {
                         /* Set some Packagizer properties */
                         link.setProperty(PROPERTY_DATE, sd.format(new Date(((Number) media.get("upload_date")).longValue())));
                         link.setProperty(PROPERTY_DATE_CAPTURED, sd.format(new Date(((Number) media.get("capture_date_ms")).longValue())));
-                        if (filenameFromURL != null && VscoCo.isPreferOriginalFilenames()) {
+                        if (filenameFromURL != null && VscoCo.isPreferOriginalFilenames(this)) {
                             link.setName(filenameFromURL);
                         } else {
                             link.setFinalFileName(filename);
@@ -318,7 +318,7 @@ public class VscoCoCrawler extends PluginForDecrypt {
             if (captureDateMs != null) {
                 link.setProperty(PROPERTY_DATE_CAPTURED, sd.format(new Date(captureDateMs.longValue())));
             }
-            if (filenameFromURL != null && VscoCo.isPreferOriginalFilenames()) {
+            if (filenameFromURL != null && VscoCo.isPreferOriginalFilenames(this)) {
                 link.setName(filenameFromURL);
             } else {
                 link.setFinalFileName(filename);

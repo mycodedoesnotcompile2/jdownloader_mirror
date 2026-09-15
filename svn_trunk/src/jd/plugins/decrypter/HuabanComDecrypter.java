@@ -20,11 +20,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
-import jd.config.SubConfiguration;
 import jd.controlling.ProgressController;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -36,7 +32,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48990 $", interfaceVersion = 3, names = { "huaban.com" }, urls = { "https?://(?:www\\.)?huaban\\.com/boards/\\d+" })
+import org.appwork.storage.TypeRef;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 53400 $", interfaceVersion = 3, names = { "huaban.com" }, urls = { "https?://(?:www\\.)?huaban\\.com/boards/\\d+" })
 public class HuabanComDecrypter extends PluginForDecrypt {
     public HuabanComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -51,7 +50,7 @@ public class HuabanComDecrypter extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         parameter = param.getCryptedUrl();
         final String boardid = new Regex(parameter, "(\\d+)").getMatch(0);
-        enable_description_inside_filenames = SubConfiguration.getConfig("huaban.com").getBooleanProperty(jd.plugins.hoster.HuabanCom.ENABLE_DESCRIPTION_IN_FILENAMES, enable_description_inside_filenames);
+        enable_description_inside_filenames = getPluginConfig().getBooleanProperty(jd.plugins.hoster.HuabanCom.ENABLE_DESCRIPTION_IN_FILENAMES, enable_description_inside_filenames);
         br.setFollowRedirects(true);
         /* Sometimes html can be very big */
         br.setLoadLimit(br.getLoadLimit() * 4);

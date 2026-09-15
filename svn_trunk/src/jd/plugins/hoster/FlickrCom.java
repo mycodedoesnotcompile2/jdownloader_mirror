@@ -66,7 +66,7 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 52372 $", interfaceVersion = 2, names = { "flickr.com" }, urls = { "https?://(?:www\\.)?flickr\\.com/photos/([^/]+)/(\\d+)(?:/in/album-\\d+|/in/gallery-\\d+@N\\d+-\\d+)?" })
+@HostPlugin(revision = "$Revision: 53400 $", interfaceVersion = 2, names = { "flickr.com" }, urls = { "https?://(?:www\\.)?flickr\\.com/photos/([^/]+)/(\\d+)(?:/in/album-\\d+|/in/gallery-\\d+@N\\d+-\\d+)?" })
 public class FlickrCom extends PluginForHost {
     public FlickrCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -293,7 +293,7 @@ public class FlickrCom extends PluginForHost {
         } else {
             directurl = getStoredDirecturl(link);
         }
-        setFilename(link);
+        setFilename(this, link);
         if (!StringUtils.isEmpty(directurl) && !isDownload && link.getVerifiedFileSize() <= 0) {
             checkDirecturl(link, directurl);
         }
@@ -301,7 +301,7 @@ public class FlickrCom extends PluginForHost {
     }
 
     /** Sets filename according to user preferences. */
-    public static void setFilename(final DownloadLink link) throws ParseException {
+    public static void setFilename(Plugin plugin, final DownloadLink link) throws ParseException {
         if (userPrefersServerFilenames() && !isVideo(link)) {
             final String directurl = getStoredDirecturl(link);
             final String filenameURL = Plugin.extractFileNameFromURL(directurl);
@@ -310,7 +310,7 @@ public class FlickrCom extends PluginForHost {
                 return;
             }
         }
-        link.setFinalFileName(getFormattedFilename(link));
+        link.setFinalFileName(getFormattedFilename(plugin, link));
     }
 
     /** Checks single video/photo via website and sets required DownloadLink properties. */
@@ -1053,9 +1053,9 @@ public class FlickrCom extends PluginForHost {
 
     /** Returns formatted filename according to user preferences. */
     @SuppressWarnings("deprecation")
-    public static String getFormattedFilename(final DownloadLink link) throws ParseException {
-        final SubConfiguration cfg = SubConfiguration.getConfig("flickr.com");
-        final String customStringForEmptyTags = getCustomStringForEmptyTags();
+    public static String getFormattedFilename(Plugin plugin, final DownloadLink link) throws ParseException {
+        final SubConfiguration cfg = plugin.getPluginConfig();
+        final String customStringForEmptyTags = getCustomStringForEmptyTags(plugin);
         final String userDefinedDateFormat = cfg.getStringProperty(CUSTOM_DATE, defaultCustomDate);
         final String formattedDate = formatToUserDefinedDate(link.getLongProperty(PROPERTY_DATE, 0), userDefinedDateFormat, customStringForEmptyTags);
         final String formattedDateTaken = formatToUserDefinedDate(link.getLongProperty(PROPERTY_DATE_TAKEN, 0), userDefinedDateFormat, customStringForEmptyTags);
@@ -1346,8 +1346,8 @@ public class FlickrCom extends PluginForHost {
         return ret;
     }
 
-    public static String getCustomStringForEmptyTags() {
-        final SubConfiguration cfg = SubConfiguration.getConfig("flickr.com");
+    public static String getCustomStringForEmptyTags(Plugin plugin) {
+        final SubConfiguration cfg = plugin.getPluginConfig();
         String emptytag = cfg.getStringProperty(CUSTOM_EMPTY_TAG_STRING, defaultCustomStringForEmptyTags);
         if (emptytag.equals("")) {
             emptytag = defaultCustomStringForEmptyTags;

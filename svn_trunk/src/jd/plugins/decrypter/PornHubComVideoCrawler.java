@@ -27,15 +27,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
@@ -60,7 +51,16 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.PornHubCom;
 
-@DecrypterPlugin(revision = "$Revision: 53356 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 53401 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornHubComVideoCrawler extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public PornHubComVideoCrawler(PluginWrapper wrapper) {
@@ -152,15 +152,15 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
     private PornHubCom hostplugin = null;
 
     private String getCorrectedContentURL(final String url) throws MalformedURLException {
-        final String preferredSubdomain = PornHubCom.getPreferredSubdomain(url);
-        return url.replaceFirst("(?i)^https?://[^/]+/", "https://" + preferredSubdomain + PornHubCom.getConfiguredDomainURL(this.getHost(), Browser.getHost(url)) + "/");
+        final String preferredSubdomain = PornHubCom.getPreferredSubdomain(this, url);
+        return url.replaceFirst("(?i)^https?://[^/]+/", "https://" + preferredSubdomain + PornHubCom.getConfiguredDomainURL(this, Browser.getHost(url)) + "/");
     }
 
     @SuppressWarnings({ "deprecation" })
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final String contenturl = getCorrectedContentURL(param.getCryptedUrl());
         br.setFollowRedirects(true);
-        PornHubCom.prepBr(br);
+        PornHubCom.prepBr(this, br);
         final Account account = AccountController.getInstance().getValidAccount(getHost());
         ensureInitHosterplugin();
         if (account != null) {
@@ -240,7 +240,7 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
     }
 
     private ArrayList<DownloadLink> crawlModelOrPornstar(final Browser br, final CryptedLink param, final Account account) throws Exception {
-        final SubConfiguration cfg = SubConfiguration.getConfig(this.getHost());
+        final SubConfiguration cfg = getPluginConfig();
         final int resultLimit = cfg.getIntegerProperty(PornHubCom.SETTING_CHANNEL_CRAWLER_LIMIT, PornHubCom.default_SETTING_CHANNEL_CRAWLER_LIMIT);
         if (resultLimit == 0) {
             logger.info("User disabled channel crawler -> Returning empty array");
@@ -289,7 +289,7 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
     /** Handles pornhub.com/bla/(model|pornstar)/bla */
     private ArrayList<DownloadLink> crawlAllVideosOf(final Browser br, final Account account, final Set<String> dupes) throws Exception {
         this.hostplugin.checkErrors(br, null, account);
-        final SubConfiguration cfg = SubConfiguration.getConfig(this.getHost());
+        final SubConfiguration cfg = getPluginConfig();
         final int resultLimit = cfg.getIntegerProperty(PornHubCom.SETTING_CHANNEL_CRAWLER_LIMIT, PornHubCom.default_SETTING_CHANNEL_CRAWLER_LIMIT);
         final Set<String> pages = new HashSet<String>();
         int page = 0;
@@ -426,7 +426,7 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
         /* 2021-08-24: At this moment we never try to find the real/"nice" username - we always use the one that's in our URL. */
         // String username = null;
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final SubConfiguration cfg = SubConfiguration.getConfig(this.getHost());
+        final SubConfiguration cfg = getPluginConfig();
         final int resultLimit = cfg.getIntegerProperty(PornHubCom.SETTING_CHANNEL_CRAWLER_LIMIT, PornHubCom.default_SETTING_CHANNEL_CRAWLER_LIMIT);
         if (resultLimit == 0) {
             logger.info("User disabled channel crawler -> Returning empty array");
@@ -481,8 +481,8 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
         final String seeAllURL = br.getRegex("(" + Pattern.quote(br._getURL().getPath()) + "/[^\"]+)\" class=\"seeAllButton greyButton float-right\">").getMatch(0);
         if (seeAllURL != null) {
             /**
-             * E.g. users/bla/videos --> /users/bla/videos/favorites </br>
-             * Without this we might only see some of all items and no pagination which is needed to be able to find all items.
+             * E.g. users/bla/videos --> /users/bla/videos/favorites </br> Without this we might only see some of all items and no
+             * pagination which is needed to be able to find all items.
              */
             logger.info("Found seeAllURL: " + seeAllURL);
             PornHubCom.getPage(br, seeAllURL);
@@ -648,7 +648,7 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
 
     private ArrayList<DownloadLink> crawlAllGifsOfAUser(final CryptedLink param, final Account account) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final boolean webm = SubConfiguration.getConfig(this.getHost()).getBooleanProperty(PornHubCom.GIFS_WEBM, PornHubCom.default_GIFS_WEBM);
+        final boolean webm = getPluginConfig().getBooleanProperty(PornHubCom.GIFS_WEBM, PornHubCom.default_GIFS_WEBM);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -863,7 +863,7 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
             break;
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final SubConfiguration cfg = SubConfiguration.getConfig(this.getHost());
+        final SubConfiguration cfg = getPluginConfig();
         final boolean bestonly = cfg.getBooleanProperty(PornHubCom.BEST_ONLY, false);
         final boolean bestselectiononly = cfg.getBooleanProperty(PornHubCom.BEST_SELECTION_ONLY, false);
         final boolean fastlinkcheck = cfg.getBooleanProperty(PornHubCom.FAST_LINKCHECK, PornHubCom.default_FAST_LINKCHECK);

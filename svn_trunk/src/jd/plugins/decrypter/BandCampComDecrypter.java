@@ -25,14 +25,6 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.ProgressController;
@@ -46,13 +38,22 @@ import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.BandCampCom;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 50407 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 53401 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { BandCampCom.class })
 public class BandCampComDecrypter extends PluginForDecrypt {
     public BandCampComDecrypter(PluginWrapper wrapper) {
@@ -232,7 +233,7 @@ public class BandCampComDecrypter extends PluginForDecrypt {
         }
         /* Add cover art if user wants it. */
         final String imageID = show.get("show_v2_image_id").toString();
-        final SubConfiguration cfg = SubConfiguration.getConfig(this.getHost());
+        final SubConfiguration cfg = getPluginConfig();
         final boolean grabCoverArt = cfg.getBooleanProperty(BandCampCom.SETTING_GRAB_COVER_ART, BandCampCom.defaultGRAB_COVER_ART);
         if (grabCoverArt) {
             final String coverArtURL = "https://f4.bcbits.com/img/" + imageID + "_0";
@@ -246,13 +247,13 @@ public class BandCampComDecrypter extends PluginForDecrypt {
         /* Add additional properties and set filename. */
         for (final DownloadLink result : ret) {
             result.setProperty(BandCampCom.PROPERTY_SHOW_NUMBEROF_TRACKS, audiotracks.size());
-            final String formattedFilename = BandCampCom.getFormattedFilename(result);
+            final String formattedFilename = BandCampCom.getFormattedFilename(this, result);
             result.setFinalFileName(formattedFilename);
             result.setAvailable(true);
         }
         /* Set FilePackage with package name. */
         final FilePackage fp = FilePackage.getInstance();
-        final String userDefinedPackagename = getFormattedPackagename(ret.get(0), cfg);
+        final String userDefinedPackagename = getFormattedPackagename(this, ret.get(0), cfg);
         if (!StringUtils.isEmpty(userDefinedPackagename)) {
             fp.setName(userDefinedPackagename);
         } else {
@@ -350,8 +351,8 @@ public class BandCampComDecrypter extends PluginForDecrypt {
             dateTimestamp = dateToTimestamp(dateStr);
         }
         /**
-         * Not all albums have playable audio tracks so for some, all we can crawl is the album cover art. </br>
-         * Example-album without any streamable tracks: https://midsummerex.bandcamp.com/album/intl
+         * Not all albums have playable audio tracks so for some, all we can crawl is the album cover art. </br> Example-album without any
+         * streamable tracks: https://midsummerex.bandcamp.com/album/intl
          */
         boolean isSingleTrack = new Regex(br.getURL(), BandCampCom.PATTERN_SINGLE_TRACK).patternFind();
         final List<Map<String, Object>> albumtracks = (List<Map<String, Object>>) JavaScriptEngineFactory.jsonToJavaObject(json);
@@ -456,7 +457,7 @@ public class BandCampComDecrypter extends PluginForDecrypt {
         }
         // final String json_band = br.getRegex("data-band=\"(\\{[^\"]+)").getMatch(0);
         /* Single song or album cover art. Crawl it if user wants it or if no audio/video items were found. */
-        final SubConfiguration cfg = SubConfiguration.getConfig(this.getHost());
+        final SubConfiguration cfg = getPluginConfig();
         if (cfg.getBooleanProperty(BandCampCom.SETTING_GRAB_COVER_ART, BandCampCom.defaultGRAB_COVER_ART) || ret.isEmpty()) {
             /* TODO: Check filenames */
             String coverArtURL = br.getRegex("(?i)<a class=\"popupImage\" href=\"(https?://[^<>\"]*?\\.jpg)\"").getMatch(0);
@@ -492,14 +493,14 @@ public class BandCampComDecrypter extends PluginForDecrypt {
             if (albumTitle != null) {
                 result.setProperty(BandCampCom.PROPERTY_ALBUM_TITLE, albumTitle);
             }
-            final String formattedFilename = BandCampCom.getFormattedFilename(result);
+            final String formattedFilename = BandCampCom.getFormattedFilename(this, result);
             result.setFinalFileName(formattedFilename);
             if (isSingleTrack || cfg.getBooleanProperty(BandCampCom.SETTING_ENABLE_FAST_LINKCHECK_ALBUM, BandCampCom.defaultEnableFastLinkcheckAlbum)) {
                 result.setAvailable(true);
             }
         }
         final FilePackage fp = FilePackage.getInstance();
-        final String formattedpackagename = getFormattedPackagename(ret.get(0), cfg);
+        final String formattedpackagename = getFormattedPackagename(this, ret.get(0), cfg);
         if (!cfg.getBooleanProperty(BandCampCom.CLEANPACKAGENAME, BandCampCom.defaultCLEANPACKAGENAME)) {
             fp.setCleanupPackageName(false);
         } else {
@@ -546,13 +547,13 @@ public class BandCampComDecrypter extends PluginForDecrypt {
         return TimeFormatter.getMilliSeconds(dateStr, "dd MMM yyyy HH:mm:ss ZZZ", Locale.ENGLISH);
     }
 
-    public static String getFormattedPackagename(final DownloadLink link, final SubConfiguration cfg) throws ParseException {
+    public static String getFormattedPackagename(Plugin plugin, final DownloadLink link, final SubConfiguration cfg) throws ParseException {
         String formatString = cfg.getStringProperty(BandCampCom.CUSTOM_PACKAGENAME, BandCampCom.defaultCustomPackagename);
         if (StringUtils.isEmpty(formatString)) {
             formatString = BandCampCom.defaultCustomPackagename;
         }
         /* Insert album title at the end to prevent errors with tags */
-        String formattedpackagename = BandCampCom.getFormattedBaseString(link, formatString);
+        String formattedpackagename = BandCampCom.getFormattedBaseString(plugin, link, formatString);
         if (cfg.getBooleanProperty(BandCampCom.PACKAGENAMELOWERCASE, BandCampCom.defaultPACKAGENAMELOWERCASE)) {
             formattedpackagename = formattedpackagename.toLowerCase(Locale.ENGLISH);
         }

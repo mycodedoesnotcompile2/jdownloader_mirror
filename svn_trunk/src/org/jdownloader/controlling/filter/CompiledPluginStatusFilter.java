@@ -65,7 +65,7 @@ public class CompiledPluginStatusFilter extends PluginStatusFilter implements St
      * Verify if there is at least one premium account valid
      *
      * @param link
-     *            Link that we want to werify
+     *            Link that we want to verify
      * @return true if a premium account is associated, false otherwise.
      */
     private boolean VerifyPremium(CrawledLink link) {

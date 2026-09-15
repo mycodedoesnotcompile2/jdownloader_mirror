@@ -68,7 +68,7 @@ import org.jdownloader.plugins.components.containers.VimeoContainer.Quality;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53401 $", interfaceVersion = 3, names = {}, urls = {})
 public class VimeoComDecrypter extends PluginForDecrypt {
     private final String type_player_private_external_direct = "(?i)https?://player\\.vimeo.com/external/\\d+\\.(source|hd|sd)\\.(mp4|mov|wmv|avi|flv).+";
     private final String type_player_private_play_direct     = "(?i)https?://player\\.vimeo.com/play/\\d+.+";
@@ -198,7 +198,7 @@ public class VimeoComDecrypter extends PluginForDecrypt {
     }
 
     private boolean retryWithCustomReferer(VIMEO_URL_TYPE urlType, final CryptedLink param, final Exception e, final Browser br, final AtomicReference<String> referer) throws Exception {
-        if (isEmbeddedForbidden(urlType, e, br) && SubConfiguration.getConfig("vimeo.com").getBooleanProperty("ASK_REF", Boolean.TRUE)) {
+        if (isEmbeddedForbidden(urlType, e, br) && getPluginConfig().getBooleanProperty("ASK_REF", Boolean.TRUE)) {
             final String vimeo_asked_referer = getUserInput("Referer?", "Please enter referer for this link", param);
             if (StringUtils.isNotEmpty(vimeo_asked_referer)) {
                 try {
@@ -339,7 +339,7 @@ public class VimeoComDecrypter extends PluginForDecrypt {
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final SubConfiguration cfg = SubConfiguration.getConfig("vimeo.com");
+        final SubConfiguration cfg = getPluginConfig();
         final boolean alwaysLogin = cfg.getBooleanProperty(VimeoCom.ALWAYS_LOGIN, false);
         init(cfg);
         int skippedLinks = 0;
@@ -1230,7 +1230,7 @@ public class VimeoComDecrypter extends PluginForDecrypt {
     }
 
     private String getFormattedFilename(DownloadLink link) throws Exception {
-        return jd.plugins.hoster.VimeoCom.getFormattedFilename(link);
+        return jd.plugins.hoster.VimeoCom.getFormattedFilename(this, link);
     }
 
     private String handlePW(final CryptedLink param, final Browser br) throws Exception {

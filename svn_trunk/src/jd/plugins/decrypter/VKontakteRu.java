@@ -72,7 +72,7 @@ import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 53392 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53401 $", interfaceVersion = 2, names = {}, urls = {})
 public class VKontakteRu extends PluginForDecrypt {
     public VKontakteRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -81,7 +81,7 @@ public class VKontakteRu extends PluginForDecrypt {
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
-        VKontakteRuHoster.prepBrowser(br);
+        VKontakteRuHoster.prepBrowser(this, br);
         return br;
     }
 
@@ -253,7 +253,7 @@ public class VKontakteRu extends PluginForDecrypt {
         }
         br.setFollowRedirects(true);
         /* Set settings */
-        cfg = SubConfiguration.getConfig(getHost());
+        cfg = getPluginConfig();
         fastcheck_photo = cfg.getBooleanProperty(VKontakteRuHoster.FASTLINKCHECK_PICTURES, VKontakteRuHoster.default_FASTLINKCHECK_PICTURES);
         fastcheck_audio = cfg.getBooleanProperty(VKontakteRuHoster.FASTLINKCHECK_AUDIO, VKontakteRuHoster.default_FASTLINKCHECK_AUDIO);
         vkwall_grabalbums = cfg.getBooleanProperty(VKontakteRuHoster.VKWALL_GRAB_ALBUMS, VKontakteRuHoster.default_VKWALL_GRAB_ALBUMS);
@@ -394,18 +394,16 @@ public class VKontakteRu extends PluginForDecrypt {
 
     public QualitySelectionMode getQualitySelectionMode() {
         if (mode != null) {
-            return mode;
-        } else {
-            return VKontakteRuHoster.getSelectedVideoQualitySelectionMode();
+
         }
+        return VKontakteRuHoster.getSelectedVideoQualitySelectionMode(this);
     }
 
     public Boolean getPreferHLS() {
         if (this.preferHLS != null) {
             return this.preferHLS;
-        } else {
-            return VKontakteRuHoster.getConfigPreferHLS();
         }
+        return VKontakteRuHoster.getConfigPreferHLS(this);
     }
 
     private String preferredQualityString = null;
@@ -413,9 +411,8 @@ public class VKontakteRu extends PluginForDecrypt {
     public String getPreferredQualityString() {
         if (preferredQualityString != null) {
             return preferredQualityString;
-        } else {
-            return VKontakteRuHoster.getPreferredQualityString();
         }
+        return VKontakteRuHoster.getPreferredQualityString(this);
     }
 
     public void setPreferredQualityString(String preferredQualityString) {
@@ -551,14 +548,23 @@ public class VKontakteRu extends PluginForDecrypt {
                 return embedResults;
             }
         }
-        final Map<String, Object> video = findVideoMap(this.br, id);
-        if (video == null) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, this.getMessageBodyText(br));
-        }
-        final String embedHash = (String) video.get("embed_hash");
-        if (embedHash == null) {
-            logger.info("Video seems to be offline");
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        final Map<String, Object> video;
+        final String embedHash;
+        try {
+            video = findVideoMap(this.br, id);
+            if (video == null) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, this.getMessageBodyText(br));
+            }
+            embedHash = (String) video.get("embed_hash");
+            if (embedHash == null) {
+                logger.info("Video seems to be offline");
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+        } catch (PluginException e) {
+            if (e.getLinkStatus() == LinkStatus.ERROR_FILE_NOT_FOUND && br.containsHTML("\"is_restricted\"\\s*:\\s*true")) {
+                throw new DecrypterRetryException(RetryReason.NO_ACCOUNT, null, null, e);
+            }
+            throw e;
         }
         String author = (String) video.get("md_author");
         if (!StringUtils.isEmpty(author)) {

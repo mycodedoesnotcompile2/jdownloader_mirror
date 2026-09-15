@@ -20,8 +20,6 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -42,7 +40,9 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.PornHubCom;
 
-@DecrypterPlugin(revision = "$Revision: 51130 $", interfaceVersion = 2, names = { "pornhub.com" }, urls = { "https?://(?:www\\.|[a-z]{2}\\.)?pornhub(?:premium)?\\.com/album/\\d+" })
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 53401 $", interfaceVersion = 2, names = { "pornhub.com" }, urls = { "https?://(?:www\\.|[a-z]{2}\\.)?pornhub(?:premium)?\\.com/album/\\d+" })
 public class PornHubComGallery extends PluginForDecrypt {
     public PornHubComGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -54,7 +54,7 @@ public class PornHubComGallery extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final String preferredSubdomain = PornHubCom.getPreferredSubdomain(param.getCryptedUrl());
+        final String preferredSubdomain = PornHubCom.getPreferredSubdomain(this, param.getCryptedUrl());
         String contenturl = param.getCryptedUrl();
         /* Replace existing subdomain with preferred subdomain. */
         contenturl = contenturl.replaceAll("^http://(www\\.)?([a-z]{2}\\.)?", "https://" + preferredSubdomain);
@@ -68,20 +68,20 @@ public class PornHubComGallery extends PluginForDecrypt {
         if (account != null && AccountType.PREMIUM.equals(account.getType())) {
             /* Premium account available --> Use premium domain */
             if (PornHubCom.isPremiumDomain(domainFromURL)) {
-                contenturl = contenturl.replaceFirst(Pattern.quote(domainFromURL), PornHubCom.getConfiguredDomainURL(this.getHost(), domainFromURL));
+                contenturl = contenturl.replaceFirst(Pattern.quote(domainFromURL), PornHubCom.getConfiguredDomainURL(this, domainFromURL));
             } else {
-                contenturl = contenturl.replaceFirst(Pattern.quote(domainFromURL), PornHubCom.getConfiguredDomainURL(this.getHost(), PornHubCom.getPrimaryPremiumDomain()));
+                contenturl = contenturl.replaceFirst(Pattern.quote(domainFromURL), PornHubCom.getConfiguredDomainURL(this, PornHubCom.getPrimaryPremiumDomain()));
             }
         } else {
             /* No account or free account --> User free domain */
             if (PornHubCom.isPremiumDomain(domainFromURL)) {
-                contenturl = contenturl.replaceFirst(Pattern.quote(domainFromURL), PornHubCom.getConfiguredDomainURL(this.getHost(), PornHubCom.getPrimaryFreeDomain()));
+                contenturl = contenturl.replaceFirst(Pattern.quote(domainFromURL), PornHubCom.getConfiguredDomainURL(this, PornHubCom.getPrimaryFreeDomain()));
             } else {
-                contenturl = contenturl.replaceFirst(Pattern.quote(domainFromURL), PornHubCom.getConfiguredDomainURL(this.getHost(), domainFromURL));
+                contenturl = contenturl.replaceFirst(Pattern.quote(domainFromURL), PornHubCom.getConfiguredDomainURL(this, domainFromURL));
             }
         }
         final String domainFromURLNew = Browser.getHost(contenturl);
-        PornHubCom.prepBr(br);
+        PornHubCom.prepBr(this, br);
         hosterPlugin.getFirstPageWithAccount(hosterPlugin, account, contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

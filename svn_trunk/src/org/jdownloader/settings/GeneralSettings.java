@@ -283,6 +283,13 @@ public interface GeneralSettings extends ConfigInterface {
     void setCleanupFileExists(boolean b);
 
     @AboutConfig
+    @DefaultBooleanValue(true)
+    @DescriptionForConfigEntry("Windows only: If enabled, long paths are assumed to be supported by the OS. The classic total MAX_PATH (260) limit is then irrelevant and only the per-segment limit (255 characters per path component) constrains the filename length. The problem is that not all Windows applications can handle such long paths. Disable this if you experience issues with files in directories with long paths created by JDownloader for example if a downloaded image file cannot be opened via a 3rd party application but only in the Windows photo viewer. When disabled, JDownloader will either skip items with too long paths or offer to auto rename such items.")
+    boolean isLongWindowsPathsAllowed();
+
+    void setLongWindowsPathsAllowed(boolean b);
+
+    @AboutConfig
     @DescriptionForConfigEntry("max buffer size for write operations in kb")
     @SpinnerValidator(min = 100, max = 100480)
     @DefaultIntValue(500)

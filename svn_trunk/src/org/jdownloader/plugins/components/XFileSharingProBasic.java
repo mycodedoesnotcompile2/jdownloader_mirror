@@ -93,7 +93,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 53395 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53415 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -689,6 +689,10 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      */
     protected String getNormalizedDownloadURL(final DownloadLink link) {
         final String fuid = this.getFUIDFromURL(link);
+        if (fuid == null) {
+            /* Without a fuid we cannot build URLs. */
+            return this.getContentURL(link);
+        }
         final String base;
         if (this.br != null && this.br.getRequest() != null) {
             /* A request has already been made -> Prefer that host. */
@@ -696,10 +700,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         } else {
             /* No request has been made yet -> Derive host from link so that a subdomain in the original URL is preserved. */
             base = this.getMainPage(link);
-        }
-        if (fuid == null) {
-            /* Without a fuid we cannot build URLs. */
-            return this.getContentURL(link);
         }
         final URL_TYPE urltype = this.getURLType(link);
         if (urltype == URL_TYPE.EMBED_VIDEO) {
@@ -816,6 +816,13 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             domainToUse = this.getHost();
         } else {
             domainToUse = urlHost;
+        }
+        return buildMainPage(url, domainToUse);
+    }
+
+    protected String buildMainPage(final URL url, String domainToUse) {
+        if (domainToUse == null) {
+            domainToUse = url.getHost();
         }
         final String protocol;
         if (this.useHTTPS()) {
@@ -1644,9 +1651,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      */
     protected void resolveShortURL(final Browser br, final DownloadLink link, final Account account) throws Exception {
         synchronized (link) {
-            if (!supportsShortURLs()) {
-                return;
-            } else if (!isShortURL(link)) {
+            if (!isShortURL(link)) {
                 /* Do nothing */
                 return;
             }
@@ -1667,15 +1672,19 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             URL_TYPE type = getURLType(br.getURL());
-            final String realFUID;
+            boolean obtainedLongFileIDFromURL = true;
+            String realFUID = null;
             if (type != null && !URL_TYPE.SHORT.equals(type)) {
                 logger.info("Type of current URL is not a short URL anymore -> Try to extract file_id from URL");
                 realFUID = getFUID(br.getURL(), type);
-            } else {
+            }
+            if (realFUID == null) {
+                /* Maybe redirect took us somewhere else -> Try to extract file_id from Form */
                 final Form form = br.getFormbyProperty("name", "F1");
                 final InputField id = form != null ? form.getInputFieldByName("id") : null;
                 realFUID = id != null ? id.getValue() : null;
                 type = URL_TYPE.NORMAL;
+                obtainedLongFileIDFromURL = false;
             }
             if (realFUID == null || !realFUID.matches("[A-Za-z0-9]{12}")) {
                 /* Failure */
@@ -1689,23 +1698,40 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             }
             /* Success! */
             final String mainPage;
-            if (isShortURLHostOnly(link)) {
-                mainPage = getMainPage(null, br._getURL());
-            } else {
-                mainPage = getMainPage(link);
-            }
             final String urlNew;
-            if (URL_TYPE.FILE.equals(type)) {
-                urlNew = URLHelper.parseLocation(new URL(mainPage), buildNormalFileURLPath(link, realFUID));
+            if (obtainedLongFileIDFromURL && this.canHandle(br.getURL())) {
+                /**
+                 * We know that the file_id is contained in our current URL, we know that the plugin can handle that URL (and the domain in
+                 * it) so we know that the current URL is the full URL to the file. The initial short-url will always redirect to this URL.
+                 * <br>
+                 * We also know that the URL-type is a supported one so it doesn't matter which one it is.
+                 */
+                mainPage = getMainPage(br);
+                urlNew = br.getURL();
             } else {
-                urlNew = URLHelper.parseLocation(new URL(mainPage), buildNormalURLPath(link, realFUID));
+                if (isShortURLHostOnly(br, link)) {
+                    mainPage = buildMainPage(br._getURL(), null);
+                } else {
+                    mainPage = getMainPage(link);
+                }
+                if (URL_TYPE.FILE.equals(type)) {
+                    urlNew = URLHelper.parseLocation(new URL(mainPage), buildNormalFileURLPath(link, realFUID));
+                } else {
+                    urlNew = URLHelper.parseLocation(new URL(mainPage), buildNormalURLPath(link, realFUID));
+                }
             }
             logger.info("resolve URL|old: " + contentURL + "|new:" + urlNew);
             link.setPluginPatternMatcher(urlNew);
         }
     }
 
-    protected boolean isShortURLHostOnly(DownloadLink link) {
+    /** Returns true if it looks like the current browser host can only be used for short-urls. */
+    protected boolean isShortURLHostOnly(Browser br, DownloadLink link) {
+        final Request currentRequest = br.getRequest();
+        final Request root = currentRequest.getRedirectRoot();
+        if (root != null && !StringUtils.equalsIgnoreCase(Browser.getHost(currentRequest.getURL()), Browser.getHost(root.getURL()))) {
+            return true;
+        }
         return false;
     }
 
@@ -2008,7 +2034,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                      * ShortURLs need to be single-checked. <br>
                      * Skip them here so that this happens later.
                      */
-                    if (supportsShortURLs() && isShortURL(link)) {
+                    if (isShortURL(link)) {
                         continue;
                     }
                     links.add(link);
