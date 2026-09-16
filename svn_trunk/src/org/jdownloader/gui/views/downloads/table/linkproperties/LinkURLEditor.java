@@ -5,7 +5,6 @@ import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.util.List;
-import java.util.Set;
 
 import javax.swing.Icon;
 import javax.swing.JLabel;
@@ -205,7 +204,7 @@ public class LinkURLEditor<PackageType extends AbstractPackageNode<ChildrenType,
 
                     @Override
                     protected Void run() throws RuntimeException {
-                        final Set<String> urls;
+                        final List<String> urls;
                         if (selectedObjects.size() == 0) {
                             urls = LinkTreeUtils.getURLs(si, false);
                         } else {

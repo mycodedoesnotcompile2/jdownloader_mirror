@@ -1,10 +1,16 @@
 package org.jdownloader.gui.views.components.packagetable;
 
 import java.io.File;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
+
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
+import jd.controlling.packagecontroller.AbstractPackageNode;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.config.JsonConfig;
@@ -15,79 +21,7 @@ import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.UrlDisplayType;
 
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
-import jd.controlling.packagecontroller.AbstractPackageNode;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-
 public class LinkTreeUtils {
-    @SuppressWarnings({ "rawtypes", "unchecked" })
-    public static <T extends AbstractNode> java.util.List<T> getPackages(AbstractNode contextObject, java.util.List<AbstractNode> selection, java.util.List<T> container) {
-        HashSet<T> ret = new HashSet<T>();
-        if (contextObject != null) {
-            if (contextObject instanceof AbstractPackageNode) {
-                ret.add((T) contextObject);
-            } else {
-                ret.add((T) ((AbstractPackageChildrenNode) contextObject).getParentNode());
-            }
-        }
-        if (selection != null) {
-            for (AbstractNode a : selection) {
-                if (a instanceof AbstractPackageNode) {
-                    ret.add((T) a);
-                } else {
-                    ret.add((T) ((AbstractPackageChildrenNode) a).getParentNode());
-                }
-            }
-        }
-        container.addAll(ret);
-        return container;
-    }
-
-    @SuppressWarnings({ "rawtypes", "unchecked" })
-    public static <T extends AbstractNode> java.util.List<T> getSelectedChildren(List<AbstractNode> selection2, java.util.List<T> container) {
-        HashSet<AbstractNode> has = new HashSet<AbstractNode>(selection2);
-        HashSet<T> ret = new HashSet<T>();
-        for (AbstractNode node : selection2) {
-            if (node instanceof AbstractPackageChildrenNode) {
-                ret.add((T) node);
-            } else {
-                // if we selected a package, and ALL it's links, we want all links
-                // if we selected a package, and only a few links, we probably want only these few links.
-                // if we selected a package, and it is NOT expanded, we want all links
-                boolean readL = ((AbstractPackageNode) node).getModifyLock().readLock();
-                try {
-                    if (!((AbstractPackageNode) node).isExpanded()) {
-                        // add allTODO
-                        List<T> childs = ((AbstractPackageNode) node).getChildren();
-                        ret.addAll(childs);
-                        // LinkGrabberTableModel.getInstance().getAllChildrenNodes()
-                    } else {
-                        List<T> childs = ((AbstractPackageNode) node).getChildren();
-                        boolean containsNone = true;
-                        boolean containsAll = true;
-                        for (AbstractNode l : childs) {
-                            if (has.contains(l)) {
-                                containsNone = false;
-                            } else {
-                                containsAll = false;
-                            }
-                        }
-                        if (containsAll || containsNone) {
-                            ret.addAll(childs);
-                        }
-                    }
-                } finally {
-                    ((AbstractPackageNode) node).getModifyLock().readUnlock(readL);
-                }
-            }
-        }
-        container.addAll(ret);
-        return container;
-    }
 
     public static File getDownloadDirectory(AbstractNode node) {
         if (node instanceof DownloadLink) {
@@ -162,6 +96,9 @@ public class LinkTreeUtils {
             link = (DownloadLink) node;
         } else if (node instanceof CrawledLink) {
             link = ((CrawledLink) node).getDownloadLink();
+            if (link == null) {
+                return null;
+            }
         } else {
             return null;
         }
@@ -195,12 +132,12 @@ public class LinkTreeUtils {
      * removed) while keeping the original order.
      *
      * @param fallbackToDisplayUrl
-     *            if true, links for which the requested {@link UrlDisplayType} is not available fall back to their default display URL
-     *            ({@link org.jdownloader.controlling.DownloadLinkView#getDisplayUrl()}) instead of being skipped.
+     *            if true, links for which the requested {@link UrlDisplayType} is not available fall back to their default display URL (
+     *            {@link org.jdownloader.controlling.DownloadLinkView#getDisplayUrl()}) instead of being skipped.
      */
-    public static Set<String> getURLs(SelectionInfo<? extends AbstractPackageNode, ? extends AbstractPackageChildrenNode> selectionInfo, final UrlDisplayType urlDisplayType, final boolean fallbackToDisplayUrl) {
-        final LinkedHashSet<String> urls = new LinkedHashSet<String>();
-        if (selectionInfo == null || selectionInfo.isEmpty() || urlDisplayType == null) {
+    public static List<String> getURLs(SelectionInfo<? extends AbstractPackageNode, ? extends AbstractPackageChildrenNode> selectionInfo, final UrlDisplayType urlDisplayType, final boolean fallbackToDisplayUrl) {
+        final List<String> urls = new ArrayList<String>();
+        if (selectionInfo == null || urlDisplayType == null || selectionInfo.isEmpty()) {
             return urls;
         }
         final List<? extends AbstractPackageChildrenNode> children = selectionInfo.getChildren();
@@ -212,12 +149,13 @@ public class LinkTreeUtils {
                     link = (DownloadLink) node;
                 } else if (node instanceof CrawledLink) {
                     link = ((CrawledLink) node).getDownloadLink();
+                    if (link == null) {
+                        continue;
+                    }
                 } else {
-                    link = null;
+                    continue;
                 }
-                if (link != null) {
-                    url = link.getView().getDisplayUrl();
-                }
+                url = link.getView().getDisplayUrl();
             }
             if (url == null) {
                 continue;
@@ -227,12 +165,12 @@ public class LinkTreeUtils {
         return urls;
     }
 
-    public static Set<String> getURLs(SelectionInfo<? extends AbstractPackageNode, ? extends AbstractPackageChildrenNode> selectionInfo, final boolean openInBrowser) {
+    public static List<String> getURLs(SelectionInfo<? extends AbstractPackageNode, ? extends AbstractPackageChildrenNode> selectionInfo, final boolean openInBrowser) {
         return getURLs(selectionInfo, openInBrowser, JsonConfig.create(GeneralSettings.class).isCopySingleRealURL());
     }
 
-    public static Set<String> getURLs(SelectionInfo<? extends AbstractPackageNode, ? extends AbstractPackageChildrenNode> selectionInfo, final boolean openInBrowser, final boolean copySingleRealURL) {
-        final LinkedHashSet<String> urls = new LinkedHashSet<String>();
+    public static List<String> getURLs(SelectionInfo<? extends AbstractPackageNode, ? extends AbstractPackageChildrenNode> selectionInfo, final boolean openInBrowser, final boolean copySingleRealURL) {
+        final List<String> urls = new ArrayList<String>();
         if (selectionInfo == null || selectionInfo.isEmpty()) {
             return urls;
         }
@@ -244,10 +182,10 @@ public class LinkTreeUtils {
                 link = (DownloadLink) node;
             } else if (node instanceof CrawledLink) {
                 link = ((CrawledLink) node).getDownloadLink();
+                if (link == null) {
+                    continue;
+                }
             } else {
-                continue;
-            }
-            if (link == null) {
                 continue;
             }
             rawURL = link.getCustomUrl();
@@ -264,7 +202,7 @@ public class LinkTreeUtils {
          * Allows to skip url content protection for single links. <br>
          * See: https://support.jdownloader.org/knowledgebase/article/copy-view-added-urls
          */
-        if (!openInBrowser && copySingleRealURL && children.size() == 1 && rawURL != null && rawURL.matches("((?-i)ftp|https?)://.+")) {
+        if (!openInBrowser && copySingleRealURL && children.size() == 1 && rawURL != null && rawURL.matches("((?-i)ftps?|https?)://.+")) {
             urls.clear();
             urls.add(rawURL);
         }

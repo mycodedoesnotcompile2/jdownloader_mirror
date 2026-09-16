@@ -5,7 +5,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import jd.controlling.linkchecker.LinkChecker;
 import jd.controlling.linkcrawler.CheckableLink;
@@ -75,7 +74,7 @@ public class SelectionInfoUtils {
                 for (final UrlDisplayType urlDisplayType : urlDisplayTypes) {
                     String url = LinkTreeUtils.getUrlByType(urlDisplayType, node);
                     if (url == null && UrlDisplayType.CONTENT.equals(urlDisplayType) && copySingleRealURL) {
-                        final Set<String> urls = LinkTreeUtils.getURLs(selectionInfo, false, true);
+                        final List<String> urls = LinkTreeUtils.getURLs(selectionInfo, false, true);
                         url = urls.size() == 1 ? urls.iterator().next() : null;
                     }
                     if (url != null) {

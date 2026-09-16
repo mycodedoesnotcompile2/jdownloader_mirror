@@ -2,7 +2,11 @@ package org.jdownloader.gui.views.downloads.action;
 
 import java.awt.event.ActionEvent;
 import java.util.List;
-import java.util.Set;
+
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
+import jd.controlling.packagecontroller.AbstractPackageNode;
+import jd.plugins.DownloadLink;
 
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.utils.os.CrossSystem;
@@ -22,16 +26,11 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.settings.UrlDisplayType;
 
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
-import jd.controlling.packagecontroller.AbstractPackageNode;
-import jd.plugins.DownloadLink;
-
 /**
  * "Open in Browser" context menu action.
  *
- * This class holds the complete functionality and is used directly by the DownloadTable. The LinkGrabber variant
- * ({@link org.jdownloader.gui.views.linkgrabber.contextmenu.OpenInBrowserAction}) simply derives from it with the CrawledPackage /
+ * This class holds the complete functionality and is used directly by the DownloadTable. The LinkGrabber variant (
+ * {@link org.jdownloader.gui.views.linkgrabber.contextmenu.OpenInBrowserAction}) simply derives from it with the CrawledPackage /
  * CrawledLink types, so the logic only exists once.
  */
 public class OpenInBrowserAction<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> extends CustomizableTableContextAppAction<PackageType, ChildrenType> implements ActionContext {
@@ -200,7 +199,7 @@ public class OpenInBrowserAction<PackageType extends AbstractPackageNode<Childre
             public void run() {
                 final int delay = getOpenDelay();
                 final LinkType linkType = getLinkType();
-                final Set<String> urls;
+                final List<String> urls;
                 if (linkType == null || linkType == LinkType.DEFAULT) {
                     urls = LinkTreeUtils.getURLs(selectionInfo, true);
                 } else {

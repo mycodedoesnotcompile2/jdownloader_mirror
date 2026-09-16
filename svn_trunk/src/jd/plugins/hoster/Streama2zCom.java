@@ -31,7 +31,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51727 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53420 $", interfaceVersion = 3, names = {}, urls = {})
 public class Streama2zCom extends XFileSharingProBasic {
     public Streama2zCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -56,6 +56,7 @@ public class Streama2zCom extends XFileSharingProBasic {
     protected List<String> getDeadDomains() {
         final ArrayList<String> deadDomains = new ArrayList<String>();
         deadDomains.add("streama2z.xyz");
+        deadDomains.add("streama2z.pro"); // 2026-09-15
         return deadDomains;
     }
 

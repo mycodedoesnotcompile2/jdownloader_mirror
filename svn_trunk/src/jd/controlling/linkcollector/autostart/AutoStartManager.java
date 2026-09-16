@@ -4,16 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.WeakHashMap;
 
-import jd.controlling.linkcollector.LinkCollectingInformation;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings;
-import jd.controlling.linkcollector.LinkCollector.JobLinkCrawler;
-import jd.controlling.linkcollector.LinkCollector.MoveLinksMode;
-import jd.controlling.linkcollector.LinkCollectorCrawler;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.packagecontroller.AbstractNode;
-
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
@@ -26,6 +16,16 @@ import org.jdownloader.gui.views.linkgrabber.LinkGrabberTable;
 import org.jdownloader.gui.views.linkgrabber.contextmenu.ConfirmLinksContextAction;
 import org.jdownloader.myjdownloader.client.json.AvailableLinkState;
 import org.jdownloader.settings.staticreferences.CFG_LINKGRABBER;
+
+import jd.controlling.linkcollector.LinkCollectingInformation;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings;
+import jd.controlling.linkcollector.LinkCollector.JobLinkCrawler;
+import jd.controlling.linkcollector.LinkCollector.MoveLinksMode;
+import jd.controlling.linkcollector.LinkCollectorCrawler;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.packagecontroller.AbstractNode;
 
 public class AutoStartManager implements GenericConfigEventListener<Boolean> {
     private final DelayedRunnable             delayer;
@@ -77,19 +77,18 @@ public class AutoStartManager implements GenericConfigEventListener<Boolean> {
                         if (eventSender.hasListener()) {
                             eventSender.fireEvent(new AutoStartManagerEvent(this, AutoStartManagerEvent.Type.RUN));
                         }
-                        final boolean autoConfirm = globalAutoConfirm;
                         final List<AbstractNode> list = new ArrayList<AbstractNode>(selectionInfo.getChildren().size());
                         boolean createNewSelection = false;
                         for (final CrawledLink child : selectionInfo.getChildren()) {
                             if (child.getLinkState() == AvailableLinkState.OFFLINE) {
+                                /* Skip offline items since they cannot be downloaded anyways */
                                 createNewSelection = true;
                                 continue;
+                            }
+                            if (isEligibleForAutoStart(child)) {
+                                list.add(child);
                             } else {
-                                if (autoConfirm || child.isAutoConfirmEnabled()) {
-                                    list.add(child);
-                                } else {
-                                    createNewSelection = true;
-                                }
+                                createNewSelection = true;
                             }
                         }
                         if (list.size() > 0) {
@@ -124,23 +123,41 @@ public class AutoStartManager implements GenericConfigEventListener<Boolean> {
         }
     }
 
+    /**
+     * Checks whether the given link is eligible for automatic processing (auto confirm / auto start).
+     *
+     * A link is eligible if the global auto confirm or global auto start setting is active, or if the link itself carries any of the auto
+     * confirm, auto start or forced auto start flags (e.g. set by a Packagizer rule). AutoStart and ForcedAutoStart imply a confirm here,
+     * because a download can only start once the link has been moved to the downloadlist.
+     *
+     * This is the single source of truth shared by {@link #onLinkAdded(CrawledLink)} (which decides whether to arm the auto confirm
+     * delayer) and the delayed run (which decides which links actually get confirmed). Both must stay in sync: otherwise a link that only
+     * has AutoStart/ForcedAutoStart set would arm the auto confirm button but never actually get moved to the downloadlist.
+     *
+     * The offline check is intentionally kept separate at the call site.
+     */
+    private boolean isEligibleForAutoStart(final CrawledLink link) {
+        return globalAutoStart || globalAutoConfirm || link.isAutoConfirmEnabled() || link.isAutoStartEnabled() || link.isForcedAutoStartEnabled();
+    }
+
     public void onLinkAdded(CrawledLink link) {
-        if (globalAutoStart || globalAutoConfirm || link.isAutoConfirmEnabled() || link.isAutoStartEnabled() || link.isForcedAutoStartEnabled()) {
-            final LinkCollectingInformation collectingInfo = link.getCollectingInfo();
-            if (collectingInfo != null) {
-                final JobLinkCrawler linkCrawler = collectingInfo.getLinkCrawler();
-                synchronized (resetMap) {
-                    resetMap.put(linkCrawler, Boolean.TRUE);
-                    if (delayer.getMaximumDelay() == -1 && linkCrawler.isCollecting()) {
-                        resetAndStart(true);
-                        return;
-                    } else {
-                        resetMap.remove(linkCrawler);
-                    }
+        if (!isEligibleForAutoStart(link)) {
+            return;
+        }
+        final LinkCollectingInformation collectingInfo = link.getCollectingInfo();
+        if (collectingInfo != null) {
+            final JobLinkCrawler linkCrawler = collectingInfo.getLinkCrawler();
+            synchronized (resetMap) {
+                resetMap.put(linkCrawler, Boolean.TRUE);
+                if (delayer.getMaximumDelay() == -1 && linkCrawler.isCollecting()) {
+                    resetAndStart(true);
+                    return;
+                } else {
+                    resetMap.remove(linkCrawler);
                 }
             }
-            resetAndStart(false);
         }
+        resetAndStart(false);
     }
 
     protected void resetAndStart(final boolean onlyWhenActive) {

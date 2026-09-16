@@ -1065,7 +1065,7 @@ public abstract class ConditionDialog<T> extends AbstractDialog<T> {
         cobOnlineOptions.addMouseListener(ml);
         // plugin
         cobPlugin = new JComboBox(new String[] { _GUI.T.ConditionDialog_layoutDialogContent_online_has_(), _GUI.T.ConditionDialog_layoutDialogContent_online_hasnot_() });
-        cobPluginOptions = new JComboBox(new String[] { _GUI.T.ConditionDialog_layoutDialogContent_premium(), _GUI.T.ConditionDialog_layoutDialogContent_account(), _GUI.T.ConditionDialog_layoutDialogContent_captcha(), _GUI.T.ConditionDialog_layoutDialogContent_directhttp() });
+        cobPluginOptions = new JComboBox(new String[] { _GUI.T.ConditionDialog_layoutDialogContent_premium(), _GUI.T.ConditionDialog_layoutDialogContent_account(), _GUI.T.ConditionDialog_layoutDialogContent_account_any(), _GUI.T.ConditionDialog_layoutDialogContent_captcha(), _GUI.T.ConditionDialog_layoutDialogContent_directhttp() });
         cbPlugin = new ExtCheckBox(cobPlugin, cobPluginOptions);
         panel.add(cbPlugin);
         panel.add(new JLabel(_GUI.T.FilterRuleDialog_layoutDialogContent_lbl_plugin()));

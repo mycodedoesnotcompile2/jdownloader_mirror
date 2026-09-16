@@ -6,7 +6,6 @@ import java.awt.datatransfer.UnsupportedFlavorException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
 import jd.controlling.packagecontroller.AbstractPackageNode;
@@ -18,11 +17,11 @@ import org.jdownloader.gui.views.components.packagetable.PackageControllerTable;
 
 public class PackageControllerTableTransferable<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> implements Transferable {
     public static final DataFlavor                           FLAVOR = new DataFlavor(PackageControllerTableTransferable.class, PackageControllerTableTransferable.class.getName()) {
-        @Override
-        public boolean isFlavorSerializedObjectType() {
-            return false;
-        }
-    };
+                                                                        @Override
+                                                                        public boolean isFlavorSerializedObjectType() {
+                                                                            return false;
+                                                                        }
+                                                                    };
     protected final SelectionInfo<PackageType, ChildrenType> selectionInfo;
 
     public SelectionInfo<PackageType, ChildrenType> getSelectionInfo() {
@@ -81,7 +80,7 @@ public class PackageControllerTableTransferable<PackageType extends AbstractPack
         }
     }
 
-    protected Set<String> getURLs() {
+    protected List<String> getURLs() {
         return LinkTreeUtils.getURLs(getSelectionInfo(), false);
     }
 

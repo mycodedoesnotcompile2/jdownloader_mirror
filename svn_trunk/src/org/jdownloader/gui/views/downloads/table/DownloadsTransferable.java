@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
@@ -36,7 +35,7 @@ public class DownloadsTransferable extends PackageControllerTableTransferable<Fi
                 return stringContent;
             } else {
                 final StringBuilder sb = new StringBuilder();
-                final Set<String> urls = getURLs();
+                final List<String> urls = getURLs();
                 if (urls != null) {
                     final Iterator<String> it = urls.iterator();
                     while (it.hasNext()) {

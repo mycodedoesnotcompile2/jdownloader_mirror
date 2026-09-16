@@ -25,18 +25,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.ReflectionUtils;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -58,7 +46,19 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53410 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
+@HostPlugin(revision = "$Revision: 53419 $", interfaceVersion = 2, names = {}, urls = {})
 public class FilerNet extends PluginForHost {
     private static final int    STATUSCODE_APIDISABLED                             = 400;
     private static final String ERRORMESSAGE_APIDISABLEDTEXT                       = "API is disabled, please wait or use filer.net in your browser";
@@ -484,8 +484,8 @@ public class FilerNet extends PluginForHost {
 
     /**
      * Throws an {@link AccountUnavailableException} with a human readable recovery ETA if the given traffic_left value is negative. Returns
-     * normally otherwise. </br>
-     * Negative traffic recovers over time: 50 GB is added back every 24 hours (which equals 1 GB every 28.8 minutes).
+     * normally otherwise. </br> Negative traffic recovers over time: 50 GB is added back every 24 hours (which equals 1 GB every 28.8
+     * minutes).
      */
     private void throwExceptionOnNegativeTraffic(final long trafficLeft) throws AccountUnavailableException {
         if (trafficLeft >= 0) {
@@ -517,9 +517,9 @@ public class FilerNet extends PluginForHost {
 
     /**
      * If the account is in the negative traffic range, throws an {@link AccountUnavailableException} with the same recovery ETA message as
-     * {@link #fetchAccountInfo(Account)}. Returns normally if there is no {@link AccountInfo} yet or the traffic is not negative. </br>
-     * The remaining traffic is read from the existing {@link AccountInfo} (note: AccountInfo may currently clamp negative values to zero,
-     * in which case this check simply does nothing).
+     * {@link #fetchAccountInfo(Account)}. Returns normally if there is no {@link AccountInfo} yet or the traffic is not negative. </br> The
+     * remaining traffic is read from the existing {@link AccountInfo} (note: AccountInfo may currently clamp negative values to zero, in
+     * which case this check simply does nothing).
      */
     private void checkNegativeTrafficAndThrow(final Account account) throws AccountUnavailableException {
         final AccountInfo ai = account.getAccountInfo();
@@ -538,7 +538,7 @@ public class FilerNet extends PluginForHost {
             requestFileInformation(link);
             br.setFollowRedirects(false);
             /* When doing this request, API will answer with json AND a redirect location (if no error happens). */
-            br.getPage(getAPI_BASE() + "/dl/" + getFileID(link) + ".json");
+            callAPI(account, br.createGetRequest(getAPI_BASE() + "/dl/" + getFileID(link) + ".json"));
             final String dllink = br.getRedirectLocation();
             if (dllink == null) {
                 this.checkErrorsAPI(account);
@@ -557,10 +557,6 @@ public class FilerNet extends PluginForHost {
         }
     }
 
-    private Object callAPI(final String url) throws Exception {
-        return callAPI(null, url);
-    }
-
     private Object callAPI(final Account account, final String url) throws Exception {
         return callAPI(account, br.createGetRequest(url));
     }
@@ -568,23 +564,261 @@ public class FilerNet extends PluginForHost {
     /** Only use this if a json response is expected!! */
     private Object callAPI(final Account account, Request req) throws Exception {
         final URLConnectionAdapter con = br.openRequestConnection(req);
-        if (con.getResponseCode() == 401) {
+        try {
+            br.followConnection(true);
+            final Object ret = checkErrorsAPI(account);
+            return ret;
+        } finally {
             con.disconnect();
-            if (account != null) {
-                throw new AccountInvalidException();
-            } else {
-                throw new AccountRequiredException();
-            }
         }
-        br.followConnection(true);
-        final Object ret = checkErrorsAPI(account);
-        return ret;
     }
 
-    private enum Error {
+    // see https://filer.net/api/
+    private enum ApiError {
+        none {
+
+            @Override
+            protected boolean matches(Map<String, Object> entries) {
+                return false;
+            }
+
+            @Override
+            public Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                return entries;
+            }
+
+        },
+        success {
+            // {"code":200,"status":"success","data":{}}
+            @Override
+            protected boolean matches(Map<String, Object> entries) {
+                if (super.matches(entries)) {
+                    return true;
+                }
+                return "200".equals(String.valueOf(entries.get("code")));
+            }
+
+            @Override
+            public Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                return entries;
+            }
+
+        },
+        file_captcha_input_needed {
+            // {"code":202,"status":"file captcha input needed","data":{}}
+            @Override
+            protected boolean matches(Map<String, Object> entries) {
+                if (super.matches(entries)) {
+                    return true;
+                }
+                return "202".equals(String.valueOf(entries.get("code")));
+            }
+
+            @Override
+            public Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                return entries;
+            }
+        },
+        file_wait_needed {
+            // {"code":203,"status":"file wait needed","data":{}}
+            @Override
+            protected boolean matches(Map<String, Object> entries) {
+                if (super.matches(entries)) {
+                    return true;
+                }
+                return "203".equals(String.valueOf(entries.get("code")));
+            }
+
+            @Override
+            public Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                return entries;
+            }
+        },
+        redirect {
+            // {"code":302,"status":"redirect","data":{}}
+            @Override
+            protected boolean matches(Map<String, Object> entries) {
+                if (super.matches(entries)) {
+                    return true;
+                }
+                return "302".equals(String.valueOf(entries.get("code")));
+            }
+
+            @Override
+            public Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                return entries;
+            }
+
+        },
+        authentication_required {
+            // {"code":401,"status":"authentication required","data":{}}
+
+            @Override
+            protected Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "authentication required");
+            }
+
+        },
+        invalid_credentials {
+            // {"code":401,"status":"invalid credentials","data":{}}
+
+            @Override
+            protected Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                if (account != null) {
+                    throw new AccountInvalidException("invalid credentials");
+                }
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unexpected API error " + entries);
+            }
+
+        },
+        authentication_failed {
+            // {"code":401,"status":"authentication failed","data":{}}
+
+            @Override
+            protected Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                if (account != null) {
+                    throw new AccountUnavailableException("authentication failed", TimeUnit.MINUTES.toMillis(30));
+                }
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unexpected API error " + entries);
+            }
+
+        },
+        account_suspended {
+            // {"code":403,"status":"account suspended","data":{}}
+
+            @Override
+            protected Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                if (account != null) {
+                    throw new AccountInvalidException("Account suspended, please contact filer.net support!");
+                }
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unexpected API error " + entries);
+            }
+        },
+        account_breach_locked {
+            // {"code":403,"status":"account_breach_locked","data":{}}
+
+            @Override
+            protected Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                if (account != null) {
+                    throw new AccountInvalidException("Security lock due to breached credentials, please reset password.");
+                }
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unexpected API error " + entries);
+            }
+        },
+        access_denied {
+            // {"code":403,"status":"access denied","data":{}}
+
+            @Override
+            protected Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unexpected API error " + entries);
+            }
+        },
+        premium_required {
+            // {"code":403,"status":"premium required","data":{}}
+            // {"code":503,"status":"premium required","data":{}}
+
+            @Override
+            protected boolean matches(Map<String, Object> entries) {
+                if (super.matches(entries)) {
+                    return true;
+                }
+                return "503".equals(String.valueOf(entries.get("code")));
+            }
+
+            @Override
+            protected Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                throw new AccountRequiredException("Premium access is required.");
+            }
+        },
+        password_required {
+            // {"code":403,"status":"password required","data":{}}
+            @Override
+            protected Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unexpected API error " + entries);
+            }
+
+        },
+        folder_password_required {
+            // {"code":403,"status":"folder password required","data":{}}
+            @Override
+            protected Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unexpected API error " + entries);
+            }
+
+        },
+        download_not_allowed {
+            // {"code":403,"status":"download not allowed","data":{}}
+            @Override
+            protected Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                if (account != null) {
+                    throw new AccountUnavailableException("Download currently not possible", TimeUnit.MINUTES.toMillis(15));
+                }
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unexpected API error " + entries);
+            }
+
+        },
+        concurrent_download_limit_reached {
+            // {"code":429,"status":"concurrent download limit reached","data":{"currentSlots":100,"maxSlots":100}}
+            @Override
+            protected Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                if (account != null) {
+                    throw new AccountUnavailableException("Parallel download slots are full.", TimeUnit.MINUTES.toMillis(15));
+                }
+                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Parallel download slots are full.", TimeUnit.MINUTES.toMillis(15));
+            }
+
+        },
+        no_download_server_available {
+            // {"code":503,"no download server available","data":{}}
+            @Override
+            protected Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Temporary delivery unavailability", TimeUnit.MINUTES.toMillis(15));
+            }
+
+        },
+        invalid_hashes_format {
+            // {"code":400,"invalid hashes format","data":{}}
+            @Override
+            protected Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unexpected API error " + entries);
+            }
+
+        },
+        file_not_found {
+            /* {"code":"505","status":"file not found","data":[]} */
+            @Override
+            protected boolean matches(Map<String, Object> entries) {
+                if (super.matches(entries)) {
+                    return true;
+                }
+                return "505".equals(String.valueOf(entries.get("code")));
+            }
+
+            @Override
+            protected Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "file not found");
+            }
+
+        },
+        folder_not_found {
+            /* {"code":"506","status":"folder not found","data":[]} */
+            @Override
+            protected boolean matches(Map<String, Object> entries) {
+                if (super.matches(entries)) {
+                    return true;
+                }
+                return "506".equals(String.valueOf(entries.get("code")));
+            }
+
+            @Override
+            protected Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "folder_not_found");
+            }
+
+        },
         hour_download_limit_reached {
             @Override
-            protected void handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+            protected Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
                 final Map<String, Object> data = (Map<String, Object>) entries.get("data");
                 final Number wait;
                 if (data != null && data.get("wait") instanceof Number) {
@@ -600,70 +834,50 @@ public class FilerNet extends PluginForHost {
                 }
             }
 
-            @Override
-            protected boolean matches(Map<String, Object> entries) {
-                return "hour download limit reached".equals(entries.get("status"));
-            }
         },
         user_download_slots_filled {
-            @Override
-            protected boolean matches(Map<String, Object> entries) {
-                return "user download slots filled".equals(entries.get("status"));
-            }
 
             @Override
-            protected void handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+            protected Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
                 plugin.errorNoFreeSlotsAvailable();
+                return entries;
             }
         },
-        account_suspended {
-            // {"code":403,"status":"account suspended","data":{}}
+        error {
+            /* {"code":"500","status":"error","data":[]} */
             @Override
             protected boolean matches(Map<String, Object> entries) {
-                return "account suspended".equals(entries.get("status"));
-            }
-
-            @Override
-            protected void handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
-                if (account != null) {
-                    throw new AccountInvalidException("Account suspended, please contact filer.net support!");
-                } else {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unexpected API error " + entries);
+                if (super.matches(entries)) {
+                    return true;
                 }
-            }
-        },
-        file_not_found {
-            /* {"code":"505","status":"file not found","data":[]} */
-            @Override
-            protected boolean matches(Map<String, Object> entries) {
-                return "file not found".equals(entries.get("status")) || "505".equals(String.valueOf(entries.get("code")));
+                return "500".equals(String.valueOf(entries.get("code")));
             }
 
             @Override
-            protected void handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-        },
-        download_not_allowed {
-            // {"code":403,"status":"download not allowed","data":{}}
-            @Override
-            protected boolean matches(Map<String, Object> entries) {
-                return "download not allowed".equals(entries.get("status"));
+            protected Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
 
-            @Override
-            protected void handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
-                if (account != null) {
-                    throw new AccountUnavailableException("Download currently not possible", TimeUnit.MINUTES.toMillis(5));
-                } else {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unexpected API error " + entries);
-                }
-            }
         };
 
-        protected abstract boolean matches(Map<String, Object> entries);
+        protected boolean matches(Map<String, Object> entries) {
+            final String status = StringUtils.valueOfOrNull(entries.get("status"));
+            if (status == null) {
+                return false;
+            }
+            return StringUtils.equals(name(), status) || StringUtils.equals(name(), status.replace(" ", "_"));
+        };
 
-        protected abstract void handle(FilerNet plugin, Map<String, Object> entries, final Account account) throws Exception;
+        protected static ApiError parseError(FilerNet plugin, Map<String, Object> entries, final Account account) throws Exception {
+            for (final ApiError error : ApiError.values()) {
+                if (error.matches(entries)) {
+                    return error;
+                }
+            }
+            return null;
+        }
+
+        protected abstract Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, final Account account) throws Exception;
     }
 
     private Object checkErrorsAPI(final Account account) throws Exception {
@@ -674,12 +888,15 @@ public class FilerNet extends PluginForHost {
             /* Check for website errors and if that doesn't throw any exception, handle state as invalid API response. */
             checkErrorsWebsite(account, false);
             final String msg = "Invalid API response";
-            final long wait = 1 * 60 * 1000;
             if (account == null) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, wait);
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, TimeUnit.MINUTES.toMillis(1));
             } else {
-                throw new AccountUnavailableException(msg, wait);
+                throw new AccountUnavailableException(msg, TimeUnit.MINUTES.toMillis(1));
             }
+        }
+        final ApiError apiError = ApiError.parseError(this, entries, account);
+        if (apiError != null) {
+            return apiError.handle(this, entries, account);
         }
         // TODO: Merge code- and "status" handling: error codes should be all we need here
         final Object codeObject = entries.get("code");
@@ -702,84 +919,37 @@ public class FilerNet extends PluginForHost {
             status = statusObject;
         }
         if (status != null) {
-            if ("hour download limit reached".equals(status)) {
-                Error.hour_download_limit_reached.handle(this, entries, account);
-            } else if ("user download slots filled".equals(status)) {
-                Error.user_download_slots_filled.handle(this, entries, account);
-            } else if ("file captcha input needed".equals(status)) {
-                /* No error */
-                /* 202 = file captcha input needed */
-                return entries;
-            } else if ("file wait needed".equals(status)) {
-                /* No error */
-                /* 203 = file wait needed */
-                return entries;
-            } else if ("account suspended".equals(status)) {
-                Error.account_suspended.handle(this, entries, account);
-            } else if ("file not found".equals(status)) {
-                Error.file_not_found.handle(this, entries, account);
-            }
+            // check/update ApiError
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unexpected API error " + entries);
         }
         if (code != null) {
             final int statusCode = code.intValue();
             switch (statusCode) {
-            case 403:
-                if ("account suspended".equals(statusObject)) {
-                    Error.account_suspended.handle(this, entries, account);
-                } else if ("hour download limit reached".equals(status)) {
-                    Error.hour_download_limit_reached.handle(this, entries, account);
-                } else if ("user download slots filled".equals(status)) {
-                    Error.user_download_slots_filled.handle(this, entries, account);
-                } else if ("download not allowed".equals(statusObject)) {
-                    Error.download_not_allowed.handle(this, entries, account);
-                } else {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unexpected API error " + entries);
-                }
             case STATUSCODE_APIDISABLED:
-                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, ERRORMESSAGE_APIDISABLEDTEXT, 2 * 60 * 60 * 1000l);
-            case 505:
-                Error.file_not_found.handle(this, entries, account);
-            case STATUSCODE_DOWNLOADTEMPORARILYDISABLED:
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, ERRORMESSAGE_DOWNLOADTEMPORARILYDISABLEDTEXT, 2 * 60 * 60 * 1000l);
+                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, ERRORMESSAGE_APIDISABLEDTEXT, TimeUnit.HOURS.toMillis(2));
             case 504:
-                if ("hour download limit reached".equals(status)) {
-                    Error.hour_download_limit_reached.handle(this, entries, account);
-                } else if ("user download slots filled".equals(status)) {
-                    Error.user_download_slots_filled.handle(this, entries, account);
-                } else if (account == null || AccountType.FREE.equals(account.getType())) {
-                    throw new AccountRequiredException(status);
+                /*
+                 * Error 504 = traffic limit reached. If the account is in the negative traffic range, display the same detailed message
+                 * (with recovery ETA) as fetchAccountInfo does instead of the generic traffic limit message.
+                 */
+                checkNegativeTrafficAndThrow(account);
+                if (StringUtils.isEmpty(status)) {
+                    throw new AccountUnavailableException("Error 504: Traffic limit reached", TimeUnit.MINUTES.toMillis(5));
                 } else {
-                    /*
-                     * Error 504 = traffic limit reached. If the account is in the negative traffic range, display the same detailed message
-                     * (with recovery ETA) as fetchAccountInfo does instead of the generic traffic limit message.
-                     */
-                    checkNegativeTrafficAndThrow(account);
-                    final long wait = 5 * 60 * 1000l;
-                    if (StringUtils.isEmpty(status)) {
-                        throw new AccountUnavailableException("Error 504: Traffic limit reached", wait);
-                    } else {
-                        throw new AccountUnavailableException(status, wait);
-                    }
+                    throw new AccountUnavailableException(status, TimeUnit.MINUTES.toMillis(5));
                 }
             case STATUSCODE_UNKNOWNERROR:
                 throw new PluginException(LinkStatus.ERROR_FATAL, ERRORMESSAGE_UNKNOWNERRORTEXT);
             default:
-                if (statusCode >= 200 && statusCode < 300) {
-                    /* No error */
-                    /* 202 = file captcha input needed */
-                    /* 203 = file wait needed */
-                    return entries;
-                } else {
-                    throw new PluginException(LinkStatus.ERROR_FATAL, "Unknown API error code " + entries);
-                }
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unexpected API error " + entries);
             }
         }
         final Object errorO = entries.get("error");
         final String message = (String) entries.get("message");
-        if (errorO instanceof Number) {
-            /*
-             * Error codes and messages can be extracted from here: https://filer.net/assets/ErrorPage-Br2HzfRN-1765742941422.js
-             */
+        if (errorO instanceof Number) { /*
+                                         * Error codes and messages can be extracted from here:
+                                         * https://filer.net/assets/ErrorPage-Br2HzfRN-1765742941422.js
+                                         */
             final int error = ((Number) errorO).intValue();
             switch (error) {
             case 404:
@@ -865,6 +1035,15 @@ public class FilerNet extends PluginForHost {
     private void checkErrorsWebsite(final Account account, final boolean afterDownload) throws PluginException {
         if (br.getHttpConnection().getResponseCode() == 401) {
             throw new AccountInvalidException();
+        }
+        if (StringUtils.containsIgnoreCase(br.getHttpConnection().getContentType(), "application/json")) {
+            final Map<String, Object> error = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            if ("ip_mismatch".equals(error.get("error"))) {
+                if (account != null) {
+                    throw new AccountUnavailableException("IP mismatch", TimeUnit.MINUTES.toMillis(5));
+                }
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "IP mismatch", TimeUnit.MINUTES.toMillis(5));
+            }
         }
         final String errorcodeStr = new Regex(br.getURL(), "(?i).+/error/(\\d+)").getMatch(0);
         if (errorcodeStr != null) {

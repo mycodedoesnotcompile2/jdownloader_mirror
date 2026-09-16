@@ -29,28 +29,10 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Files;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.plugins.components.config.KemonoPartyConfig;
-import org.jdownloader.plugins.components.config.KemonoPartyConfig.PostRevisionMode;
-import org.jdownloader.plugins.components.config.KemonoPartyConfig.TextCrawlMode;
-import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
-import org.jdownloader.plugins.components.config.KemonoPartyConfigPawchiveSt;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.http.Browser;
-import jd.http.Request;
 import jd.http.URLConnectionAdapter;
 import jd.http.requests.GetRequest;
 import jd.nutils.encoding.Encoding;
@@ -61,11 +43,31 @@ import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.PluginForHost;
 import jd.plugins.hoster.KemonoParty;
 
-@DecrypterPlugin(revision = "$Revision: 53277 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Files;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.controlling.Priority;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig.PostRevisionMode;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig.TextCrawlMode;
+import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
+import org.jdownloader.plugins.components.config.KemonoPartyConfigPawchiveSt;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 53422 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -79,19 +81,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
-        if ("pawchive.pw".equals(getHost())) {
-            br.getHeaders().put("User-Agent", Request.getSuggestedUserAgent("154.0"));// default UA blocked
-        }
-        br.setFollowRedirects(true);
-        return br;
-    }
-
-    @Override
-    public void init() {
-        for (String host : siteSupportedNames()) {
-            Browser.setRequestIntervalLimitGlobal(host, false, 1250);
-        }
-        super.init();
+        return KemonoParty.prepBrowser(this, br);
     }
 
     public static List<String[]> getPluginDomains() {
@@ -140,7 +130,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     private KemonoPartyConfig cfg = null;
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        cfg = PluginJsonConfig.get(getConfigInterface());
+        cfg = get(getConfigInterface());
         cl = param;
         if (new Regex(param.getCryptedUrl(), PATTERN_PROFILE).patternFind()) {
             return this.crawlProfile(param);
@@ -154,6 +144,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
 
     @Override
     public void clean() {
+        hostPlugin = null;
         cfg = null;
         super.clean();
     }
@@ -458,8 +449,24 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             numberofResultsSimpleCount++;
         }
         final List<Map<String, Object>> attachments = (List<Map<String, Object>>) postmap.get("attachments");
+        /*
+         * Workaround: Some attachments are "deferred", meaning the API returns them without a downloadable "path" and only with the
+         * "deferred" flag set to true. Their download-URLs are only available on the website (non-API) post page. We collect their
+         * filenames here and resolve them via the website further down below.
+         */
+        final Map<String, Integer> deferredAttachmentIndexes = new HashMap<String, Integer>();
         if (attachments != null) {
             for (final Map<String, Object> attachment : attachments) {
+                if (Boolean.TRUE.equals(attachment.get("deferred"))) {
+                    /*
+                     * Collect deferred attachment filename along with its current index position to resolve it via the website later on.
+                     * The index must be increased here as well so that the index positions of all following items stay correct.
+                     */
+                    deferredAttachmentIndexes.put(attachment.get("name").toString(), index);
+                    index++;
+                    numberofResultsSimpleCount++;
+                    continue;
+                }
                 if (!attachment.isEmpty() && attachment.get("path") == null) {
                     /* Early-skip invalid items */
                     continue;
@@ -529,8 +536,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             }
             final TextCrawlMode mode = cfg.getTextCrawlMode();
             if (mode == TextCrawlMode.ALWAYS || (mode == TextCrawlMode.ONLY_IF_NO_MEDIA_ITEMS_ARE_FOUND && directResults.isEmpty())) {
-                ensureInitHosterplugin();
-                final DownloadLink textfile = new DownloadLink(this.hostPlugin, getHost(), posturl);
+                final DownloadLink textfile = new DownloadLink(ensureInitHosterplugin(), getHost(), posturl);
                 textfile.setProperty(KemonoParty.PROPERTY_TEXT, postTextContent);
                 textfile.setFinalFileName(postFilePackage.getName() + ".txt");
                 try {
@@ -576,6 +582,25 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             }
         }
         final String username = this.findUsername(service, usernameOrUserID);
+        /**
+         * Workaround: Resolve "deferred" attachments (see above) via the website since the API does not provide download-URLs for them.
+         * Items that cannot be found on the website are logged but do not raise an Exception. <br>
+         * Use dupes set as a very cheap way to ensure that we only access website once per post since afaik website does not provide
+         * multiple revisions of a post.
+         */
+        if (!deferredAttachmentIndexes.isEmpty() && dupes.add("deferred_attachments_" + postID)) {
+            /* We are going to perform an additional http request -> Check for abort */
+            if (this.isAbort()) {
+                throw new InterruptedException();
+            }
+            try {
+                directResults.addAll(this.crawlDeferredAttachments(deferredAttachmentIndexes, dupes, posturl));
+            } catch (final Throwable e) {
+                /* Do not allow API crawl process to fail due to problems in website crawler. */
+                logger.log(e);
+                logger.warning("Deferred attachment workaround via website crawler failed");
+            }
+        }
         for (final DownloadLink directResult : directResults) {
             if (!StringUtils.isEmpty(postTitle)) {
                 directResult.setProperty(KemonoParty.PROPERTY_TITLE, postTitle);
@@ -616,8 +641,66 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         return ret;
     }
 
+    /**
+     * Workaround for "deferred" attachments. </br> Some attachments are returned by the API without a downloadable "path" and only with the
+     * "deferred" flag set to true. Their download-URLs are only available on the website (non-API) post page. This method fetches that page
+     * and returns download-links for the attachments whose filename matches one of the given deferred attachment names. </br> Names that
+     * cannot be found on the website are logged but do not raise an Exception.
+     */
+    private ArrayList<DownloadLink> crawlDeferredAttachments(final Map<String, Integer> deferredAttachmentIndexes, final HashSet<String> dupes, final String posturl) throws Exception {
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        if (deferredAttachmentIndexes == null || deferredAttachmentIndexes.isEmpty()) {
+            return ret;
+        }
+        logger.info("Trying to find " + deferredAttachmentIndexes.size() + " deferred attachment(s) via website: " + deferredAttachmentIndexes.keySet());
+        final Browser brc = br.cloneBrowser();
+        getPage(brc, posturl);
+        /* Collect all attachment download-links available on the website mapped by their filename. */
+        final Map<String, String> websiteAttachmentsByFilename = new HashMap<String, String>();
+        final String[] attachmentURLs = brc.getRegex("class=\"post__attachment-link\"[^>]*href=\"(https?://[^\"]+)\"").getColumn(0);
+        if (attachmentURLs != null) {
+            for (String attachmentURL : attachmentURLs) {
+                attachmentURL = Encoding.htmlOnlyDecode(attachmentURL);
+                final String filenameFromURL = Plugin.getFileNameFromURL(new URL(attachmentURL));
+                if (filenameFromURL != null) {
+                    websiteAttachmentsByFilename.put(filenameFromURL, attachmentURL);
+                }
+            }
+        }
+        for (final Map.Entry<String, Integer> deferredAttachmentEntry : deferredAttachmentIndexes.entrySet()) {
+            final String deferredAttachmentName = deferredAttachmentEntry.getKey();
+            final int index = deferredAttachmentEntry.getValue().intValue();
+            final String url = websiteAttachmentsByFilename.get(deferredAttachmentName);
+            if (url == null) {
+                /* Deferred attachment could not be found on the website -> Log but do not throw an Exception. */
+                logger.warning("Failed to find deferred attachment on website: " + deferredAttachmentName);
+                continue;
+            }
+            /*
+             * Add the matched link (without parameters, as the signature parameters change on each request) to the dupe set to avoid
+             * duplicates.
+             */
+            final String urlWithoutParameters = URLHelper.getUrlWithoutParams(url);
+            if (!dupes.add(urlWithoutParameters)) {
+                /* Skip dupe */
+                logger.info("Skipping already known deferred attachment: " + deferredAttachmentName);
+                continue;
+            }
+            /* Build the DownloadLink similar to buildFileDownloadLinkAPI so it is handled the same way as regular attachments. */
+            final DownloadLink deferredAttachment = new DownloadLink(ensureInitHosterplugin(), getHost(), url);
+            deferredAttachment.setFinalFileName(deferredAttachmentName);
+            deferredAttachment.setProperty(KemonoParty.PROPERTY_BETTER_FILENAME, deferredAttachmentName);
+            deferredAttachment.setProperty(KemonoParty.PROPERTY_POST_CONTENT_INDEX, index);
+            /* These items will be deleted soon -> Set high priority in hope to download them first */
+            deferredAttachment.setPriorityEnum(Priority.HIGHEST);
+            ret.add(deferredAttachment);
+            logger.info("Found deferred attachment on website: " + deferredAttachmentName);
+        }
+        return ret;
+    }
+
     private DownloadLink buildFileDownloadLinkAPI(final HashSet<String> dupes, final boolean advancedDupeCheck, final Map<String, Object> filemap, final int index, final Boolean has_full) throws PluginException {
-        this.ensureInitHosterplugin();
+
         /**
          * 2025-06-02: Looks like the "name" field is not always given though it missing can also mean that the original file is
          * broken/missing on the server. <br>
@@ -678,7 +761,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             /* Skip dupe */
             return null;
         }
-        final DownloadLink media = new DownloadLink(this.hostPlugin, getHost(), url);
+        final DownloadLink media = new DownloadLink(ensureInitHosterplugin(), getHost(), url);
         if (filename != null) {
             media.setFinalFileName(filename);
             media.setProperty(KemonoParty.PROPERTY_BETTER_FILENAME, filename);
@@ -705,9 +788,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     };
 
     /**
-     * Returns userID for given username. </br>
-     * Uses API to find userID. </br>
-     * Throws Exception if it is unable to find userID.
+     * Returns userID for given username. </br> Uses API to find userID. </br> Throws Exception if it is unable to find userID.
      */
     private String findUsername(final String service, final String usernameOrUserID) throws Exception {
         synchronized (ID_TO_USERNAME) {
@@ -745,10 +826,12 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         return null;
     }
 
-    private void ensureInitHosterplugin() throws PluginException {
-        if (this.hostPlugin == null) {
-            this.hostPlugin = (KemonoParty) getNewPluginForHostInstance(getHost());
+    private PluginForHost ensureInitHosterplugin() throws PluginException {
+        final PluginForHost hostPlugin = this.hostPlugin;
+        if (hostPlugin != null) {
+            return hostPlugin;
         }
+        return this.hostPlugin = (KemonoParty) getNewPluginForHostInstance(getHost());
     }
 
     @Override

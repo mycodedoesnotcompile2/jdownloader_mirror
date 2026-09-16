@@ -46,18 +46,22 @@ import javax.swing.JCheckBox;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.Application;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.images.IconIO;
 import org.appwork.utils.images.ScalableIcon;
 
 public final class CheckBoxIcon implements Icon, ScalableIcon, IDIcon {
-    public static final Icon FALSE     = (new CheckBoxIcon(false));
-    public static final Icon TRUE      = (new CheckBoxIcon(true));
-    public static final Icon UNDEFINED = (new CheckBoxIcon(true, false));
+    public static final Icon FALSE          = (new CheckBoxIcon(false));
+    public static final Icon TRUE           = (new CheckBoxIcon(true));
+    public static final Icon UNDEFINED      = (new CheckBoxIcon(true, false));
     private int              size;
     private final JCheckBox  checkBox;
     private Rectangle2D      unscaledDimensionAndPosition;
     private final Image      image;
+    private Image            snapshot;
+    private int              snapshotW      = -1;
+    private int              snapshotH      = -1;
+    private double           snapshotScaleX = Double.NaN;
+    private double           snapshotScaleY = Double.NaN;
     private boolean          selected;
     private boolean          enabled;
 
@@ -96,13 +100,16 @@ public final class CheckBoxIcon implements Icon, ScalableIcon, IDIcon {
                 checkBox.setSize(checkBox.getPreferredSize());
                 checkBox.setOpaque(false);
                 checkBox.setContentAreaFilled(true);
-                BufferedImage dummy = IconIO.createEmptyImage(32, 32);
-                Graphics2D g2d = (Graphics2D) dummy.getGraphics();
-                g2d.setTransform(new AffineTransform());
-                RecordingGraphics2D record = new RecordingGraphics2D(g2d);
-                checkBox.paint(record);
-                g2d.dispose();
-                unscaledDimensionAndPosition = record.getCompleteDrawnArea();
+                final BufferedImage dummy = IconIO.createEmptyImage(32, 32);
+                final Graphics2D g2d = (Graphics2D) dummy.getGraphics();
+                try {
+                    g2d.setTransform(new AffineTransform());
+                    final RecordingGraphics2D record = new RecordingGraphics2D(g2d);
+                    checkBox.paint(record);
+                    unscaledDimensionAndPosition = record.getCompleteDrawnArea();
+                } finally {
+                    g2d.dispose();
+                }
             } catch (Exception e) {
                 checkBox = null;
                 LogV3.log(e);
@@ -187,67 +194,49 @@ public final class CheckBoxIcon implements Icon, ScalableIcon, IDIcon {
             gOrg.drawImage(IconIO.getScaledInstance(image, width, height), x, y, c);
             return;
         }
-        Graphics g = gOrg.create();
-        // checkBox.setBackground(new Color(0, 0, 0, 0f));
-        Graphics2D g2d = ((Graphics2D) g);
-        // AffineTransform orgTf2 = g2d.getTransform();
-        // g2d.setColor(Color.green);
-        g2d.translate(x, y);
-        AffineTransform orgTf = g2d.getTransform();
-        // g2d.fillRect(x + 1, y + 1, getIconWidth() - 2, getIconHeight() - 2);
-        // g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        // g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-        // g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        // g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-        // dummy paint just to get the painted area
-        // g2d.setTransform(new AffineTransform());
-        double componentScaleX = height / unscaledDimensionAndPosition.getWidth();
-        double componentScaleY = width / unscaledDimensionAndPosition.getHeight();
-        // g2d.scale(orgTf.getScaleX(), orgTf.getScaleY());
-        // g2d.translate(x + area.getX() - 1, y + area.getY() + 1);
-        // g2d.translate(x, y);
-        // g2d.translate((orgTf.getTranslateX()), (orgTf.getTranslateY()));
-        g2d.scale(componentScaleX, componentScaleY);
-        // RecordingGraphics2D record2 = new RecordingGraphics2D(g2d);
-        // checkBox.paint(record2);
-        // Rectangle2D area2 = record2.getCompleteDrawnArea();
-        g2d.translate(-unscaledDimensionAndPosition.getX(), -unscaledDimensionAndPosition.getY());
-        // g2d.translate(-area2.getX() / record2.getTransform().getScaleX() * orgTf.getScaleX(), -area2.getY() /
-        // record2.getTransform().getScaleY() * orgTf.getScaleY());
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && false) {
-            System.out.println(g2d.getTransform());
-            // validation check, if the component actually paints in the desired size
-            RecordingGraphics2D record3 = new RecordingGraphics2D(g2d);
-            checkBox.paint(record3);
-            Rectangle2D area3 = record3.getCompleteDrawnArea();
-            double sizeX = (int) Math.round(area3.getWidth() / orgTf.getScaleX());
-            double sizeY = (int) Math.round(area3.getHeight() / orgTf.getScaleY());
-            DebugMode.breakIf((int) sizeX != getIconWidth());
-            DebugMode.breakIf((int) sizeY != getIconHeight());
+        final Graphics2D g2 = (Graphics2D) gOrg.create();
+        try {
+            final AffineTransform transform = g2.getTransform();
+            final double scaleX = transform.getScaleX();
+            final double scaleY = transform.getScaleY();
+            final Image img = getSnapshot(width, height, scaleX, scaleY);
+            // Draw in device pixels so a HiDPI snapshot is not scaled twice.
+            g2.scale(1d / scaleX, 1d / scaleY);
+            g2.drawImage(img, (int) Math.round(x * scaleX), (int) Math.round(y * scaleY), c);
+        } finally {
+            g2.dispose();
         }
-        // System.out.println(g2d.getTransform());
-        // System.out.println(g2d.getTransform());
-        // g2d.setClip(area3);
-        checkBox.paint(g2d);
-        g2d.dispose();
-        // BufferedImage crop1 = image.getSubimage((int) (area.getX()), (int) (area.getY()), (int) (area.getWidth() + 1), (int)
-        // (area.getHeight() + 1));
-        // if (true) {
-        // //
-        // super.paintIcon(c, g, x, y);
-        // return;
-        // } else {
-        // // might become not sharp
-        // Object restore = ((Graphics2D) g).getRenderingHint(RenderingHints.KEY_INTERPOLATION);
-        // try {
-        // ((Graphics2D) g).setRenderingHint(RenderingHints.KEY_INTERPOLATION, Interpolation.BICUBIC.getHint());
-        // super.paintIcon(c, g, x, y);
-        // } finally {
-        // if (restore == null) {
-        // restore = RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR;
-        // }
-        // ((Graphics2D) g).setRenderingHint(RenderingHints.KEY_INTERPOLATION, restore);
-        // }
-        // }
+    }
+
+    /**
+     * Paint the JCheckBox onto an isolated BufferedImage. Never call checkBox.paint() on the caller's Graphics (or a create() copy of it):
+     * Synthetica's checkbox UI/painter then shifts subsequent ComboBox renderer text. getDisabledIcon/IconIO.toImage works for the same
+     * reason.
+     */
+    private synchronized Image getSnapshot(int width, int height, double scaleX, double scaleY) {
+        if (snapshot != null && snapshotW == width && snapshotH == height && snapshotScaleX == scaleX && snapshotScaleY == scaleY) {
+            return snapshot;
+        }
+        int pixelW = Math.max(1, (int) Math.round(width * Math.abs(scaleX)));
+        int pixelH = Math.max(1, (int) Math.round(height * Math.abs(scaleY)));
+        final BufferedImage img = IconIO.createEmptyImage(pixelW, pixelH);
+        final Graphics2D g2d = img.createGraphics();
+        try {
+            g2d.scale(Math.abs(scaleX), Math.abs(scaleY));
+            final double componentScaleX = height / unscaledDimensionAndPosition.getWidth();
+            final double componentScaleY = width / unscaledDimensionAndPosition.getHeight();
+            g2d.scale(componentScaleX, componentScaleY);
+            g2d.translate(-unscaledDimensionAndPosition.getX(), -unscaledDimensionAndPosition.getY());
+            g2d.clip(unscaledDimensionAndPosition);
+            checkBox.paint(g2d);
+        } finally {
+            g2d.dispose();
+        }
+        snapshot = img;
+        snapshotW = width;
+        snapshotH = height;
+        snapshotScaleX = scaleX;
+        snapshotScaleY = scaleY;
+        return img;
     }
 }

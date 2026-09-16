@@ -26,6 +26,8 @@ public class CompiledPluginStatusFilter extends PluginStatusFilter implements St
                 return VerifyPremium(link);
             case ACCOUNT:
                 return VerifyAccount(link);
+            case ACCOUNT_ANY:
+                return VerifyAccountAny(link);
             case AUTOCAPTCHA:
                 return link.hasAutoCaptcha() || !link.hasCaptcha(null);
             case NO_DIRECT_HTTP:
@@ -38,6 +40,8 @@ public class CompiledPluginStatusFilter extends PluginStatusFilter implements St
                 return !VerifyPremium(link);
             case ACCOUNT:
                 return !VerifyAccount(link);
+            case ACCOUNT_ANY:
+                return !VerifyAccountAny(link);
             case AUTOCAPTCHA:
                 return !link.hasAutoCaptcha() && link.hasCaptcha(null);
             case NO_DIRECT_HTTP:
@@ -56,6 +60,26 @@ public class CompiledPluginStatusFilter extends PluginStatusFilter implements St
             return true;
         }
         if (AccountController.getInstance().listAccounts(new AccountFilter().setMaxResultsNum(1).setEnabled(true).setValid(true).setTemporarilyDisabled(false).setMultiHostSupported(link.getHost())).size() > 0) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Verify if there is at least one account for this link's host that is merely enabled, regardless of its error/valid state.
+     *
+     * @param link
+     *            Link that we want to verify
+     * @return true if an enabled account is associated, false otherwise.
+     */
+    private boolean VerifyAccountAny(CrawledLink link) {
+        if (link.isDirectHTTP() || link.isFTP()) {
+            return true;
+        }
+        if (AccountController.getInstance().listAccounts(new AccountFilter().setMaxResultsNum(1).setEnabled(true).setHosts(link.getHost())).size() > 0) {
+            return true;
+        }
+        if (AccountController.getInstance().listAccounts(new AccountFilter().setMaxResultsNum(1).setEnabled(true).setMultiHostSupported(link.getHost())).size() > 0) {
             return true;
         }
         return false;

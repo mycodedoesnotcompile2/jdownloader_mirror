@@ -16,6 +16,8 @@ Always wrap the commit message in a fenced ```text code block so it can be copie
 
 **All code comments must be written in English.** This applies to every comment (line comments, block comments, Javadoc), regardless of the language used in the conversation.
 
+**Use multi-line block comments (`/* ... */` or Javadoc `/** ... */`), not `//` line comments.** This applies to both single- and multi-line comments.
+
 ## Java Compatibility
 
 **All Java code in this project must be Java 1.6 compatible.**

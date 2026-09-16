@@ -1774,11 +1774,14 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "hasn't" })
     String ConditionDialog_layoutDialogContent_online_hasnot_();
 
-    @Default(lngs = { "en" }, values = { "a valid Premium Account" })
+    @Default(lngs = { "en" }, values = { "a valid, enabled Premium Account" })
     String ConditionDialog_layoutDialogContent_premium();
 
-    @Default(lngs = { "en" }, values = { "a valid Account" })
+    @Default(lngs = { "en" }, values = { "a valid, enabled Account" })
     String ConditionDialog_layoutDialogContent_account();
+
+    @Default(lngs = { "en" }, values = { "an enabled Account (regardless of status)" })
+    String ConditionDialog_layoutDialogContent_account_any();
 
     @Default(lngs = { "en" }, values = { "Plugin" })
     String FilterRuleDialog_layoutDialogContent_lbl_plugin();
@@ -1786,20 +1789,26 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "a Captcha Solver" })
     String ConditionDialog_layoutDialogContent_captcha();
 
-    @Default(lngs = { "en" }, values = { "Valid Premiumaccount is available" })
+    @Default(lngs = { "en" }, values = { "Valid, enabled Premiumaccount is available" })
     String FilterRule_toString_premium();
 
-    @Default(lngs = { "en" }, values = { "Valid account is available" })
+    @Default(lngs = { "en" }, values = { "Valid, enabled account is available" })
     String FilterRule_toString_account();
+
+    @Default(lngs = { "en" }, values = { "Enabled account is available (regardless of status)" })
+    String FilterRule_toString_account_any();
 
     @Default(lngs = { "en" }, values = { "Captchas are solved automatically" })
     String FilterRule_toString_autocaptcha();
 
-    @Default(lngs = { "en" }, values = { "No valid Premiumaccount available" })
+    @Default(lngs = { "en" }, values = { "No valid, enabled Premiumaccount available" })
     String FilterRule_toString_premium_not();
 
-    @Default(lngs = { "en" }, values = { "No valid account available" })
+    @Default(lngs = { "en" }, values = { "No valid, enabled account available" })
     String FilterRule_toString_account_not();
+
+    @Default(lngs = { "en" }, values = { "No account available (regardless of status)" })
+    String FilterRule_toString_account_any_not();
 
     @Default(lngs = { "en" }, values = { "Captchas must be entered manually" })
     String FilterRule_toString_autocaptcha_not();

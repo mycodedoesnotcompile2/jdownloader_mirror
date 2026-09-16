@@ -26,15 +26,8 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.Files;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.downloader.text.TextDownloader;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.http.Request;
 import jd.http.URLConnectionAdapter;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -42,6 +35,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
@@ -49,7 +43,14 @@ import jd.plugins.decrypter.KemonoPartyCrawler;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 
-@HostPlugin(revision = "$Revision: 53277 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.utils.Files;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.downloader.text.TextDownloader;
+
+@HostPlugin(revision = "$Revision: 53422 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { KemonoPartyCrawler.class })
 public class KemonoParty extends PluginForHost {
     public KemonoParty(PluginWrapper wrapper) {
@@ -91,20 +92,31 @@ public class KemonoParty extends PluginForHost {
         return "https://" + getHost() + "/contact";
     }
 
+    private static boolean isPawchive(Plugin plugin) {
+        return plugin.getHost().equals("pawchive.pw");
+    }
+
     private static List<String[]> getPluginDomains() {
         return KemonoPartyCrawler.getPluginDomains();
     }
 
-    @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
-        if ("pawchive.pw".equals(getHost())) {
-            br.getHeaders().put("User-Agent", Request.getSuggestedUserAgent("154.0"));
-            br.getHeaders().put("Sec-Fetch-Dest", "document");
-            br.getHeaders().put("Sec-Fetch-Mode", "navigate");
-            br.getHeaders().put("Sec-Fetch-Site", "same-site");
-        }
+        return prepBrowser(this, br);
+    }
+
+    public static Browser prepBrowser(final Plugin plugin, final Browser br) {
         br.setFollowRedirects(true);
+        if (isPawchive(plugin)) {
+            br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, "JDownloader:" + plugin.getVersion());
+            /* Do not use these headers, they will cause a 403 error (triggers anti bot detection) */
+            // br.getHeaders().put("Sec-Fetch-Dest", "document");
+            // br.getHeaders().put("Sec-Fetch-Mode", "navigate");
+            // br.getHeaders().put("Sec-Fetch-Site", "same-site");
+        }
+        for (String host : plugin.siteSupportedNames()) {
+            Browser.setRequestIntervalLimitGlobal(host, false, 1250);
+        }
         return br;
     }
 
@@ -314,14 +326,15 @@ public class KemonoParty extends PluginForHost {
      *            : (+1|-1)
      */
     protected void controlMaxFreeDownloads(final Account account, final DownloadLink link, final int num) {
-        if (account == null) {
-            final AtomicInteger freeRunning = getFreeRunning();
-            synchronized (freeRunning) {
-                final int before = freeRunning.get();
-                final int after = before + num;
-                freeRunning.set(after);
-                logger.info("freeRunning(" + link.getName() + ")|max:" + getMaxSimultanFreeDownloadNum() + "|before:" + before + "|after:" + after + "|num:" + num);
-            }
+        if (account != null) {
+            return;
+        }
+        final AtomicInteger freeRunning = getFreeRunning();
+        synchronized (freeRunning) {
+            final int before = freeRunning.get();
+            final int after = before + num;
+            freeRunning.set(after);
+            logger.info("freeRunning(" + link.getName() + ")|max:" + getMaxSimultanFreeDownloadNum() + "|before:" + before + "|after:" + after + "|num:" + num);
         }
     }
 
@@ -357,7 +370,7 @@ public class KemonoParty extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        final int max = Integer.MAX_VALUE;
+        final int max = isPawchive(this) ? 5 : Integer.MAX_VALUE;
         final int running = getFreeRunning().get();
         final int ret = Math.min(running + 1, max);
         return ret;
