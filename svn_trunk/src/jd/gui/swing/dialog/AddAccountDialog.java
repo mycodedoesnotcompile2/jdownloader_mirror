@@ -409,6 +409,13 @@ public class AddAccountDialog extends AbstractDialog<Integer> implements InputCh
             }
         });
         getDialog().setMinimumSize(new Dimension(400, 300));
+        /*
+         * Register ESC on the content panel as well. The default ESCAPE binding installed by AbstractDialog lives on the OK button's
+         * WHEN_IN_FOCUSED_WINDOW input map, which does not reliably close this content-rich dialog when the search field, a login field or
+         * the hoster table has focus. Registering ESC on the content panel makes it catch the key via WHEN_ANCESTOR_OF_FOCUSED_COMPONENT
+         * for every focusable child.
+         */
+        registerEscape(content);
         return content;
     }
 

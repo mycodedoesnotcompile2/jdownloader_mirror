@@ -1,6 +1,5 @@
 package org.appwork.swing.exttable.columns;
 
-import java.text.NumberFormat;
 import java.util.Currency;
 
 import javax.swing.JComponent;
@@ -9,17 +8,16 @@ import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtDefaultRowSorter;
 import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.utils.DebugMode;
+import org.appwork.utils.formatter.CurrencyFormatter;
 import org.appwork.utils.swing.renderer.RenderLabel;
 
 public abstract class ExtCurrencyColumn<E> extends ExtColumn<E> {
     private static final long serialVersionUID = 3468695684952592990L;
     private final RenderLabel renderer;
-    private NumberFormat      formatter;
 
     public ExtCurrencyColumn(final String name, final ExtTableModel<E> table) {
         super(name, table);
         this.renderer = new RenderLabel();
-        formatter = updateNumberFormat();
         this.setRowSorter(new ExtDefaultRowSorter<E>() {
             @Override
             public int compare(final E o1, final E o2) {
@@ -35,26 +33,12 @@ public abstract class ExtCurrencyColumn<E> extends ExtColumn<E> {
         });
     }
 
-    @Override
-    protected NumberFormat getDefaultNumberFormat() {
-        return NumberFormat.getCurrencyInstance();
-    }
-
-    @Override
-    protected NumberFormat updateNumberFormat() {
-        return formatter = super.updateNumberFormat();
-    }
-
     abstract protected Currency getCurrency(E value);
 
     protected String getText(final E value) {
         try {
-            final Currency currency = getCurrency(value);
-            final NumberFormat fmt = (NumberFormat) this.formatter.clone();
-            if (currency != null) {
-                fmt.setCurrency(currency);
-            }
-            return fmt.format(this.getValue(value) / 100.0f);
+            /* getValue returns the amount in cents, so divide by 100 to get the actual monetary amount. */
+            return CurrencyFormatter.format(this.getValue(value) / 100.0d, getCurrency(value));
         } catch (final Exception e) {
             DebugMode.debugger();
             return e.getMessage();

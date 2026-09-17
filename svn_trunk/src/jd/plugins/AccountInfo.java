@@ -116,7 +116,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
         String balanceStr = String.format("%.3f", this.getAccountBalance());
         final Currency currency = getCurrency();
         if (currency != null) {
-            balanceStr += currency.getSymbol();
+            balanceStr += " " + currency.getSymbol();
         }
         return balanceStr;
     }
