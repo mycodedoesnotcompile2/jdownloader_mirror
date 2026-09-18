@@ -29,6 +29,24 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Files;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.controlling.Priority;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig.PostRevisionMode;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig.TextCrawlMode;
+import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
+import org.jdownloader.plugins.components.config.KemonoPartyConfigPawchiveSt;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -49,25 +67,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.KemonoParty;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Files;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.controlling.Priority;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.plugins.components.config.KemonoPartyConfig;
-import org.jdownloader.plugins.components.config.KemonoPartyConfig.PostRevisionMode;
-import org.jdownloader.plugins.components.config.KemonoPartyConfig.TextCrawlMode;
-import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
-import org.jdownloader.plugins.components.config.KemonoPartyConfigPawchiveSt;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 53422 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53447 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -484,6 +484,8 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final FilePackage postFilePackage = getFilePackageForPostCrawler(service, usernameOrUserID, postID, postTitle);
         String postTextContent = (String) postmap.get("content");
+        boolean skippedPostTextContent = false;
+        int numberofHttpLinksFromPostContent = 0;
         if (!StringUtils.isEmpty(postTextContent)) {
             if (cfg.isCrawlHttpLinksFromPostContent()) {
                 /* Place number 1 where we can crawl external http links from */
@@ -492,6 +494,8 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                 postTextContent = postTextContent.replaceAll("(?i)<a[^>]href\\s*=\\s*\"(.*?)\"[^>]*>\\s*\\1\\s*</a>(?:\\s*</p>[^>]*<p>)?\\s*(?:#|KEY:)\\s*([^< ]*)", "<a href=\"$1#$2\"</a>");
                 final List<CrawledLink> postTextContentLinks = getCrawler().find(getLinkCrawlerGeneration(), getCurrentLink(), postTextContent, br.getURL(), false, false);
                 if (postTextContentLinks != null) {
+                    /* Dupe check for links found in post text content */
+                    final HashSet<String> postTextContentLinkDupes = new HashSet<String>();
                     /* Prepare URL filter if configured */
                     final KemonoPartyConfig.PostTextLinkFilterMode filterMode = cfg.getPostTextLinkFilterMode();
                     Pattern filterPattern = null;
@@ -508,14 +512,9 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                     }
                     for (CrawledLink postTextContentLink : postTextContentLinks) {
                         final String linkURL = postTextContentLink.getURL();
-                        try {
-                            final URL url = new URL(linkURL);
-                            if (!dupes.add(url.getPath())) {
-                                // alread part of attachments
-                                continue;
-                            }
-                        } catch (final MalformedURLException e) {
-                            logger.log(e);
+                        if (!postTextContentLinkDupes.add(linkURL)) {
+                            /* Duplicate link found in post text content */
+                            continue;
                         }
                         /* Apply URL filter if configured */
                         if (filterPattern != null) {
@@ -531,6 +530,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                             }
                         }
                         ret.add(this.createDownloadlink(linkURL));
+                        numberofHttpLinksFromPostContent++;
                     }
                 }
             }
@@ -545,8 +545,11 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                     ignore.printStackTrace();
                 }
                 directResults.add(textfile);
+            } else {
+                skippedPostTextContent = true;
             }
         }
+        logger.info("service: " + service + " | UserID: " + usernameOrUserID + " | PostID: " + postID + " | Attachment/File items in API response: " + numberofResultsSimpleCount + " | Number of unique file items: " + directResults.size() + " | Number of http links from post content: " + numberofHttpLinksFromPostContent + " | skippedPostTextContent: " + skippedPostTextContent);
         if (cfg.isCrawlHttpLinksFromPostContent()) {
             /* Place number 2 where we can crawl external http links from */
             final Map<String, Object> embedmap = (Map<String, Object>) postmap.get("embed");
@@ -642,10 +645,11 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     }
 
     /**
-     * Workaround for "deferred" attachments. </br> Some attachments are returned by the API without a downloadable "path" and only with the
-     * "deferred" flag set to true. Their download-URLs are only available on the website (non-API) post page. This method fetches that page
-     * and returns download-links for the attachments whose filename matches one of the given deferred attachment names. </br> Names that
-     * cannot be found on the website are logged but do not raise an Exception.
+     * Workaround for "deferred" attachments. </br>
+     * Some attachments are returned by the API without a downloadable "path" and only with the "deferred" flag set to true. Their
+     * download-URLs are only available on the website (non-API) post page. This method fetches that page and returns download-links for the
+     * attachments whose filename matches one of the given deferred attachment names. </br>
+     * Names that cannot be found on the website are logged but do not raise an Exception.
      */
     private ArrayList<DownloadLink> crawlDeferredAttachments(final Map<String, Integer> deferredAttachmentIndexes, final HashSet<String> dupes, final String posturl) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
@@ -700,7 +704,6 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     }
 
     private DownloadLink buildFileDownloadLinkAPI(final HashSet<String> dupes, final boolean advancedDupeCheck, final Map<String, Object> filemap, final int index, final Boolean has_full) throws PluginException {
-
         /**
          * 2025-06-02: Looks like the "name" field is not always given though it missing can also mean that the original file is
          * broken/missing on the server. <br>
@@ -788,7 +791,9 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     };
 
     /**
-     * Returns userID for given username. </br> Uses API to find userID. </br> Throws Exception if it is unable to find userID.
+     * Returns userID for given username. </br>
+     * Uses API to find userID. </br>
+     * Throws Exception if it is unable to find userID.
      */
     private String findUsername(final String service, final String usernameOrUserID) throws Exception {
         synchronized (ID_TO_USERNAME) {

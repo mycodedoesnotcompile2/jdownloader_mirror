@@ -63,7 +63,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 //Decrypts embedded videos from dailymotion
-@DecrypterPlugin(revision = "$Revision: 53401 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
+@DecrypterPlugin(revision = "$Revision: 53448 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
 public class DailyMotionComDecrypter extends PluginForDecrypt {
     public DailyMotionComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -103,6 +103,10 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
         // embedded video player -> rewrite URL
         contenturl = contenturl.replaceFirst("geo\\.dailymotion\\.com/player/[a-z0-9]+.html\\?video=", Matcher.quoteReplacement("dailymotion.com/video/"));
         contenturl = contenturl.replaceFirst("geo\\.dailymotion\\.com/player\\.html\\?video=", Matcher.quoteReplacement("dailymotion.com/video/"));
+        if (contenturl.matches(".*geo\\.dailymotion\\.com/player.*?")) {
+            // player only, without video, unsupported
+            return new ArrayList<DownloadLink>(0);
+        }
         contenturl = contenturl.replaceFirst("(?i)https?://dailymotion.com", "https://www.dailymotion.com");// avoid required redirect
         br.setFollowRedirects(true);
         DailyMotionCom.prepBrowser(this.br);
@@ -146,6 +150,10 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
             } else if (username != null) {
                 return crawlUser(username);
             } else {
+                final String autoTryUser = new Regex(param.getCryptedUrl(), "\\.com/([A-Za-z0-9_\\-]+)").getMatch(0);
+                if (autoTryUser != null) {
+                    return decryptIt(new CryptedLink("https://www.dailymotion.com/user/" + autoTryUser, param), progress);
+                }
                 /* This should never happen. */
                 logger.info("Unsupported linktype: " + contenturl);
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

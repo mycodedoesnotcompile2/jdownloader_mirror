@@ -33,41 +33,27 @@
  * ==================================================================================================================================================== */
 package org.appwork.storage.config.handler;
 
-import java.lang.annotation.Annotation;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
-import java.util.concurrent.CopyOnWriteArraySet;
 
 import org.appwork.storage.config.annotations.DefaultEnumArrayValue;
 import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.utils.DebugMode;
-import org.appwork.utils.ReflectionUtils;
 
 /**
  * @author Thomas
  *
  */
-public class EnumSetKeyHandler<T extends Enum<T>> extends ObjectKeyHandler<Set<T>> {
-    public EnumSetKeyHandler(StorageHandler<?> storageHandler, String key, Type type) {
-        super(storageHandler, key, type);
-    }
-
-    @Override
-    protected Class<? extends Annotation> getDefaultAnnotation() {
-        return DefaultEnumArrayValue.class;
-    }
-
-    public Set<T> newSetInstance() throws InstantiationException, IllegalAccessException {
-        Class raw = ReflectionUtils.getRaw(getTypeRef().getType());
-        if (raw.isInterface()) {
-            raw = CopyOnWriteArraySet.class;
-        }
-        final Set<T> value = (Set<T>) raw.newInstance();
-        return value;
+public class EnumArrayKeyHandler<T extends Enum<T>> extends ListHandler<T[]> {
+    /**
+     * @param storageHandler
+     * @param key
+     * @param type
+     */
+    public EnumArrayKeyHandler(final StorageHandler<?> storageHandler, final String key, final Type type) {
+        super(storageHandler, key, type, DefaultEnumArrayValue.class);
     }
 
     @Override
@@ -93,19 +79,17 @@ public class EnumSetKeyHandler<T extends Enum<T>> extends ObjectKeyHandler<Set<T
                     DebugMode.debugger(e);
                 }
             }
-            final Set<T> defaultValueSet = newSetInstance();
-            defaultValueSet.addAll(ret);
-            this.setDefaultValue(defaultValueSet);
+            final T[] emptyArray = (T[]) java.lang.reflect.Array.newInstance(getRawClass(), 0);
+            this.setDefaultValue(ret.toArray(emptyArray));
             return;
         }
         if (getAnnotation(DefaultOnNull.class) != null) {
             final ParameterizedType type = (ParameterizedType) getRawType();
-            final Set<T> defaultValueSet = newSetInstance();
             final Class<T> enumClass = (Class<T>) type.getActualTypeArguments()[0];
-            defaultValueSet.addAll(Arrays.asList(enumClass.getEnumConstants()));
-            this.setDefaultValue(defaultValueSet);
+            final T[] defaultValue = enumClass.getEnumConstants();
+            this.setDefaultValue(defaultValue);
             return;
         }
         this.setDefaultValue(null);
     }
-};
+}

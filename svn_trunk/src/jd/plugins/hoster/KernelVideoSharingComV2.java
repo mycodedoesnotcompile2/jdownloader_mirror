@@ -86,7 +86,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 53356 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53438 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -115,13 +115,13 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         EMBED(Pattern.compile("/embed/(\\d+)/?", Pattern.CASE_INSENSITIVE), true),
         VIDEOS_FUID_SLUG(Pattern.compile("/(?:[a-z]{2}/)?videos?/(\\d+)/([\\w\\-]+)/?", Pattern.CASE_INSENSITIVE), true),
         VIDEO_FUID_SLUG(Pattern.compile("/(?:[a-z]{2}/)?video/(\\d+)/([\\w\\-]+)/?", Pattern.CASE_INSENSITIVE), true),
-        VIDEOS_SLUG_FUID_AT_END(Pattern.compile("/(?:[a-z]{2}/)?videos?/([\\w\\-]+)-(\\d+)(?:/?|\\.html)$", Pattern.CASE_INSENSITIVE), true),
-        VIDEOS_SLUG_NO_FUID(Pattern.compile("/(?:[a-z]{2}/)?videos?/([\\w\\-]+)/?$", Pattern.CASE_INSENSITIVE), false),
-        VIDEO_SLUG_NO_FUID(Pattern.compile("/(?:[a-z]{2}/)?video/([\\w\\-]+)/?$", Pattern.CASE_INSENSITIVE), false),
-        FUID_SLUG_NO_VIDEOS(Pattern.compile("/(?:[a-z]{2}/)?(\\d+)/([\\w\\-]+)/?$", Pattern.CASE_INSENSITIVE), true),
-        FUID_ONLY(Pattern.compile("/(\\d+)/?$", Pattern.CASE_INSENSITIVE), true),
-        SLUG_NO_FUID(Pattern.compile("/(?:[a-z]{2}/)?([a-z0-9\\-]+)/?$", Pattern.CASE_INSENSITIVE), false),
-        SLUG_NO_FUID_HTML(Pattern.compile("/(?:[a-z]{2}/)?([a-z0-9\\-]+)\\.html$", Pattern.CASE_INSENSITIVE), false);
+        VIDEOS_SLUG_FUID_AT_END(Pattern.compile("/(?:[a-z]{2}/)?videos?/([\\w\\-]+)-(\\d+)(?:/?|\\.html)", Pattern.CASE_INSENSITIVE), true),
+        VIDEOS_SLUG_NO_FUID(Pattern.compile("/(?:[a-z]{2}/)?videos?/([\\w\\-]+)/?", Pattern.CASE_INSENSITIVE), false),
+        VIDEO_SLUG_NO_FUID(Pattern.compile("/(?:[a-z]{2}/)?video/([\\w\\-]+)/?", Pattern.CASE_INSENSITIVE), false),
+        FUID_SLUG_NO_VIDEOS(Pattern.compile("/(?:[a-z]{2}/)?(\\d+)/([\\w\\-]+)/?", Pattern.CASE_INSENSITIVE), true),
+        FUID_ONLY(Pattern.compile("/(\\d+)/?", Pattern.CASE_INSENSITIVE), true),
+        SLUG_NO_FUID(Pattern.compile("/(?:[a-z]{2}/)?([a-z0-9\\-]+)/?", Pattern.CASE_INSENSITIVE), false),
+        SLUG_NO_FUID_HTML(Pattern.compile("/(?:[a-z]{2}/)?([a-z0-9\\-]+)\\.html", Pattern.CASE_INSENSITIVE), false);
 
         private final Pattern pattern;
         private final boolean hasFUID;
@@ -143,7 +143,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
             if (url == null) {
                 return false;
             }
-            return new Regex(url, pattern).patternFind();
+            return new Regex(getUrlPath(url), pattern).patternFind();
         }
 
         public String getFUID(final String url) {
@@ -152,15 +152,16 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
             } else if (!hasFUID) {
                 return null;
             }
+            final String path = getUrlPath(url);
             switch (this) {
             case EMBED:
             case FUID_ONLY:
             case VIDEOS_FUID_SLUG:
             case VIDEO_FUID_SLUG:
             case FUID_SLUG_NO_VIDEOS:
-                return new Regex(url, pattern).getMatch(0);
+                return new Regex(path, pattern).getMatch(0);
             case VIDEOS_SLUG_FUID_AT_END:
-                return new Regex(url, pattern).getMatch(1);
+                return new Regex(path, pattern).getMatch(1);
             default:
                 return null;
             }
@@ -170,19 +171,41 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
             if (url == null) {
                 return null;
             }
+            final String path = getUrlPath(url);
             switch (this) {
             case VIDEOS_FUID_SLUG:
             case VIDEO_FUID_SLUG:
             case FUID_SLUG_NO_VIDEOS:
-                return new Regex(url, pattern).getMatch(1);
+                return new Regex(path, pattern).getMatch(1);
             case VIDEOS_SLUG_FUID_AT_END:
             case VIDEOS_SLUG_NO_FUID:
             case VIDEO_SLUG_NO_FUID:
             case SLUG_NO_FUID:
             case SLUG_NO_FUID_HTML:
-                return new Regex(url, pattern).getMatch(0);
+                return new Regex(path, pattern).getMatch(0);
             default:
                 return null;
+            }
+        }
+
+        /**
+         * Reduces a URL to its path so the patterns are matched against the path only. </br>
+         * This strips the protocol and domain (so a pattern cannot match into the host, e.g. "/www") as well as the query and fragment (so
+         * query parameters like "?promoid=nudevista" are ignored). Because of this the patterns no longer need a trailing "$" anchor.
+         */
+        private static String getUrlPath(final String url) {
+            if (url == null) {
+                return null;
+            }
+            try {
+                return new URL(url).getPath();
+            } catch (final MalformedURLException ignore) {
+                /* Fallback for inputs that are not a full URL (e.g. a plain path without protocol). */
+                /* Remove protocol and domain. */
+                String path = url.replaceFirst("(?i)^https?://[^/]+", "");
+                /* Remove query and fragment. */
+                path = path.replaceFirst("[?#].*$", "");
+                return path;
             }
         }
     }

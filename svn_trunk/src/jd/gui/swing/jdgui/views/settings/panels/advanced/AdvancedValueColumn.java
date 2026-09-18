@@ -10,7 +10,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -30,6 +29,7 @@ import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.annotations.EnumLabel;
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.storage.config.events.GenericConfigEventListener;
+import org.appwork.storage.config.handler.EnumSetKeyHandler;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.swing.components.CheckBoxIcon;
 import org.appwork.swing.exttable.ExtColumn;
@@ -38,7 +38,6 @@ import org.appwork.swing.exttable.columns.ExtCompoundColumn;
 import org.appwork.swing.exttable.columns.ExtSpinnerColumn;
 import org.appwork.swing.exttable.columns.ExtTextAreaColumn;
 import org.appwork.swing.exttable.columns.ExtTextColumn;
-import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.event.DefaultEvent;
 import org.appwork.utils.event.DontThrowFromCurrentThreadEventSuppressor;
 import org.appwork.utils.event.EventSuppressor;
@@ -426,21 +425,22 @@ public class AdvancedValueColumn extends ExtCompoundColumn<AdvancedConfigEntry> 
                 }
 
                 @Override
-                public String getStringValue(AdvancedConfigEntry value) {
+                public String getStringValue(AdvancedConfigEntry entry) {
+                    final Object value = entry.getValue();
                     try {
-                        EnumLabel lbl = value.getClazz().getDeclaredField(value.getValue().toString()).getAnnotation(EnumLabel.class);
-                        if (lbl != null) {
-                            return lbl.value();
-                        }
-                        if (value.getValue() instanceof LabelInterface) {
-                            return ((LabelInterface) value.getValue()).getLabel();
-                        }
                         if (value instanceof LabelInterface) {
                             return ((LabelInterface) value).getLabel();
                         }
+                        if (entry instanceof LabelInterface) {
+                            return ((LabelInterface) entry).getLabel();
+                        }
+                        final EnumLabel lbl = entry.getClazz().getDeclaredField(value.toString()).getAnnotation(EnumLabel.class);
+                        if (lbl != null) {
+                            return lbl.value();
+                        }
                     } catch (Exception e) {
                     }
-                    return value.getValue().toString();
+                    return value.toString();
                 }
             };
             register(enumColumn);
@@ -480,7 +480,7 @@ public class AdvancedValueColumn extends ExtCompoundColumn<AdvancedConfigEntry> 
 
                 public boolean onSingleClick(final MouseEvent e, final AdvancedConfigEntry configEntry) {
                     try {
-                        final KeyHandler<Set<Enum>> m = (KeyHandler<Set<Enum>>) configEntry.getKeyHandler();
+                        final EnumSetKeyHandler m = (EnumSetKeyHandler) configEntry.getKeyHandler();
                         final Type[] types = ((ParameterizedType) configEntry.getType()).getActualTypeArguments();
                         final MultiComboBox<Object> comp = new MultiComboBox<Object>(((Class) types[0]).getEnumConstants()) {
                             private final GenericConfigEventListener<Set<Enum>> listener = new GenericConfigEventListener<Set<Enum>>() {
@@ -494,13 +494,7 @@ public class AdvancedValueColumn extends ExtCompoundColumn<AdvancedConfigEntry> 
                                 }
                             };
                             {
-                                Set<Enum> value = (Set<Enum>) configEntry.getValue();
-                                if (value == null) {
-                                    value = newSetInstance(m);
-                                    for (Object e : ((Class) types[0]).getEnumConstants()) {
-                                        value.add((Enum) e);
-                                    }
-                                }
+                                final Set<Enum> value = (Set<Enum>) configEntry.getValue();
                                 m.getEventSender().addListener(listener, true);
                                 updateModel(value);
                             }
@@ -510,18 +504,9 @@ public class AdvancedValueColumn extends ExtCompoundColumn<AdvancedConfigEntry> 
                                 return "[" + list.size() + "/" + getValues().size() + "] " + super.getLabel(list);
                             }
 
-                            protected Set<Enum> newSetInstance(KeyHandler m) throws InstantiationException, IllegalAccessException {
-                                Class raw = ReflectionUtils.getRaw(m.getTypeRef().getType());
-                                if (raw.isInterface()) {
-                                    raw = HashSet.class;
-                                }
-                                final Set<Enum> value = (Set<Enum>) raw.newInstance();
-                                return value;
-                            }
-
                             protected void updateModel(final Set<Enum> newValue) {
                                 if (newValue == null) {
-                                    setSelectedItems(((Class) types[0]).getEnumConstants());
+                                    setSelectedItems((Object[]) null);
                                 } else {
                                     setSelectedItems((Object[]) newValue.toArray(new Enum[0]));
                                 }
@@ -541,7 +526,7 @@ public class AdvancedValueColumn extends ExtCompoundColumn<AdvancedConfigEntry> 
                                 final EventSuppressor added = new DontThrowFromCurrentThreadEventSuppressor<DefaultEvent>();
                                 m.getEventSender().addEventSuppressor(added);
                                 try {
-                                    final Set<Enum> set = newSetInstance(m);
+                                    final Set<Enum> set = m.newSetInstance();
                                     for (Object e : getSelectedItems()) {
                                         set.add((Enum) e);
                                     }
@@ -639,11 +624,9 @@ public class AdvancedValueColumn extends ExtCompoundColumn<AdvancedConfigEntry> 
             return numberColumn;
         } else if (Enum.class.isAssignableFrom(object.getClazz())) {
             return enumColumn;
-        } else if (Set.class.isAssignableFrom(object.getClazz())) {
-            final Type[] types = ((ParameterizedType) object.getType()).getActualTypeArguments();
-            if (types[0] instanceof Class && ((Class) types[0]).isEnum()) {
-                return enumSetColumn;
-            }
+        } else if (object.getKeyHandler() instanceof EnumSetKeyHandler) {
+            return enumSetColumn;
+
         }
         return defaultColumn;
     }

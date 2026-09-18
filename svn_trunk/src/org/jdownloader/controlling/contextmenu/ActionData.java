@@ -32,30 +32,28 @@ public class ActionData extends AbstractJsonData implements Storable {
     }
 
     public Class<?> _getClazz() throws ClassNotFoundException, ExtensionNotLoadedException {
-        if (clazz == null) {
-            if (getClazzName() == null) {
-                return null;
-            }
-            if (_isExtensionAction()) {
-                clazz = ExtensionController.getInstance().loadClass(getClazzName());
-            } else {
-                clazz = Class.forName(getClazzName());
-            }
-        } else if (_isExtensionAction()) {
-            clazz = ExtensionController.getInstance().loadClass(getClazzName());
+        final String cn = getClazzName();
+        if (cn == null) {
+            return null;
         }
-        return clazz;
+        if (_isExtensionAction()) {
+            /* Extension classes are (re)loaded on every access because the extension may have been (un)loaded meanwhile. */
+            return clazz = ExtensionController.getInstance().loadClass(getClazzName());
+        }
+        if (clazz != null) {
+            return clazz;
+        }
+        return clazz = Class.forName(cn);
     }
 
-    private boolean _isExtensionAction() {
-        String cn = getClazzName();
+    public boolean _isExtensionAction() {
+        final String cn = getClazzName();
         if (cn == null) {
             return false;
         }
-        int i = cn.lastIndexOf(".");
-        String pkg = i >= 0 ? cn.substring(0, i) : "";
-        boolean ret = pkg.startsWith(PACKAGE_NAME);
-        return ret;
+        final int i = cn.lastIndexOf(".");
+        final String pkg = i >= 0 ? cn.substring(0, i) : "";
+        return pkg.startsWith(PACKAGE_NAME);
     }
 
     private String                  clazzName;
@@ -121,9 +119,8 @@ public class ActionData extends AbstractJsonData implements Storable {
     public Object fetchSetup(String name2) {
         if (setup == null) {
             return null;
-        } else {
-            return setup.get(StringUtils.toUpperCaseOrNull(name2));
         }
+        return setup.get(StringUtils.toUpperCaseOrNull(name2));
     }
 
     public void setTooltip(String tooltip) {

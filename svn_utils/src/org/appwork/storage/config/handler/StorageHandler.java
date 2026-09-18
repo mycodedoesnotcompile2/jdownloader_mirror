@@ -572,7 +572,7 @@ public class StorageHandler<T extends ConfigInterface> implements InvocationHand
             } else if (Clazz.isString(ct)) {
                 return new StringListHandler(this, key, type);
             } else if (Clazz.isEnum(ct)) {
-                return new EnumListHandler(this, key, type);
+                return new EnumArrayKeyHandler(this, key, type);
             } else {
                 return new ObjectKeyHandler(this, key, type);
             }

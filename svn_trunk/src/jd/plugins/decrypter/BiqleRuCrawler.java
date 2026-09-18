@@ -21,18 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.BiqleRuConfig;
-import org.jdownloader.plugins.components.config.BiqleRuConfig.Quality;
-import org.jdownloader.plugins.components.config.BiqleRuConfig.QualitySelectionMode;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -47,7 +35,19 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 50717 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.BiqleRuConfig;
+import org.jdownloader.plugins.components.config.BiqleRuConfig.Quality;
+import org.jdownloader.plugins.components.config.BiqleRuConfig.QualitySelectionMode;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 53443 $", interfaceVersion = 3, names = {}, urls = {})
 public class BiqleRuCrawler extends PluginForDecrypt {
     public BiqleRuCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -107,7 +107,7 @@ public class BiqleRuCrawler extends PluginForDecrypt {
             final String id = urlinfo.getMatch(1);
             /* Check if content is also hosted on vk and if so, return only vk.com URLs. */
             final CryptedLink vklink = new CryptedLink(VKontakteRu.generateContentURLVideo(oid, id), param);
-            final VKontakteRu vkPlugin = (VKontakteRu) this.getNewPluginForDecryptInstance("vk.com");
+            final VKontakteRu vkPlugin = (VKontakteRu) this.getNewPluginForDecryptInstance("vk.ru");
             /* Try to use same "preferred quality selection mode" setting for vk.com as use has set for biqle.ru plugin. */
             try {
                 try {
@@ -139,8 +139,7 @@ public class BiqleRuCrawler extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if (br.containsHTML(">Попробуйте еще раз")) {
                 /**
-                 * "Try again" </br>
-                 * https://biqle.ru/watch/-163698164_456239521
+                 * "Try again" </br> https://biqle.ru/watch/-163698164_456239521
                  */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -407,9 +406,8 @@ public class BiqleRuCrawler extends PluginForDecrypt {
         }
         if (qualityMap == null || qualityMap.isEmpty()) {
             /**
-             * 2023-01-18: Assume that content is offline. </br>
-             * Alternatively we could run through vk.com handling as their content is usually hosted on vk.com. </br>
-             * Offline items may only contain hls streams but those will be offline/broken too!
+             * 2023-01-18: Assume that content is offline. </br> Alternatively we could run through vk.com handling as their content is
+             * usually hosted on vk.com. </br> Offline items may only contain hls streams but those will be offline/broken too!
              */
             logger.info("Looks like content is offline | Skipped unsupported stream types: " + numberofSkippedUnsupportedStreamTypes);
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

@@ -4,7 +4,6 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -18,8 +17,8 @@ import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.BooleanKeyHandler;
+import org.appwork.storage.config.handler.EnumSetKeyHandler;
 import org.appwork.storage.config.handler.KeyHandler;
-import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.event.DefaultEvent;
 import org.appwork.utils.event.DontThrowFromCurrentThreadEventSuppressor;
 import org.appwork.utils.event.EventSuppressor;
@@ -34,29 +33,22 @@ public class AntistandbyConfigPanel extends ExtensionConfigPanel<AntiStandbyExte
 
     public AntistandbyConfigPanel(AntiStandbyExtension trayExtension) {
         super(trayExtension);
-
-        final KeyHandler m = CFG_ANTISTANDBY.CONDITION;
+        final EnumSetKeyHandler m = CFG_ANTISTANDBY.CONDITION;
         try {
             final Type[] types = ((ParameterizedType) m.getTypeRef().getType()).getActualTypeArguments();
             final MultiComboBox<Object> comp = new MultiComboBox<Object>(((Class) types[0]).getEnumConstants()) {
                 private final GenericConfigEventListener<Set<Enum>> listener = new GenericConfigEventListener<Set<Enum>>() {
-                                                                                 @Override
-                                                                                 public void onConfigValidatorError(KeyHandler<Set<Enum>> keyHandler, Set<Enum> invalidValue, ValidationException validateException) {
-                                                                                 }
-
-                                                                                 @Override
-                                                                                 public void onConfigValueModified(KeyHandler<Set<Enum>> keyHandler, Set<Enum> newValue) {
-                                                                                     updateModel(newValue);
-                                                                                 }
-                                                                             };
-                {
-                    Set<Enum> value = (Set<Enum>) m.getValue();
-                    if (value == null) {
-                        value = newSetInstance(m);
-                        for (Object e : ((Class) types[0]).getEnumConstants()) {
-                            value.add((Enum) e);
-                        }
+                    @Override
+                    public void onConfigValidatorError(KeyHandler<Set<Enum>> keyHandler, Set<Enum> invalidValue, ValidationException validateException) {
                     }
+
+                    @Override
+                    public void onConfigValueModified(KeyHandler<Set<Enum>> keyHandler, Set<Enum> newValue) {
+                        updateModel(newValue);
+                    }
+                };
+                {
+                    final Set<Enum> value = (Set<Enum>) m.getValue();
                     m.getEventSender().addListener(listener, true);
                     updateModel(value);
                 }
@@ -66,18 +58,9 @@ public class AntistandbyConfigPanel extends ExtensionConfigPanel<AntiStandbyExte
                     return "[" + list.size() + "/" + getValues().size() + "] " + super.getLabel(list);
                 }
 
-                protected Set<Enum> newSetInstance(KeyHandler m) throws InstantiationException, IllegalAccessException {
-                    Class raw = ReflectionUtils.getRaw(m.getTypeRef().getType());
-                    if (raw.isInterface()) {
-                        raw = HashSet.class;
-                    }
-                    final Set<Enum> value = (Set<Enum>) raw.newInstance();
-                    return value;
-                }
-
                 protected void updateModel(final Set<Enum> newValue) {
                     if (newValue == null) {
-                        setSelectedItems(((Class) types[0]).getEnumConstants());
+                        setSelectedItems((Object[]) null);
                     } else {
                         setSelectedItems((Object[]) newValue.toArray(new Enum[0]));
                     }
@@ -89,7 +72,7 @@ public class AntistandbyConfigPanel extends ExtensionConfigPanel<AntiStandbyExte
                     final EventSuppressor added = new DontThrowFromCurrentThreadEventSuppressor<DefaultEvent>();
                     m.getEventSender().addEventSuppressor(added);
                     try {
-                        final Set<Enum> set = newSetInstance(m);
+                        final Set<Enum> set = m.newSetInstance();
                         for (Object e : getSelectedItems()) {
                             set.add((Enum) e);
                         }

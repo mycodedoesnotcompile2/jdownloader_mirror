@@ -57,7 +57,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.CumSt;
 
-@DecrypterPlugin(revision = "$Revision: 53362 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53447 $", interfaceVersion = 3, names = {}, urls = {})
 public class CumStCrawler extends PluginForDecrypt {
     public CumStCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -395,9 +395,9 @@ public class CumStCrawler extends PluginForDecrypt {
                 numberofResultsSimpleCount++;
             }
         }
-        logger.info("service: " + service + " | CreatorID: " + creatorID + " | PostID: " + postID + " | Attachment items in API response: " + numberofResultsSimpleCount + " | Number of unique file items: " + directResults.size());
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final FilePackage postFilePackage = getFilePackageForContentCrawler(service, creatorID, creatorName, contentType, postID);
+        boolean skippedPostTextContent = false;
         if (!StringUtils.isEmpty(postTextContent)) {
             final TextCrawlMode mode = cfg.getTextCrawlMode();
             if (mode == TextCrawlMode.ALWAYS || (mode == TextCrawlMode.ONLY_IF_NO_MEDIA_ITEMS_ARE_FOUND && directResults.isEmpty())) {
@@ -411,27 +411,30 @@ public class CumStCrawler extends PluginForDecrypt {
                     ignore.printStackTrace();
                 }
                 directResults.add(textfile);
+            } else {
+                skippedPostTextContent = true;
             }
         }
+        int numberofHttpLinksFromPostContent = 0;
         if (cfg.isCrawlHttpLinksFromPostContent()) {
             /* Crawl external http links from the raw caption text. */
             if (!StringUtils.isEmpty(postTextContent)) {
                 final List<CrawledLink> postTextContentLinks = getCrawler().find(getLinkCrawlerGeneration(), getCurrentLink(), postTextContent, br.getURL(), false, false);
                 if (postTextContentLinks != null) {
+                    /* Dupe check for links found in post text content */
+                    final Set<String> postTextContentLinkDupes = new HashSet<String>();
                     for (final CrawledLink postTextContentLink : postTextContentLinks) {
                         final String linkURL = postTextContentLink.getURL();
-                        try {
-                            final URL url = new URL(linkURL);
-                            if (!dupes.add(url.getPath())) {
-                                continue;
-                            }
-                        } catch (final MalformedURLException e) {
-                            logger.log(e);
+                        if (!postTextContentLinkDupes.add(linkURL)) {
+                            /* Duplicate link found in post text content */
+                            continue;
                         }
                         ret.add(this.createDownloadlink(linkURL));
+                        numberofHttpLinksFromPostContent++;
                     }
                 }
             }
+            logger.info("service: " + service + " | CreatorID: " + creatorID + " | PostID: " + postID + " | Attachment items in API response: " + numberofResultsSimpleCount + " | Number of unique file items: " + directResults.size() + " | Number of http links from post content: " + numberofHttpLinksFromPostContent + " | skippedPostTextContent: " + skippedPostTextContent);
             /* Crawl resolved outbound links (post_link rows). */
             final List<Map<String, Object>> links = (List<Map<String, Object>>) postmap.get("links");
             if (links != null) {

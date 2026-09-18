@@ -580,7 +580,6 @@ InfoPanel_updateInfo_header_actionlabel=(%s2) %s1
 InfoPanel_update_action=Action
 InfoPanel_update_link=Link
 InfoPanel_update_submenu=Submenu
-JACSolver_getName_=Fully automated internal Captcha Solving
 JACSolver_gettypeName_=JAntiCaptcha
 JAntiCaptchaToogleAction_createTooltip_=Enable/Disable JAC - the JDownloader Auto Captcha Solver
 JAntiCaptchaToogleAction_getNameWhenDisabled_=Auto Captcha Recognition

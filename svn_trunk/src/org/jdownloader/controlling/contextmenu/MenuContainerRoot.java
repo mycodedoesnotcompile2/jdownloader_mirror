@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.Storable;
@@ -25,7 +26,6 @@ public class MenuContainerRoot extends MenuContainer implements Storable {
     }
 
     public MenuContainerRoot(/* Storable */) {
-
     }
 
     public void validateFull() {
@@ -60,100 +60,110 @@ public class MenuContainerRoot extends MenuContainer implements Storable {
                 return false;
             }
         }
-
         container._setValidated(true);
-        boolean ret = true;
+
         container._setRoot(_getRoot());
         if (!container.isVisible() && !full) {
             return true;
         }
-        main: while (true) {
-            if (container.getItems() != null) {
-
-                HashMap<MenuItemData, MenuItemData> replaceMap = new HashMap<MenuItemData, MenuItemData>();
-                MenuItemData last = null;
-                for (int i = 0; i < container.getItems().size(); i++) {
-                    MenuItemData mid = container.getItems().get(i);
-                    mid._setRoot(_getRoot());
-                    if (!mid.isVisible() && !full) {
-                        continue;
-                    }
-                    mid._setValidateException(null);
-
-                    MenuItemData lr = null;
-                    try {
-                        try {
-                            lr = mid.createValidatedItem();
-                            if (!lr.isVisible() && !full) {
-                                continue;
-                            }
-                            if (lr.getActionData() != null && lr.getActionData()._isValidDataForCreatingAnAction() && !(lr instanceof MenuLink)) {
-                                lr.createAction();
-                            }
-
-                        } catch (ClassCurrentlyNotAvailableException e) {
-                            LogController.CL().log(e);
-                            // extension not loaded or anything like this.
-                            mid._setValidateException(e);
-
-                            lr = mid;
-                        }
-                        lr._setRoot(_getRoot());
-                        if (lr instanceof SeparatorData && (i == 0 || i == container.getItems().size() - 1)) {
-
-                            container.getItems().remove(i);
-                            ret = false;
-                            continue main;
-                        }
-                        if (lr instanceof SeparatorData && last instanceof SeparatorData) {
-
-                            container.getItems().remove(i);
-                            ret = false;
-                            continue main;
-                        }
-                        // let's allow this. actions may have a different setup
-                        // if (!set.add(lr._getIdentifier()) && !(lr instanceof SeparatorData) && lr.getType() == Type.ACTION) {
-                        //
-                        // container.getItems().remove(i);
-                        // ret = false;
-                        // continue main;
-                        //
-                        // }
-                        if (lr != mid) {
-                            // let's replace
-                            replaceMap.put(mid, lr);
-
-                        }
-                        last = lr;
-
-                    } catch (Throwable e) {
-                        LogController.CL().log(e);
-                        container.getItems().remove(i);
-                        ret = false;
-                        continue main;
-                        // if (itemsToRemove == null) itemsToRemove = new ArrayList<MenuItemData>();
-                        // itemsToRemove.add(mid);
-                        // e.printStackTrace();
-
-                    }
-
+        boolean ret = true;
+        loop: while (true) {
+            final List<MenuItemData> items = container.getItems();
+            if (items == null) {
+                return ret;
+            }
+            final Map<MenuItemData, MenuItemData> replaceMap = new HashMap<MenuItemData, MenuItemData>();
+            MenuItemData last = null;
+            for (int i = 0; i < items.size(); i++) {
+                MenuItemData mid = items.get(i);
+                mid._setRoot(_getRoot());
+                if (!mid.isVisible() && !full) {
+                    continue;
                 }
-
-                for (int i = 0; i < container.getItems().size(); i++) {
-                    MenuItemData mid = container.getItems().get(i);
-                    mid._setRoot(_getRoot());
-                    MenuItemData rep = replaceMap.remove(mid);
-                    if (rep != null) {
-                        container.getItems().set(i, rep);
-                        mid = rep;
+                mid._setValidateException(null);
+                MenuItemData lr = null;
+                try {
+                    try {
+                        lr = mid.createValidatedItem();
+                        if (!lr.isVisible() && !full) {
+                            continue;
+                        }
+                        /*
+                         * Remove orphaned core menu entries. When a core action class is deleted from the source, its menu entry survives
+                         * in the stored config as an ActionData that still carries a clazzName which can no longer be resolved. Such an
+                         * entry would otherwise stay visible in the menu manager dialog. Extension actions are intentionally excluded here:
+                         * their classes may only be temporarily unavailable while the extension is not loaded, which is handled separately
+                         * via ClassCurrentlyNotAvailableException below.
+                         */
+                        final ActionData orphanCandidate = lr.getActionData();
+                        if (orphanCandidate != null && StringUtils.isNotEmpty(orphanCandidate.getClazzName()) && !orphanCandidate._isExtensionAction() && !(lr instanceof MenuLink)) {
+                            try {
+                                orphanCandidate._getClazz();
+                            } catch (ClassNotFoundException cnfe) {
+                                LogController.CL().info("Removing orphaned menu entry, class no longer exists: " + orphanCandidate.getClazzName());
+                                items.remove(i);
+                                ret = false;
+                                continue loop;
+                            } catch (ExtensionNotLoadedException enfe) {
+                                /* Not expected for a non-extension class; keep the entry to stay on the safe side. */
+                            }
+                        }
+                        if (lr.getActionData() != null && lr.getActionData()._isValidDataForCreatingAnAction() && !(lr instanceof MenuLink)) {
+                            lr.createAction();
+                        }
+                    } catch (ClassCurrentlyNotAvailableException e) {
+                        LogController.CL().log(e);
+                        // extension not loaded or anything like this.
+                        mid._setValidateException(e);
+                        lr = mid;
                     }
-                    ret &= validate(mid, full);
-
+                    lr._setRoot(_getRoot());
+                    if (lr instanceof SeparatorData && (i == 0 || i == items.size() - 1)) {
+                        items.remove(i);
+                        ret = false;
+                        continue loop;
+                    }
+                    if (lr instanceof SeparatorData && last instanceof SeparatorData) {
+                        items.remove(i);
+                        ret = false;
+                        continue loop;
+                    }
+                    // let's allow this. actions may have a different setup
+                    // if (!set.add(lr._getIdentifier()) && !(lr instanceof SeparatorData) && lr.getType() == Type.ACTION) {
+                    //
+                    // container.getItems().remove(i);
+                    // ret = false;
+                    // continue main;
+                    //
+                    // }
+                    if (lr != mid) {
+                        // let's replace
+                        replaceMap.put(mid, lr);
+                    }
+                    last = lr;
+                } catch (Throwable e) {
+                    LogController.CL().log(e);
+                    items.remove(i);
+                    ret = false;
+                    continue loop;
+                    // if (itemsToRemove == null) itemsToRemove = new ArrayList<MenuItemData>();
+                    // itemsToRemove.add(mid);
+                    // e.printStackTrace();
                 }
             }
+            for (int i = 0; i < items.size(); i++) {
+                MenuItemData mid = items.get(i);
+                mid._setRoot(_getRoot());
+                MenuItemData rep = replaceMap.remove(mid);
+                if (rep != null) {
+                    items.set(i, rep);
+                    mid = rep;
+                }
+                ret &= validate(mid, full);
+            }
+
             return ret;
         }
-
     }
 
     public MenuContainerRoot _getRoot() {
@@ -165,7 +175,6 @@ public class MenuContainerRoot extends MenuContainer implements Storable {
             for (MenuItemData mu : nodeToAdd.getItems()) {
                 addBranch(parent, mu);
             }
-
         } else {
             boolean added = false;
             if (parent == null) {
@@ -177,22 +186,18 @@ public class MenuContainerRoot extends MenuContainer implements Storable {
                 }
                 if (StringUtils.equals(mu.getClassName(), nodeToAdd.getClassName())) {
                     // subfolder found
-
                     if (nodeToAdd.getItems() != null && nodeToAdd.getItems().size() > 0) {
                         for (MenuItemData item : nodeToAdd.getItems()) {
-
                             addBranch(mu, item);
                         }
                         added = true;
                     } else {
                         return;
                     }
-
                 }
             }
             if (!added) {
                 parent.getItems().add(nodeToAdd);
-
             }
         }
     }
@@ -207,7 +212,6 @@ public class MenuContainerRoot extends MenuContainer implements Storable {
      * @throws InstantiationException
      */
     public void add(List<MenuItemData> path) throws InstantiationException, IllegalAccessException, ClassNotFoundException, ExtensionNotLoadedException {
-
         MenuItemData addAt = this;
         MenuItemData c;
         MenuItemData parent = null;
@@ -215,25 +219,19 @@ public class MenuContainerRoot extends MenuContainer implements Storable {
             c = path.get(i);
             try {
                 if (c instanceof MenuContainerRoot) {
-
                     continue;
                 }
                 Collection<String> ids = addAt._getItemIdentifiers();
-
                 // System.out.println(parent);
-
                 if (c.getType() == Type.CONTAINER) {
-
                     for (MenuItemData mu : addAt.getItems()) {
                         // if (mu.getActionData() != null) continue;
                         if (StringUtils.equals(mu._getIdentifier(), c._getIdentifier())) {
                             // subfolder found
                             addAt = mu;
                             continue main;
-
                         }
                     }
-
                 } else {
                     if (ids.contains(c._getIdentifier())) {
                         break;
@@ -245,13 +243,10 @@ public class MenuContainerRoot extends MenuContainer implements Storable {
                     // only of the last component is not a container
                     newItem.setItems(new ArrayList<MenuItemData>());
                 }
-
                 List<MenuItemData> above = parent.getItems().subList(0, index);
                 List<MenuItemData> below = parent.getItems().subList(index + 1, parent.getItems().size());
                 index = searchBestPosition(addAt.getItems(), above, below);
-
                 addAt.getItems().add(index, newItem);
-
                 if (newItem.getType() == Type.CONTAINER) {
                     addAt = newItem;
                 }
@@ -278,20 +273,15 @@ public class MenuContainerRoot extends MenuContainer implements Storable {
         // }
         // MenuItemData addAt = this;
         // addBranch(this, lastNode);
-
     }
 
     private int searchBestPosition(ArrayList<MenuItemData> items, List<MenuItemData> above, List<MenuItemData> below) {
-
         ArrayList<Object> identList = new ArrayList<Object>();
-
         for (int i = 0; i < items.size(); i++) {
             identList.add(items.get(i)._getIdentifier());
-
         }
         int bestMatch = Integer.MAX_VALUE;
         int bestIndex = -1;
-
         if (above.size() == 0 && below.size() == 0) {
             return 0;
         }
@@ -302,27 +292,20 @@ public class MenuContainerRoot extends MenuContainer implements Storable {
                 if (bIndex >= 0) {
                     return bIndex;
                 }
-
             }
         } else if (below.size() == 0) {
             for (int a = above.size() - 1; a >= 0; a--) {
-
                 MenuItemData aN = above.get(a);
                 int aIndex = identList.indexOf(aN._getIdentifier());
                 if (aIndex >= 0) {
                     return aIndex + 1;
                 }
-
             }
-
         }
         boolean lastAWasSep = false;
         boolean lastBwasSep = false;
-
         main: for (int a = above.size() - 1; a >= 0; a--) {
-
             MenuItemData aN = above.get(a);
-
             if (aN instanceof SeparatorData) {
                 lastAWasSep = true;
                 continue;
@@ -339,7 +322,6 @@ public class MenuContainerRoot extends MenuContainer implements Storable {
                     }
                     try {
                         int aIndex = identList.indexOf(aN._getIdentifier());
-
                         int bIndex = identList.indexOf(bN._getIdentifier());
                         if (lastAWasSep && aIndex >= 0) {
                             aIndex++;
@@ -349,22 +331,18 @@ public class MenuContainerRoot extends MenuContainer implements Storable {
                         }
                         if (aIndex >= 0 && bIndex >= 0) {
                             int dist = Math.abs(bIndex - aIndex) + a + b;
-
                             if (dist < bestMatch) {
                                 bestMatch = dist;
                                 bestIndex = Math.min(aIndex, bIndex) + 1;
                             }
-
                         } else if (aIndex >= 0) {
                             int dist = 1000 + a + b;
-
                             if (dist < bestMatch) {
                                 bestMatch = dist;
                                 bestIndex = aIndex + 1;
                             }
                         } else if (bIndex >= 0) {
                             int dist = 1000 + a + b;
-
                             if (dist < bestMatch) {
                                 bestMatch = dist;
                                 bestIndex = bIndex;
@@ -382,8 +360,6 @@ public class MenuContainerRoot extends MenuContainer implements Storable {
             //
             bestIndex = items.size();
         }
-
         return bestIndex;
     }
-
 }

@@ -112,7 +112,8 @@ public class MenuItemData implements Storable {
     private MenuContainerRoot root;
     private String            mnemonic;
     private String            shortcut;
-    private boolean           visible = true;
+    private boolean           shortcutDisabled = false;
+    private boolean           visible          = true;
 
     public void setMnemonic(String mnemonic) {
         this.mnemonic = mnemonic;
@@ -423,6 +424,18 @@ public class MenuItemData implements Storable {
 
     public void setShortcut(String shortcut) {
         this.shortcut = shortcut;
+    }
+
+    /**
+     * When true, the keyboard shortcut of this menu item is disabled without discarding the stored (custom) shortcut value, so
+     * enabling it again restores that value. Consumers must treat a disabled shortcut as "no hotkey".
+     */
+    public boolean isShortcutDisabled() {
+        return shortcutDisabled;
+    }
+
+    public void setShortcutDisabled(boolean shortcutDisabled) {
+        this.shortcutDisabled = shortcutDisabled;
     }
 
     // public String _getShortcut() {

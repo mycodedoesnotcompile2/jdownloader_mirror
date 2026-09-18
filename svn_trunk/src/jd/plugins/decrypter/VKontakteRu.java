@@ -72,7 +72,7 @@ import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 53401 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53439 $", interfaceVersion = 2, names = {}, urls = {})
 public class VKontakteRu extends PluginForDecrypt {
     public VKontakteRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -458,7 +458,8 @@ public class VKontakteRu extends PluginForDecrypt {
             linkCanBeFastCrawled = false;
         }
         final String host_to_use;
-        if (StringUtils.containsIgnoreCase(contenturl, "vkvideo.ru")) {
+        if (StringUtils.containsIgnoreCase(contenturl, "vkvideo.ru") || contenturl.matches(PATTERN_VIDEO_SINGLE_ORIGINAL)) {
+            // avoid additional request/redirect to this domain for PATTERN_VIDEO_SINGLE_ORIGINAL
             host_to_use = "vkvideo.ru";
         } else {
             host_to_use = "vk.ru";

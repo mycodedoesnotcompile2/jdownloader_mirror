@@ -16,8 +16,11 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
@@ -45,11 +48,44 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48882 $", interfaceVersion = 3, names = { "filecat.net" }, urls = { "https?://(?:www\\.)?filecat\\.net/f/([A-Za-z0-9_\\-]+)" })
+@HostPlugin(revision = "$Revision: 53440 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilecatNet extends PluginForHost {
     public FilecatNet(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://filecat.net/pricing");
+        this.enablePremium(getBaseURL() + "/pricing");
+    }
+
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        ret.add(new String[] { "filecat.net" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    private static final Pattern PATTERN_FILE = Pattern.compile("/f/([A-Za-z0-9_\\-]+)");
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_FILE.pattern());
+        }
+        return ret.toArray(new String[0]);
+    }
+
+    private String getBaseURL() {
+        return "https://" + getHost();
     }
 
     @Override
@@ -67,7 +103,7 @@ public class FilecatNet extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://filecat.net/";
+        return getBaseURL() + "/";
     }
 
     private static final String WEBSITE_API_BASE     = "https://api.filecat.net";
@@ -84,7 +120,12 @@ public class FilecatNet extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        return new Regex(link.getPluginPatternMatcher(), PATTERN_FILE).getMatch(0);
+    }
+
+    @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        return this.getFID(link);
     }
 
     @Override
@@ -99,9 +140,6 @@ public class FilecatNet extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         final String fid = this.getFID(link);
-        if (!link.isNameSet()) {
-            link.setName(fid);
-        }
         this.setBrowserExclusive();
         br.setAllowedResponseCodes(new int[] { 400 });
         br.getPage(WEBSITE_API_BASE + "/file/" + fid);
@@ -109,7 +147,7 @@ public class FilecatNet extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        String filename = (String) entries.get("name");
+        final String filename = (String) entries.get("name");
         final Number filesize = (Number) entries.get("size");
         if (!StringUtils.isEmpty(filename)) {
             link.setName(filename);
@@ -153,8 +191,14 @@ public class FilecatNet extends PluginForHost {
             final long timestampBeforeCaptcha = Time.systemIndependentCurrentJVMTimeMillis();
             if (Boolean.TRUE.equals(entries.get("captcha_needed"))) {
                 /* 2019-07-08: Hardcoded reCaptchaV2 key */
+                final String main_page = getBaseURL() + "/";
                 final String rcKey = "6LfFS28UAAAAAIaK3SXWYWZ_iPK-zfOr-NmZaY0f";
-                final CaptchaHelperHostPluginRecaptchaV2 rc2 = new CaptchaHelperHostPluginRecaptchaV2(this, br, rcKey);
+                final CaptchaHelperHostPluginRecaptchaV2 rc2 = new CaptchaHelperHostPluginRecaptchaV2(this, br, rcKey) {
+                    @Override
+                    public String getSiteUrl() {
+                        return main_page;
+                    }
+                };
                 final int preDownloadWaittimeMillis = wait_sec * 1000;
                 if (preDownloadWaittimeMillis > rc2.getSolutionTimeout()) {
                     final int prePrePreDownloadWait = preDownloadWaittimeMillis - rc2.getSolutionTimeout();
@@ -242,7 +286,7 @@ public class FilecatNet extends PluginForHost {
             return;
         }
         final int extraWaitSeconds = 1;
-        int passedTime = (int) ((Time.systemIndependentCurrentJVMTimeMillis() - timeBefore) / 1000) - extraWaitSeconds;
+        final int passedTime = (int) ((Time.systemIndependentCurrentJVMTimeMillis() - timeBefore) / 1000) - extraWaitSeconds;
         /*
          * Check how much time has passed during eventual captcha event before this function has been called and see how much time is left
          * to wait.
@@ -415,11 +459,4 @@ public class FilecatNet extends PluginForHost {
         }
     }
 
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
-    }
 }

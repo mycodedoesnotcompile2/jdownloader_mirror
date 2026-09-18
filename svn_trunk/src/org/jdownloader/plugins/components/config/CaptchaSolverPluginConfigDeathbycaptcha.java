@@ -1,6 +1,7 @@
 package org.jdownloader.plugins.components.config;
 
 import org.appwork.storage.config.annotations.AboutConfig;
+import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.storage.config.annotations.DefaultStringValue;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.jdownloader.plugins.config.Order;
@@ -12,6 +13,7 @@ public interface CaptchaSolverPluginConfigDeathbycaptcha extends CaptchaSolverPl
     @AboutConfig
     @DescriptionForConfigEntry("Proxy URL(and credentials) required by deathbycaptcha.com for reCAPTCHAv2 Enterprise, e.g. http://user:pass@127.0.0.1:3128")
     @Order(900)
+    @DefaultOnNull
     String getEnterpriseRecaptchaProxy();
 
     void setEnterpriseRecaptchaProxy(String proxy);
@@ -20,6 +22,7 @@ public interface CaptchaSolverPluginConfigDeathbycaptcha extends CaptchaSolverPl
     @DefaultStringValue("HTTP")
     @DescriptionForConfigEntry("Proxy type required by deathbycaptcha.com for reCAPTCHAv2 Enterprise, e.g. HTTP, SOCKS4, SOCKS5")
     @Order(901)
+    @DefaultOnNull
     String getEnterpriseRecaptchaProxyType();
 
     void setEnterpriseRecaptchaProxyType(String proxyType);

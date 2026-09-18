@@ -43,7 +43,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
-import org.appwork.exceptions.ThrowUncheckedException;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.serializer.Deser;
 import org.appwork.serializer.SC;
@@ -88,10 +87,6 @@ public class Exceptions {
             }
         }
         return false;
-    }
-
-    public static <E extends Exception> void throwUncheckedException(Throwable e) throws E {
-        ThrowUncheckedException.throwUncheckedException(e);
     }
 
     public static <T> List<T> getInstancesof(final Throwable e, final Class<T> class1) {

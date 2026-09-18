@@ -2,10 +2,6 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -20,7 +16,11 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52820 $", interfaceVersion = 3, names = { "ipfs.io", "ipfs.io" }, urls = { "https?://(cloudflare-ipfs.com|ipfs.io|ipfs.video|gateway.ipfs.io)/ipfs/[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+(\\?filename=.+|/.+)?", "ipfs://[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+(/.+)?" })
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+
+@DecrypterPlugin(revision = "$Revision: 53443 $", interfaceVersion = 3, names = { "ipfs.io", "ipfs.io" }, urls = { "https?://(cloudflare-ipfs.com|ipfs.io|ipfs.video|gateway.ipfs.io)/ipfs/(?:Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]+)(\\?filename=.+|/.+)?", "ipfs://(?:Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]+)(/.+)?" })
 public class IPFS extends PluginForDecrypt {
     // https://developers.cloudflare.com/distributed-web/ipfs-gateway
     // https://docs.ipfs.io/concepts/ipfs-gateway/
@@ -28,14 +28,14 @@ public class IPFS extends PluginForDecrypt {
         super(wrapper);
     }
 
-    private final String base58Pattern = "[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+";
+    private final String cidPattern = "(?:Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]+)";
 
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink parameter, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String cid = new Regex(parameter.getCryptedUrl(), "(?:/ipfs/|ipfs://)(" + base58Pattern + ")").getMatch(0);
+        final String cid = new Regex(parameter.getCryptedUrl(), "(?:/ipfs/|ipfs://)(" + cidPattern + ")").getMatch(0);
         final String filename = URLEncode.decodeURIComponent(new Regex(parameter.getCryptedUrl(), "\\?filename=(.+)").getMatch(0));
-        final String resourcePath = new Regex(parameter.getCryptedUrl(), "(?:/ipfs/|ipfs://)" + base58Pattern + "/(.+)").getMatch(0);
+        final String resourcePath = new Regex(parameter.getCryptedUrl(), "(?:/ipfs/|ipfs://)" + cidPattern + "/(.+)").getMatch(0);
         String ipfsGateWay = StringUtils.startsWithCaseInsensitive(parameter.getCryptedUrl(), "ipfs://") ? "ipfs.io" : Browser.getHost(parameter.getCryptedUrl());
         if (StringUtils.equalsIgnoreCase(ipfsGateWay, "ipfs.video")) {
             ipfsGateWay = "ipfs.io";// or cloudflare-ipfs.com
@@ -86,7 +86,7 @@ public class IPFS extends PluginForDecrypt {
                 fp = FilePackage.getInstance();
                 fp.setName(Encoding.htmlDecode(folderTitle).trim());
             }
-            final String files[][] = br.getRegex("/ipfs/(" + base58Pattern + ")\\?filename=(.*?)\"").getMatches();
+            final String files[][] = br.getRegex("/ipfs/(" + cidPattern + ")\\?filename=(.*?)\"").getMatches();
             DownloadLink foundMatch = null;
             for (final String[] file : files) {
                 final DownloadLink link = createDownloadlink(DirectHTTP.createURLForThisPlugin("https://" + ipfsGateWay + "/ipfs/" + file[0] + "/"));

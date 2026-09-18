@@ -15,6 +15,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.TreeMap;
 
 import javax.swing.Action;
 import javax.swing.Icon;
@@ -36,6 +37,7 @@ import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtButton;
 import org.appwork.swing.components.ExtTextField;
 import org.appwork.utils.CompareUtils;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.FileHandler;
 import org.appwork.utils.Files;
 import org.appwork.utils.GetterSetter;
@@ -97,6 +99,7 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
     private JButton           nameReset;
     private JButton           shortCutReset;
     private JLabel            shortcutLabel;
+    private JCheckBox         shortcutEnabled;
 
     public Dimension getPreferredSize() {
         Dimension ret = super.getPreferredSize();
@@ -242,17 +245,10 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
                 new EDTRunner() {
                     @Override
                     protected void runInEDT() {
-                        // String newIconKey = null;
-                        // String oldIconKey = item.getIconKey();
-                        // if (StringUtils.isNotEmpty(oldIconKey)) {
-                        // if (MenuItemData.isEmptyValue(oldIconKey)) {
-                        // newIconKey = null;
-                        // } else {
-                        // newIconKey = MenuItemData.EMPTY;
-                        // }
-                        // } else {
-                        // newIconKey = MenuItemData.EMPTY;
-                        // }
+                        /*
+                         * Two-state toggle: when the icon is at its default, resetIconKey is EMPTY and this removes the icon;
+                         * when the icon is removed or custom, resetIconKey is the default and this restores it.
+                         */
                         item.setIconKey(resetIconKey);
                         updateInfo(item);
                         managerFrame.fireUpdate();
@@ -277,6 +273,8 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
                 String msg1 = KeyUtils.getShortcutString(event, true);
                 KeyStroke currentShortcut = KeyStroke.getKeyStroke(event.getKeyCode(), event.getModifiersEx());
                 shortcut.setText(msg1);
+                /* Assigning a shortcut implies the hotkey is enabled (the field is only editable while the checkbox is ticked). */
+                item.setShortcutDisabled(false);
                 item.setShortcut(currentShortcut == null ? null : currentShortcut.toString());
                 // managerFrame.repaint();
                 updateResetButtons(item);
@@ -284,7 +282,42 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
         });
         if (managerFrame.getManager().isAcceleratorsEnabled()) {
             add(shortcutLabel = label(_GUI.T.InfoPanel_InfoPanel_shortcuts()), "hidemode 3");
-            add(shortcut, "newline,hidemode 3");
+            shortcutEnabled = new JCheckBox();
+            shortcutEnabled.setToolTipText(_GUI.T.InfoPanel_shortcut_enabled_tooltip());
+            shortcutEnabled.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    if (item == null) {
+                        return;
+                    }
+                    final boolean on = shortcutEnabled.isSelected();
+                    if (on) {
+                        /*
+                         * Enable the hotkey. The stored (custom) shortcut value is kept, so it survives a disable/enable cycle.
+                         * Legacy data may have stored the EMPTY sentinel as "removed"; normalize that to inherit-default.
+                         */
+                        item.setShortcutDisabled(false);
+                        if (MenuItemData.isEmptyValue(item.getShortcut())) {
+                            item.setShortcut(null);
+                        }
+                    } else {
+                        /* Disable the hotkey but keep the stored (custom) shortcut value. */
+                        item.setShortcutDisabled(true);
+                    }
+                    /*
+                     * Reflect the new state directly instead of calling updateInfo(), so that a "checked but not-yet-assigned"
+                     * state on an action without a default hotkey is not immediately reverted to unchecked by the derivation.
+                     * The field always shows the effective (custom or default) hotkey, greyed out while disabled.
+                     */
+                    shortcut.setEnabled(on);
+                    final KeyStroke shown = getEffectiveAccelerator(item);
+                    shortcut.setText(shown != null ? KeyUtils.getShortcutString(shown, true) : "");
+                    updateResetButtons(item);
+                    managerFrame.fireUpdate();
+                }
+            });
+            add(shortcutEnabled, "newline,split 2,hidemode 3");
+            add(shortcut, "growx,hidemode 3");
             add(shortCutReset = new JButton(new AppAction() {
                 {
                     setIconKey(IconKey.ICON_RESET);
@@ -295,7 +328,12 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
                     new EDTRunner() {
                         @Override
                         protected void runInEDT() {
-                            item.setShortcut(resetShortcut);
+                            /*
+                             * Reset to default restores the built-in hotkey (null = inherit) and the checkbox default (enabled);
+                             * it never disables the hotkey.
+                             */
+                            item.setShortcut(null);
+                            item.setShortcutDisabled(false);
                             updateInfo(item);
                             managerFrame.fireUpdate();
                         }
@@ -310,9 +348,8 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
         add(customPanel, "spanx,growx,pushx");
     }
 
-    private String resetIconKey;
     private String resetName;
-    private String resetShortcut;
+    private String resetIconKey;
 
     private JLabel label(String infoPanel_InfoPanel_hideIfDisabled) {
         return new JLabel(infoPanel_InfoPanel_hideIfDisabled);
@@ -364,25 +401,173 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
                 } else {
                     resetName = ret.getName();
                 }
-                if (StringUtils.equals(value.getIconKey(), ret.getIconKey())) {
-                    resetIconKey = MenuItemData.EMPTY;
-                } else {
-                    resetIconKey = ret.getIconKey();
-                }
-                iconKeyReset.setToolTipText(_GUI.T.ManagerFrame_layoutPanel_resettodefault_parametered(resetIconKey));
+                resetIconKey = computeResetTarget(value.getIconKey(), ret.getIconKey());
                 nameReset.setToolTipText(_GUI.T.ManagerFrame_layoutPanel_resettodefault_parametered(resetName));
+                /*
+                 * When the icon already equals the default (resetIconKey == EMPTY), the next click removes it: show a trash icon.
+                 * Otherwise (removed or custom) show the "reset to default" icon.
+                 */
+                if (MenuItemData.isEmptyValue(resetIconKey)) {
+                    iconKeyReset.setIcon(NewTheme.I().getIcon(IconKey.ICON_TRASH, 18));
+                    iconKeyReset.setToolTipText(_GUI.T.InfoPanel_deleteicon_tooltip());
+                } else {
+                    iconKeyReset.setIcon(NewTheme.I().getIcon(IconKey.ICON_RESET, 18));
+                    iconKeyReset.setToolTipText(_GUI.T.InfoPanel_reseticon_tooltip());
+                }
+                /* The shortcut reset only restores the built-in default (the checkbox handles disabling) and never removes it. */
                 if (shortCutReset != null) {
-                    if (StringUtils.equals(value.getShortcut(), ret.getValue(Action.ACCELERATOR_KEY) + "")) {
-                        resetShortcut = MenuItemData.EMPTY;
-                    } else {
-                        resetShortcut = ret.getValue(Action.ACCELERATOR_KEY) + "";
-                    }
-                    shortCutReset.setToolTipText(_GUI.T.ManagerFrame_layoutPanel_resettodefault_parametered(resetShortcut));
+                    shortCutReset.setIcon(NewTheme.I().getIcon(IconKey.ICON_RESET, 18));
+                    shortCutReset.setToolTipText(_GUI.T.ManagerFrame_layoutPanel_resettodefault());
                 }
             } catch (Throwable e) {
                 LogController.CL().log(e);
             }
         }
+    }
+
+    /**
+     * Computes the value the icon reset button applies on its next click and, implicitly, which icon it shows: returning
+     * MenuItemData.EMPTY means the icon currently equals its default and the next click removes it (trash icon); returning the
+     * default value means the icon is currently removed or customized and the next click restores the default (reset icon).
+     * currentStored is the value stored on the menu item (null/empty when the default is inherited), defaultValue is the
+     * built-in default of the action.
+     */
+    private String computeResetTarget(final String currentStored, final String defaultValue) {
+        if (MenuItemData.isEmptyValue(currentStored)) {
+            /* Currently removed by the user: offer to restore the default. */
+            return defaultValue;
+        }
+        if (StringUtils.isEmpty(currentStored) || StringUtils.equals(currentStored, defaultValue)) {
+            /* Implicitly (inherited) or explicitly at the default: offer to delete it. */
+            return MenuItemData.EMPTY;
+        }
+        /* A custom value: offer to restore the default first. */
+        return defaultValue;
+    }
+
+    /**
+     * Reads the built-in default hotkey of the given menu item's action, independent of any custom/removed override stored on
+     * the item. A fresh action instance without a menuItemData is used, so its accelerator is the one set in the action
+     * constructor. Returns null when the action has no default hotkey.
+     */
+    private KeyStroke getDefaultAccelerator(final MenuItemData mid) {
+        try {
+            final Class<?> clazz = mid.getActionData()._getClazz();
+            final Constructor<?> c = clazz.getConstructor(new Class[] {});
+            final CustomizableAppAction fresh = (CustomizableAppAction) c.newInstance(new Object[] {});
+            try {
+                /* No menuItemData is set on purpose; some actions set their default accelerator here, others in the constructor. */
+                fresh.initContextDefaults();
+            } catch (Throwable ignore) {
+            }
+            final Object ks = fresh.getValue(Action.ACCELERATOR_KEY);
+            if (ks instanceof KeyStroke) {
+                return (KeyStroke) ks;
+            }
+        } catch (Throwable t) {
+            LogController.CL().log(t);
+        }
+        return null;
+    }
+
+    /**
+     * Returns the hotkey that currently applies to the given menu item: the custom hotkey if one is set, otherwise the built-in
+     * default. Returns null when neither exists.
+     */
+    private KeyStroke getEffectiveAccelerator(final MenuItemData mid) {
+        final String stored = mid.getShortcut();
+        if (StringUtils.isNotEmpty(stored) && !MenuItemData.isEmptyValue(stored)) {
+            return KeyStroke.getKeyStroke(stored);
+        }
+        return getDefaultAccelerator(mid);
+    }
+
+    /**
+     * Updates the shortcut checkbox and field from the menu item state: the checkbox is ticked by default (even when no hotkey
+     * is set, so the field is immediately editable to assign one with a single click) and only unticked when the user disabled
+     * the hotkey (via the disabled flag or the legacy EMPTY value). The field shows the effective (custom or default) hotkey and
+     * is greyed out together with the checkbox while disabled, so a custom hotkey stays visible and is preserved across a
+     * disable/enable cycle.
+     */
+    private void updateShortcutControls(final MenuItemData mid) {
+        if (shortcutEnabled == null || shortcut == null) {
+            return;
+        }
+        /* isEmptyValue covers legacy data where "removed" was stored as the EMPTY sentinel instead of the disabled flag. */
+        final boolean disabled = mid.isShortcutDisabled() || MenuItemData.isEmptyValue(mid.getShortcut());
+        final KeyStroke shown = getEffectiveAccelerator(mid);
+        final boolean checked = !disabled;
+        shortcutEnabled.setSelected(checked);
+        shortcut.setEnabled(checked);
+        /* Always show the effective (custom or default) hotkey; it is greyed out together with the field while disabled. */
+        shortcut.setText(shown != null ? KeyUtils.getShortcutString(shown, true) : "");
+    }
+
+    /**
+     * Returns true when every customizable setting of the given menu item still equals its built-in default, so there is
+     * nothing to reset. A fresh action instance without a menuItemData is used to read the defaults, because setup overrides
+     * are only applied while a menuItemData is present (see CustomizableAppAction.fill).
+     */
+    private boolean areSettingsAtDefault(final MenuItemData mid, final ArrayList<Entry> entries) {
+        try {
+            final Class<?> clazz = mid.getActionData()._getClazz();
+            final Constructor<?> c = clazz.getConstructor(new Class[] {});
+            final CustomizableAppAction defaults = (CustomizableAppAction) c.newInstance(new Object[] {});
+            try {
+                /*
+                 * No menuItemData is set on this instance on purpose, so the setup overrides are not applied and the setup
+                 * objects keep their built-in defaults. Some actions compute defaults from a menuItemData though; in that case
+                 * fall back to the plain constructor defaults instead of failing the whole comparison.
+                 */
+                defaults.initContextDefaults();
+            } catch (Throwable ignore) {
+            }
+            final List<ActionContext> defaultSetups = defaults.getSetupObjects();
+            if (defaultSetups == null) {
+                return false;
+            }
+            for (final Entry e : entries) {
+                final ActionContext defaultSetup = findSetupOfSameClass(defaultSetups, e.so);
+                if (defaultSetup == null) {
+                    continue;
+                }
+                final Object current = e.gs.get(e.so);
+                final Object dflt = e.gs.get(defaultSetup);
+                if (!isEqualValue(current, dflt)) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (Throwable t) {
+            LogController.CL().log(t);
+            /* On any error keep the button usable rather than hiding a working reset. */
+            return false;
+        }
+    }
+
+    private ActionContext findSetupOfSameClass(final List<ActionContext> setups, final ActionContext like) {
+        if (setups != null) {
+            for (final ActionContext setup : setups) {
+                if (setup.getClass() == like.getClass()) {
+                    return setup;
+                }
+            }
+        }
+        return null;
+    }
+
+    private boolean isEqualValue(final Object a, final Object b) {
+        if (a == b) {
+            return true;
+        }
+        if (a == null || b == null) {
+            return false;
+        }
+        if (a.equals(b)) {
+            return true;
+        }
+        /* Fallback for value types that do not implement equals (e.g. Modifier): compare their string forms. */
+        return String.valueOf(a).equals(String.valueOf(b));
     }
 
     /**
@@ -416,6 +601,9 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
                 if (shortcut != null) {
                     shortcut.setVisible(true);
                 }
+                if (shortcutEnabled != null) {
+                    shortcutEnabled.setVisible(true);
+                }
                 if (shortCutReset != null) {
                     shortCutReset.setVisible(true);
                 }
@@ -424,15 +612,7 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
                 if (StringUtils.isEmpty(action.getName())) {
                     name.setText(MenuItemData.EMPTY);
                 }
-                if (MenuItemData.isEmptyValue(mid.getShortcut())) {
-                    action.setAccelerator(null);
-                }
-                KeyStroke ks = (KeyStroke) action.getValue(Action.ACCELERATOR_KEY);
-                if (ks != null) {
-                    shortcut.setText(KeyUtils.getShortcutString(ks, true));
-                } else {
-                    shortcut.setText("");
-                }
+                updateShortcutControls(mid);
                 final List<ActionContext> sos = action.getSetupObjects();
                 if (sos != null) {
                     final ArrayList<Entry> entries = new ArrayList<Entry>();
@@ -483,6 +663,46 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
                             entries.addAll(toSort);
                         }
                     }
+                    if (entries.size() > 0 && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                        /*
+                         * Offer a button to reset all customizable action settings (the Customizer fields below) back to their
+                         * built-in defaults. It only removes the setup overrides of the shown Customizer fields, so structural
+                         * setups that are not exposed as Customizer stay untouched.
+                         *
+                         * TODO: The "at default" reference is currently the action class defaults, which is wrong for
+                         * pre-configured menu variants (e.g. the "Delete All" entry of GenericDeleteFromDownloadlistAction, whose
+                         * default is defined via a setup override, not the class default). Until this is measured against the
+                         * built-in default menu structure instead, the button is only shown while running from the IDE.
+                         */
+                        final ActionData resetTarget = mid.getActionData();
+                        final ArrayList<String> customizerKeys = new ArrayList<String>();
+                        for (Entry e : entries) {
+                            customizerKeys.add(e.gs.getKey());
+                        }
+                        final AppAction resetSettingsAction = new AppAction() {
+                            {
+                                setIconKey(IconKey.ICON_RESET);
+                                setTooltipText(_GUI.T.InfoPanel_resetsettings_tooltip());
+                            }
+
+                            @Override
+                            public void actionPerformed(ActionEvent ae) {
+                                final TreeMap<String, Object> setup = resetTarget.getSetup();
+                                if (setup != null) {
+                                    for (final String key : customizerKeys) {
+                                        setup.remove(StringUtils.toUpperCaseOrNull(key));
+                                    }
+                                }
+                                updateInfo(item);
+                                managerFrame.fireUpdate();
+                            }
+                        };
+                        /* Grey the button out while every customizer field still equals its built-in default. */
+                        resetSettingsAction.setEnabled(!areSettingsAtDefault(mid, entries));
+                        final JButton resetSettings = new JButton(resetSettingsAction);
+                        customPanel.add(new JLabel(_GUI.T.InfoPanel_resetsettings_tooltip()), "pushx,growx");
+                        customPanel.add(resetSettings, "width 22!,height 22!,wrap");
+                    }
                     for (Entry e : entries) {
                         customPanel.add(e.mid.getActionData(), action, e.so, e.gs);
                     }
@@ -491,6 +711,9 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
                 shortcut.setText("");
                 shortcutLabel.setVisible(false);
                 shortcut.setVisible(false);
+                if (shortcutEnabled != null) {
+                    shortcutEnabled.setVisible(false);
+                }
                 if (shortCutReset != null) {
                     shortCutReset.setVisible(false);
                 }

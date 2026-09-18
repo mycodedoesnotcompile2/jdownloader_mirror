@@ -170,12 +170,27 @@ public abstract class CustomizableAppAction extends AppAction {
     @Override
     public BasicAction setAccelerator(KeyStroke stroke) {
         if (menuItemData != null) {
-            if (StringUtils.isNotEmpty(menuItemData.getShortcut())) {
-                stroke = KeyStroke.getKeyStroke(menuItemData.getShortcut());
+            if (menuItemData.isShortcutDisabled()) {
+                /*
+                 * The hotkey is disabled via the checkbox. Clear the accelerator even if the action set a default in its
+                 * constructor, but keep the stored (custom) shortcut value untouched so enabling it again restores it.
+                 */
+                return super.setAccelerator(null);
+            }
+            final String customShortcut = menuItemData.getShortcut();
+            if (MenuItemData.isEmptyValue(customShortcut)) {
+                /*
+                 * Legacy "removed" state: the shortcut value itself is the EMPTY sentinel. Clear the accelerator even if the
+                 * action set a default in its constructor, instead of reverting to that default.
+                 */
+                return super.setAccelerator(null);
+            }
+            if (StringUtils.isNotEmpty(customShortcut)) {
+                stroke = KeyStroke.getKeyStroke(customShortcut);
             }
         }
         if (stroke == null) {
-            // else we would revert keystrokes set in the action constructor
+            /* Keep the keystroke set in the action constructor rather than reverting it. */
             return this;
         }
         return super.setAccelerator(stroke);

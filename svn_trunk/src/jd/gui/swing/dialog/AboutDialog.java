@@ -432,7 +432,7 @@ public class AboutDialog extends AbstractDialog<Integer> {
                     BC_VERSION = new BouncyCastleProvider().getVersion();
                 }
                 stats.add(new JLabel("TLS:"), "");
-                stats.add(createLink("BouncyCastle " + BC_VERSION, "https://www.bouncycastle.org/releasenotes.html#r" + String.valueOf(BC_VERSION).replace(".", "rv")));
+                stats.add(createLink("BouncyCastle " + BC_VERSION, "https://www.bouncycastle.org/download/bouncy-castle-java/?filter=java%3Drelease-" + String.valueOf(BC_VERSION).replace(".", "-") + "#release-notes"));
             }
         } catch (Throwable e) {
             org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);
@@ -600,7 +600,8 @@ public class AboutDialog extends AbstractDialog<Integer> {
                         }
                     }
                 }
-                final String name = getName();
+                String name = getName();
+                name = name.replaceFirst("^<html><u>", "").replaceFirst("</u></html>$", "");
                 ClipboardMonitoring.getINSTANCE().setCurrentContent(name);
                 if (urlToOpen != null && urlToOpen.matches("(?i)https?://.+") && CrossSystem.isOpenBrowserSupported()) {
                     CrossSystem.openURL(urlToOpen);

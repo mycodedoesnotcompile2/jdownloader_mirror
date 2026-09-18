@@ -2578,6 +2578,18 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Reset to Default: %s1" })
     String ManagerFrame_layoutPanel_resettodefault_parametered(String dflt);
 
+    @Default(lngs = { "en" }, values = { "Reset settings to default" })
+    String InfoPanel_resetsettings_tooltip();
+
+    @Default(lngs = { "en" }, values = { "Delete icon" })
+    String InfoPanel_deleteicon_tooltip();
+
+    @Default(lngs = { "en" }, values = { "Reset to default icon" })
+    String InfoPanel_reseticon_tooltip();
+
+    @Default(lngs = { "en" }, values = { "Delete keyboard shortcut" })
+    String InfoPanel_deleteshortcut_tooltip();
+
     @Default(lngs = { "en" }, values = { "Change Icon" })
     String InfoPanel_changeicon();
 
@@ -3526,15 +3538,6 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "General" })
     String NinekwService_createPanel_general_header();
 
-    @Default(lngs = { "en" }, values = { "Enter your Captcha Brotherhood Logins below. If you do not have an account yet, click the Link above and register for an account. It's free!" })
-    String captchabrotherhoodService_createPanel_logins_();
-
-    @Default(lngs = { "en" }, values = { "Username" })
-    String captchabrotherhoodService_createPanel_username();
-
-    @Default(lngs = { "en" }, values = { "Password" })
-    String captchabrotherhoodService_createPanel_password();
-
     @Default(lngs = { "en" }, values = { "Finding Links..." })
     String LinkCrawlerBubble_update_header();
 
@@ -3579,9 +3582,6 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Use usage rules to determine the order in which accounts should be used and which download modes should be allowed for the selected hosts." })
     String HosterOrderPanel_HosterOrderPanel_description_();
-
-    @Default(lngs = { "en" }, values = { "Enabled Captchabrotherhood Service" })
-    String captchabrotherhoodService_createPanel_enabled();
 
     @Default(lngs = { "en" }, values = { "Add, remove or modify premium accounts" })
     String AccountManager_AccountManager_accounts_tt();
@@ -5324,8 +5324,8 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Your %s2 premium account (username: %s1) has expired.\r\nPlease renew your account now to continue downloading without any limitations." })
     String OboomController_onAccountControllerEvent_premiumexpire_warn_expired_premium_msg(String user, String hoster);
 
-    @Default(lngs = { "en" }, values = { "Add a Premium Account..." })
-    String StatusBarImpl_add_premium();
+    @Default(lngs = { "en" }, values = { "Add Account" })
+    String lit_add_account();
 
     @Default(lngs = { "en" }, values = { "Please enter username and password..." })
     String AskForUserAndPasswordDialog_AskForUserAndPasswordDialog_title_();
@@ -5579,8 +5579,68 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "There are several ways to solve a captcha in JDownloader. You can change the general order/priority of these \"Solvers\" and the time a solver waits for its predecessors.\r\nExample:\r\nBy default, the manual Dialog solvers wait upto 60 seconds for all automated solvers." })
     String CaptchaConfigPanel_order_description();
 
-    @Default(lngs = { "en" }, values = { "Captcha Solver Priority" })
-    String CaptchaConfigPanel_order();
+    @Default(lngs = { "en" }, values = { "Solver Overview & Settings" })
+    String CaptchaConfigPanel_solverOverviewAndSettings();
+
+    @Default(lngs = { "en" }, values = { "Name" })
+    String CaptchaTypesTable_column_name();
+
+    @Default(lngs = { "en" }, values = { "Supported by this solver" })
+    String CaptchaTypesTable_column_supportedBySolver();
+
+    @Default(lngs = { "en" }, values = { "Ever used by you?" })
+    String CaptchaTypesTable_column_everUsed();
+
+    @Default(lngs = { "en" }, values = { "Number of captchas ever used" })
+    String CaptchaTypesTable_column_numberOfCaptchas();
+
+    @Default(lngs = { "en" }, values = { "Last used by you" })
+    String CaptchaTypesTable_column_lastUsed();
+
+    @Default(lngs = { "en" }, values = { "Used by you for services" })
+    String CaptchaTypesTable_column_usedForServices();
+
+    @Default(lngs = { "en" }, values = { "Demo URL" })
+    String CaptchaTypesTable_column_demoUrl();
+
+    @Default(lngs = { "en" }, values = { "Supported by JD" })
+    String CaptchaTypesTable_column_supportedByJD();
+
+    @Default(lngs = { "en" }, values = { "Description" })
+    String CaptchaTypesTable_column_description();
+
+    @Default(lngs = { "en" }, values = { "This captcha type is supported by this solver" })
+    String CaptchaTypesTable_tooltip_supportedBySolver();
+
+    @Default(lngs = { "en" }, values = { "This captcha type is NOT supported by this solver" })
+    String CaptchaTypesTable_tooltip_notSupportedBySolver();
+
+    @Default(lngs = { "en" }, values = { "This captcha type has never been used by this JD instance" })
+    String CaptchaTypesTable_tooltip_neverUsedByInstance();
+
+    @Default(lngs = { "en" }, values = { "Last used %s1 for service %s2" })
+    String CaptchaTypesTable_tooltip_lastUsedForService(String elapsed, String service);
+
+    @Default(lngs = { "en" }, values = { "<html>Download captchas: %s1<br>Login captchas: %s2</html>" })
+    String CaptchaTypesTable_tooltip_captchaCounts(String download, String login);
+
+    @Default(lngs = { "en" }, values = { "This captcha type has never been used" })
+    String CaptchaTypesTable_tooltip_neverUsed();
+
+    @Default(lngs = { "en" }, values = { "Last used at: %s1 via %s2" })
+    String CaptchaTypesTable_tooltip_lastUsedAt(String date, String domain);
+
+    @Default(lngs = { "en" }, values = { "none" })
+    String CaptchaTypesTable_lit_none();
+
+    @Default(lngs = { "en" }, values = { "Used for: %s1" })
+    String CaptchaTypesTable_tooltip_usedFor(String domains);
+
+    @Default(lngs = { "en" }, values = { "This captcha type is supported by JDownloader" })
+    String CaptchaTypesTable_tooltip_supportedByJD();
+
+    @Default(lngs = { "en" }, values = { "This captcha type is NOT supported by JDownloader" })
+    String CaptchaTypesTable_tooltip_notSupportedByJD();
 
     @Default(lngs = { "en" }, values = { "edit" })
     String lit_edit();
@@ -5606,7 +5666,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "My.JDownloader.org, Mobile Apps,..." })
     String CaptchaAPISolver_gettypeName();
 
-    @Default(lngs = { "en" }, values = { "Fully automated internal Captcha Solving" })
+    @Default(lngs = { "en" }, values = { "Legacy fully automated local Captcha Solving" })
     String JACSolver_getName_();
 
     @Default(lngs = { "en" }, values = { "JAntiCaptcha" })
@@ -5629,9 +5689,6 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "My.JDownloader.org" })
     String CaptchaMyJDSolver_gettypeName();
-
-    @Default(lngs = { "en" }, values = { "captchabrotherhood.com" })
-    String CBSolver_gettypeName_();
 
     @Default(lngs = { "en" }, values = { "deathbycaptcha.com" })
     String DeathByCaptchaSolver_gettypeName_();

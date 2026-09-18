@@ -358,20 +358,27 @@ public abstract class ExtColumn<E> extends AbstractCellEditor implements TableCe
     public void extendControlButtonMenu(final JPopupMenu popup) {
     }
 
-    private final static WeakHashMap<Class, String> DUPE_ID_CHECK = new WeakHashMap<Class, String>();
+    private final static WeakHashMap<ExtTableModel, WeakHashMap<Class, String>> DUPE_ID_CHECK = new WeakHashMap<ExtTableModel, WeakHashMap<Class, String>>();
 
     protected String generateID() {
-        String ret = this.getClass().getSuperclass().getSimpleName() + "." + this.getClass().getName();
-        if (getClass().isAnonymousClass() && Modifier.isAbstract(getClass().getSuperclass().getModifiers())) {
-            ret = Hash.getSHA1(StringUtils.valueOrEmpty(getName())) + "." + getClass().getSuperclass().getSimpleName() + "." + this.getClass().getEnclosingClass().getName();
+        final Class<?> clazz = this.getClass();
+        String ret = clazz.getSuperclass().getSimpleName() + "." + clazz.getName();
+        if (clazz.isAnonymousClass() && Modifier.isAbstract(clazz.getSuperclass().getModifiers())) {
+            ret = Hash.getSHA1(StringUtils.valueOrEmpty(getName())) + "." + clazz.getSuperclass().getSimpleName() + "." + clazz.getEnclosingClass().getName();
             if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                 synchronized (DUPE_ID_CHECK) {
-                    final String existingKey = DUPE_ID_CHECK.get(getClass());
+                    final ExtTableModel model = getModel();
+                    WeakHashMap<Class, String> map = DUPE_ID_CHECK.get(model);
+                    if (map == null) {
+                        map = new WeakHashMap<Class, String>();
+                        DUPE_ID_CHECK.put(model, map);
+                    }
+                    final String existingKey = map.get(getModel());
                     if (existingKey == null || ret.equals(existingKey)) {
-                        DUPE_ID_CHECK.put(getClass(), ret);
+                        map.put(clazz, ret);
                     } else {
-                        DebugMode.debugger();
                         System.out.println("check me:" + existingKey);
+                        DebugMode.debugger();
                     }
                 }
             }
