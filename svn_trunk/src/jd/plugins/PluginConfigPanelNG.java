@@ -568,8 +568,8 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
         try {
             gapleft = "5";
             gapright = ",gapright 5";
-            addHeader("Captcha types overview", new AbstractIcon(IconKey.ICON_LIST, 18));
-            addDescriptionPlain("This is a captcha solver account. You can use it to solve captchas.");
+            addHeader(_GUI.T.CaptchaSolver_account_config_header(), new AbstractIcon(IconKey.ICON_LIST, 18));
+            addDescriptionPlain(_GUI.T.CaptchaSolver_account_config_description());
             plugin.extendCaptchaSolverAccountSettingsPanel(acc, this);
         } finally {
             gapleft = gapbefore;

@@ -196,7 +196,8 @@ public class TimingTableModel extends ExtTableModel<SolverService> {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                mySolver.getConfig().setWaitForMap(null);
+                /* Wait-for persistence is currently disabled; reset is a no-op for now. */
+                mySolver.setWaitFor(null, null);
                 update();
             }
         };

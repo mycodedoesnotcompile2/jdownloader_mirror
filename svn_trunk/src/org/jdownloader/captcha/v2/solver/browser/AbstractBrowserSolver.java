@@ -21,7 +21,7 @@ import jd.gui.swing.jdgui.JDGui;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 public abstract class AbstractBrowserSolver extends ChallengeSolver<String> {
-    protected final BrowserCaptchaSolverConfig config;
+    protected final BrowserCaptchaSolverConfigV3 config;
     private volatile BrowserDialogHandler      handler;
 
     public AbstractBrowserSolver(int i) {

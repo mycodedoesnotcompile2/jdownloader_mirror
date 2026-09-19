@@ -3,15 +3,22 @@ package org.jdownloader.captcha.v2.solver.service;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+
+import org.jdownloader.gui.settings.AbstractConfigPanel;
+
 import jd.SecondLevelLaunch;
 import jd.gui.swing.jdgui.components.premiumbar.ServicePanel;
+import jd.plugins.PluginConfigPanelNG;
 
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
+import org.jdownloader.captcha.v2.CaptchaSolverConfigV3;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
 import org.jdownloader.captcha.v2.SolverService;
 
@@ -20,11 +27,81 @@ public abstract class AbstractSolverService implements SolverService {
     }
 
     @Override
+    public String getDescription() {
+        return null;
+    }
+
+    @Override
+    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        return null;
+    }
+
+    @Override
+    public Double getBalance() {
+        return null;
+    }
+
+    @Override
+    public java.util.Currency getBalanceCurrency() {
+        return null;
+    }
+
+    @Override
+    public String getHelpArticleURL() {
+        return null;
+    }
+
+    @Override
+    public String getStatusText() {
+        return "Ready";
+    }
+
+    @Override
+    public String getStatusActionName() {
+        return null;
+    }
+
+    @Override
+    public void onStatusAction() {
+    }
+
+    @Override
+    public boolean isStatusActionWarning() {
+        return false;
+    }
+
+    /**
+     * Default: a solver is ready when it does not require a status action (e.g. "Add Account"/"Configure"). Overridable.
+     */
+    @Override
+    public boolean isReady() {
+        return getStatusActionName() == null;
+    }
+
+    @Override
+    public AbstractConfigPanel getConfigComponent() {
+        final CaptchaSolverConfigV3 cfg = getConfigV3();
+        /* Build a config panel generically from the solver's V3 config interface, just like plugin config panels. */
+        final PluginConfigPanelNG panel = new PluginConfigPanelNG() {
+            @Override
+            public void updateContents() {
+            }
+
+            @Override
+            public void save() {
+            }
+        };
+        panel.build(cfg);
+        return panel;
+    }
+
+    /*
+     * Wait-for timings are stored (per solver) in the solver's own CaptchaSolverConfigV3 (getWaitForOthers). The map is empty by default,
+     * which means "automatic / no wait". It is hidden in the GUI for now.
+     */
+    @Override
     public synchronized int getWaitForByID(String solverID) {
-        Map<String, Integer> map = getConfig().getWaitForMap();
-        if (map == null) {
-            map = getWaitForOthersDefaultMap();
-        }
+        final Map<String, Integer> map = getConfigV3().getWaitForOthers();
         if (map != null) {
             final Integer obj = map.get(solverID);
             return obj == null ? 0 : Math.max(0, obj.intValue());
@@ -35,27 +112,25 @@ public abstract class AbstractSolverService implements SolverService {
 
     @Override
     public synchronized void setWaitFor(String id, Integer waitFor) {
-        Map<String, Integer> map = getConfig().getWaitForMap();
+        final CaptchaSolverConfigV3 cfg = getConfigV3();
+        Map<String, Integer> map = cfg.getWaitForOthers();
         if (map == null) {
-            map = getWaitForOthersDefaultMap();
+            map = new HashMap<String, Integer>();
         }
-        if (map != null) {
-            if (waitFor == null || waitFor <= 0) {
+        if (id == null || waitFor == null || waitFor.intValue() <= 0) {
+            if (id != null) {
                 map.remove(id);
-            } else {
-                map.put(id, waitFor);
             }
-            getConfig().setWaitForMap(map);
+        } else {
+            map.put(id, waitFor);
         }
+        cfg.setWaitForOthers(map);
     }
 
     @Override
     public synchronized Map<String, Integer> getWaitForMapCopy() {
         final Map<String, Integer> ret = new HashMap<String, Integer>();
-        Map<String, Integer> map = getConfig().getWaitForMap();
-        if (map == null) {
-            map = getWaitForOthersDefaultMap();
-        }
+        final Map<String, Integer> map = getConfigV3().getWaitForOthers();
         if (map != null) {
             ret.putAll(map);
         }
@@ -64,12 +139,12 @@ public abstract class AbstractSolverService implements SolverService {
 
     @Override
     public boolean isEnabled() {
-        return getConfig().isEnabled();
+        return getConfigV3().isEnabled();
     }
 
     @Override
     public void setEnabled(boolean b) {
-        getConfig().setEnabled(b);
+        getConfigV3().setEnabled(b);
     }
 
     protected void initServicePanel(final KeyHandler... handlers) {

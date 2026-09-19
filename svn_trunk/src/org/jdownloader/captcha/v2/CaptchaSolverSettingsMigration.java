@@ -7,16 +7,17 @@ import java.util.regex.Pattern;
 
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.StringUtils;
+import org.jdownloader.api.captcha.CaptchaAPIManualRemoteSolverService;
 import org.jdownloader.api.captcha.CaptchaMyJDownloaderRemoteSolverSettings;
-import org.jdownloader.api.captcha.CaptchaMyJDownloaderRemoteSolverSettingsV3;
 import org.jdownloader.captcha.v2.solver.antiCaptchaCom.AntiCaptchaComConfigInterface;
 import org.jdownloader.captcha.v2.solver.browser.BrowserCaptchaSolverConfig;
 import org.jdownloader.captcha.v2.solver.browser.BrowserCaptchaSolverConfigV3;
+import org.jdownloader.captcha.v2.solver.service.BrowserSolverService;
+import org.jdownloader.captcha.v2.solver.service.DialogSolverService;
 import org.jdownloader.captcha.v2.solver.cheapcaptcha.CheapCaptchaConfigInterface;
 import org.jdownloader.captcha.v2.solver.dbc.DeathByCaptchaSettings;
 import org.jdownloader.captcha.v2.solver.endcaptcha.EndCaptchaConfigInterface;
 import org.jdownloader.captcha.v2.solver.gui.DialogCaptchaSolverConfig;
-import org.jdownloader.captcha.v2.solver.gui.DialogCaptchaSolverConfigV3;
 import org.jdownloader.captcha.v2.solver.imagetyperz.ImageTyperzConfigInterface;
 import org.jdownloader.captcha.v2.solver.solver9kw.Captcha9kwSettings;
 import org.jdownloader.captcha.v2.solver.twocaptcha.TwoCaptchaConfigInterface;
@@ -120,9 +121,9 @@ public class CaptchaSolverSettingsMigration {
         if (apikey != null && apikey.matches("[a-f0-9]{32}")) {
             final Account existingAccount = getExistingAccount(host, apikey);
             if (existingAccount != null) {
-                System.out.print("Same " + host + " account already exists");
+                System.out.println("Same " + host + " account already exists");
             } else {
-                final Account acc = new Account(null, apikey);
+                final Account acc = new Account(apikey, apikey);
                 if (!cfgOld.isEnabled()) {
                     acc.setEnabled(false, false);
                 } else {
@@ -138,9 +139,9 @@ public class CaptchaSolverSettingsMigration {
         final List<String> blacklist = cfgOld.getBlacklistEntries();
         final List<String> whitelist = cfgOld.getWhitelistEntries();
         final boolean blackWhiteListingEnabled = cfgOld.isBlackWhiteListingEnabled();
-        final List<CaptchaChallengeFilter> filters = migrateBlackWhiteListToFilters(blacklist, blackWhiteListingEnabled, whitelist, blackWhiteListingEnabled);
+        final List<CaptchaChallengeFilter> filters = migrateBlackWhiteListToFilters(host, blacklist, blackWhiteListingEnabled, whitelist, blackWhiteListingEnabled);
         if (filters != null) {
-            cfgNew.setFilterList(filters);
+            CaptchaChallengeFilterController.getInstance().addAll(filters);
         }
         if (userHasAccount && userHasEnabledExistingAccount) {
             /* Migrate some settings only if user has an active account */
@@ -148,7 +149,7 @@ public class CaptchaSolverSettingsMigration {
                 cfgNew.setEnableCaptchaFeedback(false);
             }
         }
-        System.out.print(host + " migration successful");
+        System.out.println(host + " migration successful");
     }
 
     public void migrate_cheap_captcha() {
@@ -169,7 +170,7 @@ public class CaptchaSolverSettingsMigration {
         if (!StringUtils.isEmpty(username) && !StringUtils.isEmpty(password)) {
             final Account existingAccountViaUserPW = getExistingAccount(host, username, password);
             if (existingAccountViaUserPW != null) {
-                System.out.print("Same " + host + " account already exists");
+                System.out.println("Same " + host + " account already exists");
             } else {
                 final Account acc = new Account(username, password);
                 if (!cfgOld.isEnabled()) {
@@ -187,9 +188,9 @@ public class CaptchaSolverSettingsMigration {
         final List<String> blacklist = cfgOld.getBlacklistEntries();
         final List<String> whitelist = cfgOld.getWhitelistEntries();
         final boolean blackWhiteListingEnabled = cfgOld.isBlackWhiteListingEnabled();
-        final List<CaptchaChallengeFilter> filters = migrateBlackWhiteListToFilters(blacklist, blackWhiteListingEnabled, whitelist, blackWhiteListingEnabled);
+        final List<CaptchaChallengeFilter> filters = migrateBlackWhiteListToFilters(host, blacklist, blackWhiteListingEnabled, whitelist, blackWhiteListingEnabled);
         if (filters != null) {
-            cfgNew.setFilterList(filters);
+            CaptchaChallengeFilterController.getInstance().addAll(filters);
         }
         if (userHasAccount && userHasEnabledExistingAccount) {
             /* Migrate some settings only if user has an active account */
@@ -197,7 +198,7 @@ public class CaptchaSolverSettingsMigration {
                 cfgNew.setEnableCaptchaFeedback(false);
             }
         }
-        System.out.print(host + " migration successful");
+        System.out.println(host + " migration successful");
     }
 
     public void migrate_deathbycaptcha() {
@@ -218,15 +219,19 @@ public class CaptchaSolverSettingsMigration {
         final Pattern apikeypattern = Pattern.compile("^[a-zA-Z0-9]{100,}$");
         final boolean isApikey = passwordOrApitoken != null && new Regex(passwordOrApitoken, apikeypattern).patternFind();
         if ((!StringUtils.isEmpty(username) && !StringUtils.isEmpty(passwordOrApitoken)) || isApikey) {
-            final Account existingAccount = getExistingAccount(host, username, passwordOrApitoken);
+            /* Only check via user:pw if both values are present, otherwise the 3-arg lookup throws IllegalArgumentException. */
+            Account existingAccount = null;
+            if (!StringUtils.isEmpty(username) && !StringUtils.isEmpty(passwordOrApitoken)) {
+                existingAccount = getExistingAccount(host, username, passwordOrApitoken);
+            }
             Account existingAccountViaApikey = null;
             if (isApikey) {
                 existingAccountViaApikey = getExistingAccount(host, passwordOrApitoken);
             }
             if (existingAccount != null) {
-                System.out.print("Same " + host + " account already exists via user:pw");
+                System.out.println("Same " + host + " account already exists via user:pw");
             } else if (existingAccountViaApikey != null) {
-                System.out.print("Same " + host + " account already exists via apikey");
+                System.out.println("Same " + host + " account already exists via apikey");
             } else {
                 final Account acc = new Account(username, passwordOrApitoken);
                 if (!cfgOld.isEnabled()) {
@@ -244,16 +249,16 @@ public class CaptchaSolverSettingsMigration {
         final List<String> blacklist = cfgOld.getBlacklistEntries();
         final List<String> whitelist = cfgOld.getWhitelistEntries();
         final boolean blackWhiteListingEnabled = cfgOld.isBlackWhiteListingEnabled();
-        final List<CaptchaChallengeFilter> filters = migrateBlackWhiteListToFilters(blacklist, blackWhiteListingEnabled, whitelist, blackWhiteListingEnabled);
+        final List<CaptchaChallengeFilter> filters = migrateBlackWhiteListToFilters(host, blacklist, blackWhiteListingEnabled, whitelist, blackWhiteListingEnabled);
         if (filters != null) {
-            cfgNew.setFilterList(filters);
+            CaptchaChallengeFilterController.getInstance().addAll(filters);
         }
         if (userHasAccount && userHasEnabledExistingAccount) {
             if (!cfgOld.isFeedBackSendingEnabled()) {
                 cfgNew.setEnableCaptchaFeedback(false);
             }
         }
-        System.out.print(host + " migration successful");
+        System.out.println(host + " migration successful");
     }
 
     public void migrate_endcaptcha() {
@@ -274,7 +279,7 @@ public class CaptchaSolverSettingsMigration {
         if (!StringUtils.isEmpty(username) && !StringUtils.isEmpty(password)) {
             final Account existingAccount = getExistingAccount(host, username, password);
             if (existingAccount != null) {
-                System.out.print("Same " + host + " account already exists via user:pw");
+                System.out.println("Same " + host + " account already exists via user:pw");
             } else {
                 final Account acc = new Account(username, password);
                 if (!cfgOld.isEnabled()) {
@@ -292,9 +297,9 @@ public class CaptchaSolverSettingsMigration {
         final List<String> blacklist = cfgOld.getBlacklistEntries();
         final List<String> whitelist = cfgOld.getWhitelistEntries();
         final boolean blackWhiteListingEnabled = cfgOld.isBlackWhiteListingEnabled();
-        final List<CaptchaChallengeFilter> filters = migrateBlackWhiteListToFilters(blacklist, blackWhiteListingEnabled, whitelist, blackWhiteListingEnabled);
+        final List<CaptchaChallengeFilter> filters = migrateBlackWhiteListToFilters(host, blacklist, blackWhiteListingEnabled, whitelist, blackWhiteListingEnabled);
         if (filters != null) {
-            cfgNew.setFilterList(filters);
+            CaptchaChallengeFilterController.getInstance().addAll(filters);
         }
         if (userHasAccount && userHasEnabledExistingAccount) {
             /* Migrate some settings only if user has an active account */
@@ -302,7 +307,7 @@ public class CaptchaSolverSettingsMigration {
                 cfgNew.setEnableCaptchaFeedback(false);
             }
         }
-        System.out.print(host + " migration successful");
+        System.out.println(host + " migration successful");
     }
 
     public void migrate_imagetyperz() {
@@ -323,7 +328,7 @@ public class CaptchaSolverSettingsMigration {
         if (!StringUtils.isEmpty(username) && !StringUtils.isEmpty(password)) {
             final Account existingAccount = getExistingAccount(host, username, password);
             if (existingAccount != null) {
-                System.out.print("Same " + host + " account already exists via user:pw");
+                System.out.println("Same " + host + " account already exists via user:pw");
             } else {
                 final Account acc = new Account(username, password);
                 if (!cfgOld.isEnabled()) {
@@ -341,9 +346,9 @@ public class CaptchaSolverSettingsMigration {
         final List<String> blacklist = cfgOld.getBlacklistEntries();
         final List<String> whitelist = cfgOld.getWhitelistEntries();
         final boolean blackWhiteListingEnabled = cfgOld.isBlackWhiteListingEnabled();
-        final List<CaptchaChallengeFilter> filters = migrateBlackWhiteListToFilters(blacklist, blackWhiteListingEnabled, whitelist, blackWhiteListingEnabled);
+        final List<CaptchaChallengeFilter> filters = migrateBlackWhiteListToFilters(host, blacklist, blackWhiteListingEnabled, whitelist, blackWhiteListingEnabled);
         if (filters != null) {
-            cfgNew.setFilterList(filters);
+            CaptchaChallengeFilterController.getInstance().addAll(filters);
         }
         if (userHasAccount && userHasEnabledExistingAccount) {
             /* Migrate some settings only if user has an active account */
@@ -351,7 +356,7 @@ public class CaptchaSolverSettingsMigration {
                 cfgNew.setEnableCaptchaFeedback(false);
             }
         }
-        System.out.print(host + " migration successful");
+        System.out.println(host + " migration successful");
     }
 
     public void migrate_2captcha() {
@@ -368,7 +373,7 @@ public class CaptchaSolverSettingsMigration {
         if (apikey != null && apikey.matches("[a-f0-9]{32}")) {
             final Account existingAccount = getExistingAccount(host, apikey);
             if (existingAccount != null) {
-                System.out.print("Same " + host + " account already exists via apikey");
+                System.out.println("Same " + host + " account already exists via apikey");
             } else {
                 final Account acc = new Account(apikey, apikey);
                 if (!cfgOld.isEnabled()) {
@@ -386,9 +391,9 @@ public class CaptchaSolverSettingsMigration {
         final List<String> blacklist = cfgOld.getBlacklistEntries();
         final List<String> whitelist = cfgOld.getWhitelistEntries();
         final boolean blackWhiteListingEnabled = cfgOld.isBlackWhiteListingEnabled();
-        final List<CaptchaChallengeFilter> filters = migrateBlackWhiteListToFilters(blacklist, blackWhiteListingEnabled, whitelist, blackWhiteListingEnabled);
+        final List<CaptchaChallengeFilter> filters = migrateBlackWhiteListToFilters(host, blacklist, blackWhiteListingEnabled, whitelist, blackWhiteListingEnabled);
         if (filters != null) {
-            cfgNew.setFilterList(filters);
+            CaptchaChallengeFilterController.getInstance().addAll(filters);
         }
         if (userHasAccount && userHasEnabledExistingAccount) {
             /* Migrate some settings only if user has an active account */
@@ -396,7 +401,7 @@ public class CaptchaSolverSettingsMigration {
                 cfgNew.setEnableCaptchaFeedback(false);
             }
         }
-        System.out.print(host + " migration successful");
+        System.out.println(host + " migration successful");
     }
 
     public void migrate_9kw() {
@@ -413,9 +418,9 @@ public class CaptchaSolverSettingsMigration {
         if (apikey != null && apikey.matches("[a-zA-Z0-9]{10,}")) {
             final Account existingAccount = getExistingAccount(host, apikey);
             if (existingAccount != null) {
-                System.out.print("Same " + host + " account already exists");
+                System.out.println("Same " + host + " account already exists");
             } else {
-                final Account acc = new Account(null, apikey);
+                final Account acc = new Account(apikey, apikey);
                 if (!cfgOld.isEnabledGlobally() && !cfgOld.isEnabled()) {
                     acc.setEnabled(false, false);
                 } else {
@@ -457,9 +462,9 @@ public class CaptchaSolverSettingsMigration {
         }
         final boolean blacklistEnabled = cfgOld.getblacklistcheck();
         final boolean whitelistEnabled = cfgOld.getwhitelistcheck();
-        final List<CaptchaChallengeFilter> filters = migrateBlackWhiteListToFilters(blacklist, blacklistEnabled, whitelist, whitelistEnabled);
+        final List<CaptchaChallengeFilter> filters = migrateBlackWhiteListToFilters(host, blacklist, blacklistEnabled, whitelist, whitelistEnabled);
         if (filters != null) {
-            cfgNew.setFilterList(filters);
+            CaptchaChallengeFilterController.getInstance().addAll(filters);
         }
         if (userHasAccount && userHasEnabledExistingAccount) {
             /* Migrate some settings only if user has an active account */
@@ -467,11 +472,11 @@ public class CaptchaSolverSettingsMigration {
                 cfgNew.setEnableCaptchaFeedback(false);
             }
         }
-        System.out.print(host + " migration successful");
+        System.out.println(host + " migration successful");
     }
 
     public void migrate_BrowserCaptchaSolverConfig() {
-        final String name = "BrowserCaptchaSolver";
+        final String name = BrowserSolverService.ID;
         final BrowserCaptchaSolverConfig cfgOld = JsonConfig.create(BrowserCaptchaSolverConfig.class);
         final BrowserCaptchaSolverConfigV3 cfgNew = JsonConfig.create(BrowserCaptchaSolverConfigV3.class);
         /* Migrate settings, migrate all that are different from the defaults */
@@ -497,41 +502,39 @@ public class CaptchaSolverSettingsMigration {
         final List<String> blacklist = cfgOld.getBlacklistEntries();
         final List<String> whitelist = cfgOld.getWhitelistEntries();
         final boolean blackWhiteListingEnabled = cfgOld.isBlackWhiteListingEnabled();
-        final List<CaptchaChallengeFilter> filters = migrateBlackWhiteListToFilters(blacklist, blackWhiteListingEnabled, whitelist, blackWhiteListingEnabled);
+        final List<CaptchaChallengeFilter> filters = migrateBlackWhiteListToFilters(name, blacklist, blackWhiteListingEnabled, whitelist, blackWhiteListingEnabled);
         if (filters != null) {
-            cfgNew.setFilterList(filters);
+            CaptchaChallengeFilterController.getInstance().addAll(filters);
         }
-        System.out.print(name + " migration successful");
+        System.out.println(name + " migration successful");
     }
 
     public void migrate_CaptchaMyJDownloaderRemoteSolverSettings() {
-        final String name = "CaptchaMyJDownloaderRemoteSolverSettings";
+        final String name = CaptchaAPIManualRemoteSolverService.ID;
         final CaptchaMyJDownloaderRemoteSolverSettings cfgOld = JsonConfig.create(CaptchaMyJDownloaderRemoteSolverSettings.class);
-        final CaptchaMyJDownloaderRemoteSolverSettingsV3 cfgNew = JsonConfig.create(CaptchaMyJDownloaderRemoteSolverSettingsV3.class);
         /* Migrate black-/whitelist settings */
         final List<String> blacklist = cfgOld.getBlacklistEntries();
         final List<String> whitelist = cfgOld.getWhitelistEntries();
         final boolean blackWhiteListingEnabled = cfgOld.isBlackWhiteListingEnabled();
-        final List<CaptchaChallengeFilter> filters = migrateBlackWhiteListToFilters(blacklist, blackWhiteListingEnabled, whitelist, blackWhiteListingEnabled);
+        final List<CaptchaChallengeFilter> filters = migrateBlackWhiteListToFilters(name, blacklist, blackWhiteListingEnabled, whitelist, blackWhiteListingEnabled);
         if (filters != null) {
-            cfgNew.setFilterList(filters);
+            CaptchaChallengeFilterController.getInstance().addAll(filters);
         }
-        System.out.print(name + " migration successful");
+        System.out.println(name + " migration successful");
     }
 
     public void migrate_DialogCaptchaSolverConfig() {
-        final String name = "DialogCaptchaSolverConfig";
+        final String name = DialogSolverService.ID;
         final DialogCaptchaSolverConfig cfgOld = JsonConfig.create(DialogCaptchaSolverConfig.class);
-        final DialogCaptchaSolverConfigV3 cfgNew = JsonConfig.create(DialogCaptchaSolverConfigV3.class);
         /* Migrate black-/whitelist settings */
         final List<String> blacklist = cfgOld.getBlacklistEntries();
         final List<String> whitelist = cfgOld.getWhitelistEntries();
         final boolean blackWhiteListingEnabled = cfgOld.isBlackWhiteListingEnabled();
-        final List<CaptchaChallengeFilter> filters = migrateBlackWhiteListToFilters(blacklist, blackWhiteListingEnabled, whitelist, blackWhiteListingEnabled);
+        final List<CaptchaChallengeFilter> filters = migrateBlackWhiteListToFilters(name, blacklist, blackWhiteListingEnabled, whitelist, blackWhiteListingEnabled);
         if (filters != null) {
-            cfgNew.setFilterList(filters);
+            CaptchaChallengeFilterController.getInstance().addAll(filters);
         }
-        System.out.print(name + " migration successful");
+        System.out.println(name + " migration successful");
     }
 
     /**
@@ -702,7 +705,7 @@ public class CaptchaSolverSettingsMigration {
      *            Whether whitelist is enabled
      * @return List of CaptchaChallengeFilter objects, or null if no valid filters were created
      */
-    public List<CaptchaChallengeFilter> migrateBlackWhiteListToFilters(final List<String> blacklist, final boolean blacklistEnabled, final List<String> whitelist, final boolean whitelistEnabled) {
+    public List<CaptchaChallengeFilter> migrateBlackWhiteListToFilters(final String solverId, final List<String> blacklist, final boolean blacklistEnabled, final List<String> whitelist, final boolean whitelistEnabled) {
         final List<CaptchaChallengeFilter> allFilters = new ArrayList<CaptchaChallengeFilter>();
         int position = 0;
         /* Process blacklist */
@@ -711,6 +714,8 @@ public class CaptchaSolverSettingsMigration {
             if (blacklistFilters != null) {
                 for (int i = 0; i < blacklistFilters.size(); i++) {
                     final CaptchaChallengeFilter filter = blacklistFilters.get(i);
+                    filter.setName("blacklist rule " + (i + 1) + " migrated from " + solverId + " settings");
+                    filter.setSolver(solverId);
                     filter.setPosition(position);
                     position++;
                     if (!blacklistEnabled) {
@@ -727,6 +732,8 @@ public class CaptchaSolverSettingsMigration {
             if (whitelistFilters != null) {
                 for (int i = 0; i < whitelistFilters.size(); i++) {
                     final CaptchaChallengeFilter filter = whitelistFilters.get(i);
+                    filter.setName("whitelist rule " + (i + 1) + " migrated from " + solverId + " settings");
+                    filter.setSolver(solverId);
                     filter.setPosition(position);
                     position++;
                     if (!whitelistEnabled) {

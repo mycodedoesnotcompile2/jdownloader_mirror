@@ -92,16 +92,6 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
     }
 
     @Override
-    public boolean isFilterListEnabled() {
-        return plugin.isFilterListEnabled();
-    }
-
-    @Override
-    public List<CaptchaChallengeFilter> getCaptchaChallengeFilterList() {
-        return this.plugin.getCaptchaChallengeFilterList();
-    }
-
-    @Override
     public boolean setValid(AbstractResponse<?> response) {
         final List<FeedbackType> feedbacktypes = this.getSupportedFeedbackTypes();
         if (feedbacktypes != null && !feedbacktypes.contains(FeedbackType.REPORT_VALID_CAPTCHAS)) {

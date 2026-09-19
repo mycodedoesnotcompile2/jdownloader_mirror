@@ -1,14 +1,13 @@
 package org.jdownloader.captcha.v2.solver.jac;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.swing.Icon;
 
-import jd.gui.swing.jdgui.views.settings.panels.anticaptcha.AbstractCaptchaSolverConfigPanel;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 import org.appwork.storage.config.JsonConfig;
-import org.jdownloader.captcha.v2.ChallengeSolverConfig;
 import org.jdownloader.captcha.v2.SolverService;
 import org.jdownloader.captcha.v2.solver.service.AbstractSolverService;
 import org.jdownloader.gui.IconKey;
@@ -17,10 +16,10 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.advanced.AdvancedConfigManager;
 
 public class JacSolverService extends AbstractSolverService implements SolverService {
-    private JACSolverConfig config;
+    private JacSolverConfigV3 config;
 
     public JacSolverService() {
-        config = JsonConfig.create(JACSolverConfig.class);
+        config = JsonConfig.create(JacSolverConfigV3.class);
         AdvancedConfigManager.getInstance().register(config);
     }
 
@@ -42,45 +41,6 @@ public class JacSolverService extends AbstractSolverService implements SolverSer
     }
 
     @Override
-    public AbstractCaptchaSolverConfigPanel getConfigPanel() {
-        AbstractCaptchaSolverConfigPanel ret = new AbstractCaptchaSolverConfigPanel() {
-
-            {
-                addHeader(getTitle(), JacSolverService.this.getIcon(32));
-                addDescription(JacSolverService.this.getType());
-
-                addBlackWhiteList(config);
-
-            }
-
-            @Override
-            public Icon getIcon() {
-                return JacSolverService.this.getIcon(32);
-            }
-
-            @Override
-            public String getPanelID() {
-                return "JAC_" + getTitle();
-            }
-
-            @Override
-            public String getTitle() {
-                return JacSolverService.this.getName();
-            }
-
-            @Override
-            public void save() {
-            }
-
-            @Override
-            public void updateContents() {
-            }
-
-        };
-        return ret;
-    }
-
-    @Override
     public boolean hasConfigPanel() {
         return true;
     }
@@ -91,24 +51,22 @@ public class JacSolverService extends AbstractSolverService implements SolverSer
     }
 
     @Override
-    public ChallengeSolverConfig getConfig() {
-        return config;
+    public String getDescription() {
+        return "Legacy automated local captcha solving that automatically solves a few older, specific image captcha types.";
     }
 
     @Override
-    public Map<String, Integer> getWaitForOthersDefaultMap() {
-        HashMap<String, Integer> ret = new HashMap<String, Integer>();
-        // ret.put(Captcha9kwSolverClick.ID, 60000);
-        // ret.put(DialogClickCaptchaSolver.ID, 60000);
-        // ret.put(DialogBasicCaptchaSolver.ID, 60000);
-        // ret.put(CaptchaAPISolver.ID, 60000);
-        // ret.put(JACSolver.ID, 30000);
-        // ret.put(Captcha9kwSolver.ID, 60000);
-        // ret.put(CaptchaMyJDSolver.ID, 60000);
-        // ret.put(CBSolver.ID, 60000);
-        // ret.put(DeathByCaptchaSolver.ID, 60000);
+    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
+        types.add(CAPTCHA_TYPE.IMAGE);
+        types.add(CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA);
+        types.add(CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
+        return types;
+    }
 
-        return ret;
+    @Override
+    public JacSolverConfigV3 getConfigV3() {
+        return config;
     }
 
 }

@@ -5,11 +5,13 @@ import java.awt.event.ActionEvent;
 
 import javax.swing.Icon;
 import javax.swing.JLabel;
+import javax.swing.JScrollPane;
 
 import jd.gui.swing.jdgui.views.settings.components.Checkbox;
 import jd.gui.swing.jdgui.views.settings.components.SettingsButton;
 import jd.gui.swing.jdgui.views.settings.components.Spinner;
 
+import org.appwork.swing.MigPanel;
 import org.appwork.uio.UIOManager;
 import org.jdownloader.actions.AppAction;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
@@ -17,7 +19,6 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.settings.AbstractConfigPanel;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
-import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.settings.staticreferences.CFG_SOUND;
 
@@ -25,6 +26,7 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
     private static final long serialVersionUID = 1L;
 
     // private CESSettingsPanel psp;
+    private SolverOrderTable  solverOrderTable;
 
     public String getTitle() {
         return _GUI.T.AntiCaptchaConfigPanel_getTitle();
@@ -38,12 +40,13 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
         addPair(_GUI.T.AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_sounds(), null, new Checkbox(CFG_SOUND.CAPTCHA_SOUND_ENABLED));
         addPair(_GUI.T.AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_countdown_download(), null, new Checkbox(CFG_CAPTCHA.DIALOG_COUNTDOWN_FOR_DOWNLOADS_ENABLED));
         addPair(_GUI.T.CaptchaExchangeSpinnerAction_skipbubbletimeout_(), null, new Spinner(CFG_CAPTCHA.CAPTCHA_EXCHANGE_CHANCE_TO_SKIP_BUBBLE_TIMEOUT));
-        this.addHeader(_GUI.T.CaptchaConfigPanel_order(), NewTheme.I().getIcon(IconKey.ICON_ORDER, 32));
-        this.addDescription(_GUI.T.CaptchaConfigPanel_order_description());
 
-        SolverOrderTable table;
-        SolverOrderContainer container = new SolverOrderContainer(table = new SolverOrderTable());
-        this.addPair(_GUI.T.AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_reset(), null, new SettingsButton(new AppAction() {
+        /* Tabbed area at the top: solver overview and captcha rules (similar to the Linkgrabber Filter panel). */
+        final SolverOrderTable table = this.solverOrderTable = new SolverOrderTable();
+        final SolverOrderContainer container = new SolverOrderContainer(table);
+        final MigPanel solversTab = new MigPanel("ins 5, wrap 1", "[grow,fill]", "[grow,fill][]");
+        solversTab.add(container, "grow");
+        solversTab.add(new SettingsButton(new AppAction() {
             {
                 setIconKey(IconKey.ICON_RESET);
                 setName(_GUI.T.lit_reset());
@@ -55,9 +58,15 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
                     ChallengeResponseController.getInstance().resetTiming();
                 }
             }
-
-        }));
-        add(container);
+        }), "align right");
+        final CaptchaSettingsTabbedPane tabs = new CaptchaSettingsTabbedPane();
+        final JScrollPane solversScrollPane = new JScrollPane(solversTab);
+        /* The panel lays out its content to fit the available space, so neither a horizontal nor a vertical scrollbar is wanted. */
+        solversScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        solversScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
+        tabs.addTab(_GUI.T.CaptchaConfigPanel_solverOverviewAndSettings(), solversScrollPane);
+        tabs.addTab("Captcha Rules", new CaptchaRulesContainer());
+        add(tabs);
         // this.addHeader(_GUI.T.AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_solver(), new AbstractIcon(IconKey.ICON_share", 32));
         // this.addDescriptionPlain(_GUI.T.AntiCaptchaConfigPanel_onShow_description_solver());
         // add(psp = new CESSettingsPanel());
@@ -76,7 +85,12 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
 
     @Override
     protected void onShow() {
-
+        /*
+         * Re-apply the currently active column sort (e.g. "Status") against the solvers' current values. Live updates while this panel is
+         * visible only repaint cells (see SolverOrderTableModel.refreshRows()) so rows don't jump around under the user's cursor; returning
+         * to this panel is the point where rows get regrouped, matching the same behavior as the account manager's account table.
+         */
+        solverOrderTable.getModel().refreshSort();
         super.onShow();
     }
 

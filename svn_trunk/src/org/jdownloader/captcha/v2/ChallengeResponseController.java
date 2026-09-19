@@ -37,21 +37,12 @@ import org.jdownloader.captcha.v2.challenge.oauth.AccountOAuthSolver;
 import org.jdownloader.captcha.v2.challenge.oauth.OAuthDialogSolver;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.solver.CESChallengeSolver;
-import org.jdownloader.captcha.v2.solver.antiCaptchaCom.AntiCaptchaComSolver;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
 import org.jdownloader.captcha.v2.solver.browser.BrowserSolver;
-import org.jdownloader.captcha.v2.solver.cheapcaptcha.CheapCaptchaSolver;
-import org.jdownloader.captcha.v2.solver.dbc.DeathByCaptchaSolver;
-import org.jdownloader.captcha.v2.solver.endcaptcha.EndCaptchaSolver;
 import org.jdownloader.captcha.v2.solver.gui.DialogBasicCaptchaSolver;
 import org.jdownloader.captcha.v2.solver.gui.DialogClickCaptchaSolver;
 import org.jdownloader.captcha.v2.solver.gui.DialogMultiClickCaptchaSolver;
-import org.jdownloader.captcha.v2.solver.imagetyperz.ImageTyperzCaptchaSolver;
 import org.jdownloader.captcha.v2.solver.jac.JACSolver;
-import org.jdownloader.captcha.v2.solver.solver9kw.Captcha9kwSolver;
-import org.jdownloader.captcha.v2.solver.solver9kw.Captcha9kwSolverClick;
-import org.jdownloader.captcha.v2.solver.solver9kw.Captcha9kwSolverMultiClick;
-import org.jdownloader.captcha.v2.solver.twocaptcha.TwoCaptchaSolver;
 import org.jdownloader.captcha.v2.solverjob.ResponseList;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.controlling.UniqueAlltimeID;
@@ -65,6 +56,7 @@ import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPluginFilter;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
+import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 import org.jdownloader.updatev2.UpdateController;
 
 import jd.controlling.AccountController;
@@ -147,15 +139,7 @@ public class ChallengeResponseController {
             return;
         }
         addSolver(JACSolver.getInstance());
-        addSolver(DeathByCaptchaSolver.getInstance());
-        addSolver(ImageTyperzCaptchaSolver.getInstance());
-        addSolver(CheapCaptchaSolver.getInstance());
-        addSolver(TwoCaptchaSolver.getInstance());
-        addSolver(AntiCaptchaComSolver.getInstance());
-        addSolver(EndCaptchaSolver.getInstance());
-        addSolver(Captcha9kwSolver.getInstance());
-        addSolver(Captcha9kwSolverClick.getInstance());
-        addSolver(Captcha9kwSolverMultiClick.getInstance());
+        /* Legacy paid captcha solver engines were removed; they are now provided as captcha solver plugins. */
         if (!Application.isHeadless()) {
             addSolver(DialogBasicCaptchaSolver.getInstance());
             addSolver(DialogClickCaptchaSolver.getInstance());
@@ -459,6 +443,7 @@ public class ChallengeResponseController {
     private <T> List<ChallengeSolver<T>> createList(final Challenge<T> c) {
         final List<ChallengeSolver<T>> ret = new ArrayList<ChallengeSolver<T>>();
         final HashSet<ChallengeVetoReason> vetoReasons = new HashSet<ChallengeVetoReason>();
+        /* Process our own default/local solvers */
         for (final ChallengeSolver<?> solver : solverList) {
             try {
                 final ChallengeVetoReason veto = solver.getChallengeVetoReason(c);
@@ -471,68 +456,76 @@ public class ChallengeResponseController {
                 logger.log(e);
             }
         }
-        final AccountFilter af = new AccountFilter().setFeature(FEATURE.CAPTCHA_SOLVER);
-        final List<Account> solverAccounts = AccountController.getInstance().listAccounts(af);
-        /* Map to collect solver accounts by domain */
-        final Map<String, Account> bestAccountsByDomain = new HashMap<String, Account>();
-        /* Collect unavailable solver domains for logging purposes only */
-        final HashSet<String> unavailableSolverDomains = new HashSet<String>();
-        for (final Account solverAccount : solverAccounts) {
-            if (solverAccount.getAccountInfo() == null) {
-                /* Skip accounts without AccountInfo. */
-                continue;
+        add_solver_accounts: {
+            if (!CFG_GENERAL.CFG.isUseAvailableCaptchaSolverAccounts()) {
+                /* User has globally disabled usage of solver accounts -> Don't even fetch accounts */
+                logger.info("User has globally disabled usage of solver accounts");
+                vetoReasons.add(ChallengeVetoReason.EXTERNAL_SOLVER_ACCOUNTS_DISABLED);
+                break add_solver_accounts;
             }
-            boolean success = false;
-            try {
-                final abstractPluginForCaptchaSolver plugin = (abstractPluginForCaptchaSolver) solverAccount.getPlugin();
-                final ChallengeSolver<T> solver = plugin.getPluginChallengeSolver(c, solverAccount);
-                if (solver == null) {
-                    /* E.g. solver cannot handle challenge it gets presented */
+            final AccountFilter af = new AccountFilter().setFeature(FEATURE.CAPTCHA_SOLVER);
+            /* Map to collect solver accounts by domain */
+            final Map<String, Account> bestAccountsByDomain = new HashMap<String, Account>();
+            /* Collect unavailable solver domains for logging purposes only */
+            final HashSet<String> unavailableSolverDomains = new HashSet<String>();
+            final List<Account> solverAccounts = AccountController.getInstance().listAccounts(af);
+            for (final Account solverAccount : solverAccounts) {
+                if (solverAccount.getAccountInfo() == null) {
+                    /* Skip accounts without AccountInfo. */
                     continue;
                 }
-                final SolverService service = solver.getService();
-                if (!service.isEnabled()) {
-                    // TODO: Move this into getChallengeVetoReason
-                    vetoReasons.add(ChallengeVetoReason.SOLVER_DISABLED);
-                    continue;
-                }
-                final ChallengeVetoReason veto = solver.getChallengeVetoReason(c);
-                if (veto != null) {
-                    vetoReasons.add(veto);
-                    continue;
-                }
-                /* Collect account by domain, keeping only the one with lowest balance */
-                final String domain = solverAccount.getHoster();
-                final double currentBalance = solverAccount.getAccountInfo().getAccountBalance();
-                final Account existingAccount = bestAccountsByDomain.get(domain);
-                if (existingAccount == null || currentBalance < existingAccount.getAccountInfo().getAccountBalance()) {
-                    bestAccountsByDomain.put(domain, solverAccount);
-                }
-                success = true;
-            } catch (final Throwable e) {
-                logger.log(e);
-                logger.warning("Exception happened during collecting fitting solver plugins");
-            } finally {
-                if (success) {
-                    unavailableSolverDomains.remove(solverAccount.getHoster());
-                } else {
-                    unavailableSolverDomains.add(solverAccount.getHoster());
+                boolean success = false;
+                try {
+                    final abstractPluginForCaptchaSolver plugin = (abstractPluginForCaptchaSolver) solverAccount.getPlugin();
+                    final ChallengeSolver<T> solver = plugin.getPluginChallengeSolver(c, solverAccount);
+                    if (solver == null) {
+                        /* E.g. solver cannot handle challenge it gets presented */
+                        continue;
+                    }
+                    final SolverService service = solver.getService();
+                    if (!service.isEnabled()) {
+                        // TODO: Move this into getChallengeVetoReason
+                        vetoReasons.add(ChallengeVetoReason.SOLVER_DISABLED);
+                        continue;
+                    }
+                    final ChallengeVetoReason veto = solver.getChallengeVetoReason(c);
+                    if (veto != null) {
+                        vetoReasons.add(veto);
+                        continue;
+                    }
+                    /* Collect account by domain, keeping only the one with lowest balance */
+                    final String domain = solverAccount.getHoster();
+                    final double currentBalance = solverAccount.getAccountInfo().getAccountBalance();
+                    final Account existingAccount = bestAccountsByDomain.get(domain);
+                    if (existingAccount == null || currentBalance < existingAccount.getAccountInfo().getAccountBalance()) {
+                        bestAccountsByDomain.put(domain, solverAccount);
+                    }
+                    success = true;
+                } catch (final Throwable e) {
+                    logger.log(e);
+                    logger.warning("Exception happened during collecting fitting solver plugins");
+                } finally {
+                    if (success) {
+                        unavailableSolverDomains.remove(solverAccount.getHoster());
+                    } else {
+                        unavailableSolverDomains.add(solverAccount.getHoster());
+                    }
                 }
             }
+            /* Add solvers from best accounts to ret list -> Only one account per solver, only the account with the lowest balance. */
+            for (final Account bestAccount : bestAccountsByDomain.values()) {
+                try {
+                    final abstractPluginForCaptchaSolver plugin = (abstractPluginForCaptchaSolver) bestAccount.getPlugin();
+                    final ChallengeSolver<T> solver = plugin.getPluginChallengeSolver(c, bestAccount);
+                    if (solver != null) {
+                        ret.add(solver);
+                    }
+                } catch (final Throwable e) {
+                    logger.log(e);
+                }
+            }
+            logger.info("Existing solver accounts that cannot be used for this challenge: " + unavailableSolverDomains);
         }
-        /* Add solvers from best accounts to ret list -> Onkly one account per solver, only the account with the lowest balance. */
-        for (final Account bestAccount : bestAccountsByDomain.values()) {
-            try {
-                final abstractPluginForCaptchaSolver plugin = (abstractPluginForCaptchaSolver) bestAccount.getPlugin();
-                final ChallengeSolver<T> solver = plugin.getPluginChallengeSolver(c, bestAccount);
-                if (solver != null) {
-                    ret.add(solver);
-                }
-            } catch (final Throwable e) {
-                logger.log(e);
-            }
-        }
-        logger.info("Existing solver accounts that cannot be used for this challenge: " + unavailableSolverDomains);
         avoidAutoSolver: if (c.isAccountLogin() && CAPTCHA_SETTINGS.isAvoidAutoSolverForLoginCaptchas()) {
             /*
              * Special handling for login captchas: Solve them locally if possible and wished in order to solve them faster since account
@@ -578,7 +571,8 @@ public class ChallengeResponseController {
         final HashSet<Object> dupe = new HashSet<Object>();
         for (final ChallengeSolver<?> s : solverList) {
             if (dupe.add(s.getService())) {
-                s.getService().getConfig().setWaitForMap(null);
+                /* Wait-for persistence is currently disabled; reset is a no-op for now. */
+                s.getService().setWaitFor(null, null);
             }
         }
     }

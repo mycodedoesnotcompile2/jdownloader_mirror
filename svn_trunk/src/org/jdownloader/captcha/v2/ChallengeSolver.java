@@ -31,6 +31,11 @@ public abstract class ChallengeSolver<T> {
         public void solve(SolverJob<Object> solverJob) throws InterruptedException, SolverException, SkipException {
             throw new WTFException("Not Implemented");
         }
+
+        @Override
+        public SolverType getSolverType() {
+            return SolverType.EXTERNAL;
+        }
     };
 
     public enum FeedbackType {
@@ -57,7 +62,9 @@ public abstract class ChallengeSolver<T> {
         CAPTCHA_TYPE_DISABLED_BY_USER,
         ACCOUNT_DISABLED,
         ACCOUNT_IN_ERROR_STATE,
-        ACCOUNT_NOT_ENOUGH_CREDITS
+        ACCOUNT_NOT_ENOUGH_CREDITS,
+        /** The user globally disabled external (plugin based) captcha solver accounts, see GeneralSettings#isUseAvailableCaptchaSolverAccounts. */
+        EXTERNAL_SOLVER_ACCOUNTS_DISABLED
     }
 
     protected ChallengeSolver() {
@@ -81,10 +88,7 @@ public abstract class ChallengeSolver<T> {
     }
 
     /* Returns type of solver e.g. browser solver, local image solver or external solver. */
-    public SolverType getSolverType() {
-        // TODO: Make this abstract
-        return null;
-    }
+    public abstract SolverType getSolverType();
 
     /**
      * Return list of user disabled captcha types if any are disabled. <br>
@@ -150,7 +154,7 @@ public abstract class ChallengeSolver<T> {
     }
 
     public boolean isEnabled() {
-        return getService().getConfig().isEnabled();
+        return getService().isEnabled();
     }
 
     public List<SolverJob<T>> listJobs() {
@@ -247,161 +251,28 @@ public abstract class ChallengeSolver<T> {
             // TODO: fix possible NPE in above condition, getResultType should never return null?
             // This should never happen?!
             return ChallengeVetoReason.UNSUITABLE_FOR_SOLVER;
-        } else if (!validateChallengeFilters(c)) {
+        }
+        final CaptchaChallengeFilterResult filterResult = validateChallengeFilters(c);
+        switch (filterResult) {
+        case FILTERED_BLACKLIST:
             return ChallengeVetoReason.CHALLENGE_BLACKLISTED;
-        } else {
+        case FILTERED_WHITELIST:
+        case NOT_FILTERED:
+        default:
             return null;
         }
     }
 
-    public boolean isFilterListEnabled() {
-        // TODO: Make this abstract
-        // TODO: Migrate to new captcha solver config system
-        return getService().getConfig().isBlackWhiteListingEnabled();
-    }
-
-    public List<CaptchaChallengeFilter> getCaptchaChallengeFilterList() {
-        // TODO: Make this abstract
-        return null;
-    }
-
     /**
-     * Validates challenge against CaptchaChallengeFilter list. Returns true if challenge is allowed, false if blocked.
+     * Evaluates the challenge against the central {@link CaptchaChallengeFilterController}, using this solver's id (
+     * {@link SolverService#getID()}) as solver id.
      *
      * @param c
      *            Challenge to validate
-     * @return true if allowed, false if blocked
+     * @return the filter result: NOT_FILTERED, FILTERED_BLACKLIST or FILTERED_WHITELIST
      */
-    protected boolean validateChallengeFilters(final Challenge<?> c) {
-        if (!this.isFilterListEnabled()) {
-            /* Filter list disabled by user -> No need to check */
-            return true;
-        }
-        final List<CaptchaChallengeFilter> filters = this.getCaptchaChallengeFilterList();
-        if (filters == null || filters.isEmpty()) {
-            /* No filters configured -> Allow */
-            return true;
-        }
-        /* Check each filter in order (sorted by position) */
-        for (int i = 0; i < filters.size(); i++) {
-            final CaptchaChallengeFilter filter = filters.get(i);
-            if (!filter._isValid()) {
-                /* Skip invalid filters */
-                continue;
-            }
-            final CompiledCaptchaChallengeFilter compiledFilter = new CompiledCaptchaChallengeFilter(filter);
-            if (!compiledFilter.isValid()) {
-                /* Skip invalid/disabled/broken filters */
-                continue;
-            }
-            if (!compiledFilter.matches(c)) {
-                /* Filter doesn't match this challenge */
-                continue;
-            }
-            /* Filter matches - apply action */
-            if (compiledFilter.getFilterType() == CaptchaChallengeFilter.CaptchaFilterType.BLACKLIST) {
-                return false;
-            } else {
-                /* WHITELIST */
-                return true;
-            }
-        }
-        /* No filter matched -> default behavior: allow */
-        return true;
-    }
-
-    public boolean isDomainBlacklistEnabled() {
-        // TODO: Migrate to new captcha solver config system
-        return getService().getConfig().isBlackWhiteListingEnabled();
-    }
-
-    public List<String> getBlacklistedDomains() {
-        return getService().getConfig().getBlacklistEntries();
-    }
-
-    public boolean isDomainWhitelistEnabled() {
-        // TODO: Migrate to new captcha solver config system
-        return getService().getConfig().isBlackWhiteListingEnabled();
-    }
-
-    public List<String> getWhitelistedDomains() {
-        return getService().getConfig().getWhitelistEntries();
-    }
-
-    /**
-     * returns true for whitelisted and false for blacklisted
-     *
-     * @param c
-     * @return
-     */
-    @Deprecated
-    protected final boolean validateBlackWhite(final Challenge<?> c) {
-        if (!this.isDomainWhitelistEnabled() && !this.isDomainBlacklistEnabled()) {
-            /* Black/Whitelist disabled by user -> No need to check */
-            return true;
-        }
-        final Set<String> hosts = new HashSet<String>();
-        hosts.add(c.getHost());
-        final Plugin plugin = c.getPlugin();
-        final String[] siteSupportedNames = plugin.siteSupportedNames();
-        if (siteSupportedNames != null) {
-            hosts.addAll(Arrays.asList(siteSupportedNames));
-        }
-        if (this.isDomainWhitelistEnabled()) {
-            final List<String> whiteListEntries = getWhitelistedDomains();
-            whiteListHandling: if (whiteListEntries != null && whiteListEntries.size() > 0) {
-                for (final String whiteListEntry : whiteListEntries) {
-                    try {
-                        final Pattern whiteListPattern = Pattern.compile(whiteListEntry, Pattern.CASE_INSENSITIVE);
-                        for (final String host : hosts) {
-                            final Boolean matches = match(c, host, whiteListPattern);
-                            if (Boolean.TRUE.equals(matches)) {
-                                plugin.getLogger().info(c + " is whitelisted for " + this);
-                                return true;
-                            }
-                        }
-                    } catch (Throwable e) {
-                        c.getPlugin().getLogger().log(e);
-                    }
-                }
-            }
-        }
-        if (this.isDomainBlacklistEnabled()) {
-            final List<String> blackListEntries = getBlacklistedDomains();
-            if (blackListEntries != null && blackListEntries.size() > 0) {
-                blackListHandling: for (final String blackListEntry : blackListEntries) {
-                    try {
-                        final Pattern blackListPattern = Pattern.compile(blackListEntry, Pattern.CASE_INSENSITIVE);
-                        for (final String host : hosts) {
-                            final Boolean matches = match(c, host, blackListPattern);
-                            if (Boolean.TRUE.equals(matches)) {
-                                plugin.getLogger().info(c + " is blacklisted for " + this);
-                                return false;
-                            }
-                        }
-                    } catch (Throwable e) {
-                        c.getPlugin().getLogger().log(e);
-                    }
-                }
-            }
-        }
-        return true;
-    }
-
-    @Deprecated
-    private Boolean match(final Challenge<?> c, final String host, final Pattern pattern) {
-        if (!StringUtils.equalsIgnoreCase(host, c.getTypeID())) {
-            if (pattern.matcher(host + "-" + c.getTypeID()).matches()) {
-                return true;
-            }
-            if (pattern.matcher(host).matches()) {
-                return true;
-            }
-        }
-        if (pattern.matcher(c.getTypeID()).matches()) {
-            return true;
-        }
-        return null;
+    protected CaptchaChallengeFilterResult validateChallengeFilters(final Challenge<?> c) {
+        return CaptchaChallengeFilterController.getInstance().getFilterResult(c, getService().getID());
     }
 
     public long getTimeout() {
@@ -419,12 +290,8 @@ public abstract class ChallengeSolver<T> {
         if (waitForMap != null) {
             return waitForMap;
         }
-        Map<String, Integer> map = getService().getConfig().getWaitForMap();
-        if (map == null || map.size() == 0) {
-            map = getService().getWaitForOthersDefaultMap();
-            getService().getConfig().setWaitForMap(map);
-        }
-        waitForMap = Collections.synchronizedMap(map);
+        /* Wait-for persistence is disabled for now; use the static default map exposed by the service. */
+        waitForMap = Collections.synchronizedMap(getService().getWaitForMapCopy());
         return waitForMap;
     }
 

@@ -441,8 +441,20 @@ public interface GeneralSettings extends ConfigInterface {
 
     @AboutConfig
     @DefaultBooleanValue(true)
-    @DescriptionForConfigEntry("Use available Accounts?")
+    @DescriptionForConfigEntry("Use available accounts for downloading")
     boolean isUseAvailableAccounts();
+
+    /**
+     * Global switch for external (plugin based) captcha solver accounts, i.e. all captcha solvers except the local ones (dialog, browser,
+     * JAC) and the MyJDownloader remote solver. Mirrors {@link #isUseAvailableAccounts()} but scoped to captcha solving so users can
+     * disable paid captcha solving independently of normal hoster/multihoster accounts.
+     */
+    @AboutConfig
+    @DefaultBooleanValue(true)
+    @DescriptionForConfigEntry("Use available accounts for external captcha solver services (excludes local solvers and the MyJDownloader remote solver)")
+    boolean isUseAvailableCaptchaSolverAccounts();
+
+    void setUseAvailableCaptchaSolverAccounts(boolean b);
 
     @AboutConfig
     @DefaultBooleanValue(false)

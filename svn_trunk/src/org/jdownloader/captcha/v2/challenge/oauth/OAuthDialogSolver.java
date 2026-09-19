@@ -51,6 +51,12 @@ public class OAuthDialogSolver extends ChallengeSolver<Boolean> {
         return Boolean.class;
     }
 
+    @Override
+    public SolverType getSolverType() {
+        /* Backed by BrowserSolverService and opens a browser based login dialog, just like the other browser solvers. */
+        return SolverType.JD_LOCAL_BROWSER;
+    }
+
     public void checkSilentMode(final SolverJob<Boolean> job) throws SkipException, InterruptedException {
         if (JDGui.getInstance().isSilentModeActive()) {
             switch (CFG_SILENTMODE.CFG.getOnCaptchaDuringSilentModeAction()) {

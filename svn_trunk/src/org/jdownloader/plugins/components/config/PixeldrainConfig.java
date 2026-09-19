@@ -2,6 +2,7 @@ package org.jdownloader.plugins.components.config;
 
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
+import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.jdownloader.plugins.config.Order;
@@ -44,6 +45,7 @@ public interface PixeldrainConfig extends PluginConfigInterface {
     @DefaultEnumValue("TRIGGER_RECONNECT_TO_CHANGE_IP")
     @Order(10)
     @DescriptionForConfigEntry(text_ActionOnSpeedLimitReached)
+    @DefaultOnNull
     ActionOnSpeedLimitReached getActionOnSpeedLimitReached();
 
     void setActionOnSpeedLimitReached(final ActionOnSpeedLimitReached action);

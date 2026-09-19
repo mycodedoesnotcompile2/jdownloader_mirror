@@ -44,9 +44,8 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
 
     @Override
     protected boolean onDoubleClick(MouseEvent e, SolverService obj) {
-        SolverPropertiesDialog d = new SolverPropertiesDialog(obj, obj.getConfigPanel());
-        UIOManager.I().show(null, d);
-        return true;
+        /* Config is shown inline below the table now; no separate properties dialog. */
+        return false;
     }
 
     @Override

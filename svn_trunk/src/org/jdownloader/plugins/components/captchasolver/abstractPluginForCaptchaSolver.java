@@ -131,11 +131,7 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
     }
 
     public boolean isEnableCaptchaFeedback(final Account account) {
-        final CaptchaSolverPluginConfig cfg = getDefaultConfig();
-        if (cfg == null) {
-            return true;
-        }
-        return cfg.isEnableCaptchaFeedback();
+        return getDefaultConfig().isEnableCaptchaFeedback();
     }
 
     /**
@@ -145,54 +141,22 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      */
     public boolean notifyOnLowBalance(final Account account) {
         // TODO: Implement logic
-        final CaptchaSolverPluginConfig cfg = getDefaultConfig();
-        if (cfg == null) {
-            return true;
-        }
-        return cfg.isWarnOnLowCredits();
+        return getDefaultConfig().isWarnOnLowCredits();
     }
 
     /** Returns interval used for polling when waiting for captcha solution from solver. */
     public int getPollingIntervalMillis(final Account account) {
-        final CaptchaSolverPluginConfig cfg = getDefaultConfig();
-        if (cfg == null) {
-            return 5000;
-        }
-        return cfg.getPollingIntervalSeconds() * 1000;
+        return getDefaultConfig().getPollingIntervalSeconds() * 1000;
     }
 
     public int getMaxSimultaneousCaptchas(final Account account) {
-        final CaptchaSolverPluginConfig cfg = getDefaultConfig();
-        if (cfg == null) {
-            return Integer.MAX_VALUE;
-        }
-        return cfg.getMaxSimultaneousCaptchas();
-    }
-
-    public boolean isFilterListEnabled() {
-        final CaptchaSolverPluginConfig cfg = getDefaultConfig();
-        if (cfg == null) {
-            return true;
-        }
-        return cfg.isFilterListEnabled();
-    }
-
-    public List<CaptchaChallengeFilter> getCaptchaChallengeFilterList() {
-        final CaptchaSolverPluginConfig cfg = getDefaultConfig();
-        if (cfg == null) {
-            return null;
-        }
-        return cfg.getFilterList();
+        return getDefaultConfig().getMaxSimultaneousCaptchas();
     }
 
     /** Returns interval used for polling when waiting for captcha solution from solver. */
     public int getMaxCaptchasPerHour(final Account account) {
         // TODO: Implement functionality
-        final CaptchaSolverPluginConfig cfg = getDefaultConfig();
-        if (cfg == null) {
-            return 1000;
-        }
-        return cfg.getMaxCaptchasPerHour();
+        return getDefaultConfig().getMaxCaptchasPerHour();
     }
 
     /**

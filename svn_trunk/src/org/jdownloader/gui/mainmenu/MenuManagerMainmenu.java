@@ -2,18 +2,6 @@ package org.jdownloader.gui.mainmenu;
 
 import javax.swing.JPopupMenu;
 
-import jd.gui.swing.jdgui.menu.JDMenuBar;
-import jd.gui.swing.jdgui.menu.actions.AboutAction;
-import jd.gui.swing.jdgui.menu.actions.ExitAction;
-import jd.gui.swing.jdgui.menu.actions.KnowledgeAction;
-import jd.gui.swing.jdgui.menu.actions.LatestChangesAction;
-import jd.gui.swing.jdgui.menu.actions.MyJDownloaderTabAction;
-import jd.gui.swing.jdgui.menu.actions.RestartAction;
-import jd.gui.swing.jdgui.menu.actions.SettingsAccountUsageRulesAction;
-import jd.gui.swing.jdgui.menu.actions.SettingsAction;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.EDTRunner;
@@ -33,21 +21,24 @@ import org.jdownloader.gui.mainmenu.container.FileMenuContainer;
 import org.jdownloader.gui.mainmenu.container.OptionalContainer;
 import org.jdownloader.gui.mainmenu.container.SettingsMenuContainer;
 import org.jdownloader.gui.toolbar.action.CaptchaModeChangeAction;
-import org.jdownloader.gui.toolbar.action.CaptchaToogle9KWAction;
-import org.jdownloader.gui.toolbar.action.CaptchaToogleAntiCaptchaAction;
-import org.jdownloader.gui.toolbar.action.CaptchaToogleBrowserSolverAction;
-import org.jdownloader.gui.toolbar.action.CaptchaToogleCheapCaptchaAction;
-import org.jdownloader.gui.toolbar.action.CaptchaToogleDBCAction;
-import org.jdownloader.gui.toolbar.action.CaptchaToogleDialogAction;
-import org.jdownloader.gui.toolbar.action.CaptchaToogleEndCaptchaAction;
-import org.jdownloader.gui.toolbar.action.CaptchaToogleImageTyperzAction;
-import org.jdownloader.gui.toolbar.action.CaptchaToogleJACAction;
-import org.jdownloader.gui.toolbar.action.CaptchaToogleMyJDRemoteAction;
-import org.jdownloader.gui.toolbar.action.CaptchaToogleTwoCaptchaAction;
+import org.jdownloader.gui.toolbar.action.CaptchaToggleSolverServicesAction;
+import org.jdownloader.gui.toolbar.action.CaptchaToggleUseAvailableSolverAccountsAction;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.downloads.action.MenuManagerAction;
 import org.jdownloader.gui.views.linkgrabber.actions.AddContainerAction;
+
+import jd.gui.swing.jdgui.menu.JDMenuBar;
+import jd.gui.swing.jdgui.menu.actions.AboutAction;
+import jd.gui.swing.jdgui.menu.actions.ExitAction;
+import jd.gui.swing.jdgui.menu.actions.KnowledgeAction;
+import jd.gui.swing.jdgui.menu.actions.LatestChangesAction;
+import jd.gui.swing.jdgui.menu.actions.MyJDownloaderTabAction;
+import jd.gui.swing.jdgui.menu.actions.RestartAction;
+import jd.gui.swing.jdgui.menu.actions.SettingsAccountUsageRulesAction;
+import jd.gui.swing.jdgui.menu.actions.SettingsAction;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
 
 public class MenuManagerMainmenu extends ContextMenuManager<FilePackage, DownloadLink> {
     private static final MenuManagerMainmenu INSTANCE = new MenuManagerMainmenu();
@@ -97,17 +88,8 @@ public class MenuManagerMainmenu extends ContextMenuManager<FilePackage, Downloa
         CaptchaQuickSettingsContainer ocr;
         opt.add(ocr = new CaptchaQuickSettingsContainer());
         ocr.add(CaptchaModeChangeAction.class);
-        ocr.add(CaptchaToogleAntiCaptchaAction.class);
-        ocr.add(CaptchaToogleTwoCaptchaAction.class);
-        ocr.add(CaptchaToogle9KWAction.class);
-        ocr.add(CaptchaToogleDBCAction.class);
-        ocr.add(CaptchaToogleCheapCaptchaAction.class);
-        ocr.add(CaptchaToogleImageTyperzAction.class);
-        ocr.add(CaptchaToogleEndCaptchaAction.class);
-        ocr.add(CaptchaToogleDialogAction.class);
-        ocr.add(CaptchaToogleBrowserSolverAction.class);
-        ocr.add(CaptchaToogleJACAction.class);
-        ocr.add(CaptchaToogleMyJDRemoteAction.class);
+        ocr.add(CaptchaToggleSolverServicesAction.class);
+        ocr.add(CaptchaToggleUseAvailableSolverAccountsAction.class);
         // HorizontalBoxItem h = new HorizontalBoxItem();
         // h.setVisible(true);
         // mr.add(h);

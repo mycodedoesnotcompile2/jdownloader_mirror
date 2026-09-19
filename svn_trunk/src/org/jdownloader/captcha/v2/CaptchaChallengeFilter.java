@@ -25,6 +25,13 @@ public class CaptchaChallengeFilter implements Storable {
     private String                  id                  = null;
     private long                    created             = System.currentTimeMillis();
     private int                     position            = 0;
+    /**
+     * Identifier of the captcha solver service this rule applies to (e.g. the solver host "2captcha.com"). An empty/null value means the
+     * rule applies to all solvers.
+     */
+    private String                  solver              = null;
+    /** True for built-in default rules that must not be edited or removed (e.g. the example rule shown in the settings table). */
+    private boolean                 staticRule          = false;
 
     public CaptchaChallengeFilter() {
         // __Storable__ constructor
@@ -68,6 +75,22 @@ public class CaptchaChallengeFilter implements Storable {
 
     public void setPosition(int position) {
         this.position = position;
+    }
+
+    public String getSolver() {
+        return solver;
+    }
+
+    public void setSolver(String solver) {
+        this.solver = solver;
+    }
+
+    public boolean isStaticRule() {
+        return staticRule;
+    }
+
+    public void setStaticRule(boolean staticRule) {
+        this.staticRule = staticRule;
     }
 
     public String getDomain() {

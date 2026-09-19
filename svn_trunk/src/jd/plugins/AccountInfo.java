@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.text.NumberFormat;
 import java.util.Currency;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -113,12 +114,35 @@ public class AccountInfo extends Property implements AccountTrafficView {
     }
 
     public String getAccountBalanceFormatted() {
-        String balanceStr = String.format("%.3f", this.getAccountBalance());
-        final Currency currency = getCurrency();
+        return formatCaptchaSolverBalance(this.getAccountBalance(), getCurrency());
+    }
+
+    /**
+     * Central helper to format an account balance for display.
+     *
+     * The value is always rendered with exactly two fraction digits so that balances are shown consistently across the whole GUI
+     * (captcha solver status texts, account tables, ...). When a currency is given it is formatted as a localized currency amount,
+     * otherwise as a plain localized number. The two-decimal rule overrides the currency's own default fraction digits (e.g. a
+     * zero-decimal currency is still shown with two decimals) so the output stays uniform regardless of the currency in use.
+     *
+     * @param balance
+     *            the balance value to format
+     * @param currency
+     *            the currency of the balance, or {@code null} if unknown
+     * @return the balance formatted with exactly two fraction digits
+     */
+    public static String formatCaptchaSolverBalance(final double balance, final Currency currency) {
+        final NumberFormat nf;
         if (currency != null) {
-            balanceStr += " " + currency.getSymbol();
+            nf = NumberFormat.getCurrencyInstance();
+            nf.setCurrency(currency);
+        } else {
+            /* No currency known: format as a plain number. */
+            nf = NumberFormat.getNumberInstance();
         }
-        return balanceStr;
+        nf.setMinimumFractionDigits(2);
+        nf.setMaximumFractionDigits(2);
+        return nf.format(balance);
     }
 
     public void setCurrency(Currency currency) {

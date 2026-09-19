@@ -22,7 +22,6 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
 import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
 import org.appwork.utils.ImageProvider.ImageProvider;
 import org.appwork.utils.images.IconIO;
 import org.appwork.utils.parser.UrlQuery;
@@ -42,7 +41,7 @@ import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigEndcaptcha;
 
-@HostPlugin(revision = "$Revision: 52718 $", interfaceVersion = 3, names = { "endcaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53451 $", interfaceVersion = 3, names = { "endcaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSolver {
     public PluginForCaptchaSolverEndcaptcha(PluginWrapper wrapper) {
         super(wrapper);
@@ -166,16 +165,17 @@ public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSo
             }
             checkInterruption();
             job.setStatus(SolverStatus.SOLVING);
-            Map<String, Object> pollresp = null;
+            /*
+             * The poll endpoint returns plain text (NOT JSON): "UNSOLVED_YET:/poll/<id>" while the captcha is still being solved, or the
+             * plain solution text once it is done. Completion is therefore detected by the absence of the "UNSOLVED_YET" marker.
+             */
             while (true) {
                 this.sleep(this.getPollingIntervalMillis(account), null);
                 this.callAPI(br.createGetRequest(this.getApiBase() + "/poll/" + captchaID));
-                pollresp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                final int status = ((Number) pollresp.get("status")).intValue();
-                final boolean is_correct = ((Boolean) pollresp.get("is_correct")).booleanValue();
                 if (this.findCaptchaID() == null) {
                     break;
                 }
+                checkInterruption();
             }
             final String solution = br.getRequest().getHtmlCode();
             job.getLogger().info("CAPTCHA(" + type + ") solved: " + solution);
@@ -230,7 +230,7 @@ public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSo
         /* Check if error is related to login or captcha solving */
         if (this.getPluginEnvironment() == PluginEnvironment.ACCOUNT_CHECK) {
             throw new AccountInvalidException(error);
-        } else if (error.equalsIgnoreCase("NOT AUTHENTICATED") || error.equalsIgnoreCase("NOT AUTHENTICATED")) {
+        } else if (error.equalsIgnoreCase("NOT AUTHENTICATED")) {
             throw new AccountInvalidException(error);
         }
         throw new SolverException(error);

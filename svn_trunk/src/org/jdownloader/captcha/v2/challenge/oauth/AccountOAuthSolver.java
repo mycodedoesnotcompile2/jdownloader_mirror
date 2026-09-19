@@ -31,6 +31,12 @@ public class AccountOAuthSolver extends ChallengeSolver<Boolean> {
         return true;
     }
 
+    @Override
+    public SolverType getSolverType() {
+        /* Backed by JACSolver's service; solves silently using stored account credentials, no user interaction or external API call. */
+        return SolverType.JD_LOCAL;
+    }
+
     private AccountOAuthSolver() {
         super(JACSolver.getInstance().getService(), 1);
     }

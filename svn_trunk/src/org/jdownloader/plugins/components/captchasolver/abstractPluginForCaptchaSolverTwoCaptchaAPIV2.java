@@ -31,7 +31,6 @@ import org.jdownloader.captcha.v2.challenge.stringcaptcha.MultiClickCaptchaRespo
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.TokenCaptchaResponse;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
-import org.jdownloader.captcha.v2.solver.twocaptcha.TwoCaptchaResponse;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -71,7 +70,7 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
         final Map<String, Object> entries = this.handleAPIErrors(br, account);
         final double balance = ((Number) ReflectionUtils.cast(entries.get("balance"), Double.class)).doubleValue();
         final AccountInfo ai = new AccountInfo();
-        ai.setAccountBalance(balance, Currency.getInstance("USD"));
+        ai.setAccountBalance(balance, Currency.getInstance("EUR"));
         return ai;
     }
 
@@ -252,8 +251,8 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
     }
 
     private final boolean sendCaptchaFeedback(final AbstractResponse<?> response, Account account, final boolean positiveFeedback) {
-        final TwoCaptchaResponse twocaptcharesponse = (TwoCaptchaResponse) response;
-        final String captchaID = twocaptcharesponse.getCaptchaID();
+        /* The 2captcha task id was stored on the response when the captcha was solved (see solve()). */
+        final String captchaID = response.getCaptchaSolverTaskID();
         try {
             final String url;
             if (positiveFeedback) {

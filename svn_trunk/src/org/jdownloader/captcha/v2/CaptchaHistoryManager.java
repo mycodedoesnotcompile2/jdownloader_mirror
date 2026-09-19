@@ -22,7 +22,7 @@ import org.appwork.utils.StringUtils;
  */
 public class CaptchaHistoryManager {
     private static final CaptchaHistoryManager                 INSTANCE           = new CaptchaHistoryManager();
-    private static final int                                   MAX_ENTRIES        = 500;
+    private static final int                                   MAX_ENTRIES        = 1500;
     private static final long                                  ONE_YEAR_IN_MILLIS = TimeUnit.DAYS.toMillis(365);
     protected static final CaptchaSettings                     CAPTCHA_SETTINGS   = JsonConfig.create(CaptchaSettings.class);
     private volatile CopyOnWriteArrayList<CaptchaHistoryEntry> entries            = null;

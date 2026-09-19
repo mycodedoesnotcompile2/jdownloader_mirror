@@ -2581,14 +2581,14 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Reset settings to default" })
     String InfoPanel_resetsettings_tooltip();
 
-    @Default(lngs = { "en" }, values = { "Delete icon" })
-    String InfoPanel_deleteicon_tooltip();
-
     @Default(lngs = { "en" }, values = { "Reset to default icon" })
     String InfoPanel_reseticon_tooltip();
 
-    @Default(lngs = { "en" }, values = { "Delete keyboard shortcut" })
-    String InfoPanel_deleteshortcut_tooltip();
+    @Default(lngs = { "en" }, values = { "Delete icon" })
+    String InfoPanel_deleteicon_tooltip();
+
+    @Default(lngs = { "en" }, values = { "Enable keyboard shortcut" })
+    String InfoPanel_shortcut_enabled_tooltip();
 
     @Default(lngs = { "en" }, values = { "Change Icon" })
     String InfoPanel_changeicon();
@@ -3660,6 +3660,9 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "%s1 (Multi Hoster)" })
     String AccountTooltip_AccountTooltip_multi(String tld);
+
+    @Default(lngs = { "en" }, values = { "%s1 (Captcha Solver)" })
+    String AccountTooltip_AccountTooltip_captchasolver(String tld);
 
     @Default(lngs = { "en" }, values = { "With these account(s), you can download from:" })
     String AccountTooltip_AccountTooltip_supported_hosters();
@@ -5326,6 +5329,75 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Add Account" })
     String lit_add_account();
+
+    @Default(lngs = { "en" }, values = { "Toggle captcha solvers" })
+    String CaptchaToggleSolverServicesAction_name();
+
+    @Default(lngs = { "en" }, values = { "Toggle the captcha solvers configured in this action's settings" })
+    String CaptchaToggleSolverServicesAction_tooltip();
+
+    @Default(lngs = { "en" }, values = { "Automated external captcha solver service" })
+    String CaptchaSolverService_type();
+
+    @Default(lngs = { "en" }, values = { "Third-party external captcha solver service. The list of supported captcha types only contains the captcha types which JDownloader supports and the types we were aware of during development. This service may support more captcha types that are not in the list." })
+    String CaptchaSolverService_description();
+
+    @Default(lngs = { "en" }, values = { "Ready" })
+    String CaptchaSolverService_status_ready();
+
+    @Default(lngs = { "en" }, values = { "Ready | Balance: %s1" })
+    String CaptchaSolverService_status_ready_balance(String balance);
+
+    @Default(lngs = { "en" }, values = { "Ready | %s1 Accounts | %s2" })
+    String CaptchaSolverService_status_ready_accounts(String accounts, String balance);
+
+    @Default(lngs = { "en" }, values = { "Comma separated list of captcha solver ids to toggle.<br>Empty or \"*\" targets all solvers.<br>Available ids:" })
+    String CaptchaToggleSolverServicesAction_solverIDs_hint();
+
+    @Default(lngs = { "en" }, values = { "Add rule..." })
+    String CaptchaRules_add_button();
+
+    @Default(lngs = { "en" }, values = { "Remove selected" })
+    String CaptchaRules_remove_button();
+
+    @Default(lngs = { "en" }, values = { "Import" })
+    String CaptchaRules_import_button();
+
+    @Default(lngs = { "en" }, values = { "Export" })
+    String CaptchaRules_export_button();
+
+    @Default(lngs = { "en" }, values = { "No captcha solver available to create a rule for." })
+    String CaptchaRules_add_no_solver();
+
+    @Default(lngs = { "en" }, values = { "Add captcha rule" })
+    String CaptchaRules_add_title();
+
+    @Default(lngs = { "en" }, values = { "Choose the captcha solver this rule applies to:" })
+    String CaptchaRules_add_message();
+
+    @Default(lngs = { "en" }, values = { "New rule for %s1" })
+    String CaptchaRules_new_rule_name(String solver);
+
+    @Default(lngs = { "en" }, values = { "Captcha types overview" })
+    String CaptchaSolver_account_config_header();
+
+    @Default(lngs = { "en" }, values = { "This is a captcha solver account. You can use it to solve captchas." })
+    String CaptchaSolver_account_config_description();
+
+    @Default(lngs = { "en" }, values = { "Use Solver Accounts" })
+    String CaptchaToggleUseAvailableSolverAccountsAction_name();
+
+    @Default(lngs = { "en" }, values = { "External captcha solver accounts enabled. JDownloader will use them to solve captchas." })
+    String CaptchaToggleUseAvailableSolverAccountsAction_tooltip_enabled();
+
+    @Default(lngs = { "en" }, values = { "External captcha solver accounts disabled! JDownloader will not use ANY external captcha solver accounts. Local solvers and MyJDownloader remote solving are not affected." })
+    String CaptchaToggleUseAvailableSolverAccountsAction_tooltip_disabled();
+
+    @Default(lngs = { "en" }, values = { "Usage of solver accounts is globally disabled, click here to enable" })
+    String SolverOrderTableModel_status_enableSolverAccounts();
+
+    @Default(lngs = { "en" }, values = { "Accounts disabled or invalid, click to fix" })
+    String SolverOrderTableModel_status_accountsUnusable();
 
     @Default(lngs = { "en" }, values = { "Please enter username and password..." })
     String AskForUserAndPasswordDialog_AskForUserAndPasswordDialog_title_();

@@ -92,7 +92,7 @@ public class AccountTooltip extends PanelToolTip {
         if (account_collection_is_multi) {
             txt = _GUI.T.AccountTooltip_AccountTooltip_multi(accountCollection.getDomainInfo().getTld());
         } else if (account_collection_is_captcha_solver) {
-            txt = accountCollection.getDomainInfo().getTld() + " (Captcha Solver)";
+            txt = _GUI.T.AccountTooltip_AccountTooltip_captchasolver(accountCollection.getDomainInfo().getTld());
         }
         JLabel label = new JLabel(txt, accountCollection.getDomainInfo().getFavIcon(), JLabel.LEFT);
         SwingUtils.toBold(label);

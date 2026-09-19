@@ -5,9 +5,11 @@ import java.awt.Container;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Currency;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -18,26 +20,10 @@ import javax.swing.JPanel;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter.HighlightPainter;
 
-import jd.PluginWrapper;
-import jd.gui.swing.components.linkbutton.JLink;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.http.Request;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-import jd.plugins.DefaultEditAccountPanelAPIKeyLogin;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtPasswordField;
 import org.appwork.swing.components.ExtTextField;
 import org.appwork.swing.components.ExtTextHighlighter;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.Base64;
 import org.appwork.utils.parser.UrlQuery;
@@ -59,7 +45,22 @@ import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigImaget
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.seamless.util.io.IO;
 
-@HostPlugin(revision = "$Revision: 52716 $", interfaceVersion = 3, names = { "imagetyperz.com" }, urls = { "" })
+import jd.PluginWrapper;
+import jd.gui.swing.components.linkbutton.JLink;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.http.Request;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.DefaultEditAccountPanelAPIKeyLogin;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import net.miginfocom.swing.MigLayout;
+
+@HostPlugin(revision = "$Revision: 53451 $", interfaceVersion = 3, names = { "imagetyperz.com" }, urls = { "" })
 public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -68,10 +69,7 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
 
     public PluginForCaptchaSolverImagetyperz(PluginWrapper wrapper) {
         super(wrapper);
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            // TODO: Test this first before making it available in stable
-            this.enablePremium(getBuyPremiumUrl());
-        }
+        this.enablePremium(getBuyPremiumUrl());
     }
 
     private static final String PROPERTY_ACCOUNT_LOGIN_TYPE          = "login_type";
@@ -120,11 +118,12 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
 
     protected String getApiBase() {
         /* API docs: https://www.imagetyperz.com/Forms/NewAPI.aspx */
-        /*
+        /**
          * Their API docs are documented in a chaotic way, here is a different version of them:
-         * https://www.imagetyperz.com/Forms/api/api.html
+         * https://www.imagetyperz.com/Forms/api/api.html <br>
+         * 2026-09-18: Changed API domain from imagetypers.com to captchatypers.com.
          */
-        return "https://" + getHost();
+        return "https://captchatypers.com";
     }
 
     @Override
@@ -149,33 +148,24 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
     public AccountInfo fetchAccountInfo(Account account) throws Exception {
         final String username = account.getUser();
         final String password = account.getPass();
-        final Number loginTypeProperty = (Number) account.getProperty(PROPERTY_ACCOUNT_LOGIN_TYPE);
-        final int loginType = loginTypeProperty != null ? loginTypeProperty.intValue() : -1;
-        int[] loginTypesToTry = new int[2];
-        int tryCount = 0;
-        if (loginType == -1) {
-            /* Login type hasn't been set before -> Try user:pw and also token login but only if password looks like valid token. */
-            if (this.looksLikeValidAPIKey(password)) {
-                loginTypesToTry[tryCount++] = ACCOUNT_LOGIN_TYPE_AUTHTOKEN;
-            }
-            loginTypesToTry[tryCount++] = ACCOUNT_LOGIN_TYPE_USER_AND_PASSWORD;
-        } else if (loginType == ACCOUNT_LOGIN_TYPE_AUTHTOKEN) {
-            loginTypesToTry[tryCount++] = ACCOUNT_LOGIN_TYPE_AUTHTOKEN;
-        } else {
-            loginTypesToTry[tryCount++] = ACCOUNT_LOGIN_TYPE_USER_AND_PASSWORD;
-        }
-        for (int i = 0; i < tryCount; i++) {
-            final boolean isLastTry = i >= tryCount;
-            final int currentLoginType = loginTypesToTry[i];
+        /*
+         * Determine which login type(s) to try. Each login type is tried at most once. If a login type has already been established for
+         * this account, only that one is used; otherwise every applicable type is tried once (token first if the password looks like a
+         * token).
+         */
+        final List<Integer> loginTypesToTry = getLoginTypesToTry(account, password);
+        for (int i = 0; i < loginTypesToTry.size(); i++) {
+            final boolean isLastTry = i == loginTypesToTry.size() - 1;
+            final int currentLoginType = loginTypesToTry.get(i).intValue();
             final UrlQuery query = new UrlQuery(true);
             query.addAndReplace("action", "REQUESTBALANCE");
             final String path;
             if (currentLoginType == ACCOUNT_LOGIN_TYPE_AUTHTOKEN) {
-                query.append("token", password, true);
+                query.appendEncoded("token", password);
                 path = "/Forms/RequestBalanceToken.ashx";
             } else {
-                query.append("username", username, true);
-                query.append("password", password, true);
+                query.appendEncoded("username", account.getUser());
+                query.appendEncoded("password", password);
                 path = "/Forms/RequestBalance.ashx";
             }
             try {
@@ -184,26 +174,27 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
                 account.setProperty(PROPERTY_ACCOUNT_LOGIN_TYPE, currentLoginType);
                 break;
             } catch (final PluginException pe) {
-                if (loginType != -1 || isLastTry) {
+                if (isLastTry) {
                     throw pe;
                 }
+                /* Not the last candidate -> try the next login type. */
             }
         }
-        final Double creditsInDollarCent = Double.parseDouble(br.getRequest().getHtmlCode());
-        final Double creditsInDollar = creditsInDollarCent / 100;
+        /* REQUESTBALANCE returns the account balance in US dollars (NOT cents), see imagetyperz-api/API-docs. */
+        final double balance = Double.parseDouble(br.getRequest().getHtmlCode().trim());
         final AccountInfo ai = new AccountInfo();
-        ai.setAccountBalance(creditsInDollar, Currency.getInstance("USD"));
+        ai.setAccountBalance(balance, Currency.getInstance("USD"));
         return ai;
     }
 
     @Override
     public void solve(CESSolverJob<?> job, Account account) throws Exception {
         final Challenge<?> c = job.getChallenge();
-        // TODO: Finish implementation, possibly using this API: https://www.imagetyperz.com/Forms/api/api.html#-recaptcha
-        // job.showBubble(this);
-        // TODO
-        // challenge.sendStatsSolving(this);
         job.setStatus(SolverStatus.UPLOADING);
+        /*
+         * Image captchas are solved synchronously (the upload response already contains the answer as "<id>|<solution>"), while reCAPTCHA
+         * uploads only return an id that has to be polled afterwards.
+         */
         boolean expectImmediateAnswer = false;
         String uploadPath = null;
         final UrlQuery uploadQuery = new UrlQuery();
@@ -255,10 +246,11 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
                 }
                 uploadQuery.addAndReplace("enterprise_type", enterprise_type);
             } else {
+                /* recaptchatype: 1 = normal, 2 = invisible, 3 = v3 (see imagetyperz-api/API-docs). */
                 if (challenge.isInvisible()) {
-                    uploadQuery.addAndReplace("recaptchatype", "3");
-                } else if (challenge.isV3()) {
                     uploadQuery.addAndReplace("recaptchatype", "2");
+                } else if (challenge.isV3()) {
+                    uploadQuery.addAndReplace("recaptchatype", "3");
                 } else {
                     uploadQuery.addAndReplace("recaptchatype", "1");
                 }
@@ -274,30 +266,31 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
             }
         } else if (c instanceof ImageCaptchaChallenge) {
             type = "Image";
+            /* Image captchas are solved synchronously and the answer is returned directly in the upload response. */
+            expectImmediateAnswer = true;
             if (this.isLoginViaAuthtoken(account)) {
                 uploadPath = "/Forms/UploadFileAndGetTextNEWToken.ashx";
             } else {
                 uploadPath = "/Forms/UploadFileAndGetTextNew.ashx";
             }
             final ImageCaptchaChallenge challenge = (ImageCaptchaChallenge) c;
-            // TODO: Change to base64 string
-            // r.addFormData(new FormData("captchafile", "captcha", "application/octet-stream", bytes));
             final byte[] data = IO.readBytes(challenge.getImageFile());
             uploadQuery.addAndReplace("file", Base64.encodeToString(data, false));
         } else {
             throw new IllegalArgumentException("Unexpected captcha challenge type");
         }
-        this.callAPI(br.createPostRequest(uploadPath, uploadQuery));
+        this.callAPI(br.createPostRequest(this.getApiBase() + uploadPath, uploadQuery));
         String solution = null;
         final String captchaID;
         if (expectImmediateAnswer) {
-            final String resp = br.getRequest().getHtmlCode();
-            final String[] captcha_id_and_response = br.getRequest().getHtmlCode().split("\\|");
-            if (captcha_id_and_response == null || captcha_id_and_response.length != 2) {
-                throw new SolverException("Failed:" + resp);
+            /* Image captcha: the response is "<captchaID>|<solution>", e.g. "123|polum". */
+            final String responseText = br.getRequest().getHtmlCode();
+            final String[] idAndSolution = responseText.split("\\|", 2);
+            if (idAndSolution.length != 2) {
+                throw new SolverException("Unexpected image captcha response: " + responseText);
             }
-            captchaID = captcha_id_and_response[0];
-            solution = captcha_id_and_response[1];
+            captchaID = idAndSolution[0];
+            solution = idAndSolution[1];
         } else {
             captchaID = br.getRequest().getHtmlCode();
             if (!captchaID.matches("\\d+")) {
@@ -307,7 +300,7 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
             pollingQuery.addAndReplace("captchaID", captchaID);
             while (true) {
                 this.sleep(this.getPollingIntervalMillis(account), null);
-                this.callAPI(br.createPostRequest(pollingPath, pollingQuery));
+                this.callAPI(br.createPostRequest(this.getApiBase() + pollingPath, pollingQuery));
                 if (!br.containsHTML("NOT_DECODED")) {
                     solution = br.getRequest().getHtmlCode();
                     break;
@@ -357,6 +350,60 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
         return account.getIntegerProperty(PROPERTY_ACCOUNT_LOGIN_TYPE, ACCOUNT_LOGIN_TYPE_AUTHTOKEN) == ACCOUNT_LOGIN_TYPE_AUTHTOKEN;
     }
 
+    /**
+     * Returns the login types to try, in order. A login type that has already been established for this account is used exclusively;
+     * otherwise every applicable type is returned once (token login first, but only if the password looks like a token).
+     */
+    private List<Integer> getLoginTypesToTry(final Account account, final String password) {
+        final Number storedLoginType = (Number) account.getProperty(PROPERTY_ACCOUNT_LOGIN_TYPE);
+        final List<Integer> ret = new ArrayList<Integer>();
+        if (storedLoginType != null) {
+            ret.add(Integer.valueOf(storedLoginType.intValue()));
+            return ret;
+        }
+        if (this.looksLikeValidAPIKey(password)) {
+            ret.add(Integer.valueOf(ACCOUNT_LOGIN_TYPE_AUTHTOKEN));
+        }
+        ret.add(Integer.valueOf(ACCOUNT_LOGIN_TYPE_USER_AND_PASSWORD));
+        return ret;
+    }
+
+    /**
+     * Maps the API error tokens (returned as "ERROR: &lt;TOKEN&gt;", see https://www.imagetyperz.com/Forms/NewAPI.aspx) to human readable
+     * messages. Keys are upper-case and without the "ERROR:" prefix.
+     */
+    private static final Map<String, String> ERROR_MESSAGES;
+    static {
+        final Map<String, String> map = new HashMap<String, String>();
+        map.put("INVALID_REQUEST", "Invalid request sent to the captcha service.");
+        map.put("INVALID_USERNAME", "No username was provided.");
+        map.put("INVALID_PASSWORD", "No password was provided.");
+        map.put("INVALID_AFFILIATEID", "No affiliate ID was provided.");
+        map.put("INVALID_IMAGE_FILE", "No file was uploaded, or the uploaded file is not an image.");
+        map.put("AUTHENTICATION_FAILED", "The provided username and password are invalid.");
+        map.put("INVALID_IMAGE_SIZE_30_KB", "The uploaded image file must not be larger than 30 KB.");
+        map.put("UNKNOWN", "Unknown error at the captcha service. Please try again.");
+        map.put("NOT_DECODED", "The captcha has not been solved yet.");
+        map.put("INVALID_TOKEN", "No API token was provided, or the token is invalid.");
+        map.put("INVALID_IMAGE_ID", "No image ID was provided, or the provided image ID is invalid.");
+        ERROR_MESSAGES = Collections.unmodifiableMap(map);
+    }
+
+    /** Returns the human readable message for an API error token, or a generic fallback containing the raw token when unknown. */
+    private static String getHumanReadableErrorMessage(final String errorToken) {
+        final String message = ERROR_MESSAGES.get(errorToken.toUpperCase(Locale.ENGLISH));
+        if (message != null) {
+            return message;
+        }
+        return "Captcha service error: " + errorToken;
+    }
+
+    /** True for error tokens that indicate an account/credential problem (should invalidate the account). */
+    private static boolean isAccountError(final String errorToken) {
+        final String token = errorToken.toUpperCase(Locale.ENGLISH);
+        return token.equals("AUTHENTICATION_FAILED") || token.equals("INVALID_USERNAME") || token.equals("INVALID_PASSWORD") || token.equals("INVALID_TOKEN");
+    }
+
     private void callAPI(final Request req) throws Exception {
         br.getPage(req);
         String error = br.getRegex("^ERROR:(.+)").getMatch(0);
@@ -367,18 +414,17 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
         error = error.trim();
         if (error.equalsIgnoreCase("NOT_DECODED")) {
             /*
-             * Copy & paste from API docs: This is not really an error, just informs the captcha is still under completion. When you get
-             * this, retry after 5 seconds
+             * Not really an error: the captcha is still being processed. The poll loop keeps retrying while the response contains
+             * "NOT_DECODED".
              */
             return;
         }
-        /* Check if error is related to login or captcha solving */
-        if (this.getPluginEnvironment() == PluginEnvironment.ACCOUNT_CHECK) {
-            throw new AccountInvalidException(error);
-        } else if (error.equalsIgnoreCase("AUTHENTICATION_FAILED") || error.equalsIgnoreCase("INVALID_USERNAME") || error.equalsIgnoreCase("INVALID_PASSWORD")) {
-            throw new AccountInvalidException(error);
+        final String message = getHumanReadableErrorMessage(error);
+        /* Credential/authentication related errors -> mark the account as invalid. */
+        if (this.getPluginEnvironment() == PluginEnvironment.ACCOUNT_CHECK || isAccountError(error)) {
+            throw new AccountInvalidException(message);
         }
-        throw new SolverException(error);
+        throw new SolverException(message);
     }
 
     @Override

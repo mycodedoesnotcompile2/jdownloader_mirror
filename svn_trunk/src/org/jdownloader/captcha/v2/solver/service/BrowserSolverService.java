@@ -1,34 +1,29 @@
 package org.jdownloader.captcha.v2.solver.service;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.swing.Icon;
 
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.os.CrossSystem;
-import org.jdownloader.captcha.v2.solver.browser.BrowserCaptchaSolverConfig;
-import org.jdownloader.captcha.v2.solver.cheapcaptcha.CheapCaptchaSolverService;
-import org.jdownloader.captcha.v2.solver.dbc.DeathByCaptchaSolverService;
-import org.jdownloader.captcha.v2.solver.endcaptcha.EndCaptchaSolverService;
-import org.jdownloader.captcha.v2.solver.imagetyperz.ImageTyperzSolverService;
-import org.jdownloader.captcha.v2.solver.jac.JacSolverService;
-import org.jdownloader.captcha.v2.solver.solver9kw.NineKwSolverService;
+import org.jdownloader.captcha.v2.solver.browser.BrowserCaptchaSolverConfigV3;
+import org.jdownloader.controlling.browser.ExternalBrowserManager;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 
-import jd.gui.swing.jdgui.views.settings.panels.anticaptcha.AbstractCaptchaSolverConfigPanel;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 public class BrowserSolverService extends AbstractSolverService {
-    public static final String                ID       = "browser";
-    private static final BrowserSolverService INSTANCE = new BrowserSolverService();
-    private static BrowserCaptchaSolverConfig config;
+    public static final String                  ID       = "browser";
+    private static final BrowserSolverService   INSTANCE  = new BrowserSolverService();
+    private static BrowserCaptchaSolverConfigV3 config;
 
     public static BrowserSolverService getInstance() {
         if (config == null) {
-            config = JsonConfig.create(BrowserCaptchaSolverConfig.class);
+            config = JsonConfig.create(BrowserCaptchaSolverConfigV3.class);
         }
         return INSTANCE;
     }
@@ -53,42 +48,37 @@ public class BrowserSolverService extends AbstractSolverService {
 
     @Override
     public String getName() {
-        return _GUI.T.BrowserSolverService_gettypeName();
+        return "Dialog in Browser (Chrome, Firefox, Edge)";
     }
 
     @Override
-    public AbstractCaptchaSolverConfigPanel getConfigPanel() {
-        AbstractCaptchaSolverConfigPanel ret = new AbstractCaptchaSolverConfigPanel() {
-            {
-                addHeader(getTitle(), BrowserSolverService.this.getIcon(32));
-                addDescription(BrowserSolverService.this.getType());
-                addBlackWhiteList(config);
-            }
+    public String getDescription() {
+        return "Manual local captcha solving in your own browser. Requires our MyJDownloader browser extension. Does NOT require a MyJDownloader account!";
+    }
 
-            @Override
-            public Icon getIcon() {
-                return BrowserSolverService.this.getIcon(32);
+    @Override
+    public String getStatusText() {
+        final String[] commandline = getConfig().getBrowserCommandline();
+        if (commandline != null && commandline.length > 0) {
+            final String browserName = ExternalBrowserManager.getInstance().getLazyBrowserName(commandline);
+            if (browserName != null) {
+                return "Ready | using " + browserName;
             }
+            return "Ready | using custom browser";
+        }
+        return "Ready | using OS default browser";
+    }
 
-            @Override
-            public String getPanelID() {
-                return "JAC_" + getTitle();
-            }
-
-            @Override
-            public String getTitle() {
-                return BrowserSolverService.this.getName();
-            }
-
-            @Override
-            public void save() {
-            }
-
-            @Override
-            public void updateContents() {
-            }
-        };
-        return ret;
+    @Override
+    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
+        types.add(CAPTCHA_TYPE.HCAPTCHA);
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V3_ENTERPRISE);
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
+        return types;
     }
 
     @Override
@@ -96,25 +86,22 @@ public class BrowserSolverService extends AbstractSolverService {
         return true;
     }
 
-    @Override
-    public BrowserCaptchaSolverConfig getConfig() {
-        return JsonConfig.create(BrowserCaptchaSolverConfig.class);
+    /** Typed config accessor used by the browser solver subsystem. */
+    public BrowserCaptchaSolverConfigV3 getConfig() {
+        if (config == null) {
+            config = JsonConfig.create(BrowserCaptchaSolverConfigV3.class);
+        }
+        return config;
     }
 
     @Override
-    public Map<String, Integer> getWaitForOthersDefaultMap() {
-        HashMap<String, Integer> ret = new HashMap<String, Integer>();
-        // ret.put(DialogClickCaptchaSolver.ID, 0);
-        // ret.put(DialogBasicCaptchaSolver.ID, 0);
-        // ret.put(CaptchaAPISolver.ID, 0);
-        ret.put(JacSolverService.ID, 30000);
-        ret.put(NineKwSolverService.ID, 300000);
-        // ret.put(CaptchaMyJDSolverService.ID, 60000);
-        ret.put(DeathByCaptchaSolverService.ID, 60000);
-        ret.put(ImageTyperzSolverService.ID, 60000);
-        ret.put(CheapCaptchaSolverService.ID, 60000);
-        ret.put(EndCaptchaSolverService.ID, 60000);
-        return ret;
+    public BrowserCaptchaSolverConfigV3 getConfigV3() {
+        return getConfig();
+    }
+
+    @Override
+    public String getHelpArticleURL() {
+        return "https://support.jdownloader.org/de/knowledgebase/article/jd-opens-my-browser-to-display-captchas";
     }
 
     @Override

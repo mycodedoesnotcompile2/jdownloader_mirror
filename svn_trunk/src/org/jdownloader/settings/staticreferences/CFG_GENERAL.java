@@ -66,9 +66,13 @@ public class CFG_GENERAL {
     // **/
     // public static final BooleanKeyHandler JX_BROWSER_ENABLED = SH.getKeyHandler("JxBrowserEnabled", BooleanKeyHandler.class);
     /**
-     * Use available Accounts?
+     * Use available accounts for downloading?
      **/
     public static final BooleanKeyHandler               USE_AVAILABLE_ACCOUNTS                                           = SH.getKeyHandler("UseAvailableAccounts", BooleanKeyHandler.class);
+    /**
+     * Use available accounts for external captcha solver services (excludes local solvers and the MyJDownloader remote solver)?
+     **/
+    public static final BooleanKeyHandler               USE_AVAILABLE_CAPTCHA_SOLVER_ACCOUNTS                            = SH.getKeyHandler("UseAvailableCaptchaSolverAccounts", BooleanKeyHandler.class);
     /**
      * How many history entries will be kept in the download links
      **/

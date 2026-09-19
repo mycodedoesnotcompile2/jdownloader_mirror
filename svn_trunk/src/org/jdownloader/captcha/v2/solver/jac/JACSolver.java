@@ -33,7 +33,7 @@ import jd.plugins.PluginForHost;
 
 public class JACSolver extends ChallengeSolver<String> {
     private static final double              _0_85             = 0.85;
-    private final JACSolverConfig            config;
+    private final JacSolverConfigV3          config;
     private static final JACSolver           INSTANCE          = new JACSolver();
     private final HashMap<String, Integer>   jacMethodTrustMap = new HashMap<String, Integer>();
     private final HashMap<String, AutoTrust> threshold;
@@ -58,7 +58,7 @@ public class JACSolver extends ChallengeSolver<String> {
 
     private JACSolver() {
         super(new JacSolverService(), 5);
-        config = JsonConfig.create(JACSolverConfig.class);
+        config = JsonConfig.create(JacSolverConfigV3.class);
         logger = LogController.getInstance().getLogger(JACSolver.class.getName());
         final HashMap<String, AutoTrust> threshold = config.getJACThreshold();
         if (threshold == null) {
@@ -77,6 +77,11 @@ public class JACSolver extends ChallengeSolver<String> {
     @Override
     public long getTimeout() {
         return 30000;
+    }
+
+    @Override
+    public SolverType getSolverType() {
+        return SolverType.JD_LOCAL;
     }
 
     @Override

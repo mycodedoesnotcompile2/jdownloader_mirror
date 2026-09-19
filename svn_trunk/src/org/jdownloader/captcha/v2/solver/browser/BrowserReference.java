@@ -339,7 +339,7 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
             response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE, "text/html; charset=utf-8"));
             if ("loaded".equals(pDo)) {
                 final HTTPHeader ua = request.getRequestHeaders().get("User-Agent");
-                final BrowserCaptchaSolverConfig config = BrowserSolverService.getInstance().getConfig();
+                final BrowserCaptchaSolverConfigV3 config = BrowserSolverService.getInstance().getConfig();
                 if (config.isAutoClickEnabled()) {
                     // let bounds = element.getBoundingClientRect();
                     //

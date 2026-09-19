@@ -1,33 +1,34 @@
 package org.jdownloader.extensions.schedulerV2.actions;
 
-import org.jdownloader.extensions.schedulerV2.actions.CaptchaServiceAction.CAPTCHA_SERVICE;
-
 public class CaptchaServiceActionConfig implements IScheduleActionConfig {
     public CaptchaServiceActionConfig(/* Storable */) {
     }
 
-    public CAPTCHA_SERVICE _getService() {
-        try {
-            return CAPTCHA_SERVICE.valueOf(service);
-        } catch (final Exception e) {
-            return CAPTCHA_SERVICE.NONE;
-        }
-    }
+    /**
+     * Legacy field. Older saved actions stored the selected captcha service as a CAPTCHA_SERVICE enum name here (e.g. "NINEKWEU"). It is
+     * kept only so those actions can be migrated to the new free-text {@link #solverIDs} list. Null for actions created with the new format.
+     */
+    private String service = null;
 
     public String getService() {
         return service;
-    }
-
-    public void _setService(CAPTCHA_SERVICE service) {
-        if (service == null) {
-            service = CAPTCHA_SERVICE.NONE;
-        }
-        this.service = service.name();
     }
 
     public void setService(String service) {
         this.service = service;
     }
 
-    private String service = CAPTCHA_SERVICE.NONE.name();
+    /**
+     * Comma separated list of captcha solver ids (= plugin hosts / solver ids) to toggle when the action runs. An empty list or a list
+     * containing "*" means "all solvers". Null when the action has not been configured yet (then it is migrated from {@link #service}).
+     */
+    private String solverIDs = null;
+
+    public String getSolverIDs() {
+        return solverIDs;
+    }
+
+    public void setSolverIDs(String solverIDs) {
+        this.solverIDs = solverIDs;
+    }
 }

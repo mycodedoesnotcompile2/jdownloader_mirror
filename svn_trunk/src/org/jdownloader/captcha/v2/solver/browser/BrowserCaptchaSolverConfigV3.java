@@ -3,6 +3,7 @@ package org.jdownloader.captcha.v2.solver.browser;
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.storage.config.annotations.DefaultIntValue;
+import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.SpinnerValidator;
 import org.jdownloader.captcha.v2.CaptchaSolverConfigV3;
@@ -41,9 +42,14 @@ public interface BrowserCaptchaSolverConfigV3 extends CaptchaSolverConfigV3 {
 
     void setAutoOpenBrowserEnabled(boolean b);
 
-    @AboutConfig
+    /*
+     * Hidden from the generic config panel: the generic PluginConfigPanelNG has no editor for String[] values (it would fall through to the
+     * "Unsupported Type" branch and, in the IDE, pop up an exception dialog). The browser command line is edited via its own dedicated UI.
+     */
+    @AboutConfig(inGUIVisible = false)
     @DescriptionForConfigEntry("Example: [ \"C:\\\\Program Files (x86)\\\\Google\\\\Chrome\\\\Application\\\\chrome.exe\", \"%s\" ]")
     @Order(6000)
+    @DefaultOnNull
     String[] getBrowserCommandline();
 
     void setBrowserCommandline(String[] cmd);

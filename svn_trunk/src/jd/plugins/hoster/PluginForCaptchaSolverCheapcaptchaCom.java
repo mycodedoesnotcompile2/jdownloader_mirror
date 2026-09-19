@@ -41,7 +41,7 @@ import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptcha
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigCheapcaptchaCom;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 52716 $", interfaceVersion = 3, names = { "cheapcaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53451 $", interfaceVersion = 3, names = { "cheapcaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -190,26 +190,29 @@ public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCapt
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA, "Failed to upload captcha");
             }
             job.setStatus(SolverStatus.SOLVING);
-            long startTime = System.currentTimeMillis();
-            Map<String, Object> pollresp = null;
+            final long startTime = System.currentTimeMillis();
+            String solution = null;
             while (true) {
                 this.sleep(this.getPollingIntervalMillis(account), null);
                 br.getPage(getApiBase() + "/captcha/" + captchaID);
-                pollresp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                final int status = ((Number) pollresp.get("status")).intValue();
-                final boolean is_correct = ((Boolean) pollresp.get("is_correct")).booleanValue();
-                if (is_correct) {
+                final Map<String, Object> pollresp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                /*
+                 * cheapcaptcha.com is a DeathByCaptcha-compatible API: is_correct=1 both while processing AND when solved correctly, and only
+                 * turns 0 for an incorrect solution. Completion is therefore detected by a non-empty "text" (the answer); while still being
+                 * solved "text" is empty, "?" signals an incorrect solution.
+                 */
+                if (!isApiTrue(pollresp.get("is_correct"))) {
+                    throw new PluginException(LinkStatus.ERROR_CAPTCHA, "Captcha solution incorrect");
+                }
+                final String text = (String) pollresp.get("text");
+                if (text != null && text.length() > 0 && !text.equals("?")) {
+                    solution = text;
                     break;
                 }
-                if (status == 255) {
-                    throw new PluginException(LinkStatus.ERROR_CAPTCHA, "Captcha solution incorrect");
-                } else if (status != 0) {
-                    throw new PluginException(LinkStatus.ERROR_CAPTCHA, "Captcha solve error: status " + status);
-                } else if (System.currentTimeMillis() - startTime > 60 * 60 * 1000) {
+                if (System.currentTimeMillis() - startTime > 60 * 60 * 1000) {
                     throw new PluginException(LinkStatus.ERROR_CAPTCHA, "Captcha solve timeout");
                 }
             }
-            final String solution = (String) pollresp.get("text");
             job.getLogger().info("CAPTCHA(" + type + ") solved: " + solution);
             AbstractResponse resp = null;
             if (challenge instanceof RecaptchaV2Challenge || challenge instanceof HCaptchaChallenge || challenge instanceof CloudflareTurnstileChallenge || challenge instanceof CutCaptchaChallenge) {
@@ -239,6 +242,18 @@ public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCapt
             e.printStackTrace();
             return false;
         }
+    }
+
+    /** Interprets an API flag that may be a JSON boolean or a numeric/string 1/0 as a boolean. */
+    private static boolean isApiTrue(final Object value) {
+        if (value instanceof Boolean) {
+            return ((Boolean) value).booleanValue();
+        } else if (value instanceof Number) {
+            return ((Number) value).intValue() != 0;
+        } else if (value instanceof String) {
+            return "1".equals(value) || "true".equalsIgnoreCase((String) value);
+        }
+        return false;
     }
 
     private Map<String, Object> callAPI(final Request req) throws IOException, PluginException {

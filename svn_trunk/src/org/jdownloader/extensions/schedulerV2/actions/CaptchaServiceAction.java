@@ -1,15 +1,24 @@
 package org.jdownloader.extensions.schedulerV2.actions;
 
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.swing.JLabel;
+import javax.swing.JTextField;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 
-import jd.gui.swing.jdgui.views.settings.components.ComboBox;
-
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.logging2.LogInterface;
+import org.jdownloader.captcha.v2.ChallengeResponseController;
+import org.jdownloader.captcha.v2.SolverService;
 import org.jdownloader.extensions.schedulerV2.translate.T;
 
+/**
+ * Toggles a user-defined set of captcha solver services. The user configures a comma separated list of solver ids (see
+ * {@link SolverService#getID()}); an empty list or a list containing "*" toggles all solvers. Each run flips the state: if all configured
+ * solvers are currently enabled they are disabled, otherwise they are all enabled.
+ */
 @ScheduleActionIDAnnotation("SET_CAPTCHASERVICE")
 public class CaptchaServiceAction extends AbstractScheduleAction<CaptchaServiceActionConfig> {
     public CaptchaServiceAction(String configJson) {
@@ -23,59 +32,123 @@ public class CaptchaServiceAction extends AbstractScheduleAction<CaptchaServiceA
 
     @Override
     public void execute(LogInterface logger) {
-        switch (getConfig()._getService()) {
-        case NINEKWEU:
-            org.jdownloader.settings.staticreferences.CFG_9KWCAPTCHA.CFG.setEnabled(true);
-            org.jdownloader.settings.staticreferences.CFG_DBC.CFG.setEnabled(false);
-            break;
-        case DEATHBYCAPTCHA:
-            org.jdownloader.settings.staticreferences.CFG_9KWCAPTCHA.CFG.setEnabled(false);
-            org.jdownloader.settings.staticreferences.CFG_DBC.CFG.setEnabled(true);
-            break;
-        case NONE:
-        default:
-            org.jdownloader.settings.staticreferences.CFG_9KWCAPTCHA.CFG.setEnabled(false);
-            org.jdownloader.settings.staticreferences.CFG_DBC.CFG.setEnabled(false);
-            break;
+        final List<SolverService> services = resolveServices();
+        if (services.isEmpty()) {
+            return;
+        }
+        /* Toggle: if all configured solvers are currently enabled, disable them all; otherwise enable them all. */
+        boolean allEnabled = true;
+        for (final SolverService service : services) {
+            if (!service.isEnabled()) {
+                allEnabled = false;
+                break;
+            }
+        }
+        final boolean newState = !allEnabled;
+        for (final SolverService service : services) {
+            service.setEnabled(newState);
         }
     }
 
-    public static enum CAPTCHA_SERVICE {
-        NONE(T.T.action_captcha_none()),
-        NINEKWEU("9kw.eu"),
-        DEATHBYCAPTCHA("deathbycaptcha.com");
-        private final String readableName;
-
-        public final String getReadableName() {
-            return readableName;
+    /**
+     * Returns the configured solver-id list. Migrates a legacy action (that still stored the old CAPTCHA_SERVICE enum) to the new format on
+     * first access and persists the migrated value.
+     */
+    private String getEffectiveSolverIDs() {
+        final String ids = getConfig().getSolverIDs();
+        if (ids != null) {
+            return ids;
         }
-
-        private CAPTCHA_SERVICE(String readableName) {
-            this.readableName = readableName;
+        final String legacy = getConfig().getService();
+        final String migrated;
+        if ("NINEKWEU".equals(legacy)) {
+            migrated = "9kw.eu";
+        } else if ("DEATHBYCAPTCHA".equals(legacy)) {
+            migrated = "deathbycaptcha.com";
+        } else {
+            /* No (or NONE) legacy value: default to an empty list. */
+            migrated = "";
         }
+        getConfig().setSolverIDs(migrated);
+        return migrated;
+    }
+
+    /** Resolves the configured ids to solver services. Empty list or a "*" entry resolves to all available solvers. */
+    private List<SolverService> resolveServices() {
+        final List<SolverService> all = ChallengeResponseController.getInstance().listServices();
+        final String raw = getEffectiveSolverIDs();
+        if (StringUtils.isEmpty(raw) || raw.contains("*")) {
+            return new ArrayList<SolverService>(all);
+        }
+        final List<SolverService> ret = new ArrayList<SolverService>();
+        final String[] ids = raw.split(",");
+        for (int i = 0; i < ids.length; i++) {
+            final String wanted = ids[i].trim();
+            if (wanted.length() == 0) {
+                continue;
+            }
+            for (final SolverService service : all) {
+                if (StringUtils.equalsIgnoreCase(service.getID(), wanted) && !ret.contains(service)) {
+                    ret.add(service);
+                    break;
+                }
+            }
+        }
+        return ret;
+    }
+
+    /** Builds the hint text listing the solver ids that currently exist, so the user knows the valid values. */
+    private String getSolverIDsHint() {
+        final StringBuilder sb = new StringBuilder();
+        sb.append("Comma separated solver ids (empty or \"*\" = all). Available: ");
+        final List<SolverService> all = ChallengeResponseController.getInstance().listServices();
+        boolean first = true;
+        for (final SolverService service : all) {
+            if (!first) {
+                sb.append(", ");
+            }
+            sb.append(service.getID());
+            first = false;
+        }
+        return sb.toString();
     }
 
     @Override
     protected void createPanel() {
         panel.put(new JLabel(T.T.action_captcha_service() + ":"), "gapleft 10,");
-        final ComboBox<CAPTCHA_SERVICE> cbService = new ComboBox<CAPTCHA_SERVICE>(CAPTCHA_SERVICE.values()) {
-            @Override
-            protected String getLabel(int index, CAPTCHA_SERVICE value) {
-                return value.getReadableName();
+        final JTextField txtSolverIDs = new JTextField();
+        txtSolverIDs.setToolTipText(getSolverIDsHint());
+        final String current = getConfig().getSolverIDs();
+        txtSolverIDs.setText(current != null ? current : "");
+        txtSolverIDs.getDocument().addDocumentListener(new DocumentListener() {
+            private void save() {
+                getConfig().setSolverIDs(txtSolverIDs.getText());
             }
-        };
-        cbService.setSelectedItem(getConfig()._getService());
-        cbService.addActionListener(new ActionListener() {
+
             @Override
-            public void actionPerformed(ActionEvent e) {
-                getConfig()._setService(cbService.getSelectedItem());
+            public void insertUpdate(DocumentEvent e) {
+                save();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                save();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                save();
             }
         });
-        panel.put(cbService, "");
+        panel.put(txtSolverIDs, "width 250!");
     };
 
     @Override
     public String getReadableParameter() {
-        return getConfig()._getService().getReadableName();
+        final String ids = getConfig().getSolverIDs();
+        if (StringUtils.isEmpty(ids)) {
+            return "*";
+        }
+        return ids;
     }
 }

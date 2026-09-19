@@ -125,7 +125,7 @@ public class JobRunnable<T> implements Runnable {
                                         if (service.add(ss.getService())) {
                                             job.getLogger().info("Debug " + ss.getService().getName());
 
-                                            job.getLogger().info(ss.getService().getConfig() + "");
+                                            job.getLogger().info(ss.getService().getConfigV3() + "");
                                             job.getLogger().info(JSonStorage.serializeToJson(ss.getService().getWaitForMapCopy()));
                                         }
                                     }

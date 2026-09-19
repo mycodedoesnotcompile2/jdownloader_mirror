@@ -61,6 +61,7 @@ import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.InputDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.Files;
 import org.appwork.utils.Hash;
@@ -3188,7 +3189,14 @@ public abstract class PluginForHost extends Plugin {
             /* Not a captcha solver plugin */
             return;
         }
-        new CaptchaSolverAccountSettingsPanelBuilder(new AccountCaptchaTypeAccessor(acc)).build(panel);
+        /*
+         * 2026-09-17: During development I decided that we do not need the ability to turn off single captcha types per account for now
+         * since in most cases, all solver accounts for one service do support all captcha types of this service.
+         */
+        final boolean allowDisplaySolverTypesTableAsAccountSetting = false;
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && allowDisplaySolverTypesTableAsAccountSetting) {
+            new CaptchaSolverAccountSettingsPanelBuilder(new AccountCaptchaTypeAccessor(acc)).build(panel);
+        }
     }
 
     public void extendAccountSettingsPanel(final Account acc, final PluginConfigPanelNG panel) {

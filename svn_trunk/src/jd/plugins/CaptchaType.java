@@ -533,6 +533,7 @@ public class CaptchaType {
 
     public static final boolean HIDE_CAPTCHA_TYPES_NOT_SUPPORTED_BY_JD = true;
 
+    /** Returns captcha types that should be displayed in GUI. */
     public static List<CAPTCHA_TYPE> getProcessableCaptchaTypes() {
         final List<CAPTCHA_TYPE> ctypes = new ArrayList<CAPTCHA_TYPE>();
         for (final CAPTCHA_TYPE ctype : CAPTCHA_TYPE.values()) {
