@@ -82,6 +82,7 @@ import org.appwork.utils.os.ContainerRuntime;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.Flatpak;
 import org.appwork.utils.os.Snap;
+import org.appwork.utils.os.hardware.Apple;
 import org.appwork.utils.os.hardware.HardwareType;
 import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.dialog.AbstractDialog;
@@ -263,7 +264,30 @@ public class AboutDialog extends AbstractDialog<Integer> {
                     org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e1);
                 }
                 stats.add(new JLabel("OS:"), "");
-                stats.add(createLink(CrossSystem.getOSFamily() + "(" + CrossSystem.getOS() + ")" + (CrossSystem.is64BitOperatingSystem() ? "(64bit)" : "(32bit)")));
+                if (CrossSystem.isMac()) {
+                    String systemOnChip = "";
+                    String url = null;
+                    try {
+                        final Apple.SystemOnChip soc = Apple.getSoC();
+                        systemOnChip = soc == null ? "" : ("(" + soc.name() + ")");
+                        if (Boolean.TRUE.equals(Apple.isAppleSilicon())) {
+                            if (Boolean.TRUE.equals(Apple.isRunningUnderRosetta())) {
+                                url = "https://jdownloader.org/jdownloader2";
+                            }
+                        }
+                    } catch (Exception e) {
+                        org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);
+                    }
+
+                    if (url != null) {
+                        final String text = "<html>" + CrossSystem.getOSFamily() + "(" + CrossSystem.getOS() + ")" + (CrossSystem.is64BitOperatingSystem() ? "(64bit)" : "(32bit)") + systemOnChip + "<u><font color=red>(Rosetta emulation detected!)</font></u></html>";
+                        stats.add(createLink(text, url));
+                    } else {
+                        stats.add(createLink(CrossSystem.getOSFamily() + "(" + CrossSystem.getOS() + ")" + (CrossSystem.is64BitOperatingSystem() ? "(64bit)" : "(32bit)") + systemOnChip));
+                    }
+                } else {
+                    stats.add(createLink(CrossSystem.getOSFamily() + "(" + CrossSystem.getOS() + ")" + (CrossSystem.is64BitOperatingSystem() ? "(64bit)" : "(32bit)")));
+                }
                 stats.add(new JLabel("Memory:"), "");
                 final long used = memory.getUsed();
                 final long committed = memory.getCommitted();

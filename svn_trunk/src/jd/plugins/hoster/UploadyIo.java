@@ -38,7 +38,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
-@HostPlugin(revision = "$Revision: 52861 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53461 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadyIo extends XFileSharingProBasic {
     public UploadyIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -55,7 +55,7 @@ public class UploadyIo extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "uploady.io", "uploadydl.com" });
+        ret.add(new String[] { "uploady.io", "uploadydl.com", "uploady.to" });
         return ret;
     }
 

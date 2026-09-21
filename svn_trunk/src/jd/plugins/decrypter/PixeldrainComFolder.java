@@ -40,7 +40,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.URLHelper;
 
-@DecrypterPlugin(revision = "$Revision: 51179 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53462 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PixeldrainCom.class })
 public class PixeldrainComFolder extends PluginForDecrypt {
     public PixeldrainComFolder(PluginWrapper wrapper) {
@@ -107,7 +107,7 @@ public class PixeldrainComFolder extends PluginForDecrypt {
                 final DownloadLink dl = this.createDownloadlink(generateFileURL(file.get("id").toString()));
                 dl.setContentUrl(generateContentURL(listID, index));
                 dl.setContainerUrl(param.getCryptedUrl());
-                PixeldrainCom.setDownloadLinkInfo(this, dl, null, file);
+                PixeldrainCom.setDownloadLinkInfo(this, br, dl, null, file);
                 if (targetIndex != null && index == targetIndex.intValue()) {
                     /* User wants only one item within that folder */
                     logger.info("Found target-file at index: " + index + " | " + dl.getFinalFileName() + " | Returning only this file!");
