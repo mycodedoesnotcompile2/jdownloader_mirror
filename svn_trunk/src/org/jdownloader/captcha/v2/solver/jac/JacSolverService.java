@@ -1,5 +1,6 @@
 package org.jdownloader.captcha.v2.solver.jac;
 
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,18 +32,13 @@ public class JacSolverService extends AbstractSolverService implements SolverSer
     }
 
     @Override
-    public String getType() {
-        return _GUI.T.JACSolver_getName_();
+    public SolverType getType() {
+        return SolverType.JD_LOCAL;
     }
 
     @Override
     public String getID() {
         return ID;
-    }
-
-    @Override
-    public boolean hasConfigPanel() {
-        return true;
     }
 
     @Override
@@ -57,10 +53,9 @@ public class JacSolverService extends AbstractSolverService implements SolverSer
 
     @Override
     public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        /* JAC only solves plain image captchas, see JACSolver#getSupportedCaptchaTypes. */
         final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
         types.add(CAPTCHA_TYPE.IMAGE);
-        types.add(CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA);
-        types.add(CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
         return types;
     }
 

@@ -1,5 +1,7 @@
 package org.jdownloader.captcha.v2;
 
+import org.appwork.storage.config.annotations.LabelInterface;
+import org.jdownloader.gui.translate._GUI;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 
@@ -31,10 +33,25 @@ public abstract class Challenge<T> {
     private int                   round              = -1;
     private CaptchaRequestType    captchaRequestType = null;
 
-    public enum CaptchaRequestType {
-        HOSTER,
-        HOSTER_LOGIN,
-        DECRYPTER
+    public enum CaptchaRequestType implements LabelInterface {
+        HOSTER {
+            @Override
+            public String getLabel() {
+                return _GUI.T.CaptchaRequestType_HOSTER();
+            }
+        },
+        HOSTER_LOGIN {
+            @Override
+            public String getLabel() {
+                return _GUI.T.CaptchaRequestType_HOSTER_LOGIN();
+            }
+        },
+        DECRYPTER {
+            @Override
+            public String getLabel() {
+                return _GUI.T.CaptchaRequestType_DECRYPTER();
+            }
+        }
     }
 
     public int getRound() {

@@ -1,7 +1,6 @@
 package org.jdownloader.captcha.v2;
 
 import java.util.ArrayList;
-import java.util.Map;
 
 import org.appwork.storage.config.ConfigInterface;
 import org.appwork.storage.config.annotations.AboutConfig;
@@ -20,11 +19,6 @@ public interface ChallengeSolverConfig extends ConfigInterface {
     boolean isEnabled();
 
     void setEnabled(boolean b);
-
-    @AboutConfig
-    Map<String, Integer> getWaitForMap();
-
-    void setWaitForMap(Map<String, Integer> map);
 
     @AboutConfig
     ArrayList<String> getBlacklistEntries();

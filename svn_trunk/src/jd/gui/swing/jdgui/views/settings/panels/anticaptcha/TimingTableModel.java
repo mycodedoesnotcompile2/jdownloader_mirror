@@ -15,8 +15,8 @@ import org.appwork.utils.swing.EDTRunner;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.jdownloader.actions.AppAction;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
+import org.jdownloader.captcha.v2.JobRunnable;
 import org.jdownloader.captcha.v2.SolverService;
-import org.jdownloader.captcha.v2.solver.service.AbstractSolverService;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 
@@ -102,7 +102,7 @@ public class TimingTableModel extends ExtTableModel<SolverService> {
 
             @Override
             public String getStringValue(SolverService value) {
-                return value.getType();
+                return value.getType().getLabel();
             }
         });
 
@@ -149,9 +149,9 @@ public class TimingTableModel extends ExtTableModel<SolverService> {
 
             @Override
             protected void setNumberValue(Number value, SolverService object) {
-                mySolver.setWaitFor(object.getID(), value.intValue() * 1000);
+                JobRunnable.setWaitFor(mySolver, object.getID(), value.intValue() * 1000);
 
-                final ArrayList<SolverService> waitLoop = AbstractSolverService.validateWaittimeQueue(mySolver, ChallengeResponseController.getInstance().getServiceByID(object.getID()));
+                final ArrayList<SolverService> waitLoop = JobRunnable.validateWaittimeQueue(mySolver, ChallengeResponseController.getInstance().getServiceByID(object.getID()));
                 if (waitLoop != null) {
                     final StringBuilder sb = new StringBuilder();
                     for (int i = 0; i < waitLoop.size(); i++) {
@@ -160,11 +160,11 @@ public class TimingTableModel extends ExtTableModel<SolverService> {
                         if (next == null) {
 
                         } else {
-                            sb.append(_GUI.T.TimingTableModel_initColumns_waitloop_print(entry.getName(), TimeFormatter.formatMilliSeconds(entry.getWaitForByID(next.getID()), 0), next.getName())).append("\r\n");
+                            sb.append(_GUI.T.TimingTableModel_initColumns_waitloop_print(entry.getName(), TimeFormatter.formatMilliSeconds(JobRunnable.getWaitFor(entry, next), 0), next.getName())).append("\r\n");
                         }
                     }
                     Dialog.getInstance().showErrorDialog(0, _GUI.T.TimingTableModel_initColumns_waitloop_title(), _GUI.T.TimingTableModel_initColumns_waitloop_warning(sb.toString()));
-                    mySolver.setWaitFor(object.getID(), 0);
+                    JobRunnable.setWaitFor(mySolver, object.getID(), 0);
                 }
                 refreshSort();
 
@@ -180,11 +180,7 @@ public class TimingTableModel extends ExtTableModel<SolverService> {
     }
 
     public int getWaittimeBySolver(SolverService value) {
-        final Integer v = mySolver.getWaitForByID(value.getID());
-        if (v == null || v.intValue() < 0) {
-            return 0;
-        }
-        return v.intValue() / 1000;
+        return JobRunnable.getWaitFor(mySolver, value) / 1000;
     }
 
     public AbstractAction getResetAction() {
@@ -196,8 +192,8 @@ public class TimingTableModel extends ExtTableModel<SolverService> {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                /* Wait-for persistence is currently disabled; reset is a no-op for now. */
-                mySolver.setWaitFor(null, null);
+                /* Removes the user's wait times of this solver, so the defaults apply again. */
+                JobRunnable.resetWaitFor(mySolver);
                 update();
             }
         };

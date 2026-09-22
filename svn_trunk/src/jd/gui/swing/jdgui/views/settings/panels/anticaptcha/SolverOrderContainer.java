@@ -1,21 +1,25 @@
 package jd.gui.swing.jdgui.views.settings.panels.anticaptcha;
 
+import java.awt.Container;
 import java.awt.Dimension;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
 
 import javax.swing.JLabel;
 import javax.swing.JScrollPane;
+import javax.swing.SwingUtilities;
 
 import org.appwork.utils.swing.SwingUtils;
+import org.jdownloader.captcha.v2.CaptchaSolverCaptchaTypesSettingsPanelBuilder;
+import org.jdownloader.captcha.v2.CaptchaSolverCaptchaTypesSettingsPanelBuilder.SolverServiceCaptchaTypeAccessor;
 import org.jdownloader.captcha.v2.SolverService;
 import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.settings.AbstractConfigPanel;
 import org.jdownloader.images.NewTheme;
 
 import jd.gui.swing.jdgui.BasicJDTable;
 import jd.gui.swing.jdgui.views.settings.components.SettingsComponent;
-import jd.plugins.CaptchaSolverAccountSettingsPanelBuilder;
-import jd.plugins.CaptchaSolverAccountSettingsPanelBuilder.SolverServiceCaptchaTypeAccessor;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.PluginConfigPanelNG;
 
 public class SolverOrderContainer extends org.appwork.swing.MigPanel implements SettingsComponent {
     private final SolverOrderTable     solverOrder;
@@ -34,6 +38,7 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
         final JScrollPane sp = new JScrollPane(urlOrder);
         sp.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
         sp.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        passMouseWheelToParent(sp);
         SwingUtils.setOpaque(this, false);
         add(sp, "gapright 40, wrap");
         /* Header label shown above the detail table; separated from the solver table above by a gap. */
@@ -50,6 +55,7 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
         detailScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
         detailScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         detailScrollPane.setVisible(false);
+        passMouseWheelToParent(detailScrollPane);
         add(detailScrollPane, "gaptop 6, growx, gapright 40, wrap");
         /* "<solver> Settings" section header (gear icon) shown BELOW the captcha-types table, above the config panel. */
         settingsLabel = new JLabel("Settings", NewTheme.I().getIcon(IconKey.ICON_SETTINGS, 18), JLabel.LEADING);
@@ -77,8 +83,8 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
                     detailLabel.setText(solver.getName() + ": Supported captcha types overview and settings");
                     detailLabel.setVisible(true);
                     /*
-                     * Description above the table (no icon; the icon is shown on the header above): the solver's own description plus a hint
-                     * that unchecking a captcha type disables it globally for this solver. Always shown when a solver is selected.
+                     * Description above the table (no icon; the icon is shown on the header above): the solver's own description plus a
+                     * hint that unchecking a captcha type disables it globally for this solver. Always shown when a solver is selected.
                      */
                     final StringBuilder description = new StringBuilder("<html>");
                     final String descriptionText = solver.getDescription();
@@ -93,7 +99,7 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
                     settingsLabel.setText(solver.getName() + " Settings");
                     settingsLabel.setVisible(true);
                     // Build detail table from a no-account builder
-                    final CaptchaSolverAccountSettingsPanelBuilder builder = new CaptchaSolverAccountSettingsPanelBuilder(new SolverServiceCaptchaTypeAccessor(solver));
+                    final CaptchaSolverCaptchaTypesSettingsPanelBuilder builder = new CaptchaSolverCaptchaTypesSettingsPanelBuilder(new SolverServiceCaptchaTypeAccessor(solver));
                     detailTable = builder.getCaptchaTypesTable();
                     /* Size the scroll pane to fit header plus all rows so every row is shown without a scrollbar. */
                     final int fullHeight = detailTableFullHeight();
@@ -104,14 +110,19 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
                     detailScrollPane.setMinimumSize(fullSize);
                     detailScrollPane.setVisible(true);
                     /* Show the selected solver's config below the table (plugin config if available, else the local solver's config). */
-                    final AbstractConfigPanel configComponent = solver.getConfigComponent();
-                    if (configComponent != null) {
-                        configScrollPane.setViewportView(configComponent);
-                        configScrollPane.setVisible(true);
-                    } else {
-                        configScrollPane.setViewportView(null);
-                        configScrollPane.setVisible(false);
-                    }
+                    /* Built generically from the solver's V3 config interface, just like plugin config panels. */
+                    final PluginConfigPanelNG configComponent = new PluginConfigPanelNG() {
+                        @Override
+                        public void updateContents() {
+                        }
+
+                        @Override
+                        public void save() {
+                        }
+                    };
+                    configComponent.build(solver.getConfigV3());
+                    configScrollPane.setViewportView(configComponent);
+                    configScrollPane.setVisible(true);
                 }
                 revalidate();
                 repaint();
@@ -124,15 +135,36 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
     }
 
     /**
-     * Full pixel height of a table (header + all rows) plus a few pixels for the scroll pane border, so the last row is never clipped and no
-     * scrollbar is needed. getPreferredSize() already accounts for row height and inter-cell spacing of all rows.
+     * A scroll pane without scrollbars still consumes mouse wheel events, so scrolling over such a table would do nothing. Replaces the
+     * scroll pane's own wheel handling by one that forwards the event to the next scroll pane above it (the panel that actually scrolls).
+     */
+    private static void passMouseWheelToParent(final JScrollPane scrollPane) {
+        for (final MouseWheelListener listener : scrollPane.getMouseWheelListeners()) {
+            scrollPane.removeMouseWheelListener(listener);
+        }
+        scrollPane.addMouseWheelListener(new MouseWheelListener() {
+            @Override
+            public void mouseWheelMoved(final MouseWheelEvent e) {
+                final Container parent = SwingUtilities.getAncestorOfClass(JScrollPane.class, scrollPane);
+                if (parent != null) {
+                    parent.dispatchEvent(SwingUtilities.convertMouseEvent(scrollPane, e, parent));
+                }
+            }
+        });
+    }
+
+    /**
+     * Full pixel height of a table (header + all rows) plus a few pixels for the scroll pane border, so the last row is never clipped and
+     * no scrollbar is needed. getPreferredSize() already accounts for row height and inter-cell spacing of all rows. <br>
+     * 2026-09-21: Please don't ask me why but without adding these extra 10px, also e.g. with a value lower than 10px extra, the last table
+     * item will be partly cut and there will be a scrollbar which we don't want.
      */
     private static int tableFullHeight(final BasicJDTable<?> table) {
         if (table == null) {
             return 0;
         }
         final int headerHeight = table.getTableHeader() != null ? table.getTableHeader().getPreferredSize().height : 0;
-        return headerHeight + table.getPreferredSize().height + 4;
+        return headerHeight + table.getPreferredSize().height + 10;
     }
 
     private int detailTableFullHeight() {
@@ -140,9 +172,9 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
     }
 
     /*
-     * The total height is summed from the exact preferred heights of the visible components plus the explicit gaptop gaps used in the layout
-     * (the layout sets gapy 0, so there are no implicit inter-row gaps to account for). This keeps the reserved height exact: the tables are
-     * shown in full (no clipping) and there is no leftover space that would make the surrounding panel scrollable.
+     * The total height is summed from the exact preferred heights of the visible components plus the explicit gaptop gaps used in the
+     * layout (the layout sets gapy 0, so there are no implicit inter-row gaps to account for). This keeps the reserved height exact: the
+     * tables are shown in full (no clipping) and there is no leftover space that would make the surrounding panel scrollable.
      */
     @Override
     public String getConstraints() {

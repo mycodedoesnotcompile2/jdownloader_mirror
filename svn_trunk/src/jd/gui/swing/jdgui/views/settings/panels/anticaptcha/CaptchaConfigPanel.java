@@ -20,6 +20,7 @@ import org.jdownloader.gui.settings.AbstractConfigPanel;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
+import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 import org.jdownloader.settings.staticreferences.CFG_SOUND;
 
 public class CaptchaConfigPanel extends AbstractConfigPanel {
@@ -27,6 +28,7 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
 
     // private CESSettingsPanel psp;
     private SolverOrderTable  solverOrderTable;
+    private SolverComparisonContainer solverComparisonContainer;
 
     public String getTitle() {
         return _GUI.T.AntiCaptchaConfigPanel_getTitle();
@@ -37,6 +39,7 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
         this.addHeader(getTitle(), new AbstractIcon(IconKey.ICON_OCR, 32));
         this.addDescriptionPlain(_GUI.T.AntiCaptchaConfigPanel_onShow_description());
 
+        addPair(_GUI.T.CaptchaConfigPanel_useExternalSolverAccounts(), null, new Checkbox(CFG_GENERAL.USE_AVAILABLE_CAPTCHA_SOLVER_ACCOUNTS));
         addPair(_GUI.T.AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_sounds(), null, new Checkbox(CFG_SOUND.CAPTCHA_SOUND_ENABLED));
         addPair(_GUI.T.AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_countdown_download(), null, new Checkbox(CFG_CAPTCHA.DIALOG_COUNTDOWN_FOR_DOWNLOADS_ENABLED));
         addPair(_GUI.T.CaptchaExchangeSpinnerAction_skipbubbletimeout_(), null, new Spinner(CFG_CAPTCHA.CAPTCHA_EXCHANGE_CHANCE_TO_SKIP_BUBBLE_TIMEOUT));
@@ -61,11 +64,14 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
         }), "align right");
         final CaptchaSettingsTabbedPane tabs = new CaptchaSettingsTabbedPane();
         final JScrollPane solversScrollPane = new JScrollPane(solversTab);
-        /* The panel lays out its content to fit the available space, so neither a horizontal nor a vertical scrollbar is wanted. */
+        /* No horizontal scrollbar, but a vertical one: the settings of the selected solver can be taller than the available space. */
         solversScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        solversScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
+        solversScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        solversScrollPane.getVerticalScrollBar().setUnitIncrement(20);
         tabs.addTab(_GUI.T.CaptchaConfigPanel_solverOverviewAndSettings(), solversScrollPane);
         tabs.addTab("Captcha Rules", new CaptchaRulesContainer());
+        this.solverComparisonContainer = new SolverComparisonContainer();
+        tabs.addTab(_GUI.T.CaptchaSolverComparison_tab_title(), solverComparisonContainer);
         add(tabs);
         // this.addHeader(_GUI.T.AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_solver(), new AbstractIcon(IconKey.ICON_share", 32));
         // this.addDescriptionPlain(_GUI.T.AntiCaptchaConfigPanel_onShow_description_solver());
@@ -91,6 +97,8 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
          * to this panel is the point where rows get regrouped, matching the same behavior as the account manager's account table.
          */
         solverOrderTable.getModel().refreshSort();
+        /* Solvers and the captcha history change while JDownloader is running. */
+        solverComparisonContainer.refresh();
         super.onShow();
     }
 

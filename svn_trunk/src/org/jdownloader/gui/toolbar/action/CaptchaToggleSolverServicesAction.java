@@ -109,7 +109,7 @@ public class CaptchaToggleSolverServicesAction extends AbstractToolBarAction imp
             return false;
         }
         for (final SolverService service : services) {
-            if (!service.isEnabled()) {
+            if (!service.getConfigV3().isEnabled()) {
                 return false;
             }
         }
@@ -146,7 +146,7 @@ public class CaptchaToggleSolverServicesAction extends AbstractToolBarAction imp
         /* Toggle: if all are currently enabled, disable all; otherwise enable all. */
         final boolean newState = !areAllEnabled(services);
         for (final SolverService service : services) {
-            service.setEnabled(newState);
+            service.getConfigV3().setEnabled(newState);
         }
         updateSelectedState();
     }

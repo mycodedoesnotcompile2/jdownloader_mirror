@@ -1,5 +1,8 @@
 package org.jdownloader.captcha.v2.challenge.oauth;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.appwork.exceptions.WTFException;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
@@ -16,6 +19,7 @@ import org.jdownloader.settings.staticreferences.CFG_SILENTMODE;
 import jd.controlling.captcha.SkipException;
 import jd.controlling.captcha.SkipRequest;
 import jd.gui.swing.jdgui.JDGui;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 public class OAuthDialogSolver extends ChallengeSolver<Boolean> {
     private static final OAuthDialogSolver INSTANCE = new OAuthDialogSolver();
@@ -52,9 +56,9 @@ public class OAuthDialogSolver extends ChallengeSolver<Boolean> {
     }
 
     @Override
-    public SolverType getSolverType() {
-        /* Backed by BrowserSolverService and opens a browser based login dialog, just like the other browser solvers. */
-        return SolverType.JD_LOCAL_BROWSER;
+    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        /* OAuth challenges are no captchas and have no CAPTCHA_TYPE, so this solver legitimately supports no captcha type. */
+        return new ArrayList<CAPTCHA_TYPE>();
     }
 
     public void checkSilentMode(final SolverJob<Boolean> job) throws SkipException, InterruptedException {

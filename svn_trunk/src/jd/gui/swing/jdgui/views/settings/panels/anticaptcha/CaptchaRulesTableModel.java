@@ -254,7 +254,7 @@ public class CaptchaRulesTableModel extends ExtTableModel<CaptchaChallengeFilter
                 for (int i = 0; i < all.length; i++) {
                     final CaptchaRequestType type = all[i];
                     final boolean selected = current == null || current.isEmpty() || current.contains(type);
-                    final JCheckBoxMenuItem item = new JCheckBoxMenuItem(type.name(), selected);
+                    final JCheckBoxMenuItem item = new JCheckBoxMenuItem(type.getLabel(), selected);
                     item.addActionListener(new ActionListener() {
                         @Override
                         public void actionPerformed(final ActionEvent e) {

@@ -51,7 +51,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.XHamsterCom;
 
-@DecrypterPlugin(revision = "$Revision: 53313 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53473 $", interfaceVersion = 3, names = {}, urls = {})
 public class XHamsterGallery extends PluginForDecrypt {
     public XHamsterGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -93,8 +93,9 @@ public class XHamsterGallery extends PluginForDecrypt {
     public static final Pattern PATTERN_PHOTO_GALLERY                = Pattern.compile("/photos/gallery/([0-9A-Za-z_\\-/]+)-(\\d+)", Pattern.CASE_INSENSITIVE);
     public static final Pattern PATTERN_PLAYLIST_MY_FAVORITES_VIDEOS = Pattern.compile("/my/favorites/videos(/([a-f0-9]{24})-([\\w\\-]+))?", Pattern.CASE_INSENSITIVE);
     public static final Pattern PATTERN_PLAYLIST_NORMAL              = Pattern.compile("/playlists/([\\w-]+)-([a-f0-9]{24})", Pattern.CASE_INSENSITIVE);
-    public static final Pattern PATTERN_USER_VIDEOS                  = Pattern.compile("/users/([^/]+)(/videos)?", Pattern.CASE_INSENSITIVE);
-    public static final Pattern PATTERN_USER_FAVORITE_VIDEOS         = Pattern.compile("/users/([^/]+)/favorites/videos", Pattern.CASE_INSENSITIVE);
+    /* Some accounts use a "/users/profiles/<name>" URL form, so allow an optional "profiles/" segment before the username. */
+    public static final Pattern PATTERN_USER_VIDEOS                  = Pattern.compile("/users/(?:profiles/)?([^/]+)(/videos)?", Pattern.CASE_INSENSITIVE);
+    public static final Pattern PATTERN_USER_FAVORITE_VIDEOS         = Pattern.compile("/users/(?:profiles/)?([^/]+)/favorites/videos", Pattern.CASE_INSENSITIVE);
     public static final Pattern PATTERN_USER_CREATOR_PHOTOS          = Pattern.compile("/(creators|users|pornstars)/([^/]+)/photos", Pattern.CASE_INSENSITIVE);
     /* 2026-09-03: "/shorts" used to be called "/moments" in the past. */
     public static final Pattern PATTERN_USER_SHORTS                  = Pattern.compile("/(creators|users|pornstars)/([^/]+)/(shorts|moments)", Pattern.CASE_INSENSITIVE);
@@ -198,7 +199,14 @@ public class XHamsterGallery extends PluginForDecrypt {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final String contenturl = XHamsterCom.getCorrectedURL("https://xhamster.com/users/" + username + "/videos");
+        /*
+         * Use the original URL (keeps the "profiles/" segment and the original domain) and only ensure it points to the "/videos" sub-page.
+         * Rebuilding it from scratch would drop the "profiles/" segment and load the wrong page.
+         */
+        String contenturl = XHamsterCom.getCorrectedURL(param.getCryptedUrl());
+        if (!contenturl.endsWith("/videos")) {
+            contenturl += "/videos";
+        }
         br.getPage(contenturl);
         if (this.br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -274,10 +282,10 @@ public class XHamsterGallery extends PluginForDecrypt {
 
     /**
      * Crawls a /creators/<name> or /celebrities/<name> profile. </br>
-     * Such a page is only a landing/preview page: it shows a small curated subset of the profile's videos plus unrelated recommended videos.
-     * If it links to a "More videos" sub-page (e.g. /creators/<name>/newest or /celebrities/<name>/recommended) with the full paginated list,
-     * crawl that instead - otherwise the html fallback-crawler would additionally grab the unrelated recommended videos. Note: not every
-     * creator/celebrity has a matching /users/<name> profile, so we must not rewrite the URL to /users/.
+     * Such a page is only a landing/preview page: it shows a small curated subset of the profile's videos plus unrelated recommended
+     * videos. If it links to a "More videos" sub-page (e.g. /creators/<name>/newest or /celebrities/<name>/recommended) with the full
+     * paginated list, crawl that instead - otherwise the html fallback-crawler would additionally grab the unrelated recommended videos.
+     * Note: not every creator/celebrity has a matching /users/<name> profile, so we must not rewrite the URL to /users/.
      */
     private ArrayList<DownloadLink> crawlProfileViaMoreVideosLink(final CryptedLink param, final String username, final String moreVideosPath, final String emptyRetryID) throws IOException, PluginException, DecrypterRetryException, InterruptedException {
         final String contenturl = XHamsterCom.getCorrectedURL(param.getCryptedUrl());
@@ -354,6 +362,9 @@ public class XHamsterGallery extends PluginForDecrypt {
         if (this.br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        if (br.containsHTML(">This profile is visible to friends only")) {
+            throw new AccountRequiredException();
+        }
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(playlistName);
         final ArrayList<DownloadLink> ret = this.crawlPagination(param, fp, PaginationType.VIDEO);
@@ -388,7 +399,6 @@ public class XHamsterGallery extends PluginForDecrypt {
             }
         }
         final XHamsterCom hostPlugin = (XHamsterCom) this.getNewPluginForHostInstance(this.getHost());
-        final Pattern ignoreVideo = Pattern.compile("(?i).*/videos/[a-f0-9]{24}-watch-later.*");
         int numberofDeletedItemsTotal = 0;
         final boolean put_video_id_in_filename = PluginJsonConfig.get(XhamsterConfig.class).isFilenameId();
         pagination: do {
@@ -527,7 +537,7 @@ public class XHamsterGallery extends PluginForDecrypt {
                         distribute(dummy);
                         continue;
                     }
-                    if (new Regex(url, ignoreVideo).patternFind()) {
+                    if (isMatchesIgnoreVideoPattern(url)) {
                         continue;
                     } else if (!dupes.add(url)) {
                         /* Skip dupes by url */
@@ -577,7 +587,7 @@ public class XHamsterGallery extends PluginForDecrypt {
                 int fallback_crawler_number_of_new_items = 0;
                 for (final String path : paths) {
                     final String url = br.getURL(path).toExternalForm();
-                    if (new Regex(url, ignoreVideo).patternFind()) {
+                    if (isMatchesIgnoreVideoPattern(url)) {
                         continue;
                     } else if (type == PaginationType.VIDEO && !hostPlugin.canHandle(url)) {
                         /* Skip items not supported by hosterplugin */
@@ -674,6 +684,23 @@ public class XHamsterGallery extends PluginForDecrypt {
             throw new DecrypterRetryException(RetryReason.EMPTY_PROFILE, "EMPTY_PROFILE_SHORTS_" + username);
         }
         return ret;
+    }
+
+    final Pattern ignoreVideo  = Pattern.compile("(?i).*/videos/[a-f0-9]{24}-watch-later.*");
+    final Pattern ignoreVideo2 = Pattern.compile("(?i)/videos/eu$");
+    final Pattern ignoreVideo3 = Pattern.compile("(?i)/videos/friends$");
+
+    private boolean isMatchesIgnoreVideoPattern(final String url) {
+        if (new Regex(url, ignoreVideo).patternFind()) {
+            return true;
+        }
+        if (new Regex(url, ignoreVideo2).patternFind()) {
+            return true;
+        }
+        if (new Regex(url, ignoreVideo3).patternFind()) {
+            return true;
+        }
+        return false;
     }
 
     private ArrayList<DownloadLink> crawlAllGalleriesOfUserOrCreator(final CryptedLink param) throws IOException, PluginException {

@@ -39,16 +39,11 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
 
     @Override
     public boolean isEnabled() {
-        return this.service.isEnabled() && this.account.isEnabled();
+        return this.service.getConfigV3().isEnabled() && this.account.isEnabled();
     }
 
     public Account getAccount() {
         return account;
-    }
-
-    @Override
-    public SolverType getSolverType() {
-        return SolverType.EXTERNAL;
     }
 
     @Override

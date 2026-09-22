@@ -1,5 +1,6 @@
 package org.jdownloader.captcha.v2.solver.service;
 
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,8 +27,8 @@ public class DialogSolverService extends AbstractSolverService {
     }
 
     @Override
-    public String getType() {
-        return _GUI.T.DialogBasicCaptchaSolver_getName();
+    public SolverType getType() {
+        return SolverType.JD_LOCAL_DIALOG;
     }
 
     @Override
@@ -52,11 +53,6 @@ public class DialogSolverService extends AbstractSolverService {
         types.add(CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA);
         types.add(CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
         return types;
-    }
-
-    @Override
-    public boolean hasConfigPanel() {
-        return true;
     }
 
     @Override

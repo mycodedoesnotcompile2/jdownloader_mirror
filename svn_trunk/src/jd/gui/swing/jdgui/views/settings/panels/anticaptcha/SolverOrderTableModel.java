@@ -30,6 +30,7 @@ import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.swing.exttable.columns.ExtCheckColumn;
 import org.appwork.swing.exttable.columns.ExtComponentColumn;
 import org.appwork.swing.exttable.columns.ExtCurrencyColumn;
+import org.appwork.swing.exttable.columns.ExtLongColumn;
 import org.appwork.swing.exttable.columns.ExtTextColumn;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.os.CrossSystem;
@@ -40,16 +41,19 @@ import org.jdownloader.api.myjdownloader.MyJDownloaderConnectionStatus;
 import org.jdownloader.api.myjdownloader.MyJDownloaderController;
 import org.jdownloader.api.myjdownloader.event.MyJDownloaderListener;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
+import org.jdownloader.captcha.v2.JobRunnable;
 import org.jdownloader.captcha.v2.SolverService;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
+import org.jdownloader.settings.staticreferences.CFG_MYJD;
 
 import jd.controlling.AccountController;
 import jd.controlling.AccountControllerEvent;
 import jd.controlling.AccountControllerListener;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 public class SolverOrderTableModel extends ExtTableModel<SolverService> {
     public SolverOrderTableModel() {
@@ -86,6 +90,30 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
             public void onConfigValidatorError(final KeyHandler<Boolean> keyHandler, final Boolean invalidValue, final ValidationException validateException) {
             }
         });
+        addMyJDownloaderListeners();
+    }
+
+    /**
+     * The MyJDownloader solver's Status column depends on whether a MyJD login is configured (email/password) and on the latest MyJD
+     * error, so changes of those settings must redraw the rows, too. Connection status changes are already covered by the
+     * MyJDownloaderListener above.
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    private void addMyJDownloaderListeners() {
+        final GenericConfigEventListener<Object> listener = new GenericConfigEventListener<Object>() {
+            @Override
+            public void onConfigValueModified(final KeyHandler<Object> keyHandler, final Object newValue) {
+                refreshRows();
+            }
+
+            @Override
+            public void onConfigValidatorError(final KeyHandler<Object> keyHandler, final Object invalidValue, final ValidationException validateException) {
+            }
+        };
+        final KeyHandler[] keyHandlers = new KeyHandler[] { CFG_MYJD.EMAIL, CFG_MYJD.PASSWORD, CFG_MYJD.LATEST_ERROR };
+        for (final KeyHandler keyHandler : keyHandlers) {
+            keyHandler.getEventSender().addListener(listener);
+        }
     }
 
     /** Redraws all rows on the EDT without changing their order. */
@@ -162,7 +190,7 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
 
             @Override
             protected boolean getBooleanValue(SolverService value) {
-                return value.isEnabled();
+                return value.getConfigV3().isEnabled();
             }
 
             @Override
@@ -172,7 +200,7 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
 
             @Override
             protected void setBooleanValue(boolean value, final SolverService object) {
-                object.setEnabled(!object.isEnabled());
+                object.getConfigV3().setEnabled(!object.getConfigV3().isEnabled());
             }
         });
         addColumn(new ExtTextColumn<SolverService>(_GUI.T.SolverOrderTableModel_initColumns_service()) {
@@ -188,18 +216,30 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
 
             @Override
             public boolean isEnabled(SolverService obj) {
-                return obj.isEnabled();
+                return obj.getConfigV3().isEnabled();
             }
 
             @Override
             public String getStringValue(SolverService value) {
                 return value.getName();
             }
+
+            /* Same tooltip as in the solver comparison table. */
+            @Override
+            protected String getTooltipText(final SolverService value) {
+                return SolverComparisonTableModel.getSolverTooltip(value);
+            }
+
+            /* Double click opens the page where an account for this solver can be bought. */
+            @Override
+            public boolean onDoubleClick(final MouseEvent e, final SolverService value) {
+                return SolverComparisonTableModel.openBuyPage(value);
+            }
         });
         addColumn(new ExtTextColumn<SolverService>(_GUI.T.SolverOrderTableModel_initColumns_type_()) {
             @Override
             public boolean isEnabled(SolverService obj) {
-                return obj.isEnabled();
+                return obj.getConfigV3().isEnabled();
             }
 
             @Override
@@ -209,7 +249,7 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
 
             @Override
             public String getStringValue(SolverService value) {
-                return value.getType();
+                return value.getType().getLabel();
             }
 
             @Override
@@ -336,7 +376,7 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
         addColumn(new ExtTextColumn<SolverService>("Description") {
             @Override
             public boolean isEnabled(SolverService obj) {
-                return obj.isEnabled();
+                return obj.getConfigV3().isEnabled();
             }
 
             @Override
@@ -381,6 +421,28 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
                 return false;
             }
         });
+        /* Number of captcha types each solver supports (hidden by default, sortable). */
+        this.addColumn(new ExtLongColumn<SolverService>(_GUI.T.SolverOrderTableModel_column_supportedCaptchaTypes(), this) {
+            @Override
+            protected long getLong(final SolverService value) {
+                final List<CAPTCHA_TYPE> supportedTypes = value.getSupportedCaptchaTypes();
+                if (supportedTypes == null) {
+                    /* A solver without a list of supported captcha types is a bug (see SolverService#getSupportedCaptchaTypes). */
+                    return 0;
+                }
+                return supportedTypes.size();
+            }
+
+            @Override
+            public boolean isEnabled(final SolverService obj) {
+                return obj.getConfigV3().isEnabled();
+            }
+
+            @Override
+            public boolean isDefaultVisible() {
+                return false;
+            }
+        });
         this.addColumn(new ExtComponentColumn<SolverService>(_GUI.T.SolverOrderTableModel_initColumns_timeout()) {
             private JButton            editorBtn;
             private JButton            rendererBtn;
@@ -414,8 +476,8 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
                 this.setRowSorter(new ExtDefaultRowSorter<SolverService>() {
                     @Override
                     public int compare(final SolverService o1, final SolverService o2) {
-                        final int c1 = o1.getWaitForMapCopy().size();
-                        final int c2 = o2.getWaitForMapCopy().size();
+                        final int c1 = JobRunnable.getWaitForOverrideCount(o1);
+                        final int c2 = JobRunnable.getWaitForOverrideCount(o2);
                         if (this.getSortOrderIdentifier() == ExtColumn.SORT_ASC) {
                             return c1 - c2;
                         } else {

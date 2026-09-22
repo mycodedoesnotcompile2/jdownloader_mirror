@@ -33,14 +33,10 @@ import org.jdownloader.logging.LogController;
  * modification, keeps a precompiled view for cheap matching and notifies listeners via a {@link ChangeEventSender}.
  */
 public class CaptchaChallengeFilterController {
-    private static final CaptchaChallengeFilterController INSTANCE = new CaptchaChallengeFilterController(false);
+    private static final CaptchaChallengeFilterController INSTANCE = new CaptchaChallengeFilterController();
 
     public static CaptchaChallengeFilterController getInstance() {
         return INSTANCE;
-    }
-
-    public static CaptchaChallengeFilterController createEmptyTestInstance() {
-        return new CaptchaChallengeFilterController(true);
     }
 
     private volatile ArrayList<CaptchaChallengeFilter>       filters;
@@ -48,47 +44,39 @@ public class CaptchaChallengeFilterController {
     private final CaptchaChallengeFilterSettings             config;
     private final KeyHandler<Object>                         filterListHandler;
     private final ChangeEventSender                          eventSender;
-    private final boolean                                    testInstance;
 
-    private CaptchaChallengeFilterController(final boolean testInstance) {
+    private CaptchaChallengeFilterController() {
         this.eventSender = new ChangeEventSender();
-        this.testInstance = testInstance;
-        if (!testInstance) {
-            config = JsonConfig.create(CaptchaChallengeFilterSettings.class);
-            filterListHandler = config._getStorageHandler().getKeyHandler("FilterList");
-            filters = readConfig();
-            filterListHandler.getEventSender().addListener(new GenericConfigEventListener<Object>() {
-                @Override
-                public void onConfigValueModified(final KeyHandler<Object> keyHandler, final Object newValue) {
-                    filters = readConfig();
-                    update();
-                }
+        config = JsonConfig.create(CaptchaChallengeFilterSettings.class);
+        filterListHandler = config._getStorageHandler().getKeyHandler("FilterList");
+        filters = readConfig();
+        filterListHandler.getEventSender().addListener(new GenericConfigEventListener<Object>() {
+            @Override
+            public void onConfigValueModified(final KeyHandler<Object> keyHandler, final Object newValue) {
+                filters = readConfig();
+                update();
+            }
 
-                @Override
-                public void onConfigValidatorError(final KeyHandler<Object> keyHandler, final Object invalidValue, final ValidationException validateException) {
-                }
-            });
-            ShutdownController.getInstance().addShutdownEvent(new ShutdownEvent() {
-                @Override
-                public void onShutdown(final ShutdownRequest shutdownRequest) {
-                    save(filters);
-                }
+            @Override
+            public void onConfigValidatorError(final KeyHandler<Object> keyHandler, final Object invalidValue, final ValidationException validateException) {
+            }
+        });
+        ShutdownController.getInstance().addShutdownEvent(new ShutdownEvent() {
+            @Override
+            public void onShutdown(final ShutdownRequest shutdownRequest) {
+                save(filters);
+            }
 
-                @Override
-                public long getMaxDuration() {
-                    return 0;
-                }
+            @Override
+            public long getMaxDuration() {
+                return 0;
+            }
 
-                @Override
-                public String toString() {
-                    return "save captcha challenge filters...";
-                }
-            });
-        } else {
-            config = null;
-            filterListHandler = null;
-            filters = new ArrayList<CaptchaChallengeFilter>();
-        }
+            @Override
+            public String toString() {
+                return "save captcha challenge filters...";
+            }
+        });
         updateInternal();
     }
 
@@ -96,14 +84,7 @@ public class CaptchaChallengeFilterController {
         return eventSender;
     }
 
-    public boolean isTestInstance() {
-        return testInstance;
-    }
-
     private ArrayList<CaptchaChallengeFilter> readConfig() {
-        if (config == null) {
-            return new ArrayList<CaptchaChallengeFilter>();
-        }
         final ArrayList<CaptchaChallengeFilter> stored = config.getFilterList();
         if (stored == null) {
             return new ArrayList<CaptchaChallengeFilter>();
@@ -298,43 +279,27 @@ public class CaptchaChallengeFilterController {
     }
 
     private void save(final ArrayList<CaptchaChallengeFilter> toSave) {
-        if (config == null) {
-            return;
-        }
-        final EventSuppressor<ConfigEvent> eventSuppressor;
-        if (filterListHandler != null) {
-            final Thread thread = Thread.currentThread();
-            eventSuppressor = new EventSuppressor<ConfigEvent>() {
-                @Override
-                public boolean suppressEvent(final ConfigEvent eventType) {
-                    return Thread.currentThread() == thread;
-                }
-            };
-            filterListHandler.getEventSender().addEventSuppressor(eventSuppressor);
-        } else {
-            eventSuppressor = null;
-        }
+        final Thread thread = Thread.currentThread();
+        final EventSuppressor<ConfigEvent> eventSuppressor = new EventSuppressor<ConfigEvent>() {
+            @Override
+            public boolean suppressEvent(final ConfigEvent eventType) {
+                return Thread.currentThread() == thread;
+            }
+        };
+        filterListHandler.getEventSender().addEventSuppressor(eventSuppressor);
         try {
             config.setFilterList(toSave);
         } finally {
-            if (filterListHandler != null) {
-                filterListHandler.getEventSender().removeEventSuppressor(eventSuppressor);
-            }
+            filterListHandler.getEventSender().removeEventSuppressor(eventSuppressor);
         }
     }
 
     /** Returns the global master toggle for the filter list. */
     public boolean isFilterListEnabled() {
-        if (config == null) {
-            return true;
-        }
         return config.isFilterListEnabled();
     }
 
     public void setFilterListEnabled(final boolean enabled) {
-        if (config == null) {
-            return;
-        }
         config.setFilterListEnabled(enabled);
     }
 

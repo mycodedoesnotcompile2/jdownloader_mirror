@@ -39,14 +39,14 @@ public class CaptchaServiceAction extends AbstractScheduleAction<CaptchaServiceA
         /* Toggle: if all configured solvers are currently enabled, disable them all; otherwise enable them all. */
         boolean allEnabled = true;
         for (final SolverService service : services) {
-            if (!service.isEnabled()) {
+            if (!service.getConfigV3().isEnabled()) {
                 allEnabled = false;
                 break;
             }
         }
         final boolean newState = !allEnabled;
         for (final SolverService service : services) {
-            service.setEnabled(newState);
+            service.getConfigV3().setEnabled(newState);
         }
     }
 

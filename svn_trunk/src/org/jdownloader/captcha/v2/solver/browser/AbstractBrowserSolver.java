@@ -58,11 +58,6 @@ public abstract class AbstractBrowserSolver extends ChallengeSolver<String> {
         return types;
     }
 
-    @Override
-    public SolverType getSolverType() {
-        return SolverType.JD_LOCAL_BROWSER;
-    }
-
     public static boolean isSpecialReCaptchaEnterpriseChallenge(final Challenge<?> c) {
         if (c instanceof RecaptchaV2Challenge && ((RecaptchaV2Challenge) c).isEnterprise() && "filer.net".equals(c.getHost())) {
             // TODO: current version of the browser extension doesn't support special version of Recaptcha Enterprise used by filer.net

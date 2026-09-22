@@ -1,5 +1,8 @@
 package org.jdownloader.captcha.v2.challenge.oauth;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeSolver;
@@ -8,6 +11,7 @@ import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 
 import jd.controlling.captcha.SkipException;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 public class AccountOAuthSolver extends ChallengeSolver<Boolean> {
     private static final AccountOAuthSolver INSTANCE = new AccountOAuthSolver();
@@ -32,9 +36,9 @@ public class AccountOAuthSolver extends ChallengeSolver<Boolean> {
     }
 
     @Override
-    public SolverType getSolverType() {
-        /* Backed by JACSolver's service; solves silently using stored account credentials, no user interaction or external API call. */
-        return SolverType.JD_LOCAL;
+    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        /* OAuth challenges are no captchas and have no CAPTCHA_TYPE, so this solver legitimately supports no captcha type. */
+        return new ArrayList<CAPTCHA_TYPE>();
     }
 
     private AccountOAuthSolver() {

@@ -95,9 +95,11 @@ import org.jdownloader.captcha.blacklist.BlockDownloadCaptchasByHost;
 import org.jdownloader.captcha.blacklist.BlockDownloadCaptchasByLink;
 import org.jdownloader.captcha.blacklist.BlockDownloadCaptchasByPackage;
 import org.jdownloader.captcha.blacklist.CaptchaBlackList;
+import org.jdownloader.captcha.v2.CaptchaSolverCaptchaTypesSettingsPanelBuilder;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.Challenge.CaptchaRequestType;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
+import org.jdownloader.captcha.v2.CaptchaSolverCaptchaTypesSettingsPanelBuilder.AccountCaptchaTypeAccessor;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
@@ -190,7 +192,6 @@ import jd.http.URLConnectionAdapter;
 import jd.nutils.Formatter;
 import jd.nutils.JDHash;
 import jd.plugins.Account.AccountError;
-import jd.plugins.CaptchaSolverAccountSettingsPanelBuilder.AccountCaptchaTypeAccessor;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.download.DownloadInterface;
@@ -3195,7 +3196,7 @@ public abstract class PluginForHost extends Plugin {
          */
         final boolean allowDisplaySolverTypesTableAsAccountSetting = false;
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && allowDisplaySolverTypesTableAsAccountSetting) {
-            new CaptchaSolverAccountSettingsPanelBuilder(new AccountCaptchaTypeAccessor(acc)).build(panel);
+            new CaptchaSolverCaptchaTypesSettingsPanelBuilder(new AccountCaptchaTypeAccessor(acc)).build(panel);
         }
     }
 

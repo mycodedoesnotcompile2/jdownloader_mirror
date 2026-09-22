@@ -1,5 +1,6 @@
 package org.jdownloader.plugins.components.captchasolver;
 
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
 import java.util.Currency;
 import java.util.List;
 
@@ -43,8 +44,8 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
     }
 
     @Override
-    public String getType() {
-        return _GUI.T.CaptchaSolverService_type();
+    public SolverType getType() {
+        return SolverType.EXTERNAL;
     }
 
     @Override
@@ -235,15 +236,15 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
         return DomainInfo.getInstance(plugin.getHost());
     }
 
-    @Override
-    public boolean hasConfigPanel() {
-        return false;
-    }
-
     /** Returns the underlying plugin's own captcha solver config (per-plugin storage). */
     @Override
     public CaptchaSolverConfigV3 getConfigV3() {
         return PluginJsonConfig.get(plugin.getLazyP(), plugin.getConfigInterface());
+    }
+
+    @Override
+    public String getBuyURL() {
+        return plugin.getBuyPremiumUrl();
     }
 
     @Override

@@ -41,6 +41,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.appwork.utils.DebugMode;
+
 /**
  * @author thomas
  *
@@ -72,7 +74,12 @@ public class Getter implements GetterOrSetter {
         this.field = field;
         this.method = m;
         this.alternativeKeys = alternativeKeys == null ? NULL_LIST : Collections.unmodifiableList(alternativeKeys);
-        m.setAccessible(true);
+        try {
+            m.setAccessible(true);
+        } catch (RuntimeException e) {
+            DebugMode.debugger();
+            throw e;
+        }
         type = m.getGenericReturnType();
     }
 

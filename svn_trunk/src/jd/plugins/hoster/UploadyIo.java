@@ -38,7 +38,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
-@HostPlugin(revision = "$Revision: 53461 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53464 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadyIo extends XFileSharingProBasic {
     public UploadyIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -196,8 +196,8 @@ public class UploadyIo extends XFileSharingProBasic {
 
     protected void waitBeforeInteractiveCaptcha(final DownloadLink link, final long waitMillis, final int captchaTimeoutMillis) throws PluginException {
         if (waitMillis > captchaTimeoutMillis) {
-            final int prePrePreDownloadWait = (int) (waitMillis - captchaTimeoutMillis);
             logger.info("Waittime is higher than interactive captcha timeout --> Waiting a part of it before solving captcha to avoid captcha-token-timeout");
+            final int prePrePreDownloadWait = (int) (waitMillis - captchaTimeoutMillis);
             logger.info("Pre-pre download waittime seconds: " + (prePrePreDownloadWait / 1000));
             this.sleep(prePrePreDownloadWait, link);
         }

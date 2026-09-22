@@ -20,6 +20,8 @@ import java.io.File;
 import java.io.FileFilter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Locale;
+import java.util.concurrent.ConcurrentHashMap;
 
 import jd.nutils.io.JDIO;
 import jd.utils.JDUtilities;
@@ -125,10 +127,29 @@ public class JACMethod implements Comparable<JACMethod> {
         return methods;
     }
 
-    public static boolean hasMethod(String service) {
+    /**
+     * Cache for {@link #hasMethod(String)}: lowercase service name -> result. Without it every call would read the jacinfo.xml from disk
+     * again (and log). The method list itself ({@link #getMethods()}) is cached until the next restart as well, so this cache has the same
+     * lifetime.
+     */
+    private static final ConcurrentHashMap<String, Boolean> HAS_METHOD_CACHE = new ConcurrentHashMap<String, Boolean>();
+
+    public static boolean hasMethod(final String service) {
         if (service == null) {
             return false;
         }
+        final String cacheKey = service.toLowerCase(Locale.ENGLISH);
+        final Boolean cached = HAS_METHOD_CACHE.get(cacheKey);
+        if (cached != null) {
+            return cached.booleanValue();
+        }
+        final boolean hasMethod = checkHasMethod(service);
+        HAS_METHOD_CACHE.put(cacheKey, Boolean.valueOf(hasMethod));
+        return hasMethod;
+    }
+
+    /** Uncached check (disk access): does a usable JAC method exist for the given service? */
+    private static boolean checkHasMethod(final String service) {
         JACMethod methodName = forServiceName(service);
         if (methodName == null) {
             return false;

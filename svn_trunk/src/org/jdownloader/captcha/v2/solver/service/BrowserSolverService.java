@@ -1,5 +1,6 @@
 package org.jdownloader.captcha.v2.solver.service;
 
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -37,8 +38,8 @@ public class BrowserSolverService extends AbstractSolverService {
     }
 
     @Override
-    public String getType() {
-        return _GUI.T.BrowserSolverService_getName();
+    public SolverType getType() {
+        return SolverType.JD_LOCAL_BROWSER;
     }
 
     @Override
@@ -79,11 +80,6 @@ public class BrowserSolverService extends AbstractSolverService {
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
         return types;
-    }
-
-    @Override
-    public boolean hasConfigPanel() {
-        return true;
     }
 
     /** Typed config accessor used by the browser solver subsystem. */

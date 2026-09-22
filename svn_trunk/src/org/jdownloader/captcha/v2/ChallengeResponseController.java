@@ -483,7 +483,7 @@ public class ChallengeResponseController {
                         continue;
                     }
                     final SolverService service = solver.getService();
-                    if (!service.isEnabled()) {
+                    if (!service.getConfigV3().isEnabled()) {
                         // TODO: Move this into getChallengeVetoReason
                         vetoReasons.add(ChallengeVetoReason.SOLVER_DISABLED);
                         continue;
@@ -571,8 +571,8 @@ public class ChallengeResponseController {
         final HashSet<Object> dupe = new HashSet<Object>();
         for (final ChallengeSolver<?> s : solverList) {
             if (dupe.add(s.getService())) {
-                /* Wait-for persistence is currently disabled; reset is a no-op for now. */
-                s.getService().setWaitFor(null, null);
+                /* Removes the user's wait times, so the defaults apply again. */
+                JobRunnable.resetWaitFor(s.getService());
             }
         }
     }

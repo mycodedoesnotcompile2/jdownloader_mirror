@@ -7,11 +7,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-import jd.plugins.DownloadLink;
-
 import org.appwork.remoteapi.RemoteAPIRequest;
 import org.appwork.remoteapi.RemoteAPIResponse;
 import org.appwork.remoteapi.exceptions.InternalApiException;
@@ -35,6 +30,11 @@ import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.myjdownloader.client.json.SessionInfoResponse;
 
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.DownloadLink;
+
 public class CaptchaAPISolver extends ChallengeSolver<Object> implements CaptchaAPI, ChallengeResponseListener {
     private static final CaptchaAPISolver INSTANCE = new CaptchaAPISolver();
 
@@ -46,9 +46,7 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
         return 120000;
     }
 
-    private final CaptchaAPIEventPublisher                 eventPublisher;
-    /* TODO: Why does this exist but is not used? */
-    private final CaptchaMyJDownloaderRemoteSolverSettings config;
+    private final CaptchaAPIEventPublisher eventPublisher;
 
     @Override
     public ChallengeVetoReason getChallengeVetoReason(final Challenge<?> c) {
@@ -72,11 +70,6 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
         types.add(CAPTCHA_TYPE.HCAPTCHA);
         return types;
-    }
-
-    @Override
-    public SolverType getSolverType() {
-        return SolverType.JD_REMOTE_API;
     }
 
     private final RemoteAPIConfig remoteAPIConfig = JsonConfig.create(RemoteAPIConfig.class);
@@ -111,7 +104,6 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
     public CaptchaAPISolver() {
         // 0: no threadpool
         super(new CaptchaAPIManualRemoteSolverService(), 0);
-        config = JsonConfig.create(CaptchaMyJDownloaderRemoteSolverSettings.class);
         eventPublisher = new CaptchaAPIEventPublisher();
         ChallengeResponseController.getInstance().getEventSender().addListener(this, true);
     }

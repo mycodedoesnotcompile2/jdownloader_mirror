@@ -3,22 +3,30 @@ package org.jdownloader.captcha.v2;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import org.appwork.storage.config.JsonConfig;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.appwork.utils.swing.dialog.Dialog;
+import org.appwork.utils.swing.dialog.DialogNoAnswerException;
 import org.jdownloader.api.captcha.CaptchaAPIManualRemoteSolverService;
 import org.jdownloader.api.captcha.CaptchaMyJDownloaderRemoteSolverSettings;
+import org.jdownloader.api.captcha.CaptchaMyJDownloaderRemoteSolverSettingsV3;
 import org.jdownloader.captcha.v2.solver.antiCaptchaCom.AntiCaptchaComConfigInterface;
 import org.jdownloader.captcha.v2.solver.browser.BrowserCaptchaSolverConfig;
 import org.jdownloader.captcha.v2.solver.browser.BrowserCaptchaSolverConfigV3;
-import org.jdownloader.captcha.v2.solver.service.BrowserSolverService;
-import org.jdownloader.captcha.v2.solver.service.DialogSolverService;
 import org.jdownloader.captcha.v2.solver.cheapcaptcha.CheapCaptchaConfigInterface;
 import org.jdownloader.captcha.v2.solver.dbc.DeathByCaptchaSettings;
 import org.jdownloader.captcha.v2.solver.endcaptcha.EndCaptchaConfigInterface;
 import org.jdownloader.captcha.v2.solver.gui.DialogCaptchaSolverConfig;
+import org.jdownloader.captcha.v2.solver.gui.DialogCaptchaSolverConfigV3;
 import org.jdownloader.captcha.v2.solver.imagetyperz.ImageTyperzConfigInterface;
+import org.jdownloader.captcha.v2.solver.service.BrowserSolverService;
+import org.jdownloader.captcha.v2.solver.service.DialogSolverService;
 import org.jdownloader.captcha.v2.solver.solver9kw.Captcha9kwSettings;
 import org.jdownloader.captcha.v2.solver.twocaptcha.TwoCaptchaConfigInterface;
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigAntiCaptchaCom;
@@ -104,13 +112,16 @@ public class CaptchaSolverSettingsMigration {
         migrate_BrowserCaptchaSolverConfig();
         migrate_CaptchaMyJDownloaderRemoteSolverSettings();
         migrate_DialogCaptchaSolverConfig();
-        // TODO: Save a property somewhere aka "migration_conmpleted_timestamp" so we can early abort this next time
     }
 
     public void migrate_anti_captcha_com() {
         final String host = "anti-captcha.com";
         final AntiCaptchaComConfigInterface cfgOld = JsonConfig.create(AntiCaptchaComConfigInterface.class);
         final CaptchaSolverPluginConfigAntiCaptchaCom cfgNew = JsonConfig.create(CaptchaSolverPluginConfigAntiCaptchaCom.class);
+        if (isMigrated(cfgNew)) {
+            /* Already migrated successfully before -> nothing to do. */
+            return;
+        }
         /* Migrate account */
         String apikey = cfgOld.getApiKey();
         if (apikey != null) {
@@ -149,6 +160,7 @@ public class CaptchaSolverSettingsMigration {
                 cfgNew.setEnableCaptchaFeedback(false);
             }
         }
+        markMigrated(cfgNew);
         System.out.println(host + " migration successful");
     }
 
@@ -156,6 +168,10 @@ public class CaptchaSolverSettingsMigration {
         final String host = "cheapcaptcha.com";
         final CheapCaptchaConfigInterface cfgOld = JsonConfig.create(CheapCaptchaConfigInterface.class);
         final CaptchaSolverPluginConfigCheapcaptchaCom cfgNew = JsonConfig.create(CaptchaSolverPluginConfigCheapcaptchaCom.class);
+        if (isMigrated(cfgNew)) {
+            /* Already migrated successfully before -> nothing to do. */
+            return;
+        }
         /* Migrate account */
         String username = cfgOld.getUserName();
         if (username != null) {
@@ -198,6 +214,7 @@ public class CaptchaSolverSettingsMigration {
                 cfgNew.setEnableCaptchaFeedback(false);
             }
         }
+        markMigrated(cfgNew);
         System.out.println(host + " migration successful");
     }
 
@@ -205,6 +222,10 @@ public class CaptchaSolverSettingsMigration {
         final String host = "deathbycaptcha.com";
         final DeathByCaptchaSettings cfgOld = JsonConfig.create(DeathByCaptchaSettings.class);
         final CaptchaSolverPluginConfigDeathbycaptcha cfgNew = JsonConfig.create(CaptchaSolverPluginConfigDeathbycaptcha.class);
+        if (isMigrated(cfgNew)) {
+            /* Already migrated successfully before -> nothing to do. */
+            return;
+        }
         /* Migrate account */
         String username = cfgOld.getUserName();
         if (username != null) {
@@ -258,6 +279,7 @@ public class CaptchaSolverSettingsMigration {
                 cfgNew.setEnableCaptchaFeedback(false);
             }
         }
+        markMigrated(cfgNew);
         System.out.println(host + " migration successful");
     }
 
@@ -265,6 +287,10 @@ public class CaptchaSolverSettingsMigration {
         final String host = "endcaptcha.com";
         final EndCaptchaConfigInterface cfgOld = JsonConfig.create(EndCaptchaConfigInterface.class);
         final CaptchaSolverPluginConfigEndcaptcha cfgNew = JsonConfig.create(CaptchaSolverPluginConfigEndcaptcha.class);
+        if (isMigrated(cfgNew)) {
+            /* Already migrated successfully before -> nothing to do. */
+            return;
+        }
         /* Migrate account */
         String username = cfgOld.getUserName();
         if (username != null) {
@@ -307,6 +333,7 @@ public class CaptchaSolverSettingsMigration {
                 cfgNew.setEnableCaptchaFeedback(false);
             }
         }
+        markMigrated(cfgNew);
         System.out.println(host + " migration successful");
     }
 
@@ -314,6 +341,10 @@ public class CaptchaSolverSettingsMigration {
         final String host = "imagetyperz.com";
         final ImageTyperzConfigInterface cfgOld = JsonConfig.create(ImageTyperzConfigInterface.class);
         final CaptchaSolverPluginConfigImagetyperz cfgNew = JsonConfig.create(CaptchaSolverPluginConfigImagetyperz.class);
+        if (isMigrated(cfgNew)) {
+            /* Already migrated successfully before -> nothing to do. */
+            return;
+        }
         /* Migrate account */
         String username = cfgOld.getUserName();
         if (username != null) {
@@ -356,6 +387,7 @@ public class CaptchaSolverSettingsMigration {
                 cfgNew.setEnableCaptchaFeedback(false);
             }
         }
+        markMigrated(cfgNew);
         System.out.println(host + " migration successful");
     }
 
@@ -363,6 +395,10 @@ public class CaptchaSolverSettingsMigration {
         final String host = "2captcha.com";
         final TwoCaptchaConfigInterface cfgOld = JsonConfig.create(TwoCaptchaConfigInterface.class);
         final CaptchaSolverPluginConfigTwoCaptcha cfgNew = JsonConfig.create(CaptchaSolverPluginConfigTwoCaptcha.class);
+        if (isMigrated(cfgNew)) {
+            /* Already migrated successfully before -> nothing to do. */
+            return;
+        }
         /* Migrate account */
         String apikey = cfgOld.getApiKey();
         if (apikey != null) {
@@ -401,6 +437,7 @@ public class CaptchaSolverSettingsMigration {
                 cfgNew.setEnableCaptchaFeedback(false);
             }
         }
+        markMigrated(cfgNew);
         System.out.println(host + " migration successful");
     }
 
@@ -408,6 +445,10 @@ public class CaptchaSolverSettingsMigration {
         final String host = "9kw.eu";
         final Captcha9kwSettings cfgOld = JsonConfig.create(Captcha9kwSettings.class);
         final CaptchaSolverPluginConfigNinekw cfgNew = JsonConfig.create(CaptchaSolverPluginConfigNinekw.class);
+        if (isMigrated(cfgNew)) {
+            /* Already migrated successfully before -> nothing to do. */
+            return;
+        }
         /* Migrate account */
         String apikey = cfgOld.getApiKey();
         if (apikey != null) {
@@ -472,6 +513,7 @@ public class CaptchaSolverSettingsMigration {
                 cfgNew.setEnableCaptchaFeedback(false);
             }
         }
+        markMigrated(cfgNew);
         System.out.println(host + " migration successful");
     }
 
@@ -479,6 +521,10 @@ public class CaptchaSolverSettingsMigration {
         final String name = BrowserSolverService.ID;
         final BrowserCaptchaSolverConfig cfgOld = JsonConfig.create(BrowserCaptchaSolverConfig.class);
         final BrowserCaptchaSolverConfigV3 cfgNew = JsonConfig.create(BrowserCaptchaSolverConfigV3.class);
+        if (isMigrated(cfgNew)) {
+            /* Already migrated successfully before -> nothing to do. */
+            return;
+        }
         /* Migrate settings, migrate all that are different from the defaults */
         if (!cfgOld.isAutoClickEnabled()) {
             cfgNew.setAutoClickEnabled(false);
@@ -506,12 +552,18 @@ public class CaptchaSolverSettingsMigration {
         if (filters != null) {
             CaptchaChallengeFilterController.getInstance().addAll(filters);
         }
+        markMigrated(cfgNew);
         System.out.println(name + " migration successful");
     }
 
     public void migrate_CaptchaMyJDownloaderRemoteSolverSettings() {
         final String name = CaptchaAPIManualRemoteSolverService.ID;
         final CaptchaMyJDownloaderRemoteSolverSettings cfgOld = JsonConfig.create(CaptchaMyJDownloaderRemoteSolverSettings.class);
+        final CaptchaMyJDownloaderRemoteSolverSettingsV3 cfgNew = JsonConfig.create(CaptchaMyJDownloaderRemoteSolverSettingsV3.class);
+        if (isMigrated(cfgNew)) {
+            /* Already migrated successfully before -> nothing to do. */
+            return;
+        }
         /* Migrate black-/whitelist settings */
         final List<String> blacklist = cfgOld.getBlacklistEntries();
         final List<String> whitelist = cfgOld.getWhitelistEntries();
@@ -520,12 +572,18 @@ public class CaptchaSolverSettingsMigration {
         if (filters != null) {
             CaptchaChallengeFilterController.getInstance().addAll(filters);
         }
+        markMigrated(cfgNew);
         System.out.println(name + " migration successful");
     }
 
     public void migrate_DialogCaptchaSolverConfig() {
         final String name = DialogSolverService.ID;
         final DialogCaptchaSolverConfig cfgOld = JsonConfig.create(DialogCaptchaSolverConfig.class);
+        final DialogCaptchaSolverConfigV3 cfgNew = JsonConfig.create(DialogCaptchaSolverConfigV3.class);
+        if (isMigrated(cfgNew)) {
+            /* Already migrated successfully before -> nothing to do. */
+            return;
+        }
         /* Migrate black-/whitelist settings */
         final List<String> blacklist = cfgOld.getBlacklistEntries();
         final List<String> whitelist = cfgOld.getWhitelistEntries();
@@ -534,7 +592,54 @@ public class CaptchaSolverSettingsMigration {
         if (filters != null) {
             CaptchaChallengeFilterController.getInstance().addAll(filters);
         }
+        markMigrated(cfgNew);
         System.out.println(name + " migration successful");
+    }
+
+    /**
+     * Informs the user that the captcha solver settings were migrated and where to find them. Shown in a separate thread so the caller is
+     * not blocked. Not called anywhere yet.
+     */
+    public Thread showMigrationSuccessDialog() {
+        final Thread thread = new Thread() {
+            public void run() {
+                try {
+                    /* Texts are intentionally not part of the translation files: this class is temporary and will be removed. */
+                    final String title = "Captcha solver migration completed";
+                    String message = "<html>";
+                    message += "Your captcha solver accounts were successfully migrated!<br><br>";
+                    message += "You can find your captcha solver accounts under <b>Settings -> Account Manager</b><br>";
+                    message += "You can find your captcha black-/whitelists under <b>Settings -> Captchas -> Tab 'Captcha Rules'</b>";
+                    message += "</html>";
+                    final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN | UIOManager.BUTTONS_HIDE_CANCEL | Dialog.STYLE_HTML, title, message);
+                    dialog.setTimeout((int) TimeUnit.MINUTES.toMillis(3));
+                    try {
+                        UIOManager.I().show(ConfirmDialogInterface.class, dialog).throwCloseExceptions();
+                    } catch (final DialogNoAnswerException ignore) {
+                    }
+                } catch (final Throwable e) {
+                    /* Purely informational dialog, ignore errors. */
+                }
+            };
+        };
+        thread.setDaemon(true);
+        thread.start();
+        return thread;
+    }
+
+    /**
+     * Returns true if the settings of this solver were already migrated successfully (see {@link #markMigrated(CaptchaSolverConfigV3)}).
+     */
+    private boolean isMigrated(final CaptchaSolverConfigV3 cfg) {
+        return cfg.getMigrateTimestamp() > 0;
+    }
+
+    /**
+     * Marks the config of a solver as successfully migrated by saving the current time. Only called at the end of a migration, so an
+     * aborted migration (exception) leaves the timestamp at its default -1. Solvers which need no migration never get this flag.
+     */
+    private void markMigrated(final CaptchaSolverConfigV3 cfg) {
+        cfg.setMigrateTimestamp(System.currentTimeMillis());
     }
 
     /**

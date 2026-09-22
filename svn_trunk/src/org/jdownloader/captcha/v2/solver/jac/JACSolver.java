@@ -27,15 +27,11 @@ import jd.captcha.JAntiCaptcha;
 import jd.captcha.LetterComperator;
 import jd.captcha.pixelgrid.Captcha;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-import jd.plugins.Plugin;
-import jd.plugins.PluginForDecrypt;
-import jd.plugins.PluginForHost;
 
 public class JACSolver extends ChallengeSolver<String> {
-    private static final double              _0_85             = 0.85;
+    private static final double              THRESHOLD_DEFAULT = 0.85;
     private final JacSolverConfigV3          config;
     private static final JACSolver           INSTANCE          = new JACSolver();
-    private final HashMap<String, Integer>   jacMethodTrustMap = new HashMap<String, Integer>();
     private final HashMap<String, AutoTrust> threshold;
     private final LogSource                  logger;
 
@@ -79,59 +75,56 @@ public class JACSolver extends ChallengeSolver<String> {
         return 30000;
     }
 
-    @Override
-    public SolverType getSolverType() {
-        return SolverType.JD_LOCAL;
-    }
-
+    /**
+     * JAC can only solve plain image captchas (see {@link #solve(SolverJob)}: only {@link BasicCaptchaChallenge} is handled), NOT the click
+     * captcha types.
+     */
     @Override
     public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
         final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
         types.add(CAPTCHA_TYPE.IMAGE);
-        types.add(CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA);
-        types.add(CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
         return types;
+    }
+
+    /**
+     * Rejects every challenge JAC cannot solve as early as possible, so that JAC is not even added to the solver list of the job. The
+     * conditions are the ones {@link #solve(SolverJob)} used to check itself (and silently return without an answer on failure).
+     */
+    @Override
+    public ChallengeVetoReason getChallengeVetoReason(final Challenge<?> c) {
+        if (!(c instanceof BasicCaptchaChallenge)) {
+            /* Only plain text image captchas are supported. */
+            return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
+        }
+        /* JAC can only solve captchas it has a method (trained data) for. The result is cached, so no disk access on every call. */
+        if (!JACMethod.hasMethod(c.getTypeID())) {
+            return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
+        }
+        return super.getChallengeVetoReason(c);
     }
 
     @Override
     public void enqueue(SolverJob<String> job) {
-        if (isEnabled() && getChallengeVetoReason(job.getChallenge()) == null) {
+        if (getChallengeVetoReason(job.getChallenge()) == null) {
             super.enqueue(job);
         }
     }
 
     @Override
     public void solve(SolverJob<String> job) throws InterruptedException, SolverException {
-        if (!(job.getChallenge() instanceof BasicCaptchaChallenge)) {
-            throw new IllegalArgumentException("Unsupported challenge type");
-        }
+        /* Challenge is guaranteed to be a BasicCaptchaChallenge with an existing JAC method, see getChallengeVetoReason(). */
+        final BasicCaptchaChallenge captchaChallenge = (BasicCaptchaChallenge) job.getChallenge();
         try {
-            BasicCaptchaChallenge captchaChallenge = (BasicCaptchaChallenge) job.getChallenge();
-            String host = null;
-            if (captchaChallenge.getPlugin() instanceof PluginForHost) {
-                host = ((PluginForHost) captchaChallenge.getPlugin()).getHost();
-            } else if (captchaChallenge.getPlugin() instanceof PluginForDecrypt) {
-                host = ((PluginForDecrypt) captchaChallenge.getPlugin()).getHost();
-            }
-            String trustID = (host + "_" + captchaChallenge.getTypeID()).toLowerCase(Locale.ENGLISH);
-            if (StringUtils.isEmpty(captchaChallenge.getTypeID())) {
-                return;
-            }
             job.getLogger().info("JACSolver handles " + job);
-            job.getLogger().info("JAC: enabled: " + config.isEnabled() + " Has Method: " + JACMethod.hasMethod(captchaChallenge.getTypeID()));
-            if (!config.isEnabled() || !JACMethod.hasMethod(captchaChallenge.getTypeID())) {
-                return;
-            }
             job.getChallenge().sendStatsSolving(this);
             checkInterruption();
             final JAntiCaptcha jac = new JAntiCaptcha(captchaChallenge.getTypeID());
             checkInterruption();
-            Image captchaImage;
-            captchaImage = ImageProvider.read(captchaChallenge.getImageFile());
+            final Image captchaImage = ImageProvider.read(captchaChallenge.getImageFile());
             checkInterruption();
             final Captcha captcha = jac.createCaptcha(captchaImage);
             checkInterruption();
-            String captchaCode = jac.checkCaptcha(captchaChallenge.getImageFile(), captcha);
+            final String captchaCode = jac.checkCaptcha(captchaChallenge.getImageFile(), captcha);
             if (StringUtils.isEmpty(captchaCode)) {
                 return;
             }
@@ -142,8 +135,7 @@ public class JACSolver extends ChallengeSolver<String> {
                 /* internal captchaCode Response */
                 final LetterComperator[] lcs = captcha.getLetterComperators();
                 double vp = 0.0;
-                if (lcs == null) {
-                } else {
+                if (lcs != null && lcs.length > 0) {
                     for (final LetterComperator element : lcs) {
                         if (element == null) {
                             vp = 0;
@@ -154,25 +146,13 @@ public class JACSolver extends ChallengeSolver<String> {
                     vp /= lcs.length;
                 }
                 int trust = 120 - (int) vp;
-                int orgTrust = trust;
-                // StatsManager.I().
-                synchronized (jacMethodTrustMap) {
-                    Integer trustMap = jacMethodTrustMap.get(trustID);
-                    if (trustMap != null) {
-                        if (trust > trustMap) {
-                            trust = 100;
-                        }
-                    }
-                    synchronized (threshold) {
-                        final AutoTrust trustValue = threshold.get(trustID);
-                        if (trustValue != null) {
-                            if (trust > trustValue.getValue() * _0_85) {
-                                trust = 100;
-                            }
-                        }
+                final int orgTrust = trust;
+                synchronized (threshold) {
+                    final AutoTrust trustValue = threshold.get(getTrustID(captchaChallenge));
+                    if (trustValue != null && trust > trustValue.getValue() * THRESHOLD_DEFAULT) {
+                        trust = 100;
                     }
                 }
-                // we need to invert th
                 job.addAnswer(new JACCaptchaResponse(captchaChallenge, this, captchaCode, trust, orgTrust));
             }
         } catch (IOException e) {
@@ -181,15 +161,9 @@ public class JACSolver extends ChallengeSolver<String> {
         }
     }
 
-    public void setMethodTrustThreshold(PluginForHost plugin, String method, int threshold) {
-        final String trustID = (plugin.getHost() + "_" + method).toLowerCase(Locale.ENGLISH);
-        synchronized (jacMethodTrustMap) {
-            if (threshold < 0 || threshold > 100) {
-                jacMethodTrustMap.remove(trustID);
-            } else {
-                jacMethodTrustMap.put(trustID, threshold);
-            }
-        }
+    /** Returns the id under which the dynamic trust threshold is stored: "host_captchatypeid". */
+    private static String getTrustID(final Challenge<?> challenge) {
+        return (challenge.getHost() + "_" + challenge.getTypeID()).toLowerCase(Locale.ENGLISH);
     }
 
     @Override
@@ -201,8 +175,7 @@ public class JACSolver extends ChallengeSolver<String> {
             final int priority = ((JACCaptchaResponse) response).getUnmodifiedTrustValue();
             final Challenge<?> challenge = response.getChallenge();
             if (challenge instanceof BasicCaptchaChallenge) {
-                final Plugin plugin = ((BasicCaptchaChallenge) challenge).getPlugin();
-                final String trustID = (plugin.getHost() + "_" + challenge.getTypeID()).toLowerCase(Locale.ENGLISH);
+                final String trustID = getTrustID(challenge);
                 synchronized (threshold) {
                     AutoTrust trustValue = threshold.get(trustID);
                     if (trustValue == null) {
@@ -225,14 +198,13 @@ public class JACSolver extends ChallengeSolver<String> {
         final int priority = ((JACCaptchaResponse) response).getUnmodifiedTrustValue();
         final Challenge<?> challenge = response.getChallenge();
         if (challenge instanceof BasicCaptchaChallenge) {
-            final Plugin plugin = ((BasicCaptchaChallenge) challenge).getPlugin();
-            final String trustID = (plugin.getHost() + "_" + challenge.getTypeID()).toLowerCase(Locale.ENGLISH);
+            final String trustID = getTrustID(challenge);
             synchronized (threshold) {
                 final AutoTrust trustValue = threshold.get(trustID);
                 if (trustValue != null) {
                     logger.info("JAC Failure for " + trustID + "; : TrustValue " + priority + "; Dynamic Trust: " + trustValue.getValue() + "(" + trustValue.getCounter() + ") Detected: " + response.getValue());
                     // increase trustValue!
-                    trustValue.add((int) (priority * (1d + (1d - _0_85) * 2)));
+                    trustValue.add((int) (priority * (1d + (1d - THRESHOLD_DEFAULT) * 2)));
                     logger.info("New JAC Threshold for " + trustID + " : " + trustValue.getValue() + "(" + trustValue.getCounter() + ")");
                 }
             }

@@ -1,5 +1,8 @@
 package org.jdownloader.captcha.v2.solver.gui;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.appwork.storage.config.JsonConfig;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
@@ -15,6 +18,7 @@ import org.jdownloader.settings.advanced.AdvancedConfigManager;
 import jd.controlling.captcha.BasicCaptchaDialogHandler;
 import jd.controlling.captcha.CaptchaSettings;
 import jd.controlling.captcha.SkipException;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 public class DialogBasicCaptchaSolver extends AbstractDialogSolver<String> {
     private CaptchaSettings                       config;
@@ -30,6 +34,13 @@ public class DialogBasicCaptchaSolver extends AbstractDialogSolver<String> {
     @Override
     public Class<String> getResultType() {
         return String.class;
+    }
+
+    @Override
+    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
+        types.add(CAPTCHA_TYPE.IMAGE);
+        return types;
     }
 
     @Override

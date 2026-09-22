@@ -97,7 +97,7 @@ public abstract class DelayedRunnable implements Runnable {
 
     private final ScheduledExecutorService    service;
     private final long                        delayInMS;
-    private final AtomicReference<DelayState> state          = new AtomicReference<>(null);
+    private final AtomicReference<DelayState> state          = new AtomicReference<DelayState>(null);
     private final long                        maxInMS;
     private final AtomicBoolean               delayerEnabled = new AtomicBoolean(true);
 

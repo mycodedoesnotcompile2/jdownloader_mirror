@@ -5348,7 +5348,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Ready | Balance: %s1" })
     String CaptchaSolverService_status_ready_balance(String balance);
 
-    @Default(lngs = { "en" }, values = { "Ready | %s1 Accounts | %s2" })
+    @Default(lngs = { "en" }, values = { "Ready | %s1 Accounts | Balance: %s2" })
     String CaptchaSolverService_status_ready_accounts(String accounts, String balance);
 
     @Default(lngs = { "en" }, values = { "Comma separated list of captcha solver ids to toggle.<br>Empty or \"*\" targets all solvers.<br>Available ids:" })
@@ -5398,6 +5398,72 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Accounts disabled or invalid, click to fix" })
     String SolverOrderTableModel_status_accountsUnusable();
+
+    @Default(lngs = { "en" }, values = { "Configure" })
+    String CaptchaSolverService_status_configure();
+
+    @Default(lngs = { "en" }, values = { "Not connected, check MyJD config" })
+    String CaptchaSolverService_status_myjd_notConnected();
+
+    @Default(lngs = { "en" }, values = { "In error state, check MyJD config" })
+    String CaptchaSolverService_status_myjd_error();
+
+    @Default(lngs = { "en" }, values = { "Number of supported Captcha Types" })
+    String SolverOrderTableModel_column_supportedCaptchaTypes();
+
+    @Default(lngs = { "en" }, values = { "Use external solver account(s) to solve captchas?" })
+    String CaptchaConfigPanel_useExternalSolverAccounts();
+
+    @Default(lngs = { "en" }, values = { "External Solver comparison Table" })
+    String CaptchaSolverComparison_tab_title();
+
+    @Default(lngs = { "en" }, values = { "Preselected captcha types" })
+    String CaptchaSolverComparison_preselect_label();
+
+    @Default(lngs = { "en" }, values = { "All" })
+    String CaptchaSolverComparison_preselect_all();
+
+    @Default(lngs = { "en" }, values = { "Selection" })
+    String CaptchaSolverComparison_preselect_selection();
+
+    @Default(lngs = { "en" }, values = { "Used by you" })
+    String CaptchaSolverComparison_preselect_used();
+
+    @Default(lngs = { "en" }, values = { "Captcha types (%s1/%s2)" })
+    String CaptchaSolverComparison_types_button(String selected, String total);
+
+    @Default(lngs = { "en" }, values = { "Solver" })
+    String CaptchaSolverComparison_column_solver();
+
+    @Default(lngs = { "en" }, values = { "Supports %s1 captcha types\r\nDouble click to open buy account page" })
+    String CaptchaSolverComparison_solver_tooltip(String supportedCount);
+
+    @Default(lngs = { "en" }, values = { "Supports %s1 captcha types" })
+    String CaptchaSolverComparison_solver_tooltip_noBuyPage(String supportedCount);
+
+    @Default(lngs = { "en" }, values = { "Supported" })
+    String CaptchaSolverComparison_supported();
+
+    @Default(lngs = { "en" }, values = { "Not supported" })
+    String CaptchaSolverComparison_notSupported();
+
+    @Default(lngs = { "en" }, values = { "The list of supported captcha types is self-declared: a solver may support more captcha types than listed here." })
+    String CaptchaSolverComparison_disclaimer();
+
+    @Default(lngs = { "en" }, values = { "Downloads" })
+    String CaptchaRequestType_HOSTER();
+
+    @Default(lngs = { "en" }, values = { "Account check" })
+    String CaptchaRequestType_HOSTER_LOGIN();
+
+    @Default(lngs = { "en" }, values = { "Link crawling" })
+    String CaptchaRequestType_DECRYPTER();
+
+    @Default(lngs = { "en" }, values = { "Display only services that support all selected captcha types" })
+    String CaptchaSolverComparison_onlyFullSupport();
+
+    @Default(lngs = { "en" }, values = { "There is no external captcha solver that supports all selected captcha types" })
+    String CaptchaSolverComparison_noSolverSupportsAll();
 
     @Default(lngs = { "en" }, values = { "Please enter username and password..." })
     String AskForUserAndPasswordDialog_AskForUserAndPasswordDialog_title_();

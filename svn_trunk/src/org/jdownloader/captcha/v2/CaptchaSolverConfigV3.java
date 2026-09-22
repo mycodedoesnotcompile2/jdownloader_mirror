@@ -7,6 +7,8 @@ import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.storage.config.annotations.DefaultEnumArrayValue;
 import org.appwork.storage.config.annotations.DefaultIntValue;
+import org.appwork.storage.config.annotations.DefaultLongValue;
+import org.appwork.storage.config.annotations.DefaultJsonObject;
 import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.SpinnerValidator;
@@ -104,10 +106,19 @@ public interface CaptchaSolverConfigV3 extends PluginConfigInterface {
     void setDisabledCaptchaTypes(Set<CAPTCHA_TYPE> enumset);
 
     @AboutConfig(inGUIVisible = false)
-    @DescriptionForConfigEntry("Solver-timing map (other solver id -> milliseconds to wait for it). Empty means automatic. Hidden in GUI for now.")
+    @DescriptionForConfigEntry("Solver-timing map (other solver id -> milliseconds to wait for it). Empty means automatic.")
     @Order(900)
+    @DefaultJsonObject("{}")
     @DefaultOnNull
     Map<String, Integer> getWaitForOthers();
 
     void setWaitForOthers(Map<String, Integer> map);
+
+    @AboutConfig(inGUIVisible = false)
+    @DescriptionForConfigEntry("Timestamp (ms) of the successful migration of this solver's old settings (CaptchaSolverSettingsMigration). -1 = not migrated (yet) or nothing to migrate.")
+    @DefaultLongValue(-1)
+    @Order(1000)
+    long getMigrateTimestamp();
+
+    void setMigrateTimestamp(long timestamp);
 }

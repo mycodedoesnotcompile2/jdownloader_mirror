@@ -1962,7 +1962,11 @@ public class WindowsUtils {
             if (entries == null || entries.length == 0) {
                 throw new IllegalArgumentException("No ACL entries provided – this would remove all access (empty DACL).");
             }
-            ExplicitAccess[] accessList = new ExplicitAccess[entries.length];
+            // JNA requires a contiguous Structure array for SetEntriesInAclW. Tried `new ExplicitAccess[n]` +
+            // assign per slot: fails with "Structure array elements must use contiguous memory" at index 1.
+            final ExplicitAccess[] accessList = (ExplicitAccess[]) new ExplicitAccess().toArray(entries.length);
+            // Keep PSID wrappers alive until after SetEntriesInAclW (ptstrName holds only a native pointer).
+            final WinNT.PSID[] retainedPsids = new WinNT.PSID[entries.length];
             for (int i = 0; i < entries.length; i++) {
                 AccessPermissionEntry entry = entries[i];
                 Account account = Advapi32Util.getAccountBySid(entry.sid);
@@ -1999,8 +2003,9 @@ public class WindowsUtils {
                     trustee.TrusteeType = Trustee.TYPE_IS_UNKNOWN;
                     break;
                 }
-                trustee.ptstrName = new WinNT.PSID(account.sid).getPointer();
-                ExplicitAccess access = new ExplicitAccess();
+                retainedPsids[i] = new WinNT.PSID(account.sid);
+                trustee.ptstrName = retainedPsids[i].getPointer();
+                ExplicitAccess access = accessList[i];
                 access.grfAccessPermissions = 0;
                 for (AccessPermission p : entry.permissions) {
                     access.grfAccessPermissions |= p.mask;
@@ -2020,7 +2025,6 @@ public class WindowsUtils {
                     access.grfInheritance |= WinNT.CONTAINER_INHERIT_ACE;
                 }
                 access.Trustee = trustee;
-                accessList[i] = access;
             }
             PointerByReference pOldDacl = new PointerByReference();
             PointerByReference pNewDacl = new PointerByReference();

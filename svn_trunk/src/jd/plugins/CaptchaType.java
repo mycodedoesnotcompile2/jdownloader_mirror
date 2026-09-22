@@ -22,7 +22,8 @@ public class CaptchaType {
         IMAGE {
             @Override
             public boolean canHandle(Challenge<?> c) {
-                return c instanceof ImageCaptchaChallenge;
+                /* Click captchas are ImageCaptchaChallenges too but have their own captcha types (see below). */
+                return c instanceof ImageCaptchaChallenge && !(c instanceof ClickCaptchaChallenge) && !(c instanceof MultiClickCaptchaChallenge);
             }
 
             @Override

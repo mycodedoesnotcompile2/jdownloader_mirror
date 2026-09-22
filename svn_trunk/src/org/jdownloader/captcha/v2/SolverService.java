@@ -2,11 +2,10 @@ package org.jdownloader.captcha.v2;
 
 import java.util.Currency;
 import java.util.List;
-import java.util.Map;
 
 import javax.swing.Icon;
 
-import org.jdownloader.gui.settings.AbstractConfigPanel;
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
 
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
@@ -16,7 +15,10 @@ public interface SolverService {
     /** Short human readable description of what this solver does. May be null. */
     public abstract String getDescription();
 
-    /** Captcha types supported by this solver, or null if unknown (treated as "supports all"). */
+    /**
+     * Captcha types supported by this solver. Must never return null or an empty list: a solver that does not declare any supported
+     * captcha type cannot solve anything, so null/empty is treated as a bug in the solver implementation (it does NOT mean "supports all").
+     */
     public abstract List<CAPTCHA_TYPE> getSupportedCaptchaTypes();
 
     /** Total account balance of this solver across its valid accounts, or null if this solver has no balance. */
@@ -27,6 +29,9 @@ public interface SolverService {
 
     /** URL of a help/knowledgebase article for this solver, or null when there is none (then no help icon is shown). */
     public abstract String getHelpArticleURL();
+
+    /** URL of the page where the user can buy/create an account for this solver, or null for solvers that have no such page (e.g. local solvers). */
+    public abstract String getBuyURL();
 
     /**
      * Status text shown in the solver overview (e.g. "Ready", "Ready | Balance: ..."). Returns null when instead an action button (see
@@ -60,27 +65,11 @@ public interface SolverService {
      */
     public abstract CaptchaSolverConfigV3 getConfigV3();
 
-    /**
-     * Returns the config panel to show below the supported-captcha-types overview for this solver. Built generically from
-     * {@link #getConfigV3()}. May be null.
-     */
-    public abstract AbstractConfigPanel getConfigComponent();
-
-    public abstract boolean hasConfigPanel();
-
     public abstract Icon getIcon(int size);
 
-    public abstract String getType();
-
-    public int getWaitForByID(String solverID);
+    /** Kind of this solver (local automatic, manual dialog/browser/remote, external). Also provides the display text of the type. */
+    public abstract SolverType getType();
 
     public abstract String getID();
 
-    public abstract boolean isEnabled();
-
-    public abstract void setEnabled(boolean b);
-
-    public abstract void setWaitFor(String id, Integer waitFor);
-
-    public abstract Map<String, Integer> getWaitForMapCopy();
 }
