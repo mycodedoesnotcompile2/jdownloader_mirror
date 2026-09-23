@@ -136,37 +136,37 @@ public class CompiledCaptchaChallengeFilter {
     }
 
     /**
-     * Checks if filter's captcha type list matches the challenge's captcha type. Empty filter list means "match all types".
+     * Checks if the filter's excluded captcha types allow the challenge's captcha type. An empty/null exclusion list matches all captcha
+     * types, including ones added in the future - only explicitly excluded types are rejected.
      */
     public boolean matchesCaptchaType(final Challenge<?> c) {
-        final Set<CAPTCHA_TYPE> filterTypes = filter.getCaptchaTypes();
-        if (filterTypes == null || filterTypes.isEmpty()) {
-            /* Empty list means match all types */
+        final Set<CAPTCHA_TYPE> excludedTypes = filter.getExcludedCaptchaTypes();
+        if (excludedTypes == null || excludedTypes.isEmpty()) {
             return true;
         }
         final CAPTCHA_TYPE captchaType = CAPTCHA_TYPE.getCaptchaTypeForChallenge(c);
         if (captchaType == null) {
-            /* Challenge has no captcha type but filter requires specific types */
-            return false;
+            /* Challenge has no captcha type, so it cannot be excluded by one */
+            return true;
         }
-        return filterTypes.contains(captchaType);
+        return !excludedTypes.contains(captchaType);
     }
 
     /**
-     * Checks if filter's request type list matches the challenge's request type. Empty filter list means "match all request types".
+     * Checks if the filter's excluded request types allow the challenge's request type. An empty/null exclusion list matches all
+     * request types, including ones added in the future - only explicitly excluded types are rejected.
      */
     public boolean matchesRequestType(final Challenge<?> c) {
-        final Set<CaptchaRequestType> filterRequestTypes = filter.getCaptchaRequestTypes();
-        if (filterRequestTypes == null || filterRequestTypes.isEmpty()) {
-            /* Empty list means match all request types */
+        final Set<CaptchaRequestType> excludedRequestTypes = filter.getExcludedCaptchaRequestTypes();
+        if (excludedRequestTypes == null || excludedRequestTypes.isEmpty()) {
             return true;
         }
         final CaptchaRequestType requestType = c.getCaptchaRequestType();
         if (requestType == null) {
-            /* Challenge has no request type but filter requires specific types */
-            return false;
+            /* Challenge has no request type, so it cannot be excluded by one */
+            return true;
         }
-        return filterRequestTypes.contains(requestType);
+        return !excludedRequestTypes.contains(requestType);
     }
 
     /**

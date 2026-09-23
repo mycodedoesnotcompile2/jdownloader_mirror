@@ -65,7 +65,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 53451 $", interfaceVersion = 3, names = { "deathbycaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53492 $", interfaceVersion = 3, names = { "deathbycaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -154,8 +154,9 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
         final String username = account.getUser();
         final String password = account.getPass();
         /*
-         * Determine which login type(s) to try. Each login type is tried at most once. If a login type has already been established for this
-         * account, only that one is used; otherwise every applicable type is tried once (token first if the password looks like a token).
+         * Determine which login type(s) to try. Each login type is tried at most once. If a login type has already been established for
+         * this account, only that one is used; otherwise every applicable type is tried once (token first if the password looks like a
+         * token).
          */
         final List<Integer> loginTypesToTry = getLoginTypesToTry(account, password);
         Map<String, Object> entries = null;
@@ -196,8 +197,6 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
     @Override
     public void solve(CESSolverJob<?> job, Account account) throws Exception {
         final Challenge<?> challenge = job.getChallenge();
-        // TODO
-        // job.showBubble(this);
         try {
             // TODO
             // challenge.sendStatsSolving(this);
@@ -295,7 +294,7 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
             final long startTime = System.currentTimeMillis();
             String solution = null;
             while (true) {
-                this.sleep(this.getPollingIntervalMillis(account), null);
+                Thread.sleep(getPollingIntervalMillis(account));
                 br.getPage(getApiBase() + "/captcha/" + captchaID);
                 final Map<String, Object> pollresp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 /*

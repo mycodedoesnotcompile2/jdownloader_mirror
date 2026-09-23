@@ -82,7 +82,7 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
             final Map<String, Object> postdata = new HashMap<String, Object>();
             final String apikey = account.getPass();
             postdata.put("clientKey", apikey);
-            final Map<String, Object> task = new HashMap<String, Object>(); // APIv2
+            final Map<String, Object> task = new HashMap<String, Object>();
             if (captchachallenge instanceof RecaptchaV2Challenge) {
                 final RecaptchaV2Challenge challenge = (RecaptchaV2Challenge) job.getChallenge();
                 task.put("type", "RecaptchaV2TaskProxyless");
@@ -193,15 +193,19 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 final Map<String, Object> solutionmap = (Map<String, Object>) entries.get("solution");
-                final List<Map<String, Object>> clicklist = (List<Map<String, Object>>) solutionmap.get("coordinates");
                 /* Answer for interactive browser captchas is given both in field "gRecaptchaResponse" and "solution". */
                 // final String gRecaptchaResponse = (String) solutionmap.get("gRecaptchaResponse");
-                final String token = (String) solutionmap.get("token");
+                String token = (String) solutionmap.get("token");
+                if (token == null) {
+                    /* 2026-09-22: e.g. capmonster.cloud returns result only via this field. */
+                    token = (String) solutionmap.get("gRecaptchaResponse");
+                }
                 AbstractResponse resp = null;
                 if (captchachallenge instanceof RecaptchaV2Challenge || captchachallenge instanceof HCaptchaChallenge || captchachallenge instanceof CloudflareTurnstileChallenge || captchachallenge instanceof CutCaptchaChallenge) {
                     resp = new TokenCaptchaResponse((Challenge<String>) captchachallenge, this, token);
                 } else if (captchachallenge instanceof MultiClickCaptchaChallenge || captchachallenge instanceof ClickCaptchaChallenge) {
                     // TODO: Test this
+                    final List<Map<String, Object>> clicklist = (List<Map<String, Object>>) solutionmap.get("coordinates");
                     final int[] x = new int[clicklist.size()];
                     final int[] y = new int[clicklist.size()];
                     int i = 0;
@@ -337,7 +341,7 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
             throw new AccountUnavailableException(errorDescription, 5 * 60 * 1000);
         } else {
             // TODO: Check this
-            throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+            throw new PluginException(LinkStatus.ERROR_CAPTCHA, errorDescription);
         }
     }
 

@@ -59,11 +59,6 @@ public final class RandomUserAgent {
     private static java.util.List<String>   ffVersionInfos = new ArrayList<String>();
 
     /**
-     * Internet Explorer versions
-     */
-    private static java.util.List<String>   ieVersions     = new ArrayList<String>();
-
-    /**
      * Windows Versions. E.g. NT 5.1 is Windows XP
      */
     private static String              winVersions    = "";
@@ -93,12 +88,7 @@ public final class RandomUserAgent {
      */
     static {
 
-        /* Used only in generateIE */
-        RandomUserAgent.ieVersions.add("6.0");
-        RandomUserAgent.ieVersions.add("7.0");
-        RandomUserAgent.ieVersions.add("8.0");
-
-        /* Used in both generateIE and generateFF */
+        /* Used in generateFF */
         RandomUserAgent.winVersions = "NT 5.0|NT 5.1|NT 5.2|NT 6.0|NT 6.1";
 
         RandomUserAgent.winAddons.add(new String[] { "", ".NET CLR 1.0.3705", ".NET CLR 1.1.4322" });
@@ -181,15 +171,11 @@ public final class RandomUserAgent {
 
     /**
      * The main user-agent string generator
-     * 
-     * @return Random Firefox or Internet Explorer user-agent string
+     *
+     * @return Random Firefox user-agent string
      */
     public static String generate() {
-        if (new Random().nextInt() % 2 == 0) {
-            return RandomUserAgent.generateFF();
-        } else {
-            return RandomUserAgent.generateIE();
-        }
+        return RandomUserAgent.generateFF();
     }
 
     /**
@@ -248,24 +234,6 @@ public final class RandomUserAgent {
         final String[] ffReleaseDate = tmpFFVersionInfos[2].split("\\.");
 
         return "Mozilla/5.0 (" + platform + "; U; " + osAndArch + macAddon + "; " + lang + "; rv:" + ffRev + ") Gecko/" + RandomUserAgent.randomDate(ffReleaseDate) + linuxAddon + "Firefox/" + ffVersion + winAddon;
-    }
-
-    /**
-     * The Internet Explorer user-agent string generator
-     * 
-     * @return Random Internet Explorer user-agent string
-     */
-    public static String generateIE() {
-        final Random rand = new Random();
-
-        final String ieVersion = RandomUserAgent.ieVersions.get(rand.nextInt(RandomUserAgent.ieVersions.size()));
-        final String winVersion = RandomUserAgent.winVersions.split("\\|")[rand.nextInt(RandomUserAgent.winVersions.split("\\|").length)];
-        String trident = "";
-        if (ieVersion.equalsIgnoreCase("8.0")) {
-            trident = "; Trident/4.0";
-        }
-
-        return "Mozilla/4.0 (compatible; MSIE " + ieVersion + "; Windows " + winVersion + trident + RandomUserAgent.dotNetString() + ")";
     }
 
     /**

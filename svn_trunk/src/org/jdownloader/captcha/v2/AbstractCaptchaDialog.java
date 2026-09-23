@@ -63,7 +63,7 @@ import org.appwork.utils.swing.windowmanager.WindowManager;
 import org.appwork.utils.swing.windowmanager.WindowManager.FrameState;
 import org.jdownloader.DomainInfo;
 import org.jdownloader.actions.AppAction;
-import org.jdownloader.captcha.v2.solver.CESChallengeSolver;
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
 import org.jdownloader.captcha.v2.solver.gui.Header;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.gui.IconKey;
@@ -97,9 +97,9 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
         boolean cesActive = false;
         SolverJob<?> job = challenge.getJob();
         if (challenge != null) {
-            // don't autoclose captcha dialog if ces solver is still active
+            // don't autoclose captcha dialog if an external solver is still active
             for (ChallengeSolver s : challenge.getJob().getSolverList()) {
-                if (s instanceof CESChallengeSolver && !challenge.getJob().isDone(s)) {
+                if (s.getSolverType() == SolverType.EXTERNAL && !challenge.getJob().isDone(s)) {
                     cesActive = true;
                 }
             }

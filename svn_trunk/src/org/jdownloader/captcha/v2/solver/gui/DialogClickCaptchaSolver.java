@@ -9,6 +9,7 @@ import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ClickCaptchaResponse;
 import org.jdownloader.captcha.v2.solver.jac.JACSolver;
+import org.jdownloader.captcha.v2.solver.service.DialogSolverService;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.settings.advanced.AdvancedConfigManager;
 
@@ -24,7 +25,7 @@ public class DialogClickCaptchaSolver extends AbstractDialogSolver<ClickedPoint>
     private DialogClickCaptchaSolver() {
         super(1);
         config = JsonConfig.create(CaptchaSettings.class);
-        AdvancedConfigManager.getInstance().register(JsonConfig.create(DialogCaptchaSolverConfig.class));
+        AdvancedConfigManager.getInstance().register(DialogSolverService.getInstance().getConfigV3());
     }
 
     private static final DialogClickCaptchaSolver INSTANCE = new DialogClickCaptchaSolver();

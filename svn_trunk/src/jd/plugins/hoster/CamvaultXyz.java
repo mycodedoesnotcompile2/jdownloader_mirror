@@ -50,11 +50,11 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.CamvaultXyzCrawler;
 
-@HostPlugin(revision = "$Revision: 50051 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53490 $", interfaceVersion = 3, names = {}, urls = {})
 public class CamvaultXyz extends PluginForHost {
     public CamvaultXyz(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.camvault.xyz/premium");
+        this.enablePremium("https://www." + getHost() + "/premium");
     }
 
     @Override

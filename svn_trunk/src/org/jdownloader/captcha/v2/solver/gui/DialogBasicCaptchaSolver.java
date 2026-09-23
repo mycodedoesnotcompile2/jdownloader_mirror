@@ -10,6 +10,7 @@ import org.jdownloader.captcha.v2.ChallengeSolver;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.CaptchaResponse;
 import org.jdownloader.captcha.v2.solver.jac.JACSolver;
+import org.jdownloader.captcha.v2.solver.service.DialogSolverService;
 import org.jdownloader.captcha.v2.solverjob.ChallengeSolverJobListener;
 import org.jdownloader.captcha.v2.solverjob.ResponseList;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
@@ -56,7 +57,7 @@ public class DialogBasicCaptchaSolver extends AbstractDialogSolver<String> {
     private DialogBasicCaptchaSolver() {
         super(1);
         config = JsonConfig.create(CaptchaSettings.class);
-        AdvancedConfigManager.getInstance().register(JsonConfig.create(DialogCaptchaSolverConfig.class));
+        AdvancedConfigManager.getInstance().register(DialogSolverService.getInstance().getConfigV3());
     }
 
     @Override

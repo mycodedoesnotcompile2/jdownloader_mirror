@@ -71,27 +71,23 @@ public class JNAHelper {
         final String override = System.getProperty(SYSTEM_PROPERTY_JNA_AVAILABLE_OVERRIDE);
         if (override != null) {
             return Boolean.parseBoolean(override);
+        } else if (JNA_AVAILABLE != null) {
+            return Boolean.TRUE.equals(JNA_AVAILABLE);
+        } else if (unsupportedClassVersionError) {
+            return false;
         }
-        boolean available = true;
+        boolean available = false;
         try {
-            if (JNA_AVAILABLE != null) {
-                return Boolean.TRUE.equals(JNA_AVAILABLE);
-            }
-            if (unsupportedClassVersionError) {
-                return false;
-            }
             // Try to load the JNA class
             Class.forName(CLASS_COM_SUN_JNA_NATIVE, false, JNAHelper.class.getClassLoader());
             LogV3.info("JNA available! " + Application.getRessourceURL(CLASS_COM_SUN_JNA_NATIVE.replace(".", "/") + ".class"));
-            return true;
+            return available = true;
         } catch (final UnsupportedClassVersionError e) {
-            available = false;
             LogV3.info("JNA not available: \r\n" + Exceptions.getStackTrace(e));
             unsupportedClassVersionError = true;
             // JNA >=5.14.0 requires minimum JDK8
             return false;
         } catch (final Exception e) {
-            available = false;
             LogV3.info("JNA not available: \r\n" + Exceptions.getStackTrace(e));
             return false;
         } finally {

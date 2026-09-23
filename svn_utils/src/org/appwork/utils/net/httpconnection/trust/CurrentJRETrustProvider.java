@@ -65,12 +65,4 @@ public class CurrentJRETrustProvider extends AbstractTrustProvider {
         super.reload();
         trustManager = null;
     }
-
-    /**
-     * @return Provider ID for caching
-     */
-    @Override
-    public String getId() {
-        return "TrustCurrentJREProvider";
-    }
 }

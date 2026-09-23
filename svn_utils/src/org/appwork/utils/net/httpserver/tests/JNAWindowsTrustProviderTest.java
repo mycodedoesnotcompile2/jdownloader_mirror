@@ -30,7 +30,7 @@ import org.appwork.utils.net.httpconnection.tests.CertificateFactory;
 import org.appwork.utils.net.httpconnection.tests.CertificateFactory.CACertificateResult;
 import org.appwork.utils.net.httpconnection.tests.CertificateFactory.ServerCertificateResult;
 import org.appwork.utils.net.httpconnection.trust.JNAWindowsTrustProvider;
-import org.appwork.utils.net.httpconnection.trust.JNAWindowsTrustResult;
+import org.appwork.utils.net.httpconnection.trust.JNAWindowsTrustProvider.JNAWindowsTrustResult;
 import org.appwork.utils.net.httpserver.SSLHttpServer;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.WindowsCertUtils;
@@ -47,8 +47,10 @@ import com.sun.jna.platform.win32.WinUser;
  * <b>Test sequence:</b>
  * </p>
  * <ol>
- * <li><b>CA in store:</b> Install test CA in Windows Root (Current User), then HTTPS request with JNAWindowsTrustProvider → must succeed (200).</li>
- * <li><b>CA not in store:</b> Remove CA from Windows store, then same HTTPS request → must fail (connection must be rejected or TrustResult not trusted). This proves that the provider really uses the current store.</li>
+ * <li><b>CA in store:</b> Install test CA in Windows Root (Current User), then HTTPS request with JNAWindowsTrustProvider → must succeed
+ * (200).</li>
+ * <li><b>CA not in store:</b> Remove CA from Windows store, then same HTTPS request → must fail (connection must be rejected or TrustResult
+ * not trusted). This proves that the provider really uses the current store.</li>
  * <li><b>Re-install:</b> Install CA again, request again → must succeed (no reload needed).</li>
  * </ol>
  * <p>

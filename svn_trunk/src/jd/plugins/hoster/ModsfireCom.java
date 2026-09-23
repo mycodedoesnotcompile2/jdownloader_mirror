@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
+import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -44,7 +45,7 @@ import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 
-@HostPlugin(revision = "$Revision: 51036 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53485 $", interfaceVersion = 3, names = {}, urls = {})
 public class ModsfireCom extends PluginForHost {
     public ModsfireCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -162,18 +163,7 @@ public class ModsfireCom extends PluginForHost {
             }
             final String dllink = "/d/" + this.getFID(link);
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
-            if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-                br.followConnection(true);
-                if (dl.getConnection().getResponseCode() == 403) {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 5 * 60 * 1000l);
-                } else if (dl.getConnection().getResponseCode() == 404) {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 5 * 60 * 1000l);
-                } else if (dl.getConnection().getResponseCode() == 429) {
-                    throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Server error 429 Too Many Requests", 5 * 60 * 1000l);
-                } else {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-            }
+            handleConnectionErrors(br, dl.getConnection());
             link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         }
         /* Add a download slot */
@@ -185,6 +175,11 @@ public class ModsfireCom extends PluginForHost {
             /* Remove download slot */
             controlMaxFreeDownloads(null, link, -1);
         }
+    }
+
+    @Override
+    protected void throwFinalConnectionException(Browser br, URLConnectionAdapter con) throws PluginException, IOException {
+        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
 
     protected void controlMaxFreeDownloads(final Account account, final DownloadLink link, final int num) {
@@ -222,12 +217,8 @@ public class ModsfireCom extends PluginForHost {
         try {
             final Browser brc = br.cloneBrowser();
             dl = new jd.plugins.BrowserAdapter().openDownload(brc, link, url, this.isResumeable(link, account), this.getMaxChunks(link, account));
-            if (this.looksLikeDownloadableContent(dl.getConnection())) {
-                return true;
-            } else {
-                brc.followConnection(true);
-                throw new IOException();
-            }
+            handleConnectionErrors(brc, dl.getConnection());
+            return true;
         } catch (final Throwable e) {
             logger.log(e);
             try {
@@ -276,7 +267,18 @@ public class ModsfireCom extends PluginForHost {
             loginform.put("password", Encoding.urlEncode(account.getPass()));
             loginform.put("remember", "on");
             br.submitForm(loginform);
+            if (br.getURL().contains("/protected/2fa")) {
+                final Form twoFactor = br.getFormbyActionRegex(".*2fa");
+                if (twoFactor == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find 2fa form");
+                }
+                twoFactor.put("otp", getTwoFACode(account, null));
+                br.submitForm(twoFactor);
+            }
             if (!isLoggedin(br)) {
+                if (br.getFormbyActionRegex(".*2fa") != null) {
+                    throw new AccountInvalidException("Invalid 2fa code!");
+                }
                 throw new AccountInvalidException();
             }
             br.getPage(url_relative_premium);

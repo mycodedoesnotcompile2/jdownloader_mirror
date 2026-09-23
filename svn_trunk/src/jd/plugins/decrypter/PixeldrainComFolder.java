@@ -40,7 +40,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.URLHelper;
 
-@DecrypterPlugin(revision = "$Revision: 53462 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53476 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PixeldrainCom.class })
 public class PixeldrainComFolder extends PluginForDecrypt {
     public PixeldrainComFolder(PluginWrapper wrapper) {
@@ -84,7 +84,7 @@ public class PixeldrainComFolder extends PluginForDecrypt {
         this.br = hosterplugin.createNewBrowserInstance();
         if (listregex.patternFind()) {
             final String listID = listregex.getMatch(0);
-            br.getPage(PixeldrainCom.getAPIBase(this) + "/list/" + listID);
+            br.getPage(PixeldrainCom.getAPIBase(this, br) + "/list/" + listID);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 /* 2020-10-01: E.g. {"success":false,"value":"not_found","message":"The entity you requested could not be found"} */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -138,7 +138,7 @@ public class PixeldrainComFolder extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             /* Append "?stat" so even if we got a direct-URL we will get a json response and not a file. */
-            br.getPage(PixeldrainCom.getAPIBase(this) + "/filesystem/" + folderPath + "?stat");
+            br.getPage(PixeldrainCom.getAPIBase(this, br) + "/filesystem/" + folderPath + "?stat");
             if (br.getHttpConnection().getResponseCode() == 404) {
                 /* E.g. {"success":false,"value":"not_found","message":"The entity you requested could not be found"} */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

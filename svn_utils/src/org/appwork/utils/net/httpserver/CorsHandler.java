@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -357,7 +358,7 @@ public class CorsHandler {
     }
 
     public void setAllowMethods(final RequestMethod... allowMethods) {
-        setAllowMethods(allowMethods == null ? null : EnumSet.copyOf(Arrays.asList(allowMethods)));
+        setAllowMethods(allowMethods == null ? null : new HashSet<RequestMethod>(Arrays.asList(allowMethods)));
     }
 
     /**

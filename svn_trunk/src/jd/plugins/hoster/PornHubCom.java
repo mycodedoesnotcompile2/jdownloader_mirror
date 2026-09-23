@@ -37,6 +37,23 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.httpconnection.HTTPConnection;
+import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
+import org.appwork.utils.net.httpconnection.SSLSocketStreamOptionsModifier;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.logging.LogController;
+import org.jdownloader.net.BCSSLSocketStreamFactory;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -69,24 +86,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PornHubComVideoCrawler;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.ReflectionUtils;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.httpconnection.HTTPConnection;
-import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
-import org.appwork.utils.net.httpconnection.SSLSocketStreamOptionsModifier;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.logging.LogController;
-import org.jdownloader.net.BCSSLSocketStreamFactory;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 53400 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53482 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornHubComVideoCrawler.class })
 public class PornHubCom extends PluginForHost {
     /* Connection stuff */
@@ -570,13 +570,22 @@ public class PornHubCom extends PluginForHost {
                     dlUrl = br.getRegex("name=\"twitter:image:src\" content=\"(https?[^<>\"]*?\\.[A-Za-z]{3,5})\"").getMatch(0);
                 }
                 if (dlUrl != null) {
-                    ext = dlUrl.substring(dlUrl.lastIndexOf(".") + 1);
+                    ext = Plugin.getFileNameExtensionFromURL(dlUrl);
                 }
             }
             if (dlUrl == null) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            html_filename = viewKey + "." + ext;
+            if (ext != null) {
+                if (ext.contains(".")) {
+                    html_filename = viewKey + ext;
+                } else {
+                    html_filename = viewKey + "." + ext;
+                }
+            } else {
+                /* Fallback */
+                html_filename = viewKey + ".png";
+            }
         } else if (new Regex(link.getPluginPatternMatcher(), PATTERN_GIF_WEBM).patternFind()) {
             final String linkHost = Browser.getHost(link.getPluginPatternMatcher());
             /* Offline links should also have nice filenames */
@@ -1277,8 +1286,9 @@ public class PornHubCom extends PluginForHost {
 
     /**
      * Performs a full login via website to obtain fresh cookies. There are minor differences between login for free domain/account and
-     * premium (pornhubpremium.com). </br> Free login: https://www.pornhub.org/login </br> Premium login:
-     * https://www.pornhubpremium.com/premium/login
+     * premium (pornhubpremium.com). </br>
+     * Free login: https://www.pornhub.org/login </br>
+     * Premium login: https://www.pornhubpremium.com/premium/login
      */
     private void performFullLogin(final Browser br, final Account account, final String domain, final String path) throws Exception {
         logger.info("Performing full login");
@@ -1376,7 +1386,8 @@ public class PornHubCom extends PluginForHost {
     }
 
     /**
-     * Checks login and sets account-type. </br> Expects browser instance to be logged in already (cookies need to be there).
+     * Checks login and sets account-type. </br>
+     * Expects browser instance to be logged in already (cookies need to be there).
      *
      * @throws Exception
      */

@@ -19,7 +19,6 @@ import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.requests.PostRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.jdownloader.captcha.v2.Challenge;
-import org.jdownloader.captcha.v2.solver.CESChallengeSolver;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 
@@ -66,9 +65,7 @@ public abstract class AbstractBrowserChallenge extends Challenge<String> {
             }
         }
         final String url = getSiteUrl();
-        if (requestor instanceof CESChallengeSolver) {
-            return new CleanupUrl().cleanup(url);
-        } else if (requestor instanceof abstractPluginForCaptchaSolver) {
+        if (requestor instanceof abstractPluginForCaptchaSolver) {
             return new CleanupUrl().cleanup(url);
         } else {
             return url;

@@ -2,6 +2,8 @@ package org.jdownloader.captcha.v2;
 
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -9,16 +11,21 @@ import java.util.Date;
 import java.util.List;
 
 import javax.swing.Icon;
+import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.table.JTableHeader;
 
+import org.appwork.swing.MigPanel;
 import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtDefaultRowSorter;
 import org.appwork.swing.exttable.ExtTableHeaderRenderer;
 import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.swing.exttable.columns.ExtCheckColumn;
+import org.appwork.swing.exttable.columns.ExtComponentColumn;
 import org.appwork.swing.exttable.columns.ExtTextColumn;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.os.CrossSystem;
 import org.jdownloader.gui.IconKey;
@@ -103,6 +110,9 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
                 addColumn(createUsedForServicesColumn());
                 addColumn(createNumberOfCaptchasColumn());
                 addColumn(createDemoUrlColumn());
+                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                    addColumn(createTestCaptchaSolverColumn());
+                }
             }
 
             @Override
@@ -525,6 +535,144 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
             public boolean isDefaultVisible() {
                 /* Hidden by default; can be enabled via the column header context menu. */
                 return false;
+            }
+        };
+    }
+
+    /**
+     * IDE-only, hidden by default (see the {@link DebugMode#TRUE_IN_IDE_ELSE_FALSE} guard in {@link #initColumns()}): manually triggers a
+     * real, throwaway test {@link org.jdownloader.captcha.v2.Challenge} for this captcha type (see
+     * {@link CAPTCHA_TYPE#getTestChallengeDownload()}/{@link CAPTCHA_TYPE#getTestChallengeLogin()}/
+     * {@link CAPTCHA_TYPE#getTestChallengeCrawler()}), one button per {@link CaptchaRequestType}. Buttons are disabled for types without
+     * test data (see {@link CAPTCHA_TYPE#hasTestChallenges()}).
+     */
+    private ExtComponentColumn<CAPTCHA_TYPE> createTestCaptchaSolverColumn() {
+        return new ExtComponentColumn<CAPTCHA_TYPE>("Test Captcha solver") {
+            private CAPTCHA_TYPE   editing;
+            /*
+             * Separate component instances for rendering and editing: a single JComponent instance cannot simultaneously serve as the
+             * live cell editor (embedded in the table at the row currently being edited) AND be reused as the paint "stamp" for every
+             * other visible row's renderer pass -- Swing repeatedly reparents it between the two roles, which is what caused the buttons
+             * to be barely clickable and the whole table to flicker.
+             */
+            private final JButton  editorDownloadButton;
+            private final JButton  editorLoginButton;
+            private final JButton  editorCrawlerButton;
+            private final MigPanel editorPanel;
+            private final JButton  rendererDownloadButton;
+            private final JButton  rendererLoginButton;
+            private final JButton  rendererCrawlerButton;
+            private final MigPanel rendererPanel;
+            {
+                editorDownloadButton = new JButton("DL-Captcha");
+                editorDownloadButton.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(final ActionEvent e) {
+                        if (editing != null) {
+                            CaptchaTestDialog.showFor(new CaptchaTestDialog.ChallengeFactory<Object>() {
+                                @Override
+                                @SuppressWarnings("unchecked")
+                                public Challenge<Object> newChallenge() {
+                                    return (Challenge<Object>) editing.getTestChallengeDownload();
+                                }
+                            }, "Test: " + editing.getDisplayName() + " (DL-Captcha)");
+                        }
+                    }
+                });
+                editorLoginButton = new JButton("Login-Captcha");
+                editorLoginButton.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(final ActionEvent e) {
+                        if (editing != null) {
+                            CaptchaTestDialog.showFor(new CaptchaTestDialog.ChallengeFactory<Object>() {
+                                @Override
+                                @SuppressWarnings("unchecked")
+                                public Challenge<Object> newChallenge() {
+                                    return (Challenge<Object>) editing.getTestChallengeLogin();
+                                }
+                            }, "Test: " + editing.getDisplayName() + " (Login-Captcha)");
+                        }
+                    }
+                });
+                editorCrawlerButton = new JButton("CrawlerCaptcha");
+                editorCrawlerButton.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(final ActionEvent e) {
+                        if (editing != null) {
+                            CaptchaTestDialog.showFor(new CaptchaTestDialog.ChallengeFactory<Object>() {
+                                @Override
+                                @SuppressWarnings("unchecked")
+                                public Challenge<Object> newChallenge() {
+                                    return (Challenge<Object>) editing.getTestChallengeCrawler();
+                                }
+                            }, "Test: " + editing.getDisplayName() + " (CrawlerCaptcha)");
+                        }
+                    }
+                });
+                editorPanel = new MigPanel("ins 0", "[][][]", "[]");
+                editorPanel.add(editorDownloadButton, "height 20!");
+                editorPanel.add(editorLoginButton, "height 20!");
+                editorPanel.add(editorCrawlerButton, "height 20!");
+                /* Renderer buttons are a pure visual stamp (never actually clickable, Swing renderers never receive input); no listeners. */
+                rendererDownloadButton = new JButton("DL-Captcha");
+                rendererLoginButton = new JButton("Login-Captcha");
+                rendererCrawlerButton = new JButton("CrawlerCaptcha");
+                rendererPanel = new MigPanel("ins 0", "[][][]", "[]");
+                rendererPanel.add(rendererDownloadButton, "height 20!");
+                rendererPanel.add(rendererLoginButton, "height 20!");
+                rendererPanel.add(rendererCrawlerButton, "height 20!");
+                setClickcount(1);
+            }
+
+            @Override
+            public boolean isSortable(final CAPTCHA_TYPE obj) {
+                return false;
+            }
+
+            @Override
+            public boolean isEditable(final CAPTCHA_TYPE ctype) {
+                return true;
+            }
+
+            @Override
+            protected JComponent getInternalEditorComponent(final CAPTCHA_TYPE value, final boolean isSelected, final int row, final int column) {
+                return editorPanel;
+            }
+
+            @Override
+            protected JComponent getInternalRendererComponent(final CAPTCHA_TYPE value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
+                return rendererPanel;
+            }
+
+            @Override
+            public void configureEditorComponent(final CAPTCHA_TYPE value, final boolean isSelected, final int row, final int column) {
+                editing = value;
+                final boolean hasTestChallenges = value.hasTestChallenges();
+                editorDownloadButton.setEnabled(hasTestChallenges);
+                editorLoginButton.setEnabled(hasTestChallenges);
+                editorCrawlerButton.setEnabled(hasTestChallenges);
+            }
+
+            @Override
+            public void configureRendererComponent(final CAPTCHA_TYPE value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
+                final boolean hasTestChallenges = value.hasTestChallenges();
+                rendererDownloadButton.setEnabled(hasTestChallenges);
+                rendererLoginButton.setEnabled(hasTestChallenges);
+                rendererCrawlerButton.setEnabled(hasTestChallenges);
+            }
+
+            @Override
+            public boolean isDefaultVisible() {
+                /* Hidden by default even in the IDE; can be enabled via the column header context menu. */
+                return false;
+            }
+
+            @Override
+            public void resetEditor() {
+            }
+
+            @Override
+            public void resetRenderer() {
             }
         };
     }

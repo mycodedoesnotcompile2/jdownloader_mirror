@@ -42,6 +42,13 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
         return this.service.getConfigV3().isEnabled() && this.account.isEnabled();
     }
 
+    /* Distinguishes the various per-account/per-plugin instances of this solver in log output (otherwise they all just print
+     * "PluginChallengeSolver", see ChallengeSolver#toString()). */
+    @Override
+    public String toString() {
+        return super.toString() + "@" + plugin.getHost();
+    }
+
     public Account getAccount() {
         return account;
     }
@@ -150,6 +157,7 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
     public void solve(SolverJob<T> job) throws InterruptedException, SolverException, SkipException {
         final CESSolverJob<T> cesJob = new CESSolverJob<T>(job);
         try {
+            cesJob.showBubble(this);
             plugin.setCurrentCaptchaChallenge(job.getChallenge());
             plugin.solve(cesJob, account);
         } catch (final PluginException e) {

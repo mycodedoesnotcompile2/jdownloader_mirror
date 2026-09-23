@@ -17,7 +17,6 @@ import org.appwork.timetracker.TrackerRule;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.Time;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.logging2.LogSource;
@@ -30,13 +29,13 @@ import org.jdownloader.captcha.blacklist.CaptchaBlackList;
 import org.jdownloader.captcha.event.ChallengeResponseEvent;
 import org.jdownloader.captcha.event.ChallengeResponseEventSender;
 import org.jdownloader.captcha.v2.ChallengeSolver.ChallengeVetoReason;
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.oauth.AccountOAuthSolver;
 import org.jdownloader.captcha.v2.challenge.oauth.OAuthDialogSolver;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
-import org.jdownloader.captcha.v2.solver.CESChallengeSolver;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
 import org.jdownloader.captcha.v2.solver.browser.BrowserSolver;
 import org.jdownloader.captcha.v2.solver.gui.DialogBasicCaptchaSolver;
@@ -150,20 +149,18 @@ public class ChallengeResponseController {
         addSolver(AccountOAuthSolver.getInstance());
         addSolver(CaptchaAPISolver.getInstance());
         /* Add plugin captcha solver services */
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            final List<LazyHostPlugin> captchaSolverPlugins = HostPluginController.getInstance().list(new LazyHostPluginFilter().setFeatures(FEATURE.CAPTCHA_SOLVER));
-            for (final LazyHostPlugin plg : captchaSolverPlugins) {
-                final PluginClassLoaderChild pluginClassLoaderChild = PluginClassLoader.getThreadPluginClassLoaderChild();
-                abstractPluginForCaptchaSolver plugin;
-                try {
-                    plugin = Plugin.getNewPluginInstance(null, plg, pluginClassLoaderChild);
-                } catch (PluginException e) {
-                    e.printStackTrace();
-                    continue;
-                }
-                final PluginForCaptchaSolverSolverService solverservice = new PluginForCaptchaSolverSolverService(plugin);
-                addSolverService(solverservice);
+        final List<LazyHostPlugin> captchaSolverPlugins = HostPluginController.getInstance().list(new LazyHostPluginFilter().setFeatures(FEATURE.CAPTCHA_SOLVER));
+        for (final LazyHostPlugin plg : captchaSolverPlugins) {
+            final PluginClassLoaderChild pluginClassLoaderChild = PluginClassLoader.getThreadPluginClassLoaderChild();
+            abstractPluginForCaptchaSolver plugin;
+            try {
+                plugin = Plugin.getNewPluginInstance(null, plg, pluginClassLoaderChild);
+            } catch (PluginException e) {
+                e.printStackTrace();
+                continue;
             }
+            final PluginForCaptchaSolverSolverService solverservice = new PluginForCaptchaSolverSolverService(plugin);
+            addSolverService(solverservice);
         }
     }
 
@@ -466,8 +463,9 @@ public class ChallengeResponseController {
             final AccountFilter af = new AccountFilter().setFeature(FEATURE.CAPTCHA_SOLVER);
             /* Map to collect solver accounts by domain */
             final Map<String, Account> bestAccountsByDomain = new HashMap<String, Account>();
-            /* Collect unavailable solver domains for logging purposes only */
+            /* Collect unavailable solver domains and their veto reasons for logging purposes only */
             final HashSet<String> unavailableSolverDomains = new HashSet<String>();
+            final Map<String, ChallengeVetoReason> unavailableSolverDomainVetoReasons = new HashMap<String, ChallengeVetoReason>();
             final List<Account> solverAccounts = AccountController.getInstance().listAccounts(af);
             for (final Account solverAccount : solverAccounts) {
                 if (solverAccount.getAccountInfo() == null) {
@@ -486,11 +484,13 @@ public class ChallengeResponseController {
                     if (!service.getConfigV3().isEnabled()) {
                         // TODO: Move this into getChallengeVetoReason
                         vetoReasons.add(ChallengeVetoReason.SOLVER_DISABLED);
+                        unavailableSolverDomainVetoReasons.put(solverAccount.getHoster(), ChallengeVetoReason.SOLVER_DISABLED);
                         continue;
                     }
                     final ChallengeVetoReason veto = solver.getChallengeVetoReason(c);
                     if (veto != null) {
                         vetoReasons.add(veto);
+                        unavailableSolverDomainVetoReasons.put(solverAccount.getHoster(), veto);
                         continue;
                     }
                     /* Collect account by domain, keeping only the one with lowest balance */
@@ -507,6 +507,7 @@ public class ChallengeResponseController {
                 } finally {
                     if (success) {
                         unavailableSolverDomains.remove(solverAccount.getHoster());
+                        unavailableSolverDomainVetoReasons.remove(solverAccount.getHoster());
                     } else {
                         unavailableSolverDomains.add(solverAccount.getHoster());
                     }
@@ -524,27 +525,35 @@ public class ChallengeResponseController {
                     logger.log(e);
                 }
             }
-            logger.info("Existing solver accounts that cannot be used for this challenge: " + unavailableSolverDomains);
+            if (unavailableSolverDomains.size() > 0) {
+                logger.info("Existing solver accounts that cannot be used for this challenge: " + unavailableSolverDomains + "|vetoReasons=" + unavailableSolverDomainVetoReasons);
+            }
         }
+        int avoidedAutoSolversForLoginCaptcha = 0;
         avoidAutoSolver: if (c.isAccountLogin() && CAPTCHA_SETTINGS.isAvoidAutoSolverForLoginCaptchas()) {
             /*
              * Special handling for login captchas: Solve them locally if possible and wished in order to solve them faster since account
              * logins in JDownloader are supposed to happen fast.
              */
             final List<ChallengeSolver<T>> manualSolvers = new ArrayList<ChallengeSolver<T>>();
+            int numberofExternalSolvers = 0;
             for (final ChallengeSolver<T> solver : ret) {
-                if (solver instanceof CESChallengeSolver) {
+                if (solver.getSolverType() == SolverType.EXTERNAL) {
+                    numberofExternalSolvers++;
                     continue;
                 }
                 manualSolvers.add(solver);
             }
             if (manualSolvers.size() == 0) {
+                logger.info("Tried to avoid auto solvers for login challenge -> Impossible because there are no manual solvers available!");
                 break avoidAutoSolver;
             }
             /* Clear all external solvers and only allow local solvers. */
+            avoidedAutoSolversForLoginCaptcha = numberofExternalSolvers;
             ret.clear();
             ret.addAll(manualSolvers);
         }
+        logger.info("Eligible solvers for challenge " + c.getId() + ": " + ret + "|avoidedAutoSolversForLoginCaptcha=" + avoidedAutoSolversForLoginCaptcha);
         return ret;
     }
 

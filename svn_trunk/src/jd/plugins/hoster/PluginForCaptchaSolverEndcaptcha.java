@@ -8,19 +8,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.http.Request;
-import jd.http.requests.FormData;
-import jd.http.requests.PostFormDataRequest;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-
 import org.appwork.storage.JSonStorage;
 import org.appwork.utils.ImageProvider.ImageProvider;
 import org.appwork.utils.images.IconIO;
@@ -41,7 +28,20 @@ import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigEndcaptcha;
 
-@HostPlugin(revision = "$Revision: 53451 $", interfaceVersion = 3, names = { "endcaptcha.com" }, urls = { "" })
+import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.http.Request;
+import jd.http.requests.FormData;
+import jd.http.requests.PostFormDataRequest;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
+@HostPlugin(revision = "$Revision: 53492 $", interfaceVersion = 3, names = { "endcaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSolver {
     public PluginForCaptchaSolverEndcaptcha(PluginWrapper wrapper) {
         super(wrapper);
@@ -111,8 +111,6 @@ public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSo
     @Override
     public void solve(CESSolverJob<?> job, Account account) throws Exception {
         final Challenge<?> challenge = job.getChallenge();
-        // TODO
-        // job.showBubble(this);
         try {
             // TODO
             // challenge.sendStatsSolving(this);
@@ -170,7 +168,7 @@ public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSo
              * plain solution text once it is done. Completion is therefore detected by the absence of the "UNSOLVED_YET" marker.
              */
             while (true) {
-                this.sleep(this.getPollingIntervalMillis(account), null);
+                Thread.sleep(getPollingIntervalMillis(account));
                 this.callAPI(br.createGetRequest(this.getApiBase() + "/poll/" + captchaID));
                 if (this.findCaptchaID() == null) {
                     break;

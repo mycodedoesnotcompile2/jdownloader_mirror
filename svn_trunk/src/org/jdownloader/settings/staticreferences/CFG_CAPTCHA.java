@@ -50,4 +50,9 @@ public class CFG_CAPTCHA {
      * MS to wait until captcha dialog gets answered. Close dialog after this timeout unanswered
      **/
     public static final IntegerKeyHandler               CAPTCHA_DIALOG_DEFAULT_COUNTDOWN               = SH.getKeyHandler("CaptchaDialogDefaultCountdown2", IntegerKeyHandler.class);
+    /**
+     * Affects login captchas only: If a login captcha is required and at least one manual captcha solver is available, only manual
+     * captcha solvers will be allowed to solve this login captcha.
+     **/
+    public static final BooleanKeyHandler                AVOID_AUTO_SOLVER_FOR_LOGIN_CAPTCHAS           = SH.getKeyHandler("AvoidAutoSolverForLoginCaptchas", BooleanKeyHandler.class);
 }

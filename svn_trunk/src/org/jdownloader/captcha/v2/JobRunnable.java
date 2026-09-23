@@ -8,6 +8,7 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import jd.controlling.captcha.SkipException;
 
+import org.appwork.exceptions.WTFException;
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.storage.JSonStorage;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -73,15 +74,6 @@ public class JobRunnable<T> implements Runnable {
                 if (timeout != null) {
                     timeout.resetAndStart();
                 }
-                // int waitTimeout = solver.getWaitForOthersTimeout();
-                // ChallengeSolver<?>[] waitInstances = ChallengeResponseController.getInstance().getWaitForOtherSolversList(solver);
-                // getJob().getLogger().info("Solver " + solver + " Waits " + TimeFormatter.formatMilliSeconds(waitTimeout, 0) + " for " +
-                // Arrays.toString(waitInstances));
-                // if (waitTimeout > 0 && waitInstances != null && waitInstances.length > 0) {
-                // job.waitFor(waitTimeout, waitInstances);
-                //
-                // }
-                // getJob().getLogger().info("Solver " + solver + " Waiting Done... run now.");
                 long startedWaiting = System.currentTimeMillis();
                 for (ChallengeSolver<?> s : job.getSolverList()) {
                     if (s == solver) {
@@ -181,46 +173,57 @@ public class JobRunnable<T> implements Runnable {
      * overrides only). For every pair without such an override, a default derived from the SolverType of both solvers applies, so new
      * solvers (e.g. created from accounts) need no timing configuration at all.
      */
-    /** Default wait time of external solvers for local automatic solvers (JAC). */
-    private static final int  DEFAULT_WAIT_EXTERNAL_FOR_LOCAL = 5000;
-    /** Default wait time of manual (human) solvers for local automatic solvers (JAC). */
-    private static final int  DEFAULT_WAIT_MANUAL_FOR_LOCAL   = 10000;
-    /** Default wait time of manual (human) solvers for external solvers. */
-    private static final int  DEFAULT_WAIT_MANUAL_FOR_EXTERNAL = 30000;
-    private static final Object WAIT_FOR_LOCK                 = new Object();
+    /** Default wait time of any non-local-automatic solver for the local automatic solver (JAC) to solve first. */
+    private static final int    DEFAULT_WAIT_FOR_LOCAL_AUTO          = 10000;
+    /** Default wait time of the external (paid) solver for the local automatic solver (JAC) to solve first - kept short since JAC is fast. */
+    private static final int    DEFAULT_WAIT_EXTERNAL_FOR_LOCAL_AUTO = 5000;
+    /** Default wait time of a lower-priority local/manual solver for a higher-priority local/manual solver to solve first. */
+    private static final int    DEFAULT_WAIT_FOR_LOCAL_MANUAL        = 10000;
+    /** Default wait time of the external (paid) solver for any local/manual solver to solve first, so paid solvers are only used as a last resort. */
+    private static final int    DEFAULT_WAIT_EXTERNAL_FOR_MANUAL     = 30000;
+    private static final Object WAIT_FOR_LOCK                        = new Object();
 
     /**
-     * Rank of a solver type: 0 = local automatic solver, 1 = external solver (paid service), 2 = manual solver (a human has to act). A solver
-     * waits by default only for solvers with a lower rank, so the default timings can never form a wait loop.
+     * Rank of a solver type, defining the default auto-handling order: JD_LOCAL, then JD_LOCAL_DIALOG, then JD_LOCAL_BROWSER, then
+     * JD_REMOTE_API, and EXTERNAL last. A solver waits by default only for solvers with a lower rank, so the default timings can never form a
+     * wait loop.
      */
     private static int getRank(final ChallengeSolver.SolverType type) {
         switch (type) {
         case JD_LOCAL:
             return 0;
-        case EXTERNAL:
-            return 1;
         case JD_LOCAL_DIALOG:
+            return 1;
         case JD_LOCAL_BROWSER:
-        case JD_REMOTE_API:
-        default:
             return 2;
+        case JD_REMOTE_API:
+            return 3;
+        case EXTERNAL:
+            return 4;
+        default:
+            throw new WTFException();
         }
     }
 
     /** Default wait time in ms of "owner" for "other" if the user did not configure anything. */
     public static int getDefaultWaitFor(final SolverService owner, final SolverService other) {
-        final int ownerRank = getRank(owner.getType());
-        final int otherRank = getRank(other.getType());
-        if (otherRank >= ownerRank) {
+        final ChallengeSolver.SolverType ownerType = owner.getType();
+        final ChallengeSolver.SolverType otherType = other.getType();
+        if (getRank(otherType) >= getRank(ownerType)) {
             return 0;
         }
-        switch (ownerRank) {
-        case 1:
-            return DEFAULT_WAIT_EXTERNAL_FOR_LOCAL;
-        case 2:
-            return otherRank == 0 ? DEFAULT_WAIT_MANUAL_FOR_LOCAL : DEFAULT_WAIT_MANUAL_FOR_EXTERNAL;
+        final boolean ownerIsExternal = ownerType == ChallengeSolver.SolverType.EXTERNAL;
+        switch (otherType) {
+        case JD_LOCAL:
+            return ownerIsExternal ? DEFAULT_WAIT_EXTERNAL_FOR_LOCAL_AUTO : DEFAULT_WAIT_FOR_LOCAL_AUTO;
+        case JD_LOCAL_DIALOG:
+        case JD_LOCAL_BROWSER:
+        case JD_REMOTE_API:
+            return ownerIsExternal ? DEFAULT_WAIT_EXTERNAL_FOR_MANUAL : DEFAULT_WAIT_FOR_LOCAL_MANUAL;
+        case EXTERNAL:
         default:
-            return 0;
+            /* Unreachable: EXTERNAL has the highest rank (lowest priority), so it can never be a lower-ranked "other" here. */
+            throw new WTFException();
         }
     }
 

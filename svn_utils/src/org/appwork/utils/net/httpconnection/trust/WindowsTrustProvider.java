@@ -28,9 +28,10 @@ import org.appwork.utils.os.CrossSystem;
  * (PKIXRevocationChecker) - Java 1.6+: Uses TrustRevocationHandler1_6 (global properties)
  */
 public class WindowsTrustProvider extends AbstractTrustProvider {
-    protected static final String             WINDOWS_ROOT_USER    = "Windows-ROOT";
+    /** https://marschall.github.io/2018/11/23/java-native-truststore-types.html **/
+    protected static final String             WINDOWS_USER_ROOT    = "Windows-ROOT";
     /** Windows-ROOT-LOCALMACHINE: available from Java 11.0.20 / 17.0.8 (SunMSCAPI). May require elevated access. */
-    protected static final String             WINDOWS_ROOT_MACHINE = "Windows-ROOT-LOCALMACHINE";
+    protected static final String             WINDOWS_MACHINE_ROOT = "Windows-ROOT-LOCALMACHINE";
     private static final WindowsTrustProvider INSTANCE             = new WindowsTrustProvider();
     private volatile X509TrustManager         trustManager;
     /** Merged Windows trust store (roots) used as PKIX trust anchors (created lazily). */
@@ -84,18 +85,10 @@ public class WindowsTrustProvider extends AbstractTrustProvider {
             final KeyStore merged = KeyStore.getInstance(KeyStore.getDefaultType());
             merged.load(null, null);
             int total = 0;
-            // 1) Current user trusted roots
-            final KeyStore userRoot = KeyStore.getInstance(WINDOWS_ROOT_USER);
-            userRoot.load(null, null);
-            total += copyCertificateEntries(userRoot, merged, "user-");
-            // 2) Local machine trusted roots (optional / may not exist / may require admin)
-            try {
-                final KeyStore machineRoot = KeyStore.getInstance(WINDOWS_ROOT_MACHINE);
-                machineRoot.load(null, null);
-                total += copyCertificateEntries(machineRoot, merged, "machine-");
-            } catch (final Exception e) {
-                // Ignore: older Java, or "Access is denied" without admin
-            }
+            // Current user trusted roots
+            total += load(merged, WINDOWS_USER_ROOT, "user-");
+            // Local machine trusted roots (optional / may not exist / may require admin)
+            total += load(merged, WINDOWS_MACHINE_ROOT, "machine-");
             if (total == 0) {
                 throw new SSLException("No certificates in Windows root store(s)");
             }
@@ -107,11 +100,26 @@ public class WindowsTrustProvider extends AbstractTrustProvider {
         }
     }
 
-    @Override
-    public X509TrustManager getTrustManager() throws SSLException {
-        if (!CrossSystem.isWindows()) {
-            throw new SSLException("TrustWindowsProvider is only available on Windows");
+    private int load(KeyStore merged, final String type, final String prefix) {
+        try {
+            final KeyStore keyStore = KeyStore.getInstance(type);
+            keyStore.load(null, null);
+            return copyCertificateEntries(keyStore, merged, prefix);
+        } catch (final Exception e) {
+            // Ignore: older Java, or "Access is denied" without admin
         }
+        return -1;
+    }
+
+    protected void ensureEnvironment() throws UnsupportedOperationException {
+        if (!CrossSystem.isWindows()) {
+            throw new UnsupportedOperationException(getId() + " is only available on Windows");
+        }
+    }
+
+    @Override
+    public X509TrustManager getTrustManager() throws UnsupportedOperationException, SSLException {
+        ensureEnvironment();
         if (trustManager == null) {
             synchronized (this) {
                 if (trustManager == null) {
@@ -140,11 +148,6 @@ public class WindowsTrustProvider extends AbstractTrustProvider {
             }
         }
         return trustManager;
-    }
-
-    @Override
-    public String getId() {
-        return "TrustWindowsProvider";
     }
 
     /**

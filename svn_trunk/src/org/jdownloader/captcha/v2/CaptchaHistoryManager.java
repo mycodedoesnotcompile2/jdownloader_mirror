@@ -93,8 +93,11 @@ public class CaptchaHistoryManager {
         if (entry == null) {
             throw new IllegalArgumentException("entry cannot be null");
         }
-        getEntries().add(entry);
+        final CopyOnWriteArrayList<CaptchaHistoryEntry> entries = getEntries();
+        entries.add(entry);
         cleanupEntries();
+        /* The list is mutated in-place above; the setter must be called explicitly so JsonConfig notices the change and persists it. */
+        CAPTCHA_SETTINGS.setCaptchaHistoryEntries(entries);
     }
 
     /**
@@ -161,7 +164,10 @@ public class CaptchaHistoryManager {
      * Clears all entries from the history.
      */
     public void clear() {
-        getEntries().clear();
+        final CopyOnWriteArrayList<CaptchaHistoryEntry> entries = getEntries();
+        entries.clear();
+        /* The list is mutated in-place above; the setter must be called explicitly so JsonConfig notices the change and persists it. */
+        CAPTCHA_SETTINGS.setCaptchaHistoryEntries(entries);
     }
 
     /**
@@ -180,18 +186,22 @@ public class CaptchaHistoryManager {
             return entries;
         }
         final long currentTime = System.currentTimeMillis();
+        boolean removedAny = false;
         for (Iterator<CaptchaHistoryEntry> iterator = entries.iterator(); iterator.hasNext();) {
             final CaptchaHistoryEntry entry = iterator.next();
             if (entry == null) {
                 // Remove null entries
                 entries.remove(null);
+                removedAny = true;
             } else if (entry.getCaptcha_type() == null || StringUtils.isEmpty(entry.getDomain())) {
                 /* Remove broken items */
                 entries.remove(entry);
+                removedAny = true;
             } else if (entry.getTimestamp() + ONE_YEAR_IN_MILLIS < currentTime) {
                 /* Remove old items */
                 // Remove entries older than 1 year or with empty domain
                 entries.remove(entry);
+                removedAny = true;
             }
         }
         // If we exceed MAX_ENTRIES, remove the oldest ones
@@ -199,10 +209,15 @@ public class CaptchaHistoryManager {
             if (entries.size() > 0) {
                 try {
                     entries.remove(0);
+                    removedAny = true;
                 } catch (IndexOutOfBoundsException ignoreAsyncPurge) {
                     break;
                 }
             }
+        }
+        if (removedAny) {
+            /* The list is mutated in-place above; the setter must be called explicitly so JsonConfig notices the change and persists it. */
+            CAPTCHA_SETTINGS.setCaptchaHistoryEntries(entries);
         }
         return entries;
     }

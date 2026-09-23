@@ -9,6 +9,7 @@ import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaC
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.MultiClickCaptchaResponse;
 import org.jdownloader.captcha.v2.solver.jac.JACSolver;
+import org.jdownloader.captcha.v2.solver.service.DialogSolverService;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.settings.advanced.AdvancedConfigManager;
 
@@ -24,7 +25,7 @@ public class DialogMultiClickCaptchaSolver extends AbstractDialogSolver<MultiCli
     private DialogMultiClickCaptchaSolver() {
         super(1);
         config = JsonConfig.create(CaptchaSettings.class);
-        AdvancedConfigManager.getInstance().register(JsonConfig.create(DialogCaptchaSolverConfig.class));
+        AdvancedConfigManager.getInstance().register(DialogSolverService.getInstance().getConfigV3());
     }
 
     private static final DialogMultiClickCaptchaSolver INSTANCE = new DialogMultiClickCaptchaSolver();

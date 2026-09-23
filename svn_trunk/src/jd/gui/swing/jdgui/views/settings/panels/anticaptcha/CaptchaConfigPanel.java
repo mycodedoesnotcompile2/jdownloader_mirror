@@ -17,6 +17,7 @@ import org.jdownloader.actions.AppAction;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.settings.AbstractConfigPanel;
+import org.jdownloader.gui.settings.Pair;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
@@ -39,7 +40,10 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
         this.addHeader(getTitle(), new AbstractIcon(IconKey.ICON_OCR, 32));
         this.addDescriptionPlain(_GUI.T.AntiCaptchaConfigPanel_onShow_description());
 
-        addPair(_GUI.T.CaptchaConfigPanel_useExternalSolverAccounts(), null, new Checkbox(CFG_GENERAL.USE_AVAILABLE_CAPTCHA_SOLVER_ACCOUNTS));
+        final Pair<Checkbox> useExternalSolverAccounts = addPair(_GUI.T.CaptchaConfigPanel_useExternalSolverAccounts(), null, new Checkbox(CFG_GENERAL.USE_AVAILABLE_CAPTCHA_SOLVER_ACCOUNTS));
+        final Pair<Checkbox> avoidAutoSolverForLoginCaptchas = addPair(_GUI.T.CaptchaConfigPanel_avoidAutoSolverForLoginCaptchas(), null, new Checkbox(CFG_CAPTCHA.AVOID_AUTO_SOLVER_FOR_LOGIN_CAPTCHAS));
+        avoidAutoSolverForLoginCaptchas.setToolTipText(_GUI.T.CaptchaConfigPanel_avoidAutoSolverForLoginCaptchas_tooltip());
+        avoidAutoSolverForLoginCaptchas.setConditionPair(useExternalSolverAccounts);
         addPair(_GUI.T.AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_sounds(), null, new Checkbox(CFG_SOUND.CAPTCHA_SOUND_ENABLED));
         addPair(_GUI.T.AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_countdown_download(), null, new Checkbox(CFG_CAPTCHA.DIALOG_COUNTDOWN_FOR_DOWNLOADS_ENABLED));
         addPair(_GUI.T.CaptchaExchangeSpinnerAction_skipbubbletimeout_(), null, new Spinner(CFG_CAPTCHA.CAPTCHA_EXCHANGE_CHANCE_TO_SKIP_BUBBLE_TIMEOUT));

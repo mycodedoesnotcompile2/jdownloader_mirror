@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Set;
 
 import javax.swing.Icon;
+import javax.swing.JLabel;
 
 import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtDefaultRowSorter;
@@ -32,13 +33,21 @@ import jd.plugins.CaptchaType.CAPTCHA_TYPE;
  * {@link #setVisibleTypes(Set)}.
  */
 public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
-    /** Default widths of the solver column and of each captcha type column. */
-    public static final int            SOLVER_COLUMN_WIDTH = 170;
-    public static final int            TYPE_COLUMN_WIDTH   = 135;
+    /** Icon size used for the type columns' check/X icon, see {@link IconKey#ICON_TRUE}/{@link IconKey#ICON_FALSE}. */
+    private static final int           TYPE_ICON_SIZE       = 16;
+    /** Icon size used for the solver column's solver icon, see {@link SolverService#getIcon(int)}. */
+    private static final int           SOLVER_ICON_SIZE     = 18;
+    /** Fallback default width of the solver column, used only before any solver was loaded (see {@link #setSolvers(List)}). */
+    public static final int            SOLVER_COLUMN_WIDTH  = 170;
     /* null = all columns visible. Only read after the constructor has finished (columns are created inside the super constructor). */
     private volatile Set<CAPTCHA_TYPE> visibleTypes         = null;
     /* All external solvers, before filtering. */
     private volatile List<SolverService> allSolvers          = new ArrayList<SolverService>();
+    /**
+     * Default width of the solver column: at most as wide as the longest solver name currently loaded (plus its icon). Updated in
+     * {@link #setSolvers(List)}.
+     */
+    private volatile int                 solverColumnWidth   = SOLVER_COLUMN_WIDTH;
     /* True: only show solvers that support every selected (visible) captcha type. */
     private volatile boolean             onlyFullSupport     = false;
     /* True: sort by the number of supported types among the selected ones instead of the total number of supported types. */
@@ -104,12 +113,33 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
         return supportedTypes != null && supportedTypes.contains(type);
     }
 
+    /** Rendered pixel width of a piece of text in the default label font, used to size columns to fit their content. */
+    private static int textWidth(final String text) {
+        return new JLabel(text).getPreferredSize().width;
+    }
+
+    /** Default width of the column for the given captcha type: capped to the header word's width, see {@link TypeColumn}. */
+    public static int getTypeColumnDefaultWidth(final CAPTCHA_TYPE type) {
+        return Math.max(TYPE_ICON_SIZE + 16, textWidth(type.getDisplayName()) + 16);
+    }
+
+    /** Current default width of the solver column, see {@link #setSolvers(List)}. */
+    public int getSolverColumnWidth() {
+        return solverColumnWidth;
+    }
+
     /**
      * Replaces the rows. Default order: the solver supporting the most captcha types first. If the user selected a sort column, that sort
      * is applied on top.
      */
     public void setSolvers(final List<SolverService> solvers) {
         this.allSolvers = new ArrayList<SolverService>(solvers);
+        /* Default width capped to the longest solver name (plus its icon), never narrower than the icon itself. */
+        int widestName = SOLVER_ICON_SIZE + 16;
+        for (final SolverService solver : allSolvers) {
+            widestName = Math.max(widestName, textWidth(solver.getName()) + SOLVER_ICON_SIZE + 16);
+        }
+        this.solverColumnWidth = widestName;
         rebuildRows();
     }
 
@@ -195,7 +225,7 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
 
             @Override
             public int getDefaultWidth() {
-                return SOLVER_COLUMN_WIDTH;
+                return solverColumnWidth;
             }
 
             @Override
@@ -212,10 +242,15 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
     private class TypeColumn extends ExtIconColumn<SolverService> {
         private static final long serialVersionUID = 1L;
         private final CAPTCHA_TYPE type;
+        /* Default width capped to the header word's width, never narrower than the check/X icon shown in the cells. */
+        private final int          defaultWidth;
+        private final int          minWidth;
 
         public TypeColumn(final CAPTCHA_TYPE type) {
             super(type.getDisplayName());
             this.type = type;
+            this.minWidth = TYPE_ICON_SIZE + 16;
+            this.defaultWidth = getTypeColumnDefaultWidth(type);
             /* Supported solvers first when sorting ascending, unsupported first when sorting descending. */
             setRowSorter(new ExtDefaultRowSorter<SolverService>() {
                 @Override
@@ -268,12 +303,12 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
          */
         @Override
         public int getDefaultWidth() {
-            return TYPE_COLUMN_WIDTH;
+            return defaultWidth;
         }
 
         @Override
         public int getMinWidth() {
-            return 90;
+            return minWidth;
         }
 
         /* No tight limit: with few selected types the columns are stretched over the full table width. */

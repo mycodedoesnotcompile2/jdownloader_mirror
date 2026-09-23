@@ -4,24 +4,25 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.appwork.exceptions.WTFException;
-import org.appwork.utils.DebugMode;
+import org.appwork.utils.logging2.LogInterface;
 import org.jdownloader.captcha.v2.AbstractResponse;
-import org.jdownloader.captcha.v2.CaptchaChallengeFilter;
+import org.jdownloader.captcha.v2.CaptchaSolverCaptchaTypesSettingsPanelBuilder.AccountCaptchaTypeAccessor;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeSolver.ChallengeVetoReason;
 import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
 import org.jdownloader.captcha.v2.PluginChallengeSolver;
-import org.jdownloader.captcha.v2.CaptchaSolverCaptchaTypesSettingsPanelBuilder.AccountCaptchaTypeAccessor;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginForHost;
 
 /**
@@ -30,7 +31,22 @@ import jd.plugins.PluginForHost;
 public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
     public <T> PluginChallengeSolver<T> getPluginChallengeSolver(final Challenge<T> c, final Account account) throws Exception {
         final abstractPluginForCaptchaSolver plugin = getNewPluginInstance(getLazyP());
-        plugin.setBrowser(plugin.createNewBrowserInstance());
+        /*
+         * Use the logger of the plugin that triggered the challenge (e.g. the hoster/crawler plugin) if available, so solver requests show up
+         * next to the download/crawl that caused them; fall back to this solver's own logger otherwise. Debug/verbose are always enabled here
+         * so solver browser requests actually get logged (mirrors the old CESChallengeSolver#createNewBrowserInstance behavior).
+         */
+        final Plugin challengePlugin = c != null ? c.getPlugin() : null;
+        LogInterface logger = challengePlugin != null ? challengePlugin.getLogger() : null;
+        if (logger == null) {
+            logger = plugin.getLogger();
+        }
+        plugin.setLogger(logger);
+        final Browser br = plugin.createNewBrowserInstance();
+        br.setLogger(logger);
+        br.setDebug(true);
+        br.setVerbose(true);
+        plugin.setBrowser(br);
         return new PluginChallengeSolver<T>(plugin, account);
     }
 
@@ -42,10 +58,8 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      */
     public abstractPluginForCaptchaSolver(PluginWrapper wrapper) {
         super(wrapper);
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            /* All captcha solver plugins have account support. */
-            this.enablePremium(getBuyPremiumUrl());
-        }
+        /* All captcha solver plugins have account support. */
+        this.enablePremium(getBuyPremiumUrl());
     }
 
     /**

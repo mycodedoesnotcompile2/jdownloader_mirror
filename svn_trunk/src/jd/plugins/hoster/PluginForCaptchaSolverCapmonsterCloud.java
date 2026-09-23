@@ -11,16 +11,12 @@ import jd.PluginWrapper;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52505 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53490 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
 public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.CAPTCHA_SOLVER, LazyPlugin.FEATURE.BUBBLE_NOTIFICATION, LazyPlugin.FEATURE.API_KEY_LOGIN };
     }
-    // public Object getFavIcon(final String host) throws IOException {
-    // // TODO: Fix missing fav-icon (missing due to Cloudflare blocking when accessing main page).
-    // return null;
-    // }
 
     public PluginForCaptchaSolverCapmonsterCloud(PluginWrapper wrapper) {
         super(wrapper);
@@ -37,13 +33,11 @@ public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCapt
         types.add(CAPTCHA_TYPE.IMAGE);
         types.add(CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA);
         types.add(CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
-        // types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
-        // TODO: Check if they support this captcha type
-        // types.add(CAPTCHA_TYPE.HCAPTCHA);
-        // types.add(CAPTCHA_TYPE.KEY_CAPTCHA);
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V3_ENTERPRISE);
         types.add(CAPTCHA_TYPE.CLOUDFLARE_TURNSTILE);
         types.add(CAPTCHA_TYPE.MT_CAPTCHA);
         return types;

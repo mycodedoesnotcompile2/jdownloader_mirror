@@ -8,8 +8,8 @@ import java.util.Map;
 /**
  * Central access point for everything related to external (system) browsers.
  *
- * For now this manager only offers a best-effort "lazy" name lookup that turns a browser executable path (as configured e.g. in the
- * captcha browser solver commandline) into a nice human readable name.
+ * For now this manager only offers a best-effort "lazy" name lookup that turns a browser executable path (as configured e.g. in the captcha
+ * browser solver commandline) into a nice human readable name.
  *
  * In the future this class is meant to also scan the system for installed browsers and return them.
  */
@@ -53,7 +53,6 @@ public class ExternalBrowserManager {
         /* Microsoft */
         map.put("msedge", "Microsoft Edge");
         map.put("microsoft edge", "Microsoft Edge");
-        map.put("iexplore", "Internet Explorer");
         /* Apple */
         map.put("safari", "Safari");
         this.knownBrowsers = map;

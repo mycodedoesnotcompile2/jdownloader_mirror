@@ -6,7 +6,7 @@ import java.awt.event.ActionListener;
 import javax.swing.Timer;
 
 import org.appwork.utils.swing.EDTRunner;
-import org.jdownloader.captcha.v2.solver.CESChallengeSolver;
+import org.jdownloader.captcha.v2.ChallengeSolver;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.gui.notify.gui.AbstractNotifyWindow;
 import org.jdownloader.gui.translate._GUI;
@@ -15,7 +15,7 @@ public class CESBubble extends AbstractNotifyWindow<CESBubbleContent> {
 
     private Timer updateTimer;
 
-    public CESBubble(CESChallengeSolver<?> solver, CESSolverJob<?> cesSolverJob, int timeoutms) {
+    public CESBubble(ChallengeSolver<?> solver, CESSolverJob<?> cesSolverJob, int timeoutms) {
         super(_GUI.T.CESBubble_CESBubble2(solver.getService().getName(), solver.getService().getType().getLabel()), new CESBubbleContent(solver, cesSolverJob, timeoutms));
         getContentComponent().setBubble(this);
         updateTimer = new Timer(1000, new ActionListener() {

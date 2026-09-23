@@ -74,9 +74,16 @@ public class MyJDownloaderController extends AbstractServerBasics implements Shu
         return INSTANCE;
     }
 
-    private final NullsafeAtomicReference<MyJDownloaderConnectThread> thread = new NullsafeAtomicReference<MyJDownloaderConnectThread>(null);
+    private final NullsafeAtomicReference<MyJDownloaderConnectThread> thread     = new NullsafeAtomicReference<MyJDownloaderConnectThread>(null);
     private final LogSource                                           logger;
     private final MyJDownloaderEventSender                            eventSender;
+    /*
+     * Guards the start()/stop() lifecycle. start() runs the sequence stop -> validate -> compareAndSet, which is not atomic on its own:
+     * without this lock two concurrent start() calls (GUI connect(), config event, connect thread onError, constructor) can interleave so
+     * that one call's stop() tears down the connection another call has just established. Serializing both methods on this monitor prevents
+     * that.
+     */
+    private final Object                                             startStopLock = new Object();
 
     public MyJDownloaderEventSender getEventSender() {
         return eventSender;
@@ -117,20 +124,22 @@ public class MyJDownloaderController extends AbstractServerBasics implements Shu
     }
 
     protected void stop() {
-        final MyJDownloaderConnectThread lThread = thread.getAndSet(null);
-        if (lThread == null) {
-            return;
-        }
-        ShutdownController.getInstance().removeShutdownVetoListener(this);
-        new Thread("MyJDownloaderController:Stop:" + lThread) {
-            {
-                setDaemon(true);
+        synchronized (startStopLock) {
+            final MyJDownloaderConnectThread lThread = thread.getAndSet(null);
+            if (lThread == null) {
+                return;
             }
+            ShutdownController.getInstance().removeShutdownVetoListener(this);
+            new Thread("MyJDownloaderController:Stop:" + lThread) {
+                {
+                    setDaemon(true);
+                }
 
-            public void run() {
-                lThread.disconnect();
-            };
-        }.start();
+                public void run() {
+                    lThread.disconnect();
+                };
+            }.start();
+        }
     }
 
     @Override
@@ -311,6 +320,12 @@ public class MyJDownloaderController extends AbstractServerBasics implements Shu
     }
 
     protected void start() {
+        synchronized (startStopLock) {
+            startLocked();
+        }
+    }
+
+    private void startLocked() {
         stop();
         String email = CFG_MYJD.CFG.getEmail();
         String password = CFG_MYJD.CFG.getPassword();

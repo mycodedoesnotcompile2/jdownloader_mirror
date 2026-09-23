@@ -5,7 +5,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.EDTRunner;
-import org.jdownloader.captcha.v2.solver.CESChallengeSolver;
+import org.jdownloader.captcha.v2.ChallengeSolver;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.gui.notify.AbstractBubbleSupport;
 import org.jdownloader.gui.notify.BubbleNotify.AbstractNotifyWindowFactory;
@@ -36,7 +36,7 @@ public class CESBubbleSupport extends AbstractBubbleSupport {
         return null;
     }
 
-    public CESBubble show(final CESChallengeSolver<?> solver, final CESSolverJob<?> cesSolverJob, final int timeoutms) throws InterruptedException {
+    public CESBubble show(final ChallengeSolver<?> solver, final CESSolverJob<?> cesSolverJob, final int timeoutms) throws InterruptedException {
         if (isEnabled()) {
             final CESBubble ret = new EDTHelper<CESBubble>() {
 

@@ -29,35 +29,34 @@ import org.appwork.utils.os.CrossSystem;
  * <p>
  * Tries the following paths in order (first existing readable file wins):
  * <ul>
- *   <li>{@value #LINUX_CA_DEBIAN} – Debian, Ubuntu and derivatives (maintained by package {@code ca-certificates})</li>
- *   <li>{@value #LINUX_CA_FEDORA} – Fedora, RHEL, CentOS and derivatives</li>
- *   <li>{@value #LINUX_CA_OPENSUSE} – OpenSUSE and others</li>
+ * <li>{@value #LINUX_CA_DEBIAN} – Debian, Ubuntu and derivatives (maintained by package {@code ca-certificates})</li>
+ * <li>{@value #LINUX_CA_FEDORA} – Fedora, RHEL, CentOS and derivatives</li>
+ * <li>{@value #LINUX_CA_OPENSUSE} – OpenSUSE and others</li>
  * </ul>
  * Certificates are loaded via {@link java.security.cert.CertificateFactory} (X.509 PEM).
  * <p>
  * <b>References:</b>
  * <ul>
- *   <li>Debian/Ubuntu: <code>ca-certificates</code> package, default path
- *       <br><a href="https://wiki.debian.org/CA-Certificate">https://wiki.debian.org/CA-Certificate</a></li>
- *   <li>Fedora/RHEL: System-wide CA bundle
- *       <br><a href="https://fedoraproject.org/wiki/CA-Certificate_Overview">https://fedoraproject.org/wiki/CA-Certificate_Overview</a></li>
- *   <li>OpenSUSE: <code>ca-certificates-mozilla</code> / <code>ca-certificates</code>, typical path
- *       <br><a href="https://en.opensuse.org/openSUSE:Package signing">openSUSE package signing</a></li>
+ * <li>Debian/Ubuntu: <code>ca-certificates</code> package, default path <br>
+ * <a href="https://wiki.debian.org/CA-Certificate">https://wiki.debian.org/CA-Certificate</a></li>
+ * <li>Fedora/RHEL: System-wide CA bundle <br>
+ * <a href="https://fedoraproject.org/wiki/CA-Certificate_Overview">https://fedoraproject.org/wiki/CA-Certificate_Overview</a></li>
+ * <li>OpenSUSE: <code>ca-certificates-mozilla</code> / <code>ca-certificates</code>, typical path <br>
+ * <a href="https://en.opensuse.org/openSUSE:Package signing">openSUSE package signing</a></li>
  * </ul>
  *
  * @see org.appwork.utils.net.httpconnection.trust.TrustUtils#getOSProvider()
  */
 public class TrustLinuxProvider extends AbstractTrustProvider {
     /** Debian/Ubuntu and derivatives (ca-certificates package). */
-    protected static final String LINUX_CA_DEBIAN = "/etc/ssl/certs/ca-certificates.crt";
+    protected static final String           LINUX_CA_DEBIAN   = "/etc/ssl/certs/ca-certificates.crt";
     /** Fedora/RHEL and derivatives. */
-    protected static final String LINUX_CA_FEDORA = "/etc/pki/tls/certs/ca-bundle.crt";
+    protected static final String           LINUX_CA_FEDORA   = "/etc/pki/tls/certs/ca-bundle.crt";
     /** OpenSUSE and others. */
-    protected static final String LINUX_CA_OPENSUSE = "/etc/ssl/certs/ca-bundle.crt";
-
-    private static final TrustLinuxProvider INSTANCE = new TrustLinuxProvider();
-    private volatile X509TrustManager trustManager;
-    private volatile KeyStore trustStore;
+    protected static final String           LINUX_CA_OPENSUSE = "/etc/ssl/certs/ca-bundle.crt";
+    private static final TrustLinuxProvider INSTANCE          = new TrustLinuxProvider();
+    private volatile X509TrustManager       trustManager;
+    private volatile KeyStore               trustStore;
 
     public static TrustLinuxProvider getInstance() {
         return INSTANCE;
@@ -153,11 +152,6 @@ public class TrustLinuxProvider extends AbstractTrustProvider {
             }
         }
         return trustManager;
-    }
-
-    @Override
-    public String getId() {
-        return "TrustLinuxProvider";
     }
 
     @Override

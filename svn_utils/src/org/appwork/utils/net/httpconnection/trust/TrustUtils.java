@@ -105,11 +105,7 @@ public class TrustUtils {
                 return CurrentJRETrustProvider.getInstance();
             }
         case MAC:
-            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                return ExperimentalMacTrustProvider.getInstance();
-            } else {
-                return CurrentJRETrustProvider.getInstance();
-            }
+            return MacTrustProvider.getInstance();
         default:
             return CurrentJRETrustProvider.getInstance();
         }

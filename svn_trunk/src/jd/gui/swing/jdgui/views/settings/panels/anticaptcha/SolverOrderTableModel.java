@@ -53,6 +53,7 @@ import org.jdownloader.settings.staticreferences.CFG_MYJD;
 import jd.controlling.AccountController;
 import jd.controlling.AccountControllerEvent;
 import jd.controlling.AccountControllerListener;
+import jd.plugins.AccountInfo;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 public class SolverOrderTableModel extends ExtTableModel<SolverService> {
@@ -203,7 +204,7 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
                 object.getConfigV3().setEnabled(!object.getConfigV3().isEnabled());
             }
         });
-        addColumn(new ExtTextColumn<SolverService>(_GUI.T.SolverOrderTableModel_initColumns_service()) {
+        addColumn(new ExtTextColumn<SolverService>(_GUI.T.CaptchaSolverComparison_column_solver()) {
             @Override
             protected Icon getIcon(SolverService value) {
                 return value.getIcon(18);
@@ -234,6 +235,12 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
             @Override
             public boolean onDoubleClick(final MouseEvent e, final SolverService value) {
                 return SolverComparisonTableModel.openBuyPage(value);
+            }
+
+            /* Like the Enabled column, the solver name must always be visible. */
+            @Override
+            public boolean isHidable() {
+                return false;
             }
         });
         addColumn(new ExtTextColumn<SolverService>(_GUI.T.SolverOrderTableModel_initColumns_type_()) {
@@ -283,7 +290,19 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
                     @Override
                     public void actionPerformed(ActionEvent e) {
                         if (editing != null) {
-                            editing.onStatusAction();
+                            final SolverService target = editing;
+                            /*
+                             * onStatusAction() (e.g. "Add Account") opens a modal dialog; while it is open (or right after it closes,
+                             * successfully or not), an account/status change re-sorts/redraws the table (refreshRows()/update()), which
+                             * clears the row selection. Restore it afterwards so the row the user was just looking at stays selected.
+                             */
+                            target.onStatusAction();
+                            if (getModel() != null && getModel().getTable() != null) {
+                                final int row = getModel().getRowforObject(target);
+                                if (row >= 0) {
+                                    getModel().getTable().getSelectionModel().setSelectionInterval(row, row);
+                                }
+                            }
                         }
                     }
                 });
@@ -405,10 +424,15 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
             @Override
             protected String getText(final SolverService value) {
                 /* Empty for solvers without a balance (local solvers, or paid solvers without a valid account). */
-                if (value.getBalance() == null) {
+                final Double balance = value.getBalance();
+                if (balance == null) {
                     return "";
                 }
-                return super.getText(value);
+                /*
+                 * Formatted the same way as the Status column's "Balance: ..." text (AccountInfo#formatCaptchaSolverBalance), regardless of
+                 * how many accounts of this solver exist, instead of ExtCurrencyColumn's own locale-dependent formatting.
+                 */
+                return AccountInfo.formatCaptchaSolverBalance(balance.doubleValue(), value.getBalanceCurrency());
             }
 
             @Override

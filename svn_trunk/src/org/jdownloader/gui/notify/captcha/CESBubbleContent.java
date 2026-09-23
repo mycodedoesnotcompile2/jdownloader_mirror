@@ -15,16 +15,14 @@ import net.miginfocom.swing.MigLayout;
 
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtButton;
-import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.images.IconIO;
 import org.appwork.utils.swing.SwingUtils;
 import org.jdownloader.actions.AppAction;
 import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.ChallengeSolver;
 import org.jdownloader.captcha.v2.SolverStatus;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
-import org.jdownloader.captcha.v2.solver.CESChallengeSolver;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.gui.notify.AbstractBubbleContentPanel;
@@ -38,7 +36,7 @@ public class CESBubbleContent extends AbstractBubbleContentPanel {
     private JLabel                   status;
     private long                     startTime;
     private JLabel                   duration;
-    private CESChallengeSolver<?>    solver;
+    private ChallengeSolver<?>       solver;
     private CESSolverJob<?>          job;
     private JLabel                   statusLbl;
     private JLabel                   timeoutLbl;
@@ -46,11 +44,9 @@ public class CESBubbleContent extends AbstractBubbleContentPanel {
     private ExtButton                button;
     private CESBubble                bubble;
     private SolverStatus             latestStatus;
-    private JLabel                   creditsLabel;
-    private JLabel                   credits;
     protected IconedProcessIndicator progressCircle = null;
 
-    public CESBubbleContent(final CESChallengeSolver<?> solver, final CESSolverJob<?> cesSolverJob, int timeoutms) {
+    public CESBubbleContent(final ChallengeSolver<?> solver, final CESSolverJob<?> cesSolverJob, int timeoutms) {
         super(solver.getService().getIcon(20));
         this.solver = solver;
         this.job = cesSolverJob;
@@ -65,15 +61,13 @@ public class CESBubbleContent extends AbstractBubbleContentPanel {
         SwingUtils.toBold(timeoutLbl);
         east.add(durationLbl = createHeaderLabel((_GUI.T.ReconnectDialog_layoutDialogContent_duration())), "hidemode 3");
         east.add(duration = new JLabel(""), "hidemode 3");
-        east.add(creditsLabel = createHeaderLabel((_GUI.T.CESBubbleContent_CESBubbleContent_credits())), "hidemode 3");
-        east.add(credits = new JLabel(""), "hidemode 3");
         east.add(statusLbl = createHeaderLabel((_GUI.T.CESBubbleContent_CESBubbleContent_status())), "hidemode 3");
         east.add(status = new JLabel(""), "hidemode 3");
         progressCircle = createProgress(solver.getService().getIcon(20));
         add(progressCircle, "width 32!,height 32!,pushx,growx,pushy,growy,aligny top");
         add(east);
-        if (CFG_BUBBLE.CFG.isCaptchaExchangeSolverBubbleImageVisible() && !(cesSolverJob.getChallenge() instanceof RecaptchaV2Challenge)) {
-            Challenge<?> ic = cesSolverJob.getChallenge();
+        if (CFG_BUBBLE.CFG.isCaptchaExchangeSolverBubbleImageVisible()) {
+            final Challenge<?> ic = cesSolverJob.getChallenge();
             if (ic instanceof ImageCaptchaChallenge) {
                 try {
                     ImageIcon icon = null;
@@ -109,7 +103,7 @@ public class CESBubbleContent extends AbstractBubbleContentPanel {
 
             @Override
             public void mouseClicked(MouseEvent e) {
-                ((CESChallengeSolver<Object>) solver).kill((SolverJob<Object>) cesSolverJob.getJob());
+                ((ChallengeSolver<Object>) solver).kill((SolverJob<Object>) cesSolverJob.getJob());
                 if (bubble != null) {
                     bubble.hideBubble(0);
                 }
@@ -122,7 +116,7 @@ public class CESBubbleContent extends AbstractBubbleContentPanel {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                ((CESChallengeSolver<Object>) solver).kill((SolverJob<Object>) cesSolverJob.getJob());
+                ((ChallengeSolver<Object>) solver).kill((SolverJob<Object>) cesSolverJob.getJob());
                 if (bubble != null) {
                     bubble.hideBubble(0);
                 }
@@ -149,7 +143,6 @@ public class CESBubbleContent extends AbstractBubbleContentPanel {
         if (s != null) {
             latestStatus = s;
         }
-        credits.setText(solver.getAccountStatusString());
         if (latestStatus == null) {
             status.setVisible(false);
             statusLbl.setVisible(false);
@@ -178,8 +171,6 @@ public class CESBubbleContent extends AbstractBubbleContentPanel {
         duration.setVisible(rest <= 0);
         statusLbl.setVisible(rest <= 0);
         status.setVisible(rest <= 0);
-        creditsLabel.setVisible(StringUtils.isNotEmpty(credits.getText()));
-        credits.setVisible(StringUtils.isNotEmpty(credits.getText()));
         if (bubble != null) {
             bubble.pack();
             BubbleNotify.getInstance().relayout();

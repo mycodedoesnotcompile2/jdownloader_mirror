@@ -8,7 +8,7 @@ import java.lang.reflect.Type;
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.DomainInfo;
-import org.jdownloader.captcha.v2.solver.CESChallengeSolver;
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
 import org.jdownloader.captcha.v2.solverjob.ResponseList;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.controlling.UniqueAlltimeID;
@@ -349,19 +349,19 @@ public abstract class Challenge<T> {
     public void sendStatsError(ChallengeSolver<?> solver, Throwable e) {
         if (e == null || e instanceof InterruptedException) {
             return;
-        } else if (solver == null || !(solver instanceof CESChallengeSolver)) {
+        } else if (solver == null || solver.getSolverType() != SolverType.EXTERNAL) {
             return;
         }
     }
 
     public void sendStatsSolving(ChallengeSolver<?> solver) {
-        if (solver == null || !(solver instanceof CESChallengeSolver)) {
+        if (solver == null || solver.getSolverType() != SolverType.EXTERNAL) {
             return;
         }
     }
 
     public void sendStatsValidation(ChallengeSolver<?> solver, String status) {
-        if (solver == null || !(solver instanceof CESChallengeSolver)) {
+        if (solver == null || solver.getSolverType() != SolverType.EXTERNAL) {
             return;
         }
     }

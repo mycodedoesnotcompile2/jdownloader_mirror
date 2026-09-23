@@ -11,14 +11,11 @@ import java.awt.event.ActionListener;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import javax.swing.DefaultListCellRenderer;
-import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
@@ -37,6 +34,7 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSolverService;
 
 import jd.gui.swing.jdgui.BasicJDTable;
+import jd.gui.swing.jdgui.views.settings.components.MultiComboBox;
 import jd.gui.swing.jdgui.views.settings.components.SettingsComponent;
 import jd.plugins.CaptchaType;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
@@ -63,14 +61,16 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
     private final JComboBox                      presetCombo;
     private final JCheckBox                      onlyFullSupportCheckBox;
     private final JLabel                         emptyLabel;
-    private final JButton                        typesButton;
-    private final JPopupMenu                     typesPopup;
+    /**
+     * Multi-select "[x/y] [Type1, Type2, ...]" control (same widget/label format as the multi-select ENUM columns in the Advanced
+     * Settings, see {@code AdvancedValueColumn}), doubling as its own button and popup.
+     */
+    private final MultiComboBox<CAPTCHA_TYPE>    typesCombo;
     /** All captcha types JDownloader can process, i.e. all possible columns. */
     private final List<CAPTCHA_TYPE>             allTypes;
-    private final Map<CAPTCHA_TYPE, JCheckBox>   checkBoxes    = new LinkedHashMap<CAPTCHA_TYPE, JCheckBox>();
     /** Captcha types whose columns are currently shown. */
     private final Set<CAPTCHA_TYPE>              selectedTypes = new LinkedHashSet<CAPTCHA_TYPE>();
-    /** True while the dropdown is modified programmatically so that its listener does not reset the user's selection. */
+    /** True while the dropdown/multi-select is modified programmatically so that its listener does not reset the user's selection. */
     private boolean                              adjusting     = false;
     private final JScrollPane                    scrollPane;
     /**
@@ -121,25 +121,35 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
         };
         /* Many captcha type columns: keep their width and scroll horizontally instead of squeezing them. */
         table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
-        /* Multi-select "dropdown": a popup with one checkbox per captcha type. */
-        typesPopup = new JPopupMenu();
-        for (final CAPTCHA_TYPE type : allTypes) {
-            final JCheckBox checkBox = new JCheckBox(type.getDisplayName());
-            checkBox.setToolTipText(type.getDescription());
-            checkBox.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(final ActionEvent e) {
-                    if (checkBox.isSelected()) {
-                        selectedTypes.add(type);
-                    } else {
-                        selectedTypes.remove(type);
-                    }
-                    onManualSelectionChange();
+        /* Multi-select "[x/y] [Type1, Type2]" control; CAPTCHA_TYPE has no LabelInterface, so the per-item label comes from getDisplayName(). */
+        typesCombo = new MultiComboBox<CAPTCHA_TYPE>(allTypes) {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            protected String getLabel(final CAPTCHA_TYPE type) {
+                return type.getDisplayName();
+            }
+
+            @Override
+            protected String getLabel(final List<CAPTCHA_TYPE> list) {
+                final List<String> labels = new ArrayList<String>();
+                for (final CAPTCHA_TYPE type : list) {
+                    labels.add(getLabel(type));
                 }
-            });
-            checkBoxes.put(type, checkBox);
-            typesPopup.add(checkBox);
-        }
+                return "[" + list.size() + "/" + getValues().size() + "] " + labels.toString();
+            }
+
+            @Override
+            public void onChanged() {
+                super.onChanged();
+                if (adjusting) {
+                    return;
+                }
+                selectedTypes.clear();
+                selectedTypes.addAll(getSelectedItems());
+                onManualSelectionChange();
+            }
+        };
         presetCombo = new JComboBox();
         presetCombo.setRenderer(new DefaultListCellRenderer() {
             private static final long serialVersionUID = 1L;
@@ -161,17 +171,10 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
                 }
             }
         });
-        typesButton = new JButton();
-        typesButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(final ActionEvent e) {
-                typesPopup.show(typesButton, 0, typesButton.getHeight());
-            }
-        });
         final MigPanel selectionBar = new MigPanel("ins 0", "[][][grow,fill]", "[]");
         selectionBar.add(new JLabel(_GUI.T.CaptchaSolverComparison_preselect_label()));
         selectionBar.add(presetCombo, "height 26!");
-        selectionBar.add(typesButton, "height 26!");
+        selectionBar.add(typesCombo, "height 26!");
         add(selectionBar, "growx");
         onlyFullSupportCheckBox = new JCheckBox(_GUI.T.CaptchaSolverComparison_onlyFullSupport());
         onlyFullSupportCheckBox.addActionListener(new ActionListener() {
@@ -194,7 +197,7 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
         add(new JLabel(_GUI.T.CaptchaSolverComparison_disclaimer()), "growx, wmin 10");
         /* Default: all captcha types selected. */
         selectedTypes.addAll(allTypes);
-        syncCheckBoxes();
+        syncTypesCombo();
         onSelectionChanged();
         refresh();
     }
@@ -297,7 +300,7 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
     private void applyPreset(final Preselect preset) {
         selectedTypes.clear();
         selectedTypes.addAll(getPresetTypes(preset));
-        syncCheckBoxes();
+        syncTypesCombo();
         onSelectionChanged();
     }
 
@@ -332,16 +335,19 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
         onSelectionChanged();
     }
 
-    private void syncCheckBoxes() {
-        for (final Map.Entry<CAPTCHA_TYPE, JCheckBox> entry : checkBoxes.entrySet()) {
-            entry.getValue().setSelected(selectedTypes.contains(entry.getKey()));
+    /** Reflects {@link #selectedTypes} in the multi-select control without triggering its own change handling (see {@link #adjusting}). */
+    private void syncTypesCombo() {
+        adjusting = true;
+        try {
+            typesCombo.setSelectedItems(new ArrayList<CAPTCHA_TYPE>(selectedTypes));
+        } finally {
+            adjusting = false;
         }
     }
 
     private void onSelectionChanged() {
         /* "Used by you": list solvers first that support the most (ideally all) of the captcha types the user needs. */
         model.setVisibleTypes(selectedTypes, presetCombo.getSelectedItem() == Preselect.USED);
-        typesButton.setText(_GUI.T.CaptchaSolverComparison_types_button(String.valueOf(selectedTypes.size()), String.valueOf(allTypes.size())));
         updateResizeMode();
     }
 
@@ -350,7 +356,10 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
      * default width and scroll horizontally.
      */
     private void updateResizeMode() {
-        final int neededWidth = SolverComparisonTableModel.SOLVER_COLUMN_WIDTH + selectedTypes.size() * SolverComparisonTableModel.TYPE_COLUMN_WIDTH;
+        int neededWidth = model.getSolverColumnWidth();
+        for (final CAPTCHA_TYPE type : selectedTypes) {
+            neededWidth += SolverComparisonTableModel.getTypeColumnDefaultWidth(type);
+        }
         final int available = scrollPane.getViewport().getWidth();
         final int mode = neededWidth <= available ? JTable.AUTO_RESIZE_ALL_COLUMNS : JTable.AUTO_RESIZE_OFF;
         if (table.getAutoResizeMode() != mode) {

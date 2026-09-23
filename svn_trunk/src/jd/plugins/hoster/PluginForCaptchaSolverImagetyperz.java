@@ -60,7 +60,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 53451 $", interfaceVersion = 3, names = { "imagetyperz.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53488 $", interfaceVersion = 3, names = { "imagetyperz.com" }, urls = { "" })
 public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -299,7 +299,7 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
             job.setStatus(SolverStatus.SOLVING);
             pollingQuery.addAndReplace("captchaID", captchaID);
             while (true) {
-                this.sleep(this.getPollingIntervalMillis(account), null);
+                Thread.sleep(getPollingIntervalMillis(account));
                 this.callAPI(br.createPostRequest(this.getApiBase() + pollingPath, pollingQuery));
                 if (!br.containsHTML("NOT_DECODED")) {
                     solution = br.getRequest().getHtmlCode();

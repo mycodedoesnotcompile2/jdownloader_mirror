@@ -8,19 +8,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.http.Request;
-import jd.http.requests.FormData;
-import jd.http.requests.PostFormDataRequest;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.ImageProvider.ImageProvider;
@@ -41,7 +28,20 @@ import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptcha
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigCheapcaptchaCom;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 53451 $", interfaceVersion = 3, names = { "cheapcaptcha.com" }, urls = { "" })
+import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.http.Request;
+import jd.http.requests.FormData;
+import jd.http.requests.PostFormDataRequest;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
+@HostPlugin(revision = "$Revision: 53492 $", interfaceVersion = 3, names = { "cheapcaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -118,8 +118,6 @@ public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCapt
     @Override
     public void solve(CESSolverJob<?> job, Account account) throws Exception {
         final Challenge<?> challenge = job.getChallenge();
-        // TODO
-        // job.showBubble(this);
         try {
             // TODO
             // challenge.sendStatsSolving(this);
@@ -193,13 +191,13 @@ public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCapt
             final long startTime = System.currentTimeMillis();
             String solution = null;
             while (true) {
-                this.sleep(this.getPollingIntervalMillis(account), null);
+                Thread.sleep(getPollingIntervalMillis(account));
                 br.getPage(getApiBase() + "/captcha/" + captchaID);
                 final Map<String, Object> pollresp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 /*
-                 * cheapcaptcha.com is a DeathByCaptcha-compatible API: is_correct=1 both while processing AND when solved correctly, and only
-                 * turns 0 for an incorrect solution. Completion is therefore detected by a non-empty "text" (the answer); while still being
-                 * solved "text" is empty, "?" signals an incorrect solution.
+                 * cheapcaptcha.com is a DeathByCaptcha-compatible API: is_correct=1 both while processing AND when solved correctly, and
+                 * only turns 0 for an incorrect solution. Completion is therefore detected by a non-empty "text" (the answer); while still
+                 * being solved "text" is empty, "?" signals an incorrect solution.
                  */
                 if (!isApiTrue(pollresp.get("is_correct"))) {
                     throw new PluginException(LinkStatus.ERROR_CAPTCHA, "Captcha solution incorrect");

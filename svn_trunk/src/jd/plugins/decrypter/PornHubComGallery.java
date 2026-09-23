@@ -20,6 +20,8 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -40,9 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.PornHubCom;
 
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 53401 $", interfaceVersion = 2, names = { "pornhub.com" }, urls = { "https?://(?:www\\.|[a-z]{2}\\.)?pornhub(?:premium)?\\.com/album/\\d+" })
+@DecrypterPlugin(revision = "$Revision: 53482 $", interfaceVersion = 2, names = { "pornhub.com" }, urls = { "https?://(?:www\\.|[a-z]{2}\\.)?pornhub(?:premium)?\\.com/album/\\d+" })
 public class PornHubComGallery extends PluginForDecrypt {
     public PornHubComGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -87,6 +87,9 @@ public class PornHubComGallery extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (PornHubCom.isGeoRestricted(br)) {
             throw new DecrypterRetryException(RetryReason.GEO);
+        } else if (br.containsHTML(">\\s*The photo is currently pending review")) {
+            /* <p class="inactiveMessage">The photo is currently pending review.</p> */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final boolean privateImage = br.containsHTML(jd.plugins.hoster.PornHubCom.html_privateimage);
         String fpName = br.getRegex("class=\"photoAlbumTitleV2\">\\s*([^<>\"]*?)\\s*<").getMatch(0);

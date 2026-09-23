@@ -6,7 +6,9 @@ import java.util.List;
 import javax.swing.Icon;
 
 import org.jdownloader.DomainInfo;
+import org.jdownloader.captcha.v2.CaptchaTestChallengeFactory;
 import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.Challenge.CaptchaRequestType;
 import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
@@ -127,6 +129,26 @@ public class CaptchaType {
             public String getDomain() {
                 return "google.com";
             }
+
+            @Override
+            public boolean hasTestChallenges() {
+                return true;
+            }
+
+            @Override
+            public Challenge<?> getTestChallengeDownload() {
+                return CaptchaTestChallengeFactory.newRecaptchaV3Challenge(CaptchaRequestType.HOSTER);
+            }
+
+            @Override
+            public Challenge<?> getTestChallengeLogin() {
+                return CaptchaTestChallengeFactory.newRecaptchaV3Challenge(CaptchaRequestType.HOSTER_LOGIN);
+            }
+
+            @Override
+            public Challenge<?> getTestChallengeCrawler() {
+                return CaptchaTestChallengeFactory.newRecaptchaV3Challenge(CaptchaRequestType.DECRYPTER);
+            }
         },
         RECAPTCHA_V3_ENTERPRISE {
             @Override
@@ -156,6 +178,26 @@ public class CaptchaType {
             @Override
             public String getDomain() {
                 return "google.com";
+            }
+
+            @Override
+            public boolean hasTestChallenges() {
+                return true;
+            }
+
+            @Override
+            public Challenge<?> getTestChallengeDownload() {
+                return CaptchaTestChallengeFactory.newRecaptchaV3EnterpriseChallenge(CaptchaRequestType.HOSTER);
+            }
+
+            @Override
+            public Challenge<?> getTestChallengeLogin() {
+                return CaptchaTestChallengeFactory.newRecaptchaV3EnterpriseChallenge(CaptchaRequestType.HOSTER_LOGIN);
+            }
+
+            @Override
+            public Challenge<?> getTestChallengeCrawler() {
+                return CaptchaTestChallengeFactory.newRecaptchaV3EnterpriseChallenge(CaptchaRequestType.DECRYPTER);
             }
         },
         RECAPTCHA_V2_INVISIBLE {
@@ -191,6 +233,26 @@ public class CaptchaType {
             public String getDomain() {
                 return "google.com";
             }
+
+            @Override
+            public boolean hasTestChallenges() {
+                return true;
+            }
+
+            @Override
+            public Challenge<?> getTestChallengeDownload() {
+                return CaptchaTestChallengeFactory.newRecaptchaV2InvisibleChallenge(CaptchaRequestType.HOSTER);
+            }
+
+            @Override
+            public Challenge<?> getTestChallengeLogin() {
+                return CaptchaTestChallengeFactory.newRecaptchaV2InvisibleChallenge(CaptchaRequestType.HOSTER_LOGIN);
+            }
+
+            @Override
+            public Challenge<?> getTestChallengeCrawler() {
+                return CaptchaTestChallengeFactory.newRecaptchaV2InvisibleChallenge(CaptchaRequestType.DECRYPTER);
+            }
         },
         RECAPTCHA_V2_ENTERPRISE {
             @Override
@@ -221,6 +283,26 @@ public class CaptchaType {
             public String getDomain() {
                 return "google.com";
             }
+
+            @Override
+            public boolean hasTestChallenges() {
+                return true;
+            }
+
+            @Override
+            public Challenge<?> getTestChallengeDownload() {
+                return CaptchaTestChallengeFactory.newRecaptchaV2EnterpriseChallenge(CaptchaRequestType.HOSTER);
+            }
+
+            @Override
+            public Challenge<?> getTestChallengeLogin() {
+                return CaptchaTestChallengeFactory.newRecaptchaV2EnterpriseChallenge(CaptchaRequestType.HOSTER_LOGIN);
+            }
+
+            @Override
+            public Challenge<?> getTestChallengeCrawler() {
+                return CaptchaTestChallengeFactory.newRecaptchaV2EnterpriseChallenge(CaptchaRequestType.DECRYPTER);
+            }
         },
         RECAPTCHA_V2 {
             @Override
@@ -247,6 +329,26 @@ public class CaptchaType {
             public String getDomain() {
                 return "google.com";
             }
+
+            @Override
+            public boolean hasTestChallenges() {
+                return true;
+            }
+
+            @Override
+            public Challenge<?> getTestChallengeDownload() {
+                return CaptchaTestChallengeFactory.newRecaptchaV2Challenge(CaptchaRequestType.HOSTER);
+            }
+
+            @Override
+            public Challenge<?> getTestChallengeLogin() {
+                return CaptchaTestChallengeFactory.newRecaptchaV2Challenge(CaptchaRequestType.HOSTER_LOGIN);
+            }
+
+            @Override
+            public Challenge<?> getTestChallengeCrawler() {
+                return CaptchaTestChallengeFactory.newRecaptchaV2Challenge(CaptchaRequestType.DECRYPTER);
+            }
         },
         HCAPTCHA {
             @Override
@@ -272,6 +374,26 @@ public class CaptchaType {
             @Override
             public String getDomain() {
                 return "hcaptcha.com";
+            }
+
+            @Override
+            public boolean hasTestChallenges() {
+                return true;
+            }
+
+            @Override
+            public Challenge<?> getTestChallengeDownload() {
+                return CaptchaTestChallengeFactory.newHCaptchaChallenge(CaptchaRequestType.HOSTER);
+            }
+
+            @Override
+            public Challenge<?> getTestChallengeLogin() {
+                return CaptchaTestChallengeFactory.newHCaptchaChallenge(CaptchaRequestType.HOSTER_LOGIN);
+            }
+
+            @Override
+            public Challenge<?> getTestChallengeCrawler() {
+                return CaptchaTestChallengeFactory.newHCaptchaChallenge(CaptchaRequestType.DECRYPTER);
             }
         },
         CUTCAPTCHA {
@@ -388,6 +510,26 @@ public class CaptchaType {
             public String getDomain() {
                 return "cloudflare.com";
             }
+
+            @Override
+            public boolean hasTestChallenges() {
+                return true;
+            }
+
+            @Override
+            public Challenge<?> getTestChallengeDownload() {
+                return CaptchaTestChallengeFactory.newCloudflareTurnstileChallenge(CaptchaRequestType.HOSTER);
+            }
+
+            @Override
+            public Challenge<?> getTestChallengeLogin() {
+                return CaptchaTestChallengeFactory.newCloudflareTurnstileChallenge(CaptchaRequestType.HOSTER_LOGIN);
+            }
+
+            @Override
+            public Challenge<?> getTestChallengeCrawler() {
+                return CaptchaTestChallengeFactory.newCloudflareTurnstileChallenge(CaptchaRequestType.DECRYPTER);
+            }
         },
         MT_CAPTCHA {
             @Override
@@ -488,6 +630,34 @@ public class CaptchaType {
          * @return Domain as String (e.g. "google.com"), or null if not applicable
          */
         public abstract String getDomain();
+
+        /**
+         * True if this captcha type has test data available, i.e. {@link #getTestChallengeDownload()}/{@link #getTestChallengeLogin()}/
+         * {@link #getTestChallengeCrawler()} return a usable {@link Challenge} instead of null. Cheap to call (unlike the getTestChallenge*
+         * methods themselves, which build a throwaway {@link Challenge} on every call), so the "Test Captcha solver" column can use it to
+         * decide whether to enable its buttons without constructing anything.
+         */
+        public boolean hasTestChallenges() {
+            return false;
+        }
+
+        /**
+         * Builds a fresh, throwaway {@link Challenge} for the "Test Captcha solver" column's "DL-Captcha" button (IDE-only, see
+         * {@code CaptchaSolverCaptchaTypesSettingsPanelBuilder}), or null if no test data is known for this captcha type.
+         */
+        public Challenge<?> getTestChallengeDownload() {
+            return null;
+        }
+
+        /** Same as {@link #getTestChallengeDownload()}, for the "Login-Captcha" test button. */
+        public Challenge<?> getTestChallengeLogin() {
+            return null;
+        }
+
+        /** Same as {@link #getTestChallengeDownload()}, for the "CrawlerCaptcha" test button. */
+        public Challenge<?> getTestChallengeCrawler() {
+            return null;
+        }
 
         /**
          * Checks if this captcha type is supported by JDownloader. This method can be used to collect captchas available in captcha solving

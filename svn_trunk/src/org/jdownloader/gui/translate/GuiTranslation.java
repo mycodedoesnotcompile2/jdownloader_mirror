@@ -4279,9 +4279,6 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Result: %s1" })
     String DeathByCaptchaSolver_solveBasicCaptchaChallenge_answer(String substring);
 
-    @Default(lngs = { "en" }, values = { "Account:" })
-    String CESBubbleContent_CESBubbleContent_credits();
-
     @Default(lngs = { "en" }, values = { "No Answer!" })
     String DeathByCaptchaSolver_solveBasicCaptchaChallenge_failed();
 
@@ -5378,6 +5375,36 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "New rule for %s1" })
     String CaptchaRules_new_rule_name(String solver);
 
+    @Default(lngs = { "en" }, values = { "%s1 (copy)" })
+    String CaptchaRules_duplicate_name(String name);
+
+    @Default(lngs = { "en" }, values = { "Duplicate" })
+    String CaptchaRules_duplicate_button();
+
+    @Default(lngs = { "en" }, values = { "Do you really want to remove the selected rule(s)?" })
+    String CaptchaRules_remove_confirm();
+
+    @Default(lngs = { "en" }, values = { "Export captcha rules" })
+    String CaptchaRules_export_dialog_title();
+
+    @Default(lngs = { "en" }, values = { "Import captcha rules" })
+    String CaptchaRules_import_dialog_title();
+
+    @Default(lngs = { "en" }, values = { "All solvers" })
+    String CaptchaRules_allSolvers();
+
+    @Default(lngs = { "en" }, values = { "Regex" })
+    String CaptchaRules_column_regex();
+
+    @Default(lngs = { "en" }, values = { "Allow usage of regex for domain column" })
+    String CaptchaRules_regex_tooltip();
+
+    @Default(lngs = { "en" }, values = { "The static example rule cannot be removed" })
+    String CaptchaRules_remove_disabled_static();
+
+    @Default(lngs = { "en" }, values = { "Captcha rules control which solver can be used for which website domain and captcha type." })
+    String CaptchaRules_hint();
+
     @Default(lngs = { "en" }, values = { "Captcha types overview" })
     String CaptchaSolver_account_config_header();
 
@@ -5413,6 +5440,12 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Use external solver account(s) to solve captchas?" })
     String CaptchaConfigPanel_useExternalSolverAccounts();
+
+    @Default(lngs = { "en" }, values = { "Avoid external solvers for login captchas?" })
+    String CaptchaConfigPanel_avoidAutoSolverForLoginCaptchas();
+
+    @Default(lngs = { "en" }, values = { "Affects login captchas only: If a login captcha is required and at least one manual captcha solver is available, only manual captcha solvers will be allowed to solve this login captcha. Background: Captcha solver services can take a long time to solve captchas but when the user is adding an account or an account gets checked and a captcha is required, it should typically be solved faster and the manual solvers are typically faster. If you disable this setting, login captchas are handled exactly the same way as any other captchas." })
+    String CaptchaConfigPanel_avoidAutoSolverForLoginCaptchas_tooltip();
 
     @Default(lngs = { "en" }, values = { "External Solver comparison Table" })
     String CaptchaSolverComparison_tab_title();
@@ -5459,7 +5492,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Link crawling" })
     String CaptchaRequestType_DECRYPTER();
 
-    @Default(lngs = { "en" }, values = { "Display only services that support all selected captcha types" })
+    @Default(lngs = { "en" }, values = { "Display only solvers that support all selected captcha types" })
     String CaptchaSolverComparison_onlyFullSupport();
 
     @Default(lngs = { "en" }, values = { "There is no external captcha solver that supports all selected captcha types" })
@@ -5783,9 +5816,6 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "edit" })
     String lit_edit();
 
-    @Default(lngs = { "en" }, values = { "Properties for %s2 via %s1" })
-    String SolverPropertiesDialog_SolverPropertiesDialog_object_(String displayName, String type);
-
     @Default(lngs = { "en" }, values = { "Manual Captcha Solving" })
     String DialogBasicCaptchaSolver_getName();
 
@@ -5795,7 +5825,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Dialog (Window) in JDownloader" })
     String DialogBasicCaptchaSolver_gettypeName();
 
-    @Default(lngs = { "en" }, values = { "Dialog (Window) in Browser(Chrome, Firefox, Internet Explorer,..." })
+    @Default(lngs = { "en" }, values = { "Dialog (Window) in Browser(Chrome, Firefox, Edge,..." })
     String BrowserSolverService_gettypeName();
 
     @Default(lngs = { "en" }, values = { "Manual remote Captcha Solving" })
@@ -6062,35 +6092,14 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Account required" })
     String CandidateTooltipTableModel_configureRendererComponent_account_required();
 
-    @Default(lngs = { "en" }, values = { "Black & Whitelist" })
-    String captcha_settings_black_whitelist_header();
-
-    @Default(lngs = { "en" }, values = { "If you do not want this solver to handle a certain type of captchas (e.g. recaptcha) or domains(e.g. share-online.biz), add them here as a regular expression. One expression per line!\r\nTip 1: If you only want to handle certain types, and ignore all others, use  the 'match all' expression in the blacklist: .*, and add the desired captcha types to the exceptions list.\r\nTip 2: You can filter on either the hostname (e.g. uploaded.to) or the captcha type id (e.g. recaptcha) or a combination like 'uploaded.to-recaptcha'" })
-    String captcha_settings_black_whitelist_description();
-
     @Default(lngs = { "en" }, values = { "%s1 (Regular Expression OK)" })
     String RegexListTextPane_createExtTooltip_ok(String pattern);
 
     @Default(lngs = { "en" }, values = { "%s1 (INVALID Regular Expression!)" })
     String RegexListTextPane_createExtTooltip_bad(String pattern);
 
-    @Default(lngs = { "en" }, values = { "%s1 (Bad letters or malformed regular expression)" })
-    String CaptchaRegexListTextPane_createExtTooltip_bad(String p);
-
-    @Default(lngs = { "en" }, values = { "%s1 (OK)" })
-    String CaptchaRegexListTextPane_createExtTooltip_ok(String p);
-
     @Default(lngs = { "en" }, values = { "The my.JDownloader.org Service sends all captcha requests to your mobile or any other internet device. Use this service if you want to solve captchas remotely." })
     String CaptchaAPIManualRemoteSolverService_getConfigPanel_description();
-
-    @Default(lngs = { "en" }, values = { "Do not handle these expressions" })
-    String captcha_settings_blacklist();
-
-    @Default(lngs = { "en" }, values = { "but handle these anyway" })
-    String captcha_settings_whitelist();
-
-    @Default(lngs = { "en" }, values = { "Black/White Listing enabled" })
-    String captcha_settings_blacklist_enabled();
 
     @Default(lngs = { "en" }, values = { "Contribute" })
     String DonateAction();
@@ -6355,9 +6364,6 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Use a My.JDownloader.org account to access advanced JDownloader features and full remote control." })
     String MyJDownloaderView_tooltip();
-
-    @Default(lngs = { "en" }, values = { "Save & Close" })
-    String lit_save_and_close();
 
     @Default(lngs = { "en" }, values = { "Setup & Login" })
     String MyJDownloaderSettingsPanelForTab_title();

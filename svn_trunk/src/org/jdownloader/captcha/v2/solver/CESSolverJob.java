@@ -56,13 +56,13 @@ public class CESSolverJob<T> {
         }
     }
 
-    public void showBubble(CESChallengeSolver<T> cbSolver) throws InterruptedException {
+    public void showBubble(ChallengeSolver<T> cbSolver) throws InterruptedException {
         if (!org.appwork.utils.Application.isHeadless()) {
             showBubble(cbSolver, CFG_CAPTCHA.CFG.getCaptchaExchangeChanceToSkipBubbleTimeout());
         }
     }
 
-    public void showBubble(CESChallengeSolver<T> cbSolver, int timeout) throws InterruptedException {
+    public void showBubble(ChallengeSolver<T> cbSolver, int timeout) throws InterruptedException {
         if (!org.appwork.utils.Application.isHeadless()) {
             bubble = CESBubbleSupport.getInstance().show(cbSolver, this, timeout);
         }

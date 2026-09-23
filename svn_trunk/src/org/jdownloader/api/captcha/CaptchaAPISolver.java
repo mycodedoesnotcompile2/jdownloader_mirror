@@ -42,10 +42,6 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
         return INSTANCE;
     }
 
-    protected int getDefaultWaitForOthersTimeout() {
-        return 120000;
-    }
-
     private final CaptchaAPIEventPublisher eventPublisher;
 
     @Override
@@ -53,9 +49,8 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
         if (AbstractBrowserSolver.isSpecialReCaptchaEnterpriseChallenge(c)) {
             /* Special false case */
             return ChallengeVetoReason.UNSUPPORTED_FOR_INTERNAL_SPECIAL_REASONS;
-        } else {
-            return super.getChallengeVetoReason(c);
         }
+        return super.getChallengeVetoReason(c);
     }
 
     @Override
@@ -174,20 +169,19 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
     }
 
     public boolean isJobDone(final SolverJob<?> job) {
-        if (isMyJDownloaderActive()) {
-            return super.isJobDone(job);
-        } else {
+        if (!isMyJDownloaderActive()) {
             return true;
         }
+        return super.isJobDone(job);
     }
 
     @Override
     public void enqueue(SolverJob<Object> job) {
         if (!isMyJDownloaderActive()) {
             job.setSolverDone(this);
-        } else {
-            super.enqueue(job);
+            return;
         }
+        super.enqueue(job);
     }
 
     private boolean isMyJDownloaderActive() {
@@ -203,16 +197,14 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
         final SolverJob<?> job = getJobByChallengeId(id);
         if (job == null || job.isDone()) {
             throw new InvalidCaptchaIDException();
-        } else {
-            final Challenge<?> challenge = job.getChallenge();
-            final AbstractResponse<?> ret = challenge.parseAPIAnswer(result, resultFormat, this);
-            if (ret == null) {
-                throw new InvalidChallengeTypeException(challenge.getClass().getName());
-            } else {
-                ((SolverJob<Object>) job).addAnswer((AbstractResponse<Object>) ret);
-                return true;
-            }
         }
+        final Challenge<?> challenge = job.getChallenge();
+        final AbstractResponse<?> ret = challenge.parseAPIAnswer(result, resultFormat, this);
+        if (ret == null) {
+            throw new InvalidChallengeTypeException(challenge.getClass().getName());
+        }
+        ((SolverJob<Object>) job).addAnswer((AbstractResponse<Object>) ret);
+        return true;
     }
 
     @Deprecated
@@ -224,10 +216,9 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
         final SolverJob<?> job = getJobByChallengeId(id);
         if (job == null) {
             throw new InvalidCaptchaIDException();
-        } else {
-            ChallengeResponseController.getInstance().setSkipRequest(type, this, job.getChallenge());
-            return true;
         }
+        ChallengeResponseController.getInstance().setSkipRequest(type, this, job.getChallenge());
+        return true;
     }
 
     public void kill(SolverJob<Object> job) {
@@ -238,38 +229,37 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
     @Override
     public CaptchaJob getCaptchaJob(RemoteAPIRequest request, long id) {
         final SolverJob<?> entry = getJobByChallengeId(id);
-        if (entry != null) {
-            final CaptchaJob ret = new CaptchaJob();
-            final Challenge<?> challenge = entry.getChallenge();
-            Class<?> cls = challenge.getClass();
-            while (cls != null && StringUtils.isEmpty(ret.getType())) {
-                ret.setType(cls.getSimpleName());
-                ret.setChallengeType(cls.getSimpleName());
-                cls = cls.getSuperclass();
-            }
-            if (challenge instanceof HCaptchaChallenge) {
-                final MyJDownloaderHttpConnection con = MyJDownloaderHttpConnection.getMyJDownloaderHttpConnection(request);
-                final SessionInfoResponse sessionInfo = con != null ? con.getSessionInfo() : null;
-                if (sessionInfo != null && StringUtils.startsWithCaseInsensitive(sessionInfo.getAppKey(), "myjd_webinterface")) {
-                    // workaround, required for Webinterface to show captcha popup
-                    ret.setType("RecaptchaV2Challenge");
-                }
-            }
-            ret.setID(challenge.getId().getID());
-            ret.setHoster(challenge.getHost());
-            ret.setCaptchaCategory(challenge.getTypeID());
-            ret.setExplain(challenge.getExplain());
-            ret.setRemaining(challenge.getRemainingTimeout());
-            ret.setTimeout(challenge.getTimeout());
-            ret.setCreated(challenge.getCreated());
-            final DownloadLink link = challenge.getDownloadLink();
-            if (link != null) {
-                ret.setLink(link.getUniqueID().getID());
-            }
-            return ret;
-        } else {
+        if (entry == null) {
             return null;
         }
+        final CaptchaJob ret = new CaptchaJob();
+        final Challenge<?> challenge = entry.getChallenge();
+        Class<?> cls = challenge.getClass();
+        while (cls != null && StringUtils.isEmpty(ret.getType())) {
+            ret.setType(cls.getSimpleName());
+            ret.setChallengeType(cls.getSimpleName());
+            cls = cls.getSuperclass();
+        }
+        if (challenge instanceof HCaptchaChallenge) {
+            final MyJDownloaderHttpConnection con = MyJDownloaderHttpConnection.getMyJDownloaderHttpConnection(request);
+            final SessionInfoResponse sessionInfo = con != null ? con.getSessionInfo() : null;
+            if (sessionInfo != null && StringUtils.startsWithCaseInsensitive(sessionInfo.getAppKey(), "myjd_webinterface")) {
+                /* Workaround, required for Webinterface to show captcha popup */
+                ret.setType("RecaptchaV2Challenge");
+            }
+        }
+        ret.setID(challenge.getId().getID());
+        ret.setHoster(challenge.getHost());
+        ret.setCaptchaCategory(challenge.getTypeID());
+        ret.setExplain(challenge.getExplain());
+        ret.setRemaining(challenge.getRemainingTimeout());
+        ret.setTimeout(challenge.getTimeout());
+        ret.setCreated(challenge.getCreated());
+        final DownloadLink link = challenge.getDownloadLink();
+        if (link != null) {
+            ret.setLink(link.getUniqueID().getID());
+        }
+        return ret;
     }
 
     @Override
@@ -281,12 +271,6 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
         getEventPublisher().fireJobDoneEvent(job);
         dispose(job);
         MyJDownloaderController.getInstance().pushCaptchaFlag(hasJobs());
-    }
-
-    public boolean hasJobs() {
-        synchronized (map) {
-            return map.size() > 0;
-        }
     }
 
     protected void dispose(SolverJob<?> job) {
@@ -304,10 +288,9 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
         if (entry == null) {
             ChallengeResponseController.getInstance().keepAlivePendingChallenges(null);
             return -1;
-        } else {
-            ChallengeResponseController.getInstance().keepAlivePendingChallenges(entry.getChallenge());
-            return entry.getChallenge().getRemainingTimeout();
         }
+        ChallengeResponseController.getInstance().keepAlivePendingChallenges(entry.getChallenge());
+        return entry.getChallenge().getRemainingTimeout();
     }
 
     @Override

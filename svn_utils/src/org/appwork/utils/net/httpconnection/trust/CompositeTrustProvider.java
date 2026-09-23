@@ -11,7 +11,9 @@ package org.appwork.utils.net.httpconnection.trust;
 import java.security.KeyStore;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -43,7 +45,7 @@ public class CompositeTrustProvider extends AbstractTrustProvider {
     private final TrustProviderInterface[] delegates;
 
     public CompositeTrustProvider(final TrustProviderInterface... delegates) {
-        this.delegates = delegates != null && delegates.length > 0 ? delegates.clone() : new TrustProviderInterface[0];
+        this.delegates = delegates != null && delegates.length > 0 ? new LinkedHashSet<TrustProviderInterface>(Arrays.asList(delegates)).toArray(new TrustProviderInterface[0]) : new TrustProviderInterface[0];
         if (delegates.length == 0) {
             throw new IllegalArgumentException("at least one TrustProviderInterface must be declared");
         }

@@ -129,20 +129,13 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
             return _GUI.T.CaptchaSolverService_status_ready();
         }
         final Currency currency = getBalanceCurrency();
+        /* Same balance formatting regardless of account count, consistent with the Balance column and single-account solvers. */
+        final String balanceText = AccountInfo.formatCaptchaSolverBalance(balance.doubleValue(), currency);
         if (validAccounts.size() > 1) {
-            /*
-             * Multiple accounts of the same solver: show the account count and the summed balance rendered as "<value> <symbol>" (e.g.
-             * "12.35 $"). The value is formatted currency-independently (two decimals) and the currency symbol is appended separately, so
-             * the trailing-symbol layout stays consistent regardless of the account's locale currency formatting.
-             */
-            String balanceText = AccountInfo.formatCaptchaSolverBalance(balance.doubleValue(), null);
-            if (currency != null) {
-                balanceText += " " + currency.getSymbol();
-            }
             return _GUI.T.CaptchaSolverService_status_ready_accounts(Integer.toString(validAccounts.size()), balanceText);
         }
         /* Single account: keep the established "Ready | Balance: <localized amount>" layout. */
-        return _GUI.T.CaptchaSolverService_status_ready_balance(AccountInfo.formatCaptchaSolverBalance(balance.doubleValue(), currency));
+        return _GUI.T.CaptchaSolverService_status_ready_balance(balanceText);
     }
 
     @Override
