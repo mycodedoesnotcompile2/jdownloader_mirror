@@ -44,6 +44,14 @@ public interface CaptchaSolverConfigV3 extends PluginConfigInterface {
         public String getMaxSimultaneousCaptchas_label() {
             return "Max simultaneous captchas";
         }
+
+        public String getMaxPollingTimeoutEnabled_label() {
+            return "Limit max captcha solving time?";
+        }
+
+        public String getMaxPollingTimeoutSeconds_label() {
+            return "Max captcha solving time (seconds)";
+        }
     }
 
     @AboutConfig(inGUIVisible = false)
@@ -95,6 +103,23 @@ public interface CaptchaSolverConfigV3 extends PluginConfigInterface {
     int getMaxCaptchasPerHour();
 
     void setMaxCaptchasPerHour(int max);
+
+    @AboutConfig
+    @DescriptionForConfigEntry("Limit the maximum time to wait/poll for a captcha solution before giving up")
+    @DefaultBooleanValue(false)
+    @Order(675)
+    boolean isMaxPollingTimeoutEnabled();
+
+    void setMaxPollingTimeoutEnabled(boolean b);
+
+    @AboutConfig
+    @DescriptionForConfigEntry("Maximum time in seconds to wait/poll for a captcha solution before giving up")
+    @SpinnerValidator(min = 1, max = 3600, step = 1)
+    @DefaultIntValue(300)
+    @Order(676)
+    int getMaxPollingTimeoutSeconds();
+
+    void setMaxPollingTimeoutSeconds(int seconds);
 
     @AboutConfig(inGUIVisible = false)
     @DescriptionForConfigEntry("ENUM StringList of captcha types which are disabled for this solver.")

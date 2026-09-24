@@ -41,7 +41,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 53492 $", interfaceVersion = 3, names = { "endcaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53502 $", interfaceVersion = 3, names = { "endcaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSolver {
     public PluginForCaptchaSolverEndcaptcha(PluginWrapper wrapper) {
         super(wrapper);
@@ -111,9 +111,8 @@ public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSo
     @Override
     public void solve(CESSolverJob<?> job, Account account) throws Exception {
         final Challenge<?> challenge = job.getChallenge();
+        challenge.sendStatsSolving(job.getSolver());
         try {
-            // TODO
-            // challenge.sendStatsSolving(this);
             job.setStatus(SolverStatus.UPLOADING);
             final PostFormDataRequest r = new PostFormDataRequest(getApiBase() + "/upload");
             r.addFormData(new FormData("username", account.getUser()));
@@ -161,34 +160,31 @@ public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSo
             if (captchaID == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            checkInterruption();
             job.setStatus(SolverStatus.SOLVING);
             /*
              * The poll endpoint returns plain text (NOT JSON): "UNSOLVED_YET:/poll/<id>" while the captcha is still being solved, or the
              * plain solution text once it is done. Completion is therefore detected by the absence of the "UNSOLVED_YET" marker.
              */
             while (true) {
-                Thread.sleep(getPollingIntervalMillis(account));
+                waitDuringPolling(job.getChallenge(), account);
                 this.callAPI(br.createGetRequest(this.getApiBase() + "/poll/" + captchaID));
                 if (this.findCaptchaID() == null) {
                     break;
                 }
-                checkInterruption();
             }
             final String solution = br.getRequest().getHtmlCode();
             job.getLogger().info("CAPTCHA(" + type + ") solved: " + solution);
             final AbstractResponse resp;
             if (challenge instanceof RecaptchaV2Challenge || challenge instanceof HCaptchaChallenge || challenge instanceof CloudflareTurnstileChallenge || challenge instanceof CutCaptchaChallenge) {
-                resp = new TokenCaptchaResponse((Challenge<String>) challenge, this, solution);
+                resp = new TokenCaptchaResponse((Challenge<String>) challenge, job.getSolver(), solution);
             } else {
-                resp = new CaptchaResponse((Challenge<String>) challenge, this, solution);
+                resp = new CaptchaResponse((Challenge<String>) challenge, job.getSolver(), solution);
             }
             resp.setCaptchaSolverTaskID(captchaID);
             job.setAnswer(resp);
             return;
         } catch (Exception e) {
-            // TODO
-            // challenge.sendStatsError(this, e);
+            challenge.sendStatsError(job.getSolver(), e);
             throw e;
         }
     }
@@ -225,10 +221,10 @@ public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSo
             /* No error */
             return;
         }
-        /* Check if error is related to login or captcha solving */
+        /* Check if error is related to login or captcha solving. Docs: https://endcaptcha.com/api-specs */
         if (this.getPluginEnvironment() == PluginEnvironment.ACCOUNT_CHECK) {
             throw new AccountInvalidException(error);
-        } else if (error.equalsIgnoreCase("NOT AUTHENTICATED")) {
+        } else if (error.equalsIgnoreCase("NOT AUTHENTICATED") || error.equalsIgnoreCase("NOT ENOUGH BALANCE")) {
             throw new AccountInvalidException(error);
         }
         throw new SolverException(error);

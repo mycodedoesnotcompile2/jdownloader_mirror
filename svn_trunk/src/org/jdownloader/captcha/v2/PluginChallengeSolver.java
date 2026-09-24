@@ -28,7 +28,7 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
         final ChallengeResponseController crp = ChallengeResponseController.getInstance();
         SolverService svs = ChallengeResponseController.getInstance().getServiceByID(plugin.getHost());
         if (svs == null) {
-            // TODO: Check if this is necessary
+            /* Plugin appeared/updated after ChallengeResponseController's one-time startup scan (e.g. hot-loaded, no restart yet). */
             svs = new PluginForCaptchaSolverSolverService(plugin);
             crp.addSolverService(svs);
         }
@@ -42,8 +42,42 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
         return this.service.getConfigV3().isEnabled() && this.account.isEnabled();
     }
 
-    /* Distinguishes the various per-account/per-plugin instances of this solver in log output (otherwise they all just print
-     * "PluginChallengeSolver", see ChallengeSolver#toString()). */
+    /**
+     * Combines the user's configured max polling time (if enabled) with the solver service's own server-side limit
+     * ({@link abstractPluginForCaptchaSolver#getServerSideMaxPollingTimeoutMillis()}), whichever is smaller. Both of those return
+     * {@link Long#MAX_VALUE} for "no limit"; that value must never reach {@link JobRunnable}'s
+     * {@link org.appwork.scheduler.DelayedRunnable} as a real delay (huge millisecond delays risk overflow in the underlying scheduler), so
+     * it is translated back to this class' own "no timeout" sentinel, -1, same as the default {@link ChallengeSolver#getTimeoutMillis()}.
+     */
+    @Override
+    public long getTimeoutMillis() {
+        final CaptchaSolverConfigV3 cfg = service.getConfigV3();
+        final long configured = cfg.isMaxPollingTimeoutEnabled() ? cfg.getMaxPollingTimeoutSeconds() * 1000L : Long.MAX_VALUE;
+        final long serverSide = plugin.getServerSideMaxPollingTimeoutMillis();
+        final long combined = Math.min(configured, serverSide);
+        if (combined == Long.MAX_VALUE) {
+            return -1;
+        }
+        return Math.max(1L, combined);
+    }
+
+    /**
+     * Combines the user's configured max simultaneous captchas limit (if enabled) with the solver service's own server-side limit
+     * ({@link abstractPluginForCaptchaSolver#getServerSideMaxSimultaneousCaptchaThreadsLimit(Account)}), whichever is smaller, but always
+     * at least 1.
+     */
+    @Override
+    public final int getFinalMaxCaptchaThreads() {
+        final CaptchaSolverConfigV3 cfg = service.getConfigV3();
+        final int configured = cfg.isLimitMaxSimultaneousCaptchasEnabled() ? cfg.getMaxSimultaneousCaptchas() : Integer.MAX_VALUE;
+        final int serverSide = plugin.getServerSideMaxSimultaneousCaptchaThreadsLimit(account);
+        return Math.max(1, Math.min(configured, serverSide));
+    }
+
+    /*
+     * Distinguishes the various per-account/per-plugin instances of this solver in log output (otherwise they all just print
+     * "PluginChallengeSolver", see ChallengeSolver#toString()).
+     */
     @Override
     public String toString() {
         return super.toString() + "@" + plugin.getHost();
@@ -155,9 +189,9 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
 
     @Override
     public void solve(SolverJob<T> job) throws InterruptedException, SolverException, SkipException {
-        final CESSolverJob<T> cesJob = new CESSolverJob<T>(job);
+        final CESSolverJob<T> cesJob = new CESSolverJob<T>(job, this);
         try {
-            cesJob.showBubble(this);
+            cesJob.showBubble();
             plugin.setCurrentCaptchaChallenge(job.getChallenge());
             plugin.solve(cesJob, account);
         } catch (final PluginException e) {

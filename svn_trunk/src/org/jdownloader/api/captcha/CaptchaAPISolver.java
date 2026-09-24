@@ -25,7 +25,7 @@ import org.jdownloader.captcha.v2.ChallengeSolver;
 import org.jdownloader.captcha.v2.JobRunnable;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
-import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserSolver;
+import org.jdownloader.captcha.v2.solver.browser.BrowserSolver;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.myjdownloader.client.json.SessionInfoResponse;
@@ -46,7 +46,7 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
 
     @Override
     public ChallengeVetoReason getChallengeVetoReason(final Challenge<?> c) {
-        if (AbstractBrowserSolver.isSpecialReCaptchaEnterpriseChallenge(c)) {
+        if (BrowserSolver.isSpecialReCaptchaEnterpriseChallenge(c)) {
             /* Special false case */
             return ChallengeVetoReason.UNSUPPORTED_FOR_INTERNAL_SPECIAL_REASONS;
         }

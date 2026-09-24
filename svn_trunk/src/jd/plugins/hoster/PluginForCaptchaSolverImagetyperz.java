@@ -60,7 +60,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 53488 $", interfaceVersion = 3, names = { "imagetyperz.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53499 $", interfaceVersion = 3, names = { "imagetyperz.com" }, urls = { "" })
 public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -299,22 +299,21 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
             job.setStatus(SolverStatus.SOLVING);
             pollingQuery.addAndReplace("captchaID", captchaID);
             while (true) {
-                Thread.sleep(getPollingIntervalMillis(account));
+                waitDuringPolling(job.getChallenge(), account);
                 this.callAPI(br.createPostRequest(this.getApiBase() + pollingPath, pollingQuery));
                 if (!br.containsHTML("NOT_DECODED")) {
                     solution = br.getRequest().getHtmlCode();
                     break;
                 }
                 /* Not done yet -> Continue */
-                checkInterruption();
             }
         }
         job.getLogger().info("CAPTCHA(" + type + ") solved: " + solution);
         AbstractResponse resp = null;
         if (c instanceof RecaptchaV2Challenge) {
-            resp = new TokenCaptchaResponse((Challenge<String>) c, this, solution);
+            resp = new TokenCaptchaResponse((Challenge<String>) c, job.getSolver(), solution);
         } else {
-            resp = new CaptchaResponse((Challenge<String>) c, this, solution);
+            resp = new CaptchaResponse((Challenge<String>) c, job.getSolver(), solution);
         }
         resp.setCaptchaSolverTaskID(captchaID);
         job.setAnswer(resp);

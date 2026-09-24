@@ -15,6 +15,7 @@ import org.jdownloader.captcha.v2.CaptchaSolverCaptchaTypesSettingsPanelBuilder.
 import org.jdownloader.captcha.v2.SolverService;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.images.NewTheme;
+import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSolverService;
 
 import jd.gui.swing.jdgui.BasicJDTable;
 import jd.gui.swing.jdgui.views.settings.components.SettingsComponent;
@@ -27,12 +28,13 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
     private JScrollPane                detailScrollPane;
     private JLabel                     detailLabel;
     private JLabel                     descriptionLabel;
+    private JLabel                     limitsLabel;
     private JLabel                     settingsLabel;
     private JScrollPane                configScrollPane;
 
     public SolverOrderContainer(SolverOrderTable urlOrder) {
         /* gapy 0: no implicit inter-row gaps, so the height reserved in getConstraints() stays exact (all gaps are set explicitly). */
-        super("ins 0, gapy 0", "[grow,fill]", "[][][][][][]");
+        super("ins 0, gapy 0", "[grow,fill]", "[][][][][][][]");
         this.solverOrder = urlOrder;
         /* Main solver order table. Slightly narrower on the right; never shows any scrollbar. */
         final JScrollPane sp = new JScrollPane(urlOrder);
@@ -57,6 +59,10 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
         detailScrollPane.setVisible(false);
         passMouseWheelToParent(detailScrollPane);
         add(detailScrollPane, "gaptop 6, growx, gapright 40, wrap");
+        /* Server-side limits info line, shown below the captcha-types table for plugin-based (account) solvers only. */
+        limitsLabel = new JLabel();
+        limitsLabel.setVisible(false);
+        add(limitsLabel, "gaptop 6, wrap");
         /* "<solver> Settings" section header (gear icon) shown BELOW the captcha-types table, above the config panel. */
         settingsLabel = new JLabel("Settings", NewTheme.I().getIcon(IconKey.ICON_SETTINGS, 18), JLabel.LEADING);
         settingsLabel.setVisible(false);
@@ -72,6 +78,7 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
                 if (solver == null) {
                     detailLabel.setVisible(false);
                     descriptionLabel.setVisible(false);
+                    limitsLabel.setVisible(false);
                     settingsLabel.setVisible(false);
                     detailScrollPane.setVisible(false);
                     detailTable = null;
@@ -109,6 +116,21 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
                     detailScrollPane.setPreferredSize(fullSize);
                     detailScrollPane.setMinimumSize(fullSize);
                     detailScrollPane.setVisible(true);
+                    /*
+                     * Server-side limits info line: only meaningful for plugin-based (account) solvers, which are the only ones that
+                     * implement getServerSideMaxSimultaneousCaptchaThreadsLimit()/getServerSideMaxPollingTimeoutMillis().
+                     */
+                    if (solver instanceof PluginForCaptchaSolverSolverService) {
+                        final PluginForCaptchaSolverSolverService pluginSolver = (PluginForCaptchaSolverSolverService) solver;
+                        final int maxThreads = pluginSolver.getServerSideMaxSimultaneousCaptchaThreadsLimit();
+                        final long maxPollingMillis = pluginSolver.getServerSideMaxPollingTimeoutMillis();
+                        final String maxThreadsText = maxThreads == Integer.MAX_VALUE ? "~" : String.valueOf(maxThreads);
+                        final String maxPollingText = maxPollingMillis == Long.MAX_VALUE ? "~" : String.valueOf(maxPollingMillis / 1000L);
+                        limitsLabel.setText("<html>Max concurrent captcha threads: " + maxThreadsText + "<br>Server side max polling time: " + maxPollingText + "s</html>");
+                        limitsLabel.setVisible(true);
+                    } else {
+                        limitsLabel.setVisible(false);
+                    }
                     /* Show the selected solver's config below the table (plugin config if available, else the local solver's config). */
                     /* Built generically from the solver's V3 config interface, just like plugin config panels. */
                     final PluginConfigPanelNG configComponent = new PluginConfigPanelNG() {
@@ -187,6 +209,10 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
             }
             /* gaptop 6 above the captcha-types table. */
             height += 6 + detailTableFullHeight();
+            if (limitsLabel.isVisible()) {
+                /* gaptop 6 above the limits info line. */
+                height += 6 + limitsLabel.getPreferredSize().height;
+            }
             if (settingsLabel.isVisible()) {
                 /* gaptop 12 above the "Settings" header. */
                 height += 12 + settingsLabel.getPreferredSize().height;

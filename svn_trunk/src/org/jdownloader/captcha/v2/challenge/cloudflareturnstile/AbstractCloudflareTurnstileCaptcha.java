@@ -28,6 +28,8 @@ import org.jdownloader.logging.LogController;
 /** https://www.cloudflare.com/products/turnstile/ */
 public abstract class AbstractCloudflareTurnstileCaptcha<T extends Plugin> {
     private final static Pattern PATTERN_VALID_RESPONSE_TOKEN = Pattern.compile("^\\d\\.[a-zA-Z0-9_\\-\\.]{60,}$");
+    /** Cloudflare's official dummy token, always returned by the "always passes" Turnstile test site key. */
+    private final static String  DUMMY_RESPONSE_TOKEN         = "XXXX.DUMMY.TOKEN.XXXX";
 
     public static boolean containsCloudflareTurnstileClass(final Browser br) {
         return br != null && containsCloudflareTurnstileClass(br.toString());
@@ -197,6 +199,8 @@ public abstract class AbstractCloudflareTurnstileCaptcha<T extends Plugin> {
         /* E.g. 0.zTSnTXO0X0XwSjSCU8oyzbjEtD8p.d62306d4ee00c00dda690f959ebbd0bd90 */
         if (str == null) {
             return false;
+        } else if (DUMMY_RESPONSE_TOKEN.equals(str)) {
+            return true;
         }
         return new Regex(str, PATTERN_VALID_RESPONSE_TOKEN).matches();
     }

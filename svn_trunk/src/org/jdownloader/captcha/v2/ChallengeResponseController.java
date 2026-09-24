@@ -6,9 +6,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.timetracker.TimeTracker;
@@ -218,9 +220,73 @@ public class ChallengeResponseController {
         eventSender.fireEvent(new ChallengeResponseEvent(this, ChallengeResponseEvent.Type.JOB_DONE, job));
     }
 
-    private final List<ChallengeSolver<?>>               solverList          = new CopyOnWriteArrayList<ChallengeSolver<?>>();
-    private final List<SolverJob<?>>                     activeJobs          = new ArrayList<SolverJob<?>>();
-    private final HashMap<UniqueAlltimeID, SolverJob<?>> challengeIDToJobMap = new HashMap<UniqueAlltimeID, SolverJob<?>>();
+    private final List<ChallengeSolver<?>>                 solverList                       = new CopyOnWriteArrayList<ChallengeSolver<?>>();
+    private final List<SolverJob<?>>                       activeJobs                       = new ArrayList<SolverJob<?>>();
+    private final HashMap<UniqueAlltimeID, SolverJob<?>>   challengeIDToJobMap              = new HashMap<UniqueAlltimeID, SolverJob<?>>();
+    /**
+     * Tracks how many solve attempts are currently in-flight per solver service (key: {@link SolverService#getID()}). Used by
+     * {@link #createList(Challenge)} to push a solver that is already at/over {@link ChallengeSolver#getFinalMaxCaptchaThreads()} to the
+     * end of the candidate list instead of excluding it outright, so it still gets used as a last resort if no solver with free capacity is
+     * available, and by {@link #reserveCaptchaSlot(ChallengeSolver)}/{@link #releaseCaptchaSlot(ChallengeSolver)}, which
+     * {@link JobRunnable} uses to actually enforce the limit around a solve attempt.
+     */
+    private final ConcurrentHashMap<String, AtomicInteger> activeCaptchasByServiceID        = new ConcurrentHashMap<String, AtomicInteger>();
+    /** Max time to wait for a solver's max-simultaneous-captchas limit to free up before giving up on using that solver for a job. */
+    private static final long                              CAPTCHA_SLOT_WAIT_TIMEOUT_MILLIS = 60 * 1000L;
+
+    private int getActiveCaptchas(final String serviceID) {
+        final AtomicInteger counter = activeCaptchasByServiceID.get(serviceID);
+        return counter == null ? 0 : counter.get();
+    }
+
+    private AtomicInteger getOrCreateActiveCaptchasCounter(final String serviceID) {
+        final AtomicInteger existing = activeCaptchasByServiceID.get(serviceID);
+        if (existing != null) {
+            return existing;
+        }
+        final AtomicInteger created = new AtomicInteger(0);
+        final AtomicInteger race = activeCaptchasByServiceID.putIfAbsent(serviceID, created);
+        return race != null ? race : created;
+    }
+
+    /**
+     * Reserves a "slot" for the given solver against its {@link ChallengeSolver#getFinalMaxCaptchaThreads()} limit. If the solver's service
+     * is currently at/over that limit, this waits up to {@link #CAPTCHA_SLOT_WAIT_TIMEOUT_MILLIS} for a slot to free up. Every successful
+     * reservation must be paired with a matching {@link #releaseCaptchaSlot(ChallengeSolver)} once the solve attempt (whether it succeeded,
+     * failed, or was skipped) is finished.
+     *
+     * @return true if a slot was reserved, false if the limit was still reached after waiting -> the caller must not run this solver.
+     */
+    public boolean reserveCaptchaSlot(final ChallengeSolver<?> solver) throws InterruptedException {
+        final int maxThreads = solver.getFinalMaxCaptchaThreads();
+        final AtomicInteger counter = getOrCreateActiveCaptchasCounter(solver.getService().getID());
+        final long deadline = System.currentTimeMillis() + CAPTCHA_SLOT_WAIT_TIMEOUT_MILLIS;
+        synchronized (counter) {
+            while (true) {
+                if (counter.get() < maxThreads) {
+                    counter.incrementAndGet();
+                    return true;
+                }
+                final long remaining = deadline - System.currentTimeMillis();
+                if (remaining <= 0) {
+                    return false;
+                }
+                counter.wait(remaining);
+            }
+        }
+    }
+
+    /** Releases a slot previously reserved via {@link #reserveCaptchaSlot(ChallengeSolver)} for the given solver. */
+    public void releaseCaptchaSlot(final ChallengeSolver<?> solver) {
+        final AtomicInteger counter = activeCaptchasByServiceID.get(solver.getService().getID());
+        if (counter == null) {
+            return;
+        }
+        synchronized (counter) {
+            counter.decrementAndGet();
+            counter.notifyAll();
+        }
+    }
 
     /**
      * When one job gets a skiprequest, we have to check all pending jobs if this skiprequest affects them as well. if so, we have to skip
@@ -267,7 +333,7 @@ public class ChallengeResponseController {
         logger.info("Handle Challenge: " + c);
         final List<ChallengeSolver<T>> solvers = createList(c);
         logger.info("Solver: " + solvers);
-        if (solvers.size() == 0) {
+        if (solvers == null || solvers.size() == 0) {
             logger.info("No solver available!");
             if (c instanceof CloudflareTurnstileChallenge) {
                 showNoBrowserSolverInfoDialog(c);
@@ -552,6 +618,28 @@ public class ChallengeResponseController {
             avoidedAutoSolversForLoginCaptcha = numberofExternalSolvers;
             ret.clear();
             ret.addAll(manualSolvers);
+        }
+        reSortByOverThreadsLimit: {
+            /*
+             * Soft-limit handling for ChallengeSolver#getFinalMaxCaptchaThreads(): a solver already at/over its max-simultaneous-captchas
+             * limit is not removed from the list, just moved to the end, so it is only used if no solver with free capacity is available.
+             */
+            final List<ChallengeSolver<T>> withinCaptchaThreadsLimit = new ArrayList<ChallengeSolver<T>>(ret.size());
+            final List<ChallengeSolver<T>> overCaptchaThreadsLimit = new ArrayList<ChallengeSolver<T>>();
+            for (final ChallengeSolver<T> solver : ret) {
+                final int activeCaptchas = getActiveCaptchas(solver.getService().getID());
+                if (activeCaptchas >= solver.getFinalMaxCaptchaThreads()) {
+                    overCaptchaThreadsLimit.add(solver);
+                } else {
+                    withinCaptchaThreadsLimit.add(solver);
+                }
+            }
+            if (overCaptchaThreadsLimit.size() > 0) {
+                logger.info("Solvers currently over their max-simultaneous-captchas limit for challenge " + c.getId() + ": " + overCaptchaThreadsLimit);
+                ret.clear();
+                ret.addAll(withinCaptchaThreadsLimit);
+                ret.addAll(overCaptchaThreadsLimit);
+            }
         }
         logger.info("Eligible solvers for challenge " + c.getId() + ": " + ret + "|avoidedAutoSolversForLoginCaptcha=" + avoidedAutoSolversForLoginCaptcha);
         return ret;

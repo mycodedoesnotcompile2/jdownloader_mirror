@@ -81,13 +81,12 @@ public class SolverJob<T> {
         if (kill) {
             kill();
         }
-        if (isAlive) {
-            fireNewAnswerEvent(abstractResponse);
-            return true;
-        } else {
+        if (!isAlive) {
             abstractResponse.setValidation(ValidationResult.UNUSED);
             return false;
         }
+        fireNewAnswerEvent(abstractResponse);
+        return true;
     }
 
     public ArrayList<ResponseList<T>> getResponses() {
@@ -156,7 +155,8 @@ public class SolverJob<T> {
             synchronized (LOCK) {
                 if (!solverList.contains(solver)) {
                     throw new IllegalStateException("This Job does not contain this solver");
-                } else if (!doneList.add(solver)) {
+                }
+                if (!doneList.add(solver)) {
                     return;
                 }
             }
@@ -241,10 +241,8 @@ public class SolverJob<T> {
     public boolean isDone() {
         synchronized (LOCK) {
             for (ChallengeSolver<T> sj : solverList) {
-                if (!doneList.contains(sj)) {
-                    if (sj.isJobDone(this)) {
-                        setSolverDone(sj);
-                    }
+                if (!doneList.contains(sj) && sj.isJobDone(this)) {
+                    setSolverDone(sj);
                 }
             }
             return solverList.size() == doneList.size();
@@ -377,18 +375,19 @@ public class SolverJob<T> {
      */
     public void validate() {
         final ArrayList<ResponseList<T>> responsesLists = this.getResponses();
-        if (responsesLists != null) {
-            for (int i = 0; i < responsesLists.size(); i++) {
-                final ResponseList<T> responseList = responsesLists.get(0);
-                for (final AbstractResponse<T> response : responseList) {
-                    if (i == 0) {
-                        // used response
-                        response.setValidation(ValidationResult.VALID);
-                    } else {
-                        // unused responses
-                        // maybe send invalid instead?
-                        response.setValidation(ValidationResult.UNUSED);
-                    }
+        if (responsesLists == null) {
+            return;
+        }
+        for (int i = 0; i < responsesLists.size(); i++) {
+            final ResponseList<T> responseList = responsesLists.get(i);
+            for (final AbstractResponse<T> response : responseList) {
+                if (i == 0) {
+                    // used response
+                    response.setValidation(ValidationResult.VALID);
+                } else {
+                    // unused responses
+                    // maybe send invalid instead?
+                    response.setValidation(ValidationResult.UNUSED);
                 }
             }
         }
@@ -399,17 +398,18 @@ public class SolverJob<T> {
      */
     public void invalidate() {
         final ArrayList<ResponseList<T>> responsesLists = this.getResponses();
-        if (responsesLists != null) {
-            for (int i = 0; i < responsesLists.size(); i++) {
-                final ResponseList<T> responseList = responsesLists.get(0);
-                for (final AbstractResponse<T> response : responseList) {
-                    if (i == 0) {
-                        // used response
-                        response.setValidation(ValidationResult.INVALID);
-                    } else {
-                        // unused responses
-                        response.setValidation(ValidationResult.UNUSED);
-                    }
+        if (responsesLists == null) {
+            return;
+        }
+        for (int i = 0; i < responsesLists.size(); i++) {
+            final ResponseList<T> responseList = responsesLists.get(i);
+            for (final AbstractResponse<T> response : responseList) {
+                if (i == 0) {
+                    // used response
+                    response.setValidation(ValidationResult.INVALID);
+                } else {
+                    // unused responses
+                    response.setValidation(ValidationResult.UNUSED);
                 }
             }
         }

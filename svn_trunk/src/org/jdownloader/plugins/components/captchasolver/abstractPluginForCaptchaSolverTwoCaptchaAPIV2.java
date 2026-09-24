@@ -1,6 +1,5 @@
 package org.jdownloader.plugins.components.captchasolver;
 
-import java.io.IOException;
 import java.util.Currency;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -30,11 +29,9 @@ import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.MultiClickCaptchaResponse;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.TokenCaptchaResponse;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
-import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
-import jd.controlling.captcha.SkipException;
 import jd.http.Browser;
 import jd.http.requests.PostRequest;
 import jd.plugins.Account;
@@ -75,12 +72,11 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
     }
 
     @Override
-    public void solve(CESSolverJob<?> job, Account account) throws InterruptedException, SolverException, SkipException {
+    public void solve(CESSolverJob<?> job, Account account) throws Exception {
         final Challenge<?> captchachallenge = job.getChallenge();
         job.setStatus(SolverStatus.UPLOADING);
-        try {
-            final Map<String, Object> postdata = new HashMap<String, Object>();
-            final String apikey = account.getPass();
+        final Map<String, Object> postdata = new HashMap<String, Object>();
+        final String apikey = account.getPass();
             postdata.put("clientKey", apikey);
             final Map<String, Object> task = new HashMap<String, Object>();
             if (captchachallenge instanceof RecaptchaV2Challenge) {
@@ -176,7 +172,7 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
             /* Wait for captcha answer */
             job.setStatus(SolverStatus.SOLVING);
             while (job.getJob().isAlive() && !job.getJob().isSolved()) {
-                checkInterruption();
+                waitDuringPolling(job.getChallenge(), account);
                 final PostRequest req_getTaskResult = br.createJSonPostRequest(this.getApiBase() + "/getTaskResult", postdata_getTaskResult);
                 br.getPage(req_getTaskResult);
                 entries = this.handleAPIErrors(br, account);
@@ -184,8 +180,6 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
                 final String status = entries.get("status").toString();
                 if (status.equalsIgnoreCase("processing")) {
                     /* Not yet ready */
-                    // TODO: Use other, more responsive sleep method
-                    Thread.sleep(getPollingIntervalMillis(account));
                     continue;
                 }
                 if (!status.equalsIgnoreCase("ready")) {
@@ -194,7 +188,6 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
                 }
                 final Map<String, Object> solutionmap = (Map<String, Object>) entries.get("solution");
                 /* Answer for interactive browser captchas is given both in field "gRecaptchaResponse" and "solution". */
-                // final String gRecaptchaResponse = (String) solutionmap.get("gRecaptchaResponse");
                 String token = (String) solutionmap.get("token");
                 if (token == null) {
                     /* 2026-09-22: e.g. capmonster.cloud returns result only via this field. */
@@ -202,7 +195,7 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
                 }
                 AbstractResponse resp = null;
                 if (captchachallenge instanceof RecaptchaV2Challenge || captchachallenge instanceof HCaptchaChallenge || captchachallenge instanceof CloudflareTurnstileChallenge || captchachallenge instanceof CutCaptchaChallenge) {
-                    resp = new TokenCaptchaResponse((Challenge<String>) captchachallenge, this, token);
+                    resp = new TokenCaptchaResponse((Challenge<String>) captchachallenge, job.getSolver(), token);
                 } else if (captchachallenge instanceof MultiClickCaptchaChallenge || captchachallenge instanceof ClickCaptchaChallenge) {
                     // TODO: Test this
                     final List<Map<String, Object>> clicklist = (List<Map<String, Object>>) solutionmap.get("coordinates");
@@ -218,30 +211,19 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
                     if (captchachallenge instanceof MultiClickCaptchaChallenge) {
                         final MultiClickedPoint mcp = new MultiClickedPoint(x, y);
                         final MultiClickCaptchaChallenge challenge = (MultiClickCaptchaChallenge) captchachallenge;
-                        resp = new MultiClickCaptchaResponse(challenge, this, mcp);
+                        resp = new MultiClickCaptchaResponse(challenge, job.getSolver(), mcp);
                     } else {
                         final ClickCaptchaChallenge challenge = (ClickCaptchaChallenge) captchachallenge;
                         final ClickedPoint cp = new ClickedPoint(x[0], y[0]);
-                        resp = new ClickCaptchaResponse(challenge, this, cp);
+                        resp = new ClickCaptchaResponse(challenge, job.getSolver(), cp);
                     }
                 } else {
-                    resp = new CaptchaResponse((Challenge<String>) captchachallenge, this, solutionmap.get("text").toString());
+                    resp = new CaptchaResponse((Challenge<String>) captchachallenge, job.getSolver(), solutionmap.get("text").toString());
                 }
-                /**
-                 * TODO: Correct answer leads to exception in PluginForHost -> Line 676 check why this happens <br>
-                 * if (!c.isSolved()) { throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                 */
                 resp.setCaptchaSolverTaskID(id);
                 job.setAnswer(resp);
                 return;
             }
-        } catch (IOException e) {
-            job.getLogger().log(e);
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            System.out.println(1);
-        }
     }
 
     @Override
@@ -304,7 +286,6 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
         final HashSet<String> accountErrorsPermament = new HashSet<String>();
         accountErrorsPermament.add("ERROR_KEY_DOES_NOT_EXIST");
         accountErrorsPermament.add("ERROR_ZERO_BALANCE");
-        accountErrorsPermament.add("ERROR_NO_SUCH_METHOD");
         accountErrorsPermament.add("ERROR_ACCOUNT_SUSPENDED");
         final HashSet<String> accountErrorsTemp = new HashSet<String>();
         accountErrorsTemp.add("ERROR_NO_SLOT_AVAILABLE");
@@ -314,20 +295,6 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
          * User-induced problem!
          */
         accountErrorsTemp.add("ERROR_IP_BLOCKED");
-        final HashSet<String> captchaErrors = new HashSet<String>();
-        captchaErrors.add("ERROR_ZERO_CAPTCHA_FILESIZE");
-        captchaErrors.add("ERROR_TOO_BIG_CAPTCHA_FILESIZE");
-        captchaErrors.add("ERROR_CAPTCHA_UNSOLVABLE");
-        captchaErrors.add("ERROR_BAD_DUPLICATES");
-        captchaErrors.add("ERROR_IMAGE_TYPE_NOT_SUPPORTED");
-        /* Errors that should never happen */
-        captchaErrors.add("ERROR_NO_SUCH_CAPCHA_ID");
-        captchaErrors.add("ERROR_TASK_ABSENT");
-        captchaErrors.add("ERROR_TASK_NOT_SUPPORTED");
-        captchaErrors.add("ERROR_RECAPTCHA_INVALID_SITEKEY");
-        captchaErrors.add("ERROR_BAD_PROXY");
-        captchaErrors.add("ERROR_BAD_PARAMETERS");
-        captchaErrors.add("ERROR_BAD_IMGINSTRUCTIONS");
         final int errorId = ((Number) entries.get("errorId")).intValue();
         if (errorId == 0) {
             /* No error */
@@ -340,7 +307,10 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
         } else if (accountErrorsTemp.contains(errorCode)) {
             throw new AccountUnavailableException(errorDescription, 5 * 60 * 1000);
         } else {
-            // TODO: Check this
+            /*
+             * Everything else (bad captcha data/parameters, unsolvable captcha, unsupported/unknown task type, missing method, ...) is a
+             * per-request/captcha problem, not an account problem, see https://2captcha.com/api-docs/error-codes
+             */
             throw new PluginException(LinkStatus.ERROR_CAPTCHA, errorDescription);
         }
     }

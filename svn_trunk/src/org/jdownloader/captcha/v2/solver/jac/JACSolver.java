@@ -71,7 +71,7 @@ public class JACSolver extends ChallengeSolver<String> {
     }
 
     @Override
-    public long getTimeout() {
+    public long getTimeoutMillis() {
         return 30000;
     }
 

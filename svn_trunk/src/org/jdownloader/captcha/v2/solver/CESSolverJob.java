@@ -16,17 +16,28 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 
 public class CESSolverJob<T> {
-    private final SolverJob<T>    job;
-    private volatile SolverStatus status;
-    private CESBubble             bubble;
-    private volatile boolean      answered;
+    private final SolverJob<T>       job;
+    private final ChallengeSolver<T> solver;
+    private volatile SolverStatus    status;
+    private CESBubble                bubble;
+    private volatile boolean         answered;
 
     public SolverJob<T> getJob() {
         return job;
     }
 
-    public CESSolverJob(SolverJob<T> job) {
+    /**
+     * The {@link ChallengeSolver} (e.g. a {@code PluginChallengeSolver}) that owns this job. Plugin solvers must attribute the
+     * {@link AbstractResponse} they build to this instance (not to themselves) so that {@code AbstractResponse#setValidation} can find a real
+     * {@link ChallengeSolver} and actually deliver setValid()/setInvalid()/setUnused() feedback.
+     */
+    public ChallengeSolver<T> getSolver() {
+        return solver;
+    }
+
+    public CESSolverJob(SolverJob<T> job, ChallengeSolver<T> solver) {
         this.job = job;
+        this.solver = solver;
     }
 
     public Challenge<T> getChallenge() {
@@ -56,15 +67,15 @@ public class CESSolverJob<T> {
         }
     }
 
-    public void showBubble(ChallengeSolver<T> cbSolver) throws InterruptedException {
+    public void showBubble() throws InterruptedException {
         if (!org.appwork.utils.Application.isHeadless()) {
-            showBubble(cbSolver, CFG_CAPTCHA.CFG.getCaptchaExchangeChanceToSkipBubbleTimeout());
+            showBubble(CFG_CAPTCHA.CFG.getCaptchaExchangeChanceToSkipBubbleTimeout());
         }
     }
 
-    public void showBubble(ChallengeSolver<T> cbSolver, int timeout) throws InterruptedException {
+    public void showBubble(int timeout) throws InterruptedException {
         if (!org.appwork.utils.Application.isHeadless()) {
-            bubble = CESBubbleSupport.getInstance().show(cbSolver, this, timeout);
+            bubble = CESBubbleSupport.getInstance().show(solver, this, timeout);
         }
     }
 

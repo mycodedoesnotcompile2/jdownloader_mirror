@@ -11,7 +11,7 @@ import jd.PluginWrapper;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52170 $", interfaceVersion = 3, names = { "anti-captcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53503 $", interfaceVersion = 3, names = { "anti-captcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverAntiCaptchaCom extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -24,26 +24,37 @@ public class PluginForCaptchaSolverAntiCaptchaCom extends abstractPluginForCaptc
 
     @Override
     public String getBuyPremiumUrl() {
-        // TODO: Remove this ref-link as it belongs into the server side ref link handling
         return "https://getcaptchasolution.com/pue5rd7req";
     }
 
     @Override
     public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
-        // TODO: Check and TEST(!!) this list of supported captcha types
-        /* List of supported captcha types: https://anti-captcha.com/apidoc */
+        /*
+         * List of task types anti-captcha.com's API offers: https://anti-captcha.com/apidoc (confirmed 2026-09-24). Only types with a
+         * matching solve() branch in abstractPluginForCaptchaSolverTwoCaptchaAPIV2 are declared here -- declaring one without a matching
+         * branch would make solve() throw IllegalArgumentException for such a challenge.
+         */
         final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
         types.add(CAPTCHA_TYPE.IMAGE);
         types.add(CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA);
         types.add(CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
+        /*
+         * 2026-09-24: anti-captcha.com's API does offer RecaptchaV3TaskProxyless, and solve() already builds a v3 task when a
+         * RecaptchaV2Challenge reports isV3()/a v3 action -- but this was never live-tested for this service specifically, so it stays
+         * disabled here until confirmed working. Re-enable once tested.
+         */
         // types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
         types.add(CAPTCHA_TYPE.CLOUDFLARE_TURNSTILE);
-        types.add(CAPTCHA_TYPE.GEETEST_V1);
-        types.add(CAPTCHA_TYPE.GEETEST_V4);
-        types.add(CAPTCHA_TYPE.FRIENDLY_CAPTCHA);
+        /*
+         * 2026-09-24: anti-captcha.com's API does offer GeeTestTaskProxyless/FriendlyCaptchaTaskProxyless, but solve() has no request
+         * handling for them yet, so they are NOT declared here. Re-add together with the corresponding solve() handling.
+         */
+        // types.add(CAPTCHA_TYPE.GEETEST_V1);
+        // types.add(CAPTCHA_TYPE.GEETEST_V4);
+        // types.add(CAPTCHA_TYPE.FRIENDLY_CAPTCHA);
         return types;
     }
 

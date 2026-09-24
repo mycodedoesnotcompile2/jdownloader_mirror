@@ -471,6 +471,18 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Hoster" })
     String premiumaccounttablemodel_column_hoster();
 
+    @Default(lngs = { "en" }, values = { "Type" })
+    String premiumaccounttablemodel_column_type();
+
+    @Default(lngs = { "en" }, values = { "Multihoster" })
+    String premiumaccounttablemodel_type_multihoster();
+
+    @Default(lngs = { "en" }, values = { "Captcha Solver" })
+    String premiumaccounttablemodel_type_captchasolver();
+
+    @Default(lngs = { "en" }, values = { "Hoster" })
+    String premiumaccounttablemodel_type_download();
+
     @Default(lngs = { "en" }, values = { "Password" })
     String premiumaccounttablemodel_column_password();
 

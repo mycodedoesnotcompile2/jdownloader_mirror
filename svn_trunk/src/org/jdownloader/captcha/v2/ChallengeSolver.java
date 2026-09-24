@@ -15,6 +15,7 @@ import org.appwork.storage.config.annotations.LabelInterface;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 
 import jd.controlling.captcha.SkipException;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
@@ -314,8 +315,38 @@ public abstract class ChallengeSolver<T> {
         return CaptchaChallengeFilterController.getInstance().getFilterResult(c, getService().getID());
     }
 
-    public long getTimeout() {
+    /**
+     * Returns the max time in milliseconds this solver has to solve a challenge before {@link JobRunnable} kills it (see
+     * {@link JobRunnable#run()}, which only arms this timeout for values &gt; 0). Default: -1 (no solver-specific timeout). <br>
+     * Do not call this directly to decide whether/when to kill a solver -- use {@link #getFinalTimeoutMillis()}, which additionally
+     * applies {@link jd.controlling.captcha.CaptchaSettings#getDefaultMaxSolverChallengePollingTimeoutMillis()} as a global fallback/cap.
+     */
+    public long getTimeoutMillis() {
         return -1;
+    }
+
+    /**
+     * Combines this solver's own {@link #getTimeoutMillis()} with the global
+     * {@link jd.controlling.captcha.CaptchaSettings#getDefaultMaxSolverChallengePollingTimeoutMillis()} default: the global default
+     * applies unless the solver itself specifies a lower (positive) value, e.g. a server-side polling timeout. This is what
+     * {@link JobRunnable} actually uses.
+     */
+    public final long getFinalTimeoutMillis() {
+        final long ownTimeoutMillis = getTimeoutMillis();
+        final long defaultMaxMillis = CFG_CAPTCHA.CFG.getDefaultMaxSolverChallengePollingTimeoutMillis();
+        if (ownTimeoutMillis <= 0) {
+            return defaultMaxMillis;
+        }
+        return Math.min(ownTimeoutMillis, defaultMaxMillis);
+    }
+
+    /**
+     * Returns the actual, safe maximum number of captchas this solver may work on at the same time. Default: unlimited (no local or
+     * server-side limit applies to this solver type). See {@link PluginChallengeSolver#getFinalMaxCaptchaThreads()} for the
+     * plugin-/account-based override.
+     */
+    public int getFinalMaxCaptchaThreads() {
+        return Integer.MAX_VALUE;
     }
 
     public String toString() {

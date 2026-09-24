@@ -11,7 +11,7 @@ import jd.PluginWrapper;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 53490 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53503 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
 public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -39,7 +39,13 @@ public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCapt
         types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V3_ENTERPRISE);
         types.add(CAPTCHA_TYPE.CLOUDFLARE_TURNSTILE);
-        types.add(CAPTCHA_TYPE.MT_CAPTCHA);
+        /*
+         * 2026-09-24: capmonster.cloud's API does offer MtCaptchaTaskProxyless, but solve() (in
+         * abstractPluginForCaptchaSolverTwoCaptchaAPIV2) has no request handling for it yet, so it is NOT declared here. Declaring it
+         * without a matching solve() branch would make solve() throw for such a challenge. Re-add together with the corresponding solve()
+         * handling.
+         */
+        // types.add(CAPTCHA_TYPE.MT_CAPTCHA);
         return types;
     }
 
@@ -68,5 +74,11 @@ public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCapt
     @Override
     public Class<? extends CaptchaSolverPluginConfigCapmonster> getConfigInterface() {
         return CaptchaSolverPluginConfigCapmonster.class;
+    }
+
+    @Override
+    public long getServerSideMaxPollingTimeoutMillis() {
+        /* capmonster.cloud gives up on a submitted task server-side after 5 minutes. */
+        return 5 * 60 * 1000L;
     }
 }

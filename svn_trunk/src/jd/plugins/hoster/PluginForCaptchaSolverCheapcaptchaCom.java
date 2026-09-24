@@ -36,12 +36,13 @@ import jd.http.requests.PostFormDataRequest;
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountUnavailableException;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 53492 $", interfaceVersion = 3, names = { "cheapcaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53502 $", interfaceVersion = 3, names = { "cheapcaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -57,7 +58,13 @@ public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCapt
         final Browser br = super.createNewBrowserInstance();
         br.getHeaders().put("Accept", "application/json");
         br.getHeaders().put("User-Agent", "JDownloader");
-        br.setAllowedResponseCodes(200, 400);
+        /*
+         * cheapcaptcha.com is a DeathByCaptcha-compatible API (see https://deathbycaptcha.com/api#api_details): 403 = credentials
+         * rejected OR insufficient credits, 400 = malformed request/invalid captcha, 500 = internal error, 503 = service overloaded. All
+         * of these still return a normal JSON body (status + error fields), so they must be allowed here and classified by HTTP code in
+         * callAPI(), not treated as a transport error.
+         */
+        br.setAllowedResponseCodes(200, 400, 403, 500, 503);
         br.setFollowRedirects(true);
         return br;
     }
@@ -118,9 +125,8 @@ public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCapt
     @Override
     public void solve(CESSolverJob<?> job, Account account) throws Exception {
         final Challenge<?> challenge = job.getChallenge();
+        challenge.sendStatsSolving(job.getSolver());
         try {
-            // TODO
-            // challenge.sendStatsSolving(this);
             job.setStatus(SolverStatus.UPLOADING);
             final PostFormDataRequest r = new PostFormDataRequest(getApiBase() + "/captcha");
             final String username = account.getUser();
@@ -188,10 +194,9 @@ public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCapt
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA, "Failed to upload captcha");
             }
             job.setStatus(SolverStatus.SOLVING);
-            final long startTime = System.currentTimeMillis();
             String solution = null;
             while (true) {
-                Thread.sleep(getPollingIntervalMillis(account));
+                waitDuringPolling(job.getChallenge(), account);
                 br.getPage(getApiBase() + "/captcha/" + captchaID);
                 final Map<String, Object> pollresp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 /*
@@ -207,23 +212,19 @@ public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCapt
                     solution = text;
                     break;
                 }
-                if (System.currentTimeMillis() - startTime > 60 * 60 * 1000) {
-                    throw new PluginException(LinkStatus.ERROR_CAPTCHA, "Captcha solve timeout");
-                }
             }
             job.getLogger().info("CAPTCHA(" + type + ") solved: " + solution);
             AbstractResponse resp = null;
             if (challenge instanceof RecaptchaV2Challenge || challenge instanceof HCaptchaChallenge || challenge instanceof CloudflareTurnstileChallenge || challenge instanceof CutCaptchaChallenge) {
-                resp = new TokenCaptchaResponse((Challenge<String>) challenge, this, solution);
+                resp = new TokenCaptchaResponse((Challenge<String>) challenge, job.getSolver(), solution);
             } else {
-                resp = new CaptchaResponse((Challenge<String>) challenge, this, solution);
+                resp = new CaptchaResponse((Challenge<String>) challenge, job.getSolver(), solution);
             }
             resp.setCaptchaSolverTaskID(Integer.toString(captchaID));
             job.setAnswer(resp);
             return;
         } catch (Exception e) {
-            // TODO
-            // challenge.sendStatsError(this, e);
+            challenge.sendStatsError(job.getSolver(), e);
             throw e;
         }
     }
@@ -269,7 +270,20 @@ public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCapt
         if (error == null) {
             return entries;
         }
-        throw new AccountInvalidException(error);
+        /*
+         * Docs: https://deathbycaptcha.com/api#api_details -- the JSON body alone (status/error) does not distinguish an account problem
+         * from a captcha problem, only the HTTP response code does: 403 = credentials rejected or insufficient credits (account,
+         * permanent), 400 = malformed request or invalid captcha image (captcha-level, not account), 503 = service overloaded
+         * (temporary), 500/other = internal server error (not the account's fault).
+         */
+        final int responseCode = br.getHttpConnection().getResponseCode();
+        if (responseCode == 403) {
+            throw new AccountInvalidException(error);
+        } else if (responseCode == 503) {
+            throw new AccountUnavailableException(error, 60 * 1000L);
+        } else {
+            throw new PluginException(LinkStatus.ERROR_CAPTCHA, error);
+        }
     }
 
     @Override

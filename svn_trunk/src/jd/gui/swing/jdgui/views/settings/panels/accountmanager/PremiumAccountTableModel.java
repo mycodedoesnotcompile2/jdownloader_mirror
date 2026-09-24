@@ -9,7 +9,9 @@ import java.text.FieldPosition;
 import java.util.ArrayList;
 import java.util.Currency;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 
 import javax.swing.Icon;
@@ -22,6 +24,7 @@ import org.appwork.storage.config.JsonConfig;
 import org.appwork.swing.components.ExtMergedIcon;
 import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtDefaultRowSorter;
+import org.appwork.swing.exttable.ExtTable;
 import org.appwork.swing.exttable.ExtTableHeaderRenderer;
 import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.swing.exttable.columns.ExtCheckColumn;
@@ -369,6 +372,7 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
     protected void initColumns() {
         addEnabledColumn();
         addColumnHoster();
+        addTypeColumn();
         addStatusColumn();
         addUsernameColumn();
         addPasswordColumn();
@@ -791,6 +795,95 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
             @Override
             public String getStringValue(AccountEntry value) {
                 return value.getAccount().getHosterByPlugin();
+            }
+        });
+    }
+
+    /**
+     * The plugin-category of an account, as opposed to {@link jd.plugins.Account.AccountType} which describes the premium status
+     * (free/premium/lifetime).
+     */
+    protected static enum AccountManagerType {
+        MULTIHOST,
+        CAPTCHA_SOLVER,
+        DOWNLOAD
+    }
+
+    protected AccountManagerType getAccountManagerType(final Account acc) {
+        final PluginForHost plg = acc.getPlugin();
+        if (plg != null && plg.hasFeature(FEATURE.CAPTCHA_SOLVER)) {
+            return AccountManagerType.CAPTCHA_SOLVER;
+        } else if (acc.isMultiHost()) {
+            return AccountManagerType.MULTIHOST;
+        } else {
+            return AccountManagerType.DOWNLOAD;
+        }
+    }
+
+    protected void addTypeColumn() {
+        this.addColumn(new ExtTextColumn<AccountEntry>(_GUI.T.premiumaccounttablemodel_column_type()) {
+            private static final long serialVersionUID = 1L;
+            {
+                replaceSorter(this);
+            }
+
+            @Override
+            public boolean isEnabled(AccountEntry obj) {
+                return obj.getAccount().isEnabled();
+            }
+
+            @Override
+            public boolean isSortable(AccountEntry obj) {
+                return PremiumAccountTableModel.this.isSortable();
+            }
+
+            @Override
+            public boolean isDefaultVisible() {
+                return false;
+            }
+
+            @Override
+            public boolean isVisible(final boolean savedValue) {
+                final ExtTable<AccountEntry> table = getModel().getTable();
+                if (table != null && table.getStorage().hasProperty(table.getColumnStoreKey("VISABLE_COL_", getID()))) {
+                    /* The user has an explicit show/hide preference for this column - always respect it. */
+                    return savedValue;
+                }
+                /*
+                 * No explicit user preference stored yet: this column only adds information once the account list mixes
+                 * different account types, so only show it automatically when at least two different types are present.
+                 */
+                final Set<AccountManagerType> types = new HashSet<AccountManagerType>();
+                for (final AccountEntry entry : PremiumAccountTableModel.this.getTableData()) {
+                    types.add(getAccountManagerType(entry.getAccount()));
+                    if (types.size() >= 2) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            @Override
+            public int getDefaultWidth() {
+                return 90;
+            }
+
+            @Override
+            public int getMinWidth() {
+                return 60;
+            }
+
+            @Override
+            public String getStringValue(AccountEntry value) {
+                switch (getAccountManagerType(value.getAccount())) {
+                case CAPTCHA_SOLVER:
+                    return _GUI.T.premiumaccounttablemodel_type_captchasolver();
+                case MULTIHOST:
+                    return _GUI.T.premiumaccounttablemodel_type_multihoster();
+                case DOWNLOAD:
+                default:
+                    return _GUI.T.premiumaccounttablemodel_type_download();
+                }
             }
         });
     }

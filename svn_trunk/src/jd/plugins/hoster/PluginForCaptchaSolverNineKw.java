@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.exceptions.WTFException;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
@@ -36,6 +37,7 @@ import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountUnavailableException;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
@@ -44,7 +46,7 @@ import jd.plugins.PluginException;
 /**
  * Plugin for 9kw captcha solving service (https://9kw.eu/).
  */
-@HostPlugin(revision = "$Revision: 52511 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53502 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
 public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -174,10 +176,9 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         /* See list of possible errors here: https://www.9kw.eu/api.html#apigeneral-tab */
         final Regex non_json_error_regex = br.getRegex("(\\d{4}) (.+)");
         if (non_json_error_regex.patternFind()) {
-            // TODO: Check for account related problems too
-            final String error_code = non_json_error_regex.getMatch(0);
+            final int error_code = Integer.parseInt(non_json_error_regex.getMatch(0));
             final String error_msg = non_json_error_regex.getMatch(1);
-            throw new PluginException(LinkStatus.ERROR_CAPTCHA, error_msg);
+            throwForErrorCode(error_code, error_msg);
         }
         final Regex captcha_upload_success = br.getRegex("OK-(\\d+)");
         if (captcha_upload_success.patternFind()) {
@@ -207,17 +208,35 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         if (errorNumber == null) {
             throw new AccountInvalidException(error);
         }
-        final int errorcode = Integer.parseInt(errorNumber);
-        if (errorcode == 1 || errorcode == 2 || errorcode == 3 || errorcode == 4 || errorcode == 5 || errorcode == 11 || errorcode == 26 || errorcode == 30 || errorcode == 31 || errorcode == 32) {
-            throw new AccountInvalidException(error);
+        throwForErrorCode(Integer.parseInt(errorNumber), error);
+        /* Unreachable: throwForErrorCode always throws. */
+        throw new WTFException();
+    }
+
+    /**
+     * Classifies a 9kw error code (see https://www.9kw.eu/api.html#apigeneral-tab) as a permanent account error, a temporary account
+     * error, or a plain captcha error, and throws the matching exception. Always throws.
+     */
+    private void throwForErrorCode(final int errorcode, final String message) throws PluginException {
+        /*
+         * 1-5: no/inactive/deactivated API key or no matching account found. 11 & 24: insufficient balance (two separate error codes for
+         * the same underlying problem). 26: terms of service not accepted. 30: user/account not found. 32: account temporarily or
+         * permanently restricted by the operator -> treated as permanent since it needs manual/support action either way.
+         */
+        if (errorcode == 1 || errorcode == 2 || errorcode == 3 || errorcode == 4 || errorcode == 5 || errorcode == 11 || errorcode == 24 || errorcode == 26 || errorcode == 30 || errorcode == 32) {
+            throw new AccountInvalidException(message);
+        } else if (errorcode == 31) {
+            /* Account is not yet 24h old -> resolves itself, purely temporary. */
+            throw new AccountUnavailableException(message, 24 * 60 * 60 * 1000L);
         } else {
             /* Captcha error */
-            throw new PluginException(LinkStatus.ERROR_CAPTCHA, error);
+            throw new PluginException(LinkStatus.ERROR_CAPTCHA, message);
         }
     }
 
     @Override
     public void solve(CESSolverJob<?> job, Account account) throws Exception {
+        job.setStatus(SolverStatus.UPLOADING);
         final UrlQuery upload_query = new UrlQuery();
         upload_query.appendEncoded("action", "usercaptchaupload");
         final Challenge<?> captchachallenge = job.getChallenge();
@@ -234,11 +253,6 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
                 upload_query.appendEncoded("actionname", (String) v3action.get("action"));
                 upload_query.appendEncoded("min_score", "0.3");// minimal score
             } else {
-                // if (options.isSiteDomain()) {
-                // query.appendEncoded("pageurl", rcChallenge.getSiteDomain());
-                // } else {
-                // query.appendEncoded("pageurl", rcChallenge.getSiteUrl());
-                // }
                 upload_query.appendEncoded("pageurl", challenge.getSiteUrl(this));
                 upload_query.appendEncoded("captchachoice", "recaptchav2");
             }
@@ -297,12 +311,10 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         final UrlQuery polling_query = new UrlQuery();
         polling_query.appendEncoded("action", "usercaptchacorrectdata");
         polling_query.appendEncoded("id", captcha_id);
-        // q.appendEncoded("maxtimeout", cfg.tt + "");
         /* Wait for captcha answer */
         job.setStatus(SolverStatus.SOLVING);
         while (job.getJob().isAlive() && !job.getJob().isSolved()) {
-            checkInterruption();
-            Thread.sleep(getPollingIntervalMillis(account));
+            waitDuringPolling(job.getChallenge(), account);
             final Map<String, Object> pollingresp = this.callAPI(polling_query, account);
             final Number credits = (Number) pollingresp.get("credits");
             if (credits != null) {
@@ -326,13 +338,13 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
             }
             final AbstractResponse resp;
             if (captchachallenge instanceof RecaptchaV2Challenge || captchachallenge instanceof HCaptchaChallenge || captchachallenge instanceof CutCaptchaChallenge) {
-                resp = new TokenCaptchaResponse((Challenge<String>) captchachallenge, this, answer);
+                resp = new TokenCaptchaResponse((Challenge<String>) captchachallenge, job.getSolver(), answer);
             } else if (captchachallenge instanceof ClickCaptchaChallenge) {
                 // TODO: Test this
                 final String[] splitResult = answer.split("x");
                 final ClickCaptchaChallenge challenge = (ClickCaptchaChallenge) captchachallenge;
                 final ClickedPoint cp = new ClickedPoint(Integer.parseInt(splitResult[0]), Integer.parseInt(splitResult[1]));
-                resp = new ClickCaptchaResponse(challenge, this, cp);
+                resp = new ClickCaptchaResponse(challenge, job.getSolver(), cp);
             } else if (captchachallenge instanceof MultiClickCaptchaChallenge) {
                 // TODO: Test this
                 final String[] pairs = answer.split(";"); // e.g. "68x149;81x192"
@@ -344,9 +356,9 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
                     y[i] = Integer.parseInt(xy[1]);
                 }
                 final MultiClickCaptchaChallenge challenge = (MultiClickCaptchaChallenge) captchachallenge;
-                resp = new MultiClickCaptchaResponse(challenge, this, new MultiClickedPoint(x, y));
+                resp = new MultiClickCaptchaResponse(challenge, job.getSolver(), new MultiClickedPoint(x, y));
             } else {
-                resp = new CaptchaResponse((Challenge<String>) captchachallenge, this, answer);
+                resp = new CaptchaResponse((Challenge<String>) captchachallenge, job.getSolver(), answer);
             }
             resp.setCaptchaSolverTaskID(captcha_id);
             job.setAnswer(resp);

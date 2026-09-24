@@ -180,16 +180,53 @@ public class CaptchaTestDialog<T> extends AbstractDialog<Void> {
         return "Elapsed: " + ((System.currentTimeMillis() - startTime) / 100) / 10d + "s";
     }
 
-    /** Ticks the elapsed-time label while waiting; stopped once solving finishes (see {@link #stopElapsedTimer()}). */
+    /**
+     * Ticks the elapsed-time label and the "currently solving" status while waiting; stopped once solving finishes (see
+     * {@link #stopElapsedTimer()}).
+     */
     private void startElapsedTimer() {
         elapsedTimer = new Timer(100, new ActionListener() {
             @Override
             public void actionPerformed(final ActionEvent e) {
                 elapsedLabel.setText(formatElapsed());
+                updateActiveSolversStatus();
             }
         });
         elapsedTimer.setRepeats(true);
         elapsedTimer.start();
+    }
+
+    /** Shows which solver(s) are still working on the challenge and their {@link ChallengeSolver#getFinalTimeoutMillis()}, while waiting. */
+    private void updateActiveSolversStatus() {
+        if (finishedJob != null) {
+            /* Solving already finished -> onSolved()/onFailed() own the status label from here on. */
+            return;
+        }
+        final SolverJob<?> job = ChallengeResponseController.getInstance().getJobByChallengeId(challengeId);
+        if (job != null) {
+            updateActiveSolversStatus(job);
+        }
+    }
+
+    private <X> void updateActiveSolversStatus(final SolverJob<X> job) {
+        final StringBuilder sb = new StringBuilder();
+        for (final ChallengeSolver<X> solver : job.getSolverList()) {
+            if (job.isDone(solver)) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append(", ");
+            }
+            sb.append(solver).append(" (timeout: ").append(formatTimeout(solver.getFinalTimeoutMillis())).append(")");
+        }
+        if (sb.length() > 0) {
+            statusLabel.setText("Solving with: " + sb);
+        }
+    }
+
+    /** {@link ChallengeSolver#getFinalTimeoutMillis()} returns -1 for "no timeout", and a millisecond delay otherwise. */
+    private static String formatTimeout(final long timeoutMillis) {
+        return timeoutMillis <= 0 ? "unlimited" : (timeoutMillis / 1000L) + "s";
     }
 
     private void stopElapsedTimer() {

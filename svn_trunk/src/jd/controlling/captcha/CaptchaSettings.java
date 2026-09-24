@@ -114,6 +114,14 @@ public interface CaptchaSettings extends ConfigInterface {
     void setDefaultChallengeTimeout(int ms);
 
     @AboutConfig
+    @DefaultIntValue(10 * 60 * 1000)
+    @SpinnerValidator(min = 2 * 60 * 1000, max = 10 * 60 * 1000, step = 1000)
+    @DescriptionForConfigEntry("Default max time in milliseconds a single captcha solver has to solve a challenge before it gets killed, unless the solver itself specifies a lower value (e.g. a server-side polling timeout).")
+    int getDefaultMaxSolverChallengePollingTimeoutMillis();
+
+    void setDefaultMaxSolverChallengePollingTimeoutMillis(int ms);
+
+    @AboutConfig
     @DefaultIntValue(10000)
     @DescriptionForConfigEntry("If the CES Bubble Support is enable, the bubble gives the user a chance to cancel the CES usage. This is the timeout for this skip option")
     int getCaptchaExchangeChanceToSkipBubbleTimeout();

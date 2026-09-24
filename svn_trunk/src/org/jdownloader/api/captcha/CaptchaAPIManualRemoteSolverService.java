@@ -1,6 +1,5 @@
 package org.jdownloader.api.captcha;
 
-import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -10,6 +9,7 @@ import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.api.myjdownloader.MyJDownloaderController;
 import org.jdownloader.api.myjdownloader.MyJDownloaderSettings.MyJDownloaderError;
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
 import org.jdownloader.captcha.v2.solver.service.AbstractSolverService;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
@@ -138,6 +138,7 @@ public class CaptchaAPIManualRemoteSolverService extends AbstractSolverService {
         /* Everything the browser dialog solver can do, too. */
         types.add(CAPTCHA_TYPE.HCAPTCHA);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
+        /* TODO: Check enterprise handling: https://svn.jdownloader.org/issues/90631 */
         types.add(CAPTCHA_TYPE.RECAPTCHA_V3_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);

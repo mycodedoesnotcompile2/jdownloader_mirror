@@ -235,6 +235,24 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
         return PluginJsonConfig.get(plugin.getLazyP(), plugin.getConfigInterface());
     }
 
+    /**
+     * Returns this service's server-side max-simultaneous-captchas limit (see
+     * {@link abstractPluginForCaptchaSolver#getServerSideMaxSimultaneousCaptchaThreadsLimit(Account)}), for display purposes (e.g. the
+     * captcha types table's info line). None of the current overrides actually depend on the account they are given, so null is passed
+     * here.
+     */
+    public int getServerSideMaxSimultaneousCaptchaThreadsLimit() {
+        return plugin.getServerSideMaxSimultaneousCaptchaThreadsLimit(null);
+    }
+
+    /**
+     * Returns this service's server-side max polling time in milliseconds (see
+     * {@link abstractPluginForCaptchaSolver#getServerSideMaxPollingTimeoutMillis()}), for display purposes.
+     */
+    public long getServerSideMaxPollingTimeoutMillis() {
+        return plugin.getServerSideMaxPollingTimeoutMillis();
+    }
+
     @Override
     public String getBuyURL() {
         return plugin.getBuyPremiumUrl();

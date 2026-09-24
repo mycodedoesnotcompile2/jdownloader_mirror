@@ -4,6 +4,7 @@ import java.awt.Rectangle;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.jdownloader.captcha.v2.Challenge.CaptchaRequestType;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
@@ -12,6 +13,7 @@ import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.solver.browser.BrowserViewport;
 import org.jdownloader.captcha.v2.solver.browser.BrowserWindow;
+import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.controller.PluginClassLoader;
 import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChild;
 import org.jdownloader.plugins.controller.host.HostPluginController;
@@ -41,7 +43,18 @@ public class CaptchaTestChallengeFactory {
         }
         final PluginClassLoaderChild classLoader = PluginClassLoader.getThreadPluginClassLoaderChild();
         try {
-            return Plugin.getNewPluginInstance(null, lazyPlugin, classLoader);
+            final PluginForHost plugin = Plugin.getNewPluginInstance(null, lazyPlugin, classLoader);
+            /*
+             * A freshly created Plugin instance defaults to LogController.TRASH (a no-op logger, see Plugin#logger) until something
+             * explicitly calls setLogger() -- real downloads get that wired up by the download pipeline, this throwaway carrier never goes
+             * through it. Without this, abstractPluginForCaptchaSolver#getPluginChallengeSolver() (which prefers the challenge's own
+             * plugin logger for both the solver and its Browser instance) would silently discard all solver/browser logging for test
+             * challenges. Instant flush so the log shows up in the console right away instead of only after the periodic flush timeout.
+             */
+            final LogSource logger = LogController.getInstance().getLogger(plugin.getClass().getName());
+            logger.setInstantFlush(true);
+            plugin.setLogger(logger);
+            return plugin;
         } catch (final PluginException e) {
             return null;
         }
@@ -310,7 +323,10 @@ public class CaptchaTestChallengeFactory {
         }
     }
 
-    /** Cloudflare's officially documented "always passes" Turnstile test site key, paired with their public demo page. */
+    /**
+     * Cloudflare's officially documented "always passes" Turnstile test site key, paired with their public demo page. <br>
+     * Test-keys will return dummy token: XXXX.DUMMY.TOKEN.XXXX (yes literally this, including the "XXX"!)
+     */
     public static Challenge<String> newCloudflareTurnstileChallenge(final CaptchaRequestType requestType) {
         final PluginForHost plugin = newCarrierPlugin();
         if (plugin == null) {
