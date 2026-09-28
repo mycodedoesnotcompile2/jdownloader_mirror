@@ -104,7 +104,7 @@ public class IconIO {
     public static class ScaledIcon extends AbstractIconPipe implements Icon, IDIcon {
         private final int                          width;
         private final int                          height;
-        private final Interpolation                interpolation;
+        private Interpolation                      interpolation = org.appwork.utils.images.Interpolation.BICUBIC;
         private final double                       faktor;
         private static final Set<ModificationType> MODIFICATIONS = Collections.unmodifiableSet(new HashSet<ModificationType>(Arrays.asList(ModificationType.SIZE)));
 
@@ -127,7 +127,7 @@ public class IconIO {
             this.faktor = 1d / Math.max((double) icon.getIconWidth() / width, (double) icon.getIconHeight() / height);
             this.width = Math.max((int) Math.round(icon.getIconWidth() * this.faktor), 1);
             this.height = Math.max((int) Math.round(icon.getIconHeight() * this.faktor), 1);
-            this.interpolation = interpolation;
+            this.interpolation = interpolation == null ? org.appwork.utils.images.Interpolation.BICUBIC : interpolation;
         }
 
         /*

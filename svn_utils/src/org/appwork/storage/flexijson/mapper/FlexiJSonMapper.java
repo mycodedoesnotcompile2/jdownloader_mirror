@@ -1950,6 +1950,11 @@ public class FlexiJSonMapper {
     }
 
     protected FlexiJSonNode resolveValue(FlexiJSonNode value, final CompiledType fieldType, final List<String> access, LinkedHashSet<JSPath> loopCheck) throws FlexiMapperException, CannotResolvePathException, NoSuchMethodException {
+        // After ~{path} resolve, the target may already be an object/array. resolve() re-enters here to unwind nested
+        // string refs only; non-string nodes have nothing left to parse (nested strings are resolved when their fields map).
+        if (!(value instanceof FlexiJSonValue) || ((FlexiJSonValue) value).getType() != ValueType.STRING) {
+            return value;
+        }
         try {
             long a = Time.systemIndependentCurrentJVMTimeMillis();
             boolean isStepping = Time.systemIndependentCurrentJVMTimeMillis() - a > 10;

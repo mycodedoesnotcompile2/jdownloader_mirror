@@ -78,7 +78,6 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 import org.appwork.exceptions.WTFException;
-import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.os.CrossSystem;
 
@@ -736,7 +735,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see java.io.OutputStream#write(int)
          */
         @Override
@@ -759,7 +758,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see java.io.OutputStream#write(byte[])
          */
         @Override
@@ -782,7 +781,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see java.io.OutputStream#write(byte[], int, int)
          */
         @Override
@@ -805,7 +804,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see java.io.OutputStream#flush()
          */
         @Override
@@ -826,7 +825,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see java.io.OutputStream#close()
          */
         @Override
@@ -991,6 +990,9 @@ public class Application {
      * @param newJar
      */
     public synchronized static void setApplication(final String newAppFolder) {
+        if (ROOT != null) {
+            DebugMode.debugger();
+        }
         Application.ROOT = null;
         Application.APP_FOLDER = newAppFolder;
         if (MAINCLASS == null) {

@@ -18,6 +18,7 @@ package org.appwork.utils.net.httpconnection.proxy.tests;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+
 import org.appwork.loggingv3.LogV3;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
