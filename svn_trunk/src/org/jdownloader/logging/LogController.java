@@ -153,7 +153,10 @@ public class LogController extends LogSourceProvider {
 
     @Override
     public LogSource getLogger(String name) {
-        LogSource ret = super.getLogger(name);
+        if ("org.fourthline.cling.transport.Router".equals(name)) {
+            return TRASH;
+        }
+        final LogSource ret = super.getLogger(name);
         ret.setMaxSizeInMemory(512 * 1024);
         return ret;
     }

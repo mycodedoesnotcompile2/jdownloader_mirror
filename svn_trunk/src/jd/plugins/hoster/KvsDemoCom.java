@@ -19,9 +19,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52781 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53504 $", interfaceVersion = 3, names = {}, urls = {})
 public class KvsDemoCom extends KernelVideoSharingComV2 {
     public KvsDemoCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -53,14 +54,14 @@ public class KvsDemoCom extends KernelVideoSharingComV2 {
     }
 
     @Override
-    protected boolean isValidDirectURL(final String url) {
+    protected boolean isValidDirectURL(final Browser br, final String url) {
         if (url == null) {
             return false;
         } else if (url.contains("get_file") && url.contains("premium_trailer")) {
             /* 2023-08-14: E.g. https://www.kvs-demo.com/videos/422/david-guetta-feat-kid-cudi-memories/ */
             return true;
         } else {
-            return super.isValidDirectURL(url);
+            return super.isValidDirectURL(br, url);
         }
     }
 }

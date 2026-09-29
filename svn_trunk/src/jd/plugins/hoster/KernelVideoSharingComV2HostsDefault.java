@@ -21,18 +21,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.parser.Regex;
+import jd.plugins.DownloadLink;
+import jd.plugins.HostPlugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.config.KVSConfig;
 import org.jdownloader.plugins.components.config.KVSConfigFullpornxxx;
 
-import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.plugins.DownloadLink;
-import jd.plugins.HostPlugin;
-import jd.plugins.PluginException;
-
-@HostPlugin(revision = "$Revision: 53283 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53504 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
@@ -168,6 +170,10 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         ret.add(new String[] { "wow.xxx" });
         ret.add(new String[] { "neporn.com" });
         ret.add(new String[] { "ooxxx.com" });
+        ret.add(new String[] { "porndos.com" });
+        ret.add(new String[] { "free4kporn.com" });// generate_mp4
+        ret.add(new String[] { "freepornvideos.xxx" });
+        ret.add(new String[] { "extreme.adult" });// embeds others, eg x-x-x.tube
         return ret;
     }
 
@@ -203,8 +209,19 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
             logger.log(e);
             exception = e;
         }
-        final String selfEmbed = br.getRegex("<iframe[^>]*src=\"(https?://[^\"]+/embed/[^\"]+)\"").getMatch(0);
-        if (selfEmbed == null || !canHandle(selfEmbed)) {
+        final String selfEmbed = br.getRegex("<iframe[^>]*src\\s*=\\s*\"(https?://[^\"]+/embed/[^\"]+)\"").getMatch(0);
+        canHandle: if (selfEmbed == null || !canHandle(selfEmbed)) {
+            try {
+                if (selfEmbed != null) {
+                    final String selfEmbedHost = Browser.getHost(selfEmbed);
+                    final PluginForHost selfEmbedPlugin = getNewPluginForHostInstance(selfEmbedHost);
+                    if (selfEmbedPlugin != null && selfEmbedPlugin instanceof KernelVideoSharingComV2 && selfEmbedPlugin.canHandle(selfEmbed)) {
+                        break canHandle;
+                    }
+                }
+            } catch (PluginException e) {
+                logger.log(e);
+            }
             throw exception;
         }
         /**
@@ -231,17 +248,50 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         if (video_url == null) {
             return -1;
         }
-        final String hd = br.getRegex(video_url + "_hd\\s*:\\s*(?:\"|'|)(\\d+)").getMatch(0);
         final String text = br.getRegex(video_url + "_text\\s*:\\s*(\"|')(.*?)\\1").getMatch(1);
+        Integer textVideoQuality = null;
+        if (text != null) {
+            if (text.matches("\\d+")) {
+                textVideoQuality = Integer.parseInt(new Regex(text, "^(\\d+)").getMatch(0));// no p, 720
+            } else if (text.matches("\\d+p.*")) {
+                textVideoQuality = Integer.parseInt(new Regex(text, "^(\\d+)p.*").getMatch(0));// with p, 720p
+            } else if (text.equalsIgnoreCase("HQ")) {
+                /* 2020-12-14: Rare case e.g. thisvid.com */
+                textVideoQuality = 720;
+            } else if (text.equalsIgnoreCase("FHD")) {
+                textVideoQuality = 1080;
+            } else if (text.equalsIgnoreCase("2K")) {
+                textVideoQuality = 1440;
+            } else if (text.equalsIgnoreCase("4K")) {
+                textVideoQuality = 2160;
+            } else if (text.equalsIgnoreCase("HD")) {
+                // Can also be 720p (e.g. love4porn.com)
+                textVideoQuality = 1080;
+            } else if (StringUtils.containsIgnoreCase(text, "high")) {
+                textVideoQuality = 480;
+            } else if (StringUtils.containsIgnoreCase(text, "low")) {
+                textVideoQuality = 360;
+            }
+        }
+        final String fhd = br.getRegex(video_url + "_fhd\\s*:\\s*(?:\"|'|)(\\d+)").getMatch(0);
+        if ("1".equals(fhd)) {
+            if (textVideoQuality != null) {
+                textVideoQuality = Math.max(textVideoQuality.intValue(), 1080);
+            } else {
+                textVideoQuality = 1080;
+            }
+        }
+        final String hd = br.getRegex(video_url + "_hd\\s*:\\s*(?:\"|'|)(\\d+)").getMatch(0);
         if ("1".equals(hd)) {
-            qualityMap.put(Integer.valueOf(720), url);
-            return 720;
-        } else if (StringUtils.containsIgnoreCase(text, "high")) {
-            qualityMap.put(Integer.valueOf(480), url);
-            return 480;
-        } else if (StringUtils.containsIgnoreCase(text, "low")) {
-            qualityMap.put(Integer.valueOf(360), url);
-            return 360;
+            if (textVideoQuality != null) {
+                textVideoQuality = Math.max(textVideoQuality.intValue(), 720);
+            } else {
+                textVideoQuality = 720;
+            }
+        }
+        if (textVideoQuality != null) {
+            qualityMap.put(textVideoQuality, url);
+            return textVideoQuality.intValue();
         } else {
             logger.info("Unknown quality:" + text + " for " + url);
             return -1;

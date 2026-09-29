@@ -38,6 +38,8 @@ import javax.swing.plaf.metal.MetalLookAndFeel;
 import javax.swing.text.JTextComponent;
 import javax.swing.text.Keymap;
 
+import jd.SecondLevelLaunch;
+
 import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
@@ -67,8 +69,6 @@ import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.updatev2.UpdateController;
 import org.jdownloader.updatev2.gui.LAFOptions;
 import org.jdownloader.updatev2.gui.LookAndFeelType;
-
-import jd.SecondLevelLaunch;
 
 public class LookAndFeelController implements LAFManagerInterface {
     private static final LookAndFeelController INSTANCE = new LookAndFeelController();
@@ -258,7 +258,7 @@ public class LookAndFeelController implements LAFManagerInterface {
             // if (true) return;
             String laf = null;
             try {
-                final String customLookAndFeel = config.getCustomLookAndFeelClass();
+                final String customLookAndFeel = StringUtils.nullify(config.getCustomLookAndFeelClass());
                 if (StringUtils.isNotEmpty(customLookAndFeel)) {
                     try {
                         // copy the libs to a tmp dir. we do not want to block them
@@ -513,8 +513,8 @@ public class LookAndFeelController implements LAFManagerInterface {
                 }
                 /*
                  * No selection: there is no standard action to delegate to here. Swing only loads its default keymap's standard key
-                 * bindings lazily on first use, and at LAF setup time (when this action is installed) none exist yet to grab a
-                 * reference to. So we set the caret position ourselves, one character to the right.
+                 * bindings lazily on first use, and at LAF setup time (when this action is installed) none exist yet to grab a reference
+                 * to. So we set the caret position ourselves, one character to the right.
                  */
                 final int pos = textComponent.getCaretPosition();
                 if (pos < textComponent.getDocument().getLength()) {

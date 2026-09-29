@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.SpankBangComCrawler;
 
-@HostPlugin(revision = "$Revision: 52320 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53504 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { SpankBangComCrawler.class })
 public class SpankBangCom extends PluginForHost {
     public SpankBangCom(PluginWrapper wrapper) {
@@ -137,7 +137,7 @@ public class SpankBangCom extends PluginForHost {
 
     public AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
         this.setBrowserExclusive();
-        SpankBangComCrawler.prepBR(br);
+        SpankBangComCrawler.prepBR(this, br);
         if (account != null) {
             this.login(account, false);
         }
@@ -148,12 +148,13 @@ public class SpankBangCom extends PluginForHost {
         if (isValidURL(br, link, dllink)) {
             return AvailableStatus.TRUE;
         }
-        final String mainlink = link.getStringProperty(PROPERTY_MAINLINK);
+        String mainlink = link.getStringProperty(PROPERTY_MAINLINK);
         final String quality = link.getStringProperty(PROPERTY_QUALITY);
         if (mainlink == null || quality == null) {
             /* Missing property - this should not happen! */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        mainlink = SpankBangComCrawler.rewriteHost(this, mainlink);
         br.getPage(mainlink);
         if (SpankBangComCrawler.isOffline(this.br)) {
             /* Main videolink offline --> Offline */

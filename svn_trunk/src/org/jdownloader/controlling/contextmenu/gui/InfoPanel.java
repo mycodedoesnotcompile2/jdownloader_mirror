@@ -9,7 +9,6 @@ import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.io.File;
 import java.lang.reflect.Constructor;
-import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -32,6 +31,8 @@ import javax.swing.ListSelectionModel;
 import javax.swing.Scrollable;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
+
+import net.miginfocom.swing.MigLayout;
 
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtButton;
@@ -62,8 +63,6 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.config.Order;
-
-import net.miginfocom.swing.MigLayout;
 
 public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
     public Dimension getPreferredScrollableViewportSize() {
@@ -144,6 +143,9 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
                 final File imagesDir = NewTheme.I().getImagesDirectory();
                 final ArrayList<File> files = new ArrayList<File>();
                 Files.internalWalkThroughStructure(new FileHandler<RuntimeException>() {
+
+                    private final boolean isSVGSupported = IconIO.getSvgFactory() != null;
+
                     @Override
                     public void intro(File f) throws RuntimeException {
                     }
@@ -154,7 +156,7 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
                         if ("fav".equals(name) && f.isDirectory()) {
                             return false;
                         } else {
-                            if (name.endsWith(".png") || (IconIO.getSvgFactory() != null && name.endsWith(".svg"))) {
+                            if (name.endsWith(".png") || (isSVGSupported && name.endsWith(".svg"))) {
                                 files.add(f);
                             }
                             return true;
@@ -171,13 +173,11 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
                 final ListCellRenderer org = list.getCellRenderer();
                 list.setCellRenderer(new ListCellRenderer() {
                     public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
-                        File f = (File) value;
-                        // String key = value.toString().substring(0, value.toString().length() - 4);
-                        JLabel ret = (JLabel) org.getListCellRendererComponent(list, "", index, isSelected, cellHasFocus);
+                        final File f = (File) value;
+                        final JLabel ret = (JLabel) org.getListCellRendererComponent(list, "", index, isSelected, cellHasFocus);
                         try {
                             ret.setIcon(IconIO.getIcon(f.toURI().toURL(), 20, 20));
-                        } catch (MalformedURLException e) {
-                            e.printStackTrace();
+                        } catch (Exception e) {
                         }
                         return ret;
                     }
@@ -246,8 +246,8 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
                     @Override
                     protected void runInEDT() {
                         /*
-                         * Two-state toggle: when the icon is at its default, resetIconKey is EMPTY and this removes the icon;
-                         * when the icon is removed or custom, resetIconKey is the default and this restores it.
+                         * Two-state toggle: when the icon is at its default, resetIconKey is EMPTY and this removes the icon; when the icon
+                         * is removed or custom, resetIconKey is the default and this restores it.
                          */
                         item.setIconKey(resetIconKey);
                         updateInfo(item);
@@ -293,8 +293,8 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
                     final boolean on = shortcutEnabled.isSelected();
                     if (on) {
                         /*
-                         * Enable the hotkey. The stored (custom) shortcut value is kept, so it survives a disable/enable cycle.
-                         * Legacy data may have stored the EMPTY sentinel as "removed"; normalize that to inherit-default.
+                         * Enable the hotkey. The stored (custom) shortcut value is kept, so it survives a disable/enable cycle. Legacy data
+                         * may have stored the EMPTY sentinel as "removed"; normalize that to inherit-default.
                          */
                         item.setShortcutDisabled(false);
                         if (MenuItemData.isEmptyValue(item.getShortcut())) {
@@ -305,9 +305,9 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
                         item.setShortcutDisabled(true);
                     }
                     /*
-                     * Reflect the new state directly instead of calling updateInfo(), so that a "checked but not-yet-assigned"
-                     * state on an action without a default hotkey is not immediately reverted to unchecked by the derivation.
-                     * The field always shows the effective (custom or default) hotkey, greyed out while disabled.
+                     * Reflect the new state directly instead of calling updateInfo(), so that a "checked but not-yet-assigned" state on an
+                     * action without a default hotkey is not immediately reverted to unchecked by the derivation. The field always shows
+                     * the effective (custom or default) hotkey, greyed out while disabled.
                      */
                     shortcut.setEnabled(on);
                     final KeyStroke shown = getEffectiveAccelerator(item);
@@ -329,8 +329,8 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
                         @Override
                         protected void runInEDT() {
                             /*
-                             * Reset to default restores the built-in hotkey (null = inherit) and the checkbox default (enabled);
-                             * it never disables the hotkey.
+                             * Reset to default restores the built-in hotkey (null = inherit) and the checkbox default (enabled); it never
+                             * disables the hotkey.
                              */
                             item.setShortcut(null);
                             item.setShortcutDisabled(false);
@@ -404,8 +404,8 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
                 resetIconKey = computeResetTarget(value.getIconKey(), ret.getIconKey());
                 nameReset.setToolTipText(_GUI.T.ManagerFrame_layoutPanel_resettodefault_parametered(resetName));
                 /*
-                 * When the icon already equals the default (resetIconKey == EMPTY), the next click removes it: show a trash icon.
-                 * Otherwise (removed or custom) show the "reset to default" icon.
+                 * When the icon already equals the default (resetIconKey == EMPTY), the next click removes it: show a trash icon. Otherwise
+                 * (removed or custom) show the "reset to default" icon.
                  */
                 if (MenuItemData.isEmptyValue(resetIconKey)) {
                     iconKeyReset.setIcon(NewTheme.I().getIcon(IconKey.ICON_TRASH, 18));
@@ -426,11 +426,10 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
     }
 
     /**
-     * Computes the value the icon reset button applies on its next click and, implicitly, which icon it shows: returning
-     * MenuItemData.EMPTY means the icon currently equals its default and the next click removes it (trash icon); returning the
-     * default value means the icon is currently removed or customized and the next click restores the default (reset icon).
-     * currentStored is the value stored on the menu item (null/empty when the default is inherited), defaultValue is the
-     * built-in default of the action.
+     * Computes the value the icon reset button applies on its next click and, implicitly, which icon it shows: returning MenuItemData.EMPTY
+     * means the icon currently equals its default and the next click removes it (trash icon); returning the default value means the icon is
+     * currently removed or customized and the next click restores the default (reset icon). currentStored is the value stored on the menu
+     * item (null/empty when the default is inherited), defaultValue is the built-in default of the action.
      */
     private String computeResetTarget(final String currentStored, final String defaultValue) {
         if (MenuItemData.isEmptyValue(currentStored)) {
@@ -446,9 +445,9 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
     }
 
     /**
-     * Reads the built-in default hotkey of the given menu item's action, independent of any custom/removed override stored on
-     * the item. A fresh action instance without a menuItemData is used, so its accelerator is the one set in the action
-     * constructor. Returns null when the action has no default hotkey.
+     * Reads the built-in default hotkey of the given menu item's action, independent of any custom/removed override stored on the item. A
+     * fresh action instance without a menuItemData is used, so its accelerator is the one set in the action constructor. Returns null when
+     * the action has no default hotkey.
      */
     private KeyStroke getDefaultAccelerator(final MenuItemData mid) {
         try {
@@ -471,8 +470,8 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
     }
 
     /**
-     * Returns the hotkey that currently applies to the given menu item: the custom hotkey if one is set, otherwise the built-in
-     * default. Returns null when neither exists.
+     * Returns the hotkey that currently applies to the given menu item: the custom hotkey if one is set, otherwise the built-in default.
+     * Returns null when neither exists.
      */
     private KeyStroke getEffectiveAccelerator(final MenuItemData mid) {
         final String stored = mid.getShortcut();
@@ -483,11 +482,10 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
     }
 
     /**
-     * Updates the shortcut checkbox and field from the menu item state: the checkbox is ticked by default (even when no hotkey
-     * is set, so the field is immediately editable to assign one with a single click) and only unticked when the user disabled
-     * the hotkey (via the disabled flag or the legacy EMPTY value). The field shows the effective (custom or default) hotkey and
-     * is greyed out together with the checkbox while disabled, so a custom hotkey stays visible and is preserved across a
-     * disable/enable cycle.
+     * Updates the shortcut checkbox and field from the menu item state: the checkbox is ticked by default (even when no hotkey is set, so
+     * the field is immediately editable to assign one with a single click) and only unticked when the user disabled the hotkey (via the
+     * disabled flag or the legacy EMPTY value). The field shows the effective (custom or default) hotkey and is greyed out together with
+     * the checkbox while disabled, so a custom hotkey stays visible and is preserved across a disable/enable cycle.
      */
     private void updateShortcutControls(final MenuItemData mid) {
         if (shortcutEnabled == null || shortcut == null) {
@@ -504,9 +502,9 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
     }
 
     /**
-     * Returns true when every customizable setting of the given menu item still equals its built-in default, so there is
-     * nothing to reset. A fresh action instance without a menuItemData is used to read the defaults, because setup overrides
-     * are only applied while a menuItemData is present (see CustomizableAppAction.fill).
+     * Returns true when every customizable setting of the given menu item still equals its built-in default, so there is nothing to reset.
+     * A fresh action instance without a menuItemData is used to read the defaults, because setup overrides are only applied while a
+     * menuItemData is present (see CustomizableAppAction.fill).
      */
     private boolean areSettingsAtDefault(final MenuItemData mid, final ArrayList<Entry> entries) {
         try {
@@ -515,9 +513,9 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
             final CustomizableAppAction defaults = (CustomizableAppAction) c.newInstance(new Object[] {});
             try {
                 /*
-                 * No menuItemData is set on this instance on purpose, so the setup overrides are not applied and the setup
-                 * objects keep their built-in defaults. Some actions compute defaults from a menuItemData though; in that case
-                 * fall back to the plain constructor defaults instead of failing the whole comparison.
+                 * No menuItemData is set on this instance on purpose, so the setup overrides are not applied and the setup objects keep
+                 * their built-in defaults. Some actions compute defaults from a menuItemData though; in that case fall back to the plain
+                 * constructor defaults instead of failing the whole comparison.
                  */
                 defaults.initContextDefaults();
             } catch (Throwable ignore) {
@@ -665,14 +663,14 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
                     }
                     if (entries.size() > 0 && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                         /*
-                         * Offer a button to reset all customizable action settings (the Customizer fields below) back to their
-                         * built-in defaults. It only removes the setup overrides of the shown Customizer fields, so structural
-                         * setups that are not exposed as Customizer stay untouched.
+                         * Offer a button to reset all customizable action settings (the Customizer fields below) back to their built-in
+                         * defaults. It only removes the setup overrides of the shown Customizer fields, so structural setups that are not
+                         * exposed as Customizer stay untouched.
                          *
-                         * TODO: The "at default" reference is currently the action class defaults, which is wrong for
-                         * pre-configured menu variants (e.g. the "Delete All" entry of GenericDeleteFromDownloadlistAction, whose
-                         * default is defined via a setup override, not the class default). Until this is measured against the
-                         * built-in default menu structure instead, the button is only shown while running from the IDE.
+                         * TODO: The "at default" reference is currently the action class defaults, which is wrong for pre-configured menu
+                         * variants (e.g. the "Delete All" entry of GenericDeleteFromDownloadlistAction, whose default is defined via a
+                         * setup override, not the class default). Until this is measured against the built-in default menu structure
+                         * instead, the button is only shown while running from the IDE.
                          */
                         final ActionData resetTarget = mid.getActionData();
                         final ArrayList<String> customizerKeys = new ArrayList<String>();

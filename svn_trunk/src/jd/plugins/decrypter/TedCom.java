@@ -28,7 +28,7 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.youtube.YoutubeHelper;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 53400 $", interfaceVersion = 2, names = { "ted.com" }, urls = { "https?://(?:www\\.)?ted\\.com/(talks/(?:lang/[a-zA-Z\\-]+/)?[\\w_]+|[\\w_]+\\?language=\\w+|playlists/\\d+/[^/]+)" })
+@DecrypterPlugin(revision = "$Revision: 53504 $", interfaceVersion = 2, names = { "ted.com" }, urls = { "https?://(?:www\\.)?ted\\.com/(talks/(?:lang/[a-zA-Z\\-]+/)?[\\w_]+|[\\w_]+\\?language=\\w+|playlists/\\d+/[^/]+)" })
 public class TedCom extends PluginForDecrypt {
     public TedCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -174,12 +174,18 @@ public class TedCom extends PluginForDecrypt {
             }
             final Map<String, Object> root = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(json);
             final Map<String, Object> videoData = (Map<String, Object>) JavaScriptEngineFactory.walkJson(root, "props/pageProps/videoData");
-            final String playerDataJson = (String) videoData.get("playerData");
-            final Map<String, Object> playerData = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(playerDataJson);
+            Map<String, Object> videoPlayerData = (Map<String, Object>) videoData.get("videoPlayerData");
+            if (videoPlayerData == null) {
+                final String playerDataJson = (String) videoData.get("playerData");
+                videoPlayerData = (Map<String, Object>) (playerDataJson == null ? null : JavaScriptEngineFactory.jsonToJavaObject(playerDataJson));
+                if (videoPlayerData == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+            }
             /* 2022-02-25: Subtitle handling is broken! */
             final String subtitleText = br.getRegex("<select name=\"languageCode\" id=\"languageCode\"><option value=\"\">Show transcript</option>(.*?)</select>").getMatch(0);
             /** Decrypt video */
-            final Object externalMediaO = playerData.get("external");
+            final Object externalMediaO = videoPlayerData.get("external");
             if (externalMediaO != null) {
                 logger.info("Found external media");
                 final Map<String, Object> externalMedia = (Map<String, Object>) externalMediaO;
@@ -199,9 +205,9 @@ public class TedCom extends PluginForDecrypt {
             }
             /* All streaming resources */
             /* TODO: Check for official downloads */
-            final Map<String, Object> resources = (Map<String, Object>) playerData.get("resources");
+            final Map<String, Object> resources = (Map<String, Object>) videoPlayerData.get("resources");
             final List<Map<String, Object>> httpStreams = (List<Map<String, Object>>) resources.get("h264");
-            final Map<String, Object> hls = (Map<String, Object>) playerData.get("hls");
+            final Map<String, Object> hls = (Map<String, Object>) videoPlayerData.get("hls");
             final String title = (String) videoData.get("title");
             final FilePackage fp = FilePackage.getInstance();
             fp.setName(title);
@@ -339,7 +345,7 @@ public class TedCom extends PluginForDecrypt {
                 decryptedLinks.add(dl);
             }
             /** Decrypt subtitles */
-            final List<Map<String, Object>> subtitles = (List<Map<String, Object>>) playerData.get("languages");
+            final List<Map<String, Object>> subtitles = (List<Map<String, Object>>) videoPlayerData.get("languages");
             if (subtitles != null && hls != null) {
                 final String[][] allSubtitleValues = { { "sq", "Albanian" }, { "ar", "Arabic" }, { "hy", "Armenian" }, { "az", "Azerbaijani" }, { "bn", "Bengali" }, { "bg", "Bulgarian" }, { "zh-cn", "Chinese, Simplified" }, { "zh-tw", "Chinese, Traditional" }, { "hr", "Croatian" }, { "cs", "Czech" }, { "da", "Danish" }, { "nl", "Dutch" }, { "en", "English" }, { "et", "Estonian" }, { "fi", "Finnish" }, { "fr", "French" }, { "ka", "Georgian" }, { "de", "German" }, { "el", "Greek" }, { "he", "Hebrew" }, { "hu", "Hungarian" }, { "id", "Indonesian" }, { "it", "Italian" }, { "ja", "Japanese" }, { "ko", "Korean" }, { "ku", "Kurdish" }, { "lt", "Lithuanian" }, { "mk", "Macedonian" }, { "ms", "Malay" }, { "nb", "Norwegian Bokmal" }, { "fa", "Persian" }, { "pl", "Polish" }, { "pt", "Portuguese" }, { "pt-br", "Portuguese, Brazilian" }, { "ro", "Romanian" }, { "ru", "Russian" },
                         { "sr", "Serbian" }, { "sk", "Slovak" }, { "sl", "Slovenian" }, { "es", "Spanish" }, { "sv", "Swedish" }, { "th", "Thai" }, { "tr", "Turkish" }, { "uk", "Ukrainian" }, { "vi", "Vietnamese" } };

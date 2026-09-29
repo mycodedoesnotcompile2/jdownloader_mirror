@@ -434,12 +434,14 @@ public class IconIO {
      * @return
      */
     public static Icon getIcon(final URL resource, final int w, int h) {
-        Icon ret = loadVectorIcon(resource, w, h);
+        final Icon ret = loadVectorIcon(resource, w, h);
         if (ret != null) {
             return ret;
         }
-        Image image = loadImage(resource);
-        if (image.getWidth(null) == w && image.getHeight(null) == h) {
+        final Image image = loadImage(resource);
+        if (image == null) {
+            return null;
+        } else if (image.getWidth(null) == w && image.getHeight(null) == h) {
             return new ImageIcon(image);
         } else if (w <= 0 && h <= 0) {
             return new ImageIcon(image);

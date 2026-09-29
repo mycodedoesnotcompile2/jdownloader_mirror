@@ -26,7 +26,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 45872 $", interfaceVersion = 2, names = { "tiny.cc" }, urls = { "https?://(www\\.)?tiny\\.cc/[0-9a-zA-Z]+" })
+@DecrypterPlugin(revision = "$Revision: 53504 $", interfaceVersion = 2, names = { "tiny.cc" }, urls = { "https?://(www\\.)?tiny\\.cc/[0-9a-zA-Z]+" })
 public class TinyCc extends PluginForDecrypt {
     public TinyCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -43,7 +43,7 @@ public class TinyCc extends PluginForDecrypt {
         }
         br.setFollowRedirects(false);
         br.getPage(parameter);
-        if (br.containsHTML(" we weren't able to locate that URL")) {
+        if (br.containsHTML(" we weren't able to locate that URL") || br.containsHTML(">\\s*Please double check your link")) {
             logger.info("Link offline: " + parameter);
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }

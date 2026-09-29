@@ -58,7 +58,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 53419 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53504 $", interfaceVersion = 2, names = {}, urls = {})
 public class FilerNet extends PluginForHost {
     private static final int    STATUSCODE_APIDISABLED                             = 400;
     private static final String ERRORMESSAGE_APIDISABLEDTEXT                       = "API is disabled, please wait or use filer.net in your browser";
@@ -710,6 +710,9 @@ public class FilerNet extends PluginForHost {
 
             @Override
             protected Map<String, Object> handle(FilerNet plugin, Map<String, Object> entries, Account account) throws Exception {
+                if (account != null) {
+                    throw new AccountUnavailableException("Access denied, please contact filer.net support! Maybe IP blocked.", TimeUnit.MINUTES.toHours(1));
+                }
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unexpected API error " + entries);
             }
         },
@@ -947,9 +950,9 @@ public class FilerNet extends PluginForHost {
         final Object errorO = entries.get("error");
         final String message = (String) entries.get("message");
         if (errorO instanceof Number) { /*
-                                         * Error codes and messages can be extracted from here:
-                                         * https://filer.net/assets/ErrorPage-Br2HzfRN-1765742941422.js
-                                         */
+         * Error codes and messages can be extracted from here:
+         * https://filer.net/assets/ErrorPage-Br2HzfRN-1765742941422.js
+         */
             final int error = ((Number) errorO).intValue();
             switch (error) {
             case 404:

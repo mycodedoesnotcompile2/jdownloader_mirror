@@ -50,7 +50,7 @@ import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 import org.jdownloader.downloader.text.TextDownloader;
 
-@HostPlugin(revision = "$Revision: 53422 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53504 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { KemonoPartyCrawler.class })
 public class KemonoParty extends PluginForHost {
     public KemonoParty(PluginWrapper wrapper) {
@@ -100,6 +100,7 @@ public class KemonoParty extends PluginForHost {
         return KemonoPartyCrawler.getPluginDomains();
     }
 
+    @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
         return prepBrowser(this, br);

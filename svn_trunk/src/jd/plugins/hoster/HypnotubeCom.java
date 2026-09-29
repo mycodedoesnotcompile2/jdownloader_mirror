@@ -22,10 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -48,7 +44,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53394 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 53504 $", interfaceVersion = 3, names = {}, urls = {})
 public class HypnotubeCom extends PluginForHost {
     public HypnotubeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -209,9 +209,12 @@ public class HypnotubeCom extends PluginForHost {
         best_resolution: if (sources != null) {
             int best_resolution = -1;
             for (String source : sources) {
-                final String resolutionString = new Regex(source, "sizes\\s*=\\s*'(\\d+)").getMatch(0);
+                String resolutionString = new Regex(source, "sizes\\s*=\\s*'(\\d+)").getMatch(0);
+                if (resolutionString == null) {
+                    resolutionString = "-1";
+                }
                 if (dllink == null || Integer.parseInt(resolutionString) > best_resolution) {
-                    dllink = new Regex(source, "src=\"(https?://[^\"]+)").getMatch(0);
+                    dllink = Encoding.htmlOnlyDecode(new Regex(source, "src=\"(https?://[^\"]+)").getMatch(0));
                     best_resolution = Integer.parseInt(resolutionString);
                 }
             }
@@ -279,6 +282,9 @@ public class HypnotubeCom extends PluginForHost {
             getPage(br, br.createGetRequest("https://" + this.getHost() + "/login"));
             Form loginform = br.getFormbyProperty("id", "formLogin"); // shesfreaky.com
             if (loginform == null) {
+                loginform = br.getFormbyActionRegex(".*/login.*");// shesfreaky.com
+            }
+            if (loginform == null) {
                 loginform = br.getFormbyProperty("id", "login-form"); // hypnotube.com
                 if (loginform == null) {
                     loginform = br.getFormbyKey("ahd_username"); // both
@@ -287,17 +293,24 @@ public class HypnotubeCom extends PluginForHost {
             if (loginform == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find loginform");
             }
-            loginform.put("ahd_username", Encoding.urlEncode(account.getUser()));
-            loginform.put("ahd_password", Encoding.urlEncode(account.getPass()));
-            br.submitForm(loginform);
+            if (loginform.getInputFieldByName("name") != null) {
+                loginform.put("name", Encoding.urlEncode(account.getUser()));
+            } else {
+                loginform.put("ahd_username", Encoding.urlEncode(account.getUser()));
+            }
+            if (loginform.getInputFieldByName("password") != null) {
+                loginform.put("password", Encoding.urlEncode(account.getPass()));
+            } else {
+                loginform.put("ahd_password", Encoding.urlEncode(account.getPass()));
+            }
             getPage(br, br.createFormRequest(loginform));
             if (!isLoggedin(br)) {
                 throw new AccountInvalidException();
             }
+            account.saveCookies(br.getCookies(br.getHost()), "");
             if (checkurl != null) {
                 getPage(br, br.createGetRequest(checkurl));
             }
-            account.saveCookies(br.getCookies(br.getHost()), "");
             return true;
         }
     }
