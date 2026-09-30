@@ -27,7 +27,7 @@ import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
 import org.jdownloader.plugins.components.usenet.UsenetServer;
 
-@HostPlugin(revision = "$Revision: 52699 $", interfaceVersion = 3, names = { "hitnews.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53510 $", interfaceVersion = 3, names = { "hitnews.com" }, urls = { "" })
 public class HitNewsCom extends UseNet {
     public HitNewsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -117,8 +117,9 @@ public class HitNewsCom extends UseNet {
                 logger.log(e);
                 logger.info("Cookie login failed");
             }
+            account.clearCookies("");
         }
-        if (br.getCookie(getHost(), "sess", Cookies.NOTDELETEDPATTERN) == null) {
+        if (br.getCookie(getHost(), "hitmember", Cookies.NOTDELETEDPATTERN) == null) {
             account.clearCookies("");
             br.getPage("https://member.hitnews.com/login.html");
             Form loginForm = br.getFormbyActionRegex("auth/login");
@@ -137,7 +138,7 @@ public class HitNewsCom extends UseNet {
             br.submitForm(loginForm);
             if (br.containsHTML("<p>\\s*Invalid user/pass\\s*</p>")) {
                 throw new AccountInvalidException();
-            } else if (br.getCookie(getHost(), "sess", Cookies.NOTDELETEDPATTERN) == null) {
+            } else if (br.getCookie(getHost(), "hitmember", Cookies.NOTDELETEDPATTERN) == null) {
                 throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
             }
         }

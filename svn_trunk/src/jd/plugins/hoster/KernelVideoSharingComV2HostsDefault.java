@@ -34,7 +34,7 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.config.KVSConfig;
 import org.jdownloader.plugins.components.config.KVSConfigFullpornxxx;
 
-@HostPlugin(revision = "$Revision: 53504 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53511 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
@@ -206,7 +206,6 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
             if (isEmbedURL(br.getURL())) {
                 throw e;
             }
-            logger.log(e);
             exception = e;
         }
         final String selfEmbed = br.getRegex("<iframe[^>]*src\\s*=\\s*\"(https?://[^\"]+/embed/[^\"]+)\"").getMatch(0);

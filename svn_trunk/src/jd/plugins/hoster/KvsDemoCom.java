@@ -20,9 +20,10 @@ import java.util.List;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.plugins.Account;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 53504 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53511 $", interfaceVersion = 3, names = {}, urls = {})
 public class KvsDemoCom extends KernelVideoSharingComV2 {
     public KvsDemoCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -42,6 +43,11 @@ public class KvsDemoCom extends KernelVideoSharingComV2 {
     @Override
     public String[] siteSupportedNames() {
         return buildSupportedNames(getPluginDomains());
+    }
+
+    @Override
+    protected int getMaxChunks(Account account) {
+        return -2;
     }
 
     public static String[] getAnnotationUrls() {

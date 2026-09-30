@@ -17,15 +17,13 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.parser.html.Form;
+import jd.parser.html.HTMLParser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -34,7 +32,12 @@ import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 46220 $", interfaceVersion = 3, names = { "tr.link" }, urls = { "https?://(?:www\\.)?tr\\.link/(?!dmca|skype|webroot)([A-Za-z0-9]+)" })
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
+import org.jdownloader.plugins.components.antiDDoSForDecrypt;
+
+@DecrypterPlugin(revision = "$Revision: 53511 $", interfaceVersion = 3, names = { "tr.link", "ay.link" }, urls = { "https?://(?:www\\.)?tr\\.link/(?!dmca|skype|webroot)([A-Za-z0-9]+)", "https?://(?:www\\.)?(?:ay\\.link|aylink\\.co)/(?!dmca|skype|webroot)([A-Za-z0-9]+)" })
 public class TrLink extends antiDDoSForDecrypt {
     public TrLink(PluginWrapper wrapper) {
         super(wrapper);
@@ -44,9 +47,6 @@ public class TrLink extends antiDDoSForDecrypt {
         final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
         br.setFollowRedirects(false);
         br.getPage(param.getCryptedUrl());
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
         int loop = 0;
         while (br.getRedirectLocation() != null && loop <= 2) {
             if (!this.canHandle(br.getRedirectLocation())) {
@@ -59,10 +59,19 @@ public class TrLink extends antiDDoSForDecrypt {
         }
         if (br.getRedirectLocation() != null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Too many redirects");
+        } else if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final Form turnstileForm = br.getFormByRegex("id=\"turnstile-form\"");
+        if (turnstileForm != null) {
+            final CaptchaHelperCrawlerPluginCloudflareTurnstile turnStile = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, br);
+            turnstileForm.put("cf-turnstile-response", turnStile.getToken());
+            br.submitForm(turnstileForm);
         }
         final String alias = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
         final String csrf = br.getRegex("app\\['csrf'\\] = '([^<>\"\\']+)';").getMatch(0);
         final String token = br.getRegex("app\\['token'\\] = '([^<>\"\\']+)';").getMatch(0);
+        final String destContent = br.getRegex("<div class\\s*=\\s*\"destination-content\">\\s*(.*?)\\s*</div>").getMatch(0);
         if (csrf == null || token == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
@@ -78,6 +87,17 @@ public class TrLink extends antiDDoSForDecrypt {
         getPage("/links/go2?" + query.toString());
         String finallink = PluginJSonUtils.getJson(br, "url");
         if (StringUtils.isEmpty(finallink)) {
+            if (destContent != null) {
+                final String links[] = HTMLParser.getHttpLinks(destContent, br.getURL());
+                if (links != null) {
+                    for (String link : links) {
+                        decryptedLinks.add(createDownloadlink(link));
+                    }
+                }
+                if (decryptedLinks.size() > 0) {
+                    return decryptedLinks;
+                }
+            }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         if (Browser.getHost(finallink).equals(br.getHost())) {

@@ -989,7 +989,7 @@ public abstract class AbstractFFmpegBinary {
                         if (StringUtils.containsIgnoreCase(lastStderr, "No such file or directory") || StringUtils.containsIgnoreCase(lastStderr, "Invalid argument") || StringUtils.containsIgnoreCase(lastStderr, "Illegal byte sequence")) {
                             // /Users/XZY/...../Songs/... 😞😩😔🩷 .....m4a.part.part: Illegal byte sequence
                             throw new FFMpegException("FFmpeg Failed: path too long or contains invalid chars?", lastStdout, lastStderr, ERROR.PATH_OR_LENGTH);
-                        } else if (StringUtils.containsIgnoreCase(lastStderr, "Unrecognized option 'c:v'") || StringUtils.containsIgnoreCase(lastStderr, "Unrecognized option '-c:v'")) {
+                        } else if (StringUtils.containsIgnoreCase(lastStderr, "Unrecognized option")) {
                             throw new FFMpegException("FFmpeg Failed: version too old", lastStdout, lastStderr, ERROR.TOO_OLD);
                         } else if (StringUtils.containsIgnoreCase(lastStderr, "No space left on device") && StringUtils.containsIgnoreCase(lastStderr, "Error writing")) {
                             throw new FFMpegException("FFmpeg Failed: disk full", lastStdout, lastStderr, ERROR.DISK_FULL);
