@@ -48,6 +48,7 @@ dont_delete=Ništa ne briši
 downloadedbad=Dokument mora biti download-ovan
 downloadedok=Dokument već postoji
 dummyarchivedialog_title=Arhiva %s1
+dummyarchivedialog_title_multi=%s1 nedovršenih arhiva
 exists=Status Linka
 extract_to2=Eskstraktuj Arhive u...
 extracting_archive=Ekstrakcija Arhive: %s1
