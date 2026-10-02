@@ -19,8 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -38,7 +36,9 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.RootzSo;
 
-@DecrypterPlugin(revision = "$Revision: 52079 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+
+@DecrypterPlugin(revision = "$Revision: 53513 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { RootzSo.class })
 public class RootzSoFolder extends PluginForDecrypt {
     public RootzSoFolder(PluginWrapper wrapper) {
@@ -58,6 +58,12 @@ public class RootzSoFolder extends PluginForDecrypt {
 
     public static String[] getAnnotationNames() {
         return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public void init() {
+        super.init();
+        Browser.setRequestIntervalLimitGlobal(getHost(), 250);
     }
 
     @Override
@@ -99,7 +105,7 @@ public class RootzSoFolder extends PluginForDecrypt {
         fp.setName(folderinfo.get("name").toString());
         fp.setPackageKey("rootz://folder/" + folder_id);
         for (final Map<String, Object> file : files) {
-            final DownloadLink link = this.createDownloadlink("https://www." + getHost() + "/d/" + file.get("short_id"));
+            final DownloadLink link = this.createDownloadlink("https://www." + getHost() + "/d/" + file.get("short_id").toString());
             link.setFinalFileName(file.get("name").toString());
             link.setVerifiedFileSize(((Number) file.get("size")).longValue());
             link.setAvailable(true);

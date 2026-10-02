@@ -22,12 +22,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
@@ -54,13 +48,12 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.SpankBangCom;
 
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 53504 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53513 $", interfaceVersion = 2, names = {}, urls = {})
 public class SpankBangComCrawler extends PluginForDecrypt {
     public SpankBangComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -265,7 +258,7 @@ public class SpankBangComCrawler extends PluginForDecrypt {
         if (videoID == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final LinkedHashMap<String, String> foundQualities = findQualities(this.br, currenturl);
+        final LinkedHashMap<String, String> foundQualities = findQualities(this, this.br, currenturl);
         if (foundQualities == null || foundQualities.size() == 0 || title == null) {
             if (SpankBangCom.isAgeVerificationRequired(br)) {
                 throw new DecrypterRetryException(RetryReason.AGE_VERIFICATION_REQUIRED);
@@ -402,7 +395,7 @@ public class SpankBangComCrawler extends PluginForDecrypt {
         }
     }
 
-    public static LinkedHashMap<String, String> findQualities(final Browser br, final String source_url) throws DecrypterException, PluginException, IOException {
+    public static LinkedHashMap<String, String> findQualities(final Plugin plugin, final Browser br, final String source_url) throws DecrypterException, PluginException, IOException {
         final LinkedHashMap<String, String> foundQualities = new LinkedHashMap<String, String>();
         final String[] knownQualities = new String[] { "4k", "1080p", "720p", "480p", "320p", "240p" };
         // final String fid = getFid(source_url);
@@ -446,7 +439,7 @@ public class SpankBangComCrawler extends PluginForDecrypt {
             final Browser brc = br.cloneBrowser();
             final String page = brc.getPage(request);
             if (page.matches("(?s)^\\s*\\{.*") && page.matches("(?s).*\\}\\s*$")) {
-                final Map<String, Object> map = JSonStorage.restoreFromString(page, TypeRef.MAP);
+                final Map<String, Object> map = plugin.restoreFromString(page, TypeRef.MAP);
                 final String stream_url_m3u8 = String.valueOf(map.get("m3u8"));
                 for (final String quality : knownQualities) {
                     final String qualityID = getQuality(quality);

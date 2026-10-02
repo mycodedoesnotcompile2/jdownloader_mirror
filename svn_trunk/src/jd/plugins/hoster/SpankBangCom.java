@@ -19,11 +19,6 @@ import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -47,7 +42,12 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.SpankBangComCrawler;
 
-@HostPlugin(revision = "$Revision: 53504 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 53513 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { SpankBangComCrawler.class })
 public class SpankBangCom extends PluginForHost {
     public SpankBangCom(PluginWrapper wrapper) {
@@ -162,7 +162,7 @@ public class SpankBangCom extends PluginForHost {
         }
         setFilename(link);
         /* Main videolink online --> Refresh directlink ... */
-        final LinkedHashMap<String, String> foundQualities = SpankBangComCrawler.findQualities(this.br, mainlink);
+        final LinkedHashMap<String, String> foundQualities = SpankBangComCrawler.findQualities(this, this.br, mainlink);
         if (foundQualities != null) {
             dllink = foundQualities.get(quality);
         }

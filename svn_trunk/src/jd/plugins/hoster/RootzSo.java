@@ -35,7 +35,7 @@ import jd.plugins.PluginForHost;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 
-@HostPlugin(revision = "$Revision: 52783 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53513 $", interfaceVersion = 3, names = {}, urls = {})
 public class RootzSo extends PluginForHost {
     public RootzSo(PluginWrapper wrapper) {
         super(wrapper);
@@ -87,6 +87,12 @@ public class RootzSo extends PluginForHost {
         }
     }
 
+    @Override
+    public void init() {
+        super.init();
+        Browser.setRequestIntervalLimitGlobal(getHost(), 250);
+    }
+
     private String getFID(final DownloadLink link) {
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
     }
@@ -97,7 +103,7 @@ public class RootzSo extends PluginForHost {
     }
 
     public int getMaxChunks(final DownloadLink link, final Account account) {
-        return 0;
+        return -5;
     }
 
     @Override
@@ -157,6 +163,6 @@ public class RootzSo extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return Integer.MAX_VALUE;
+        return 1;
     }
 }

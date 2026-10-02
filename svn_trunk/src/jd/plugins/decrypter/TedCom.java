@@ -11,6 +11,7 @@ import java.util.Random;
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.ProgressController;
+import jd.controlling.linkcrawler.LinkCrawler;
 import jd.http.Browser;
 import jd.http.Request;
 import jd.parser.Regex;
@@ -28,66 +29,18 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.youtube.YoutubeHelper;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 53504 $", interfaceVersion = 2, names = { "ted.com" }, urls = { "https?://(?:www\\.)?ted\\.com/(talks/(?:lang/[a-zA-Z\\-]+/)?[\\w_]+|[\\w_]+\\?language=\\w+|playlists/\\d+/[^/]+)" })
+@DecrypterPlugin(revision = "$Revision: 53513 $", interfaceVersion = 2, names = { "ted.com" }, urls = { "https?://(?:www\\.)?ted\\.com/(talks/(?:lang/[a-zA-Z\\-]+/)?[\\w_]+|[\\w_]+\\?language=\\w+|playlists/\\d+/[^/]+)" })
 public class TedCom extends PluginForDecrypt {
     public TedCom(PluginWrapper wrapper) {
         super(wrapper);
     }
 
-    private static final String     TYPE_PLAYLIST                      = "https?://(?:www\\.)?ted\\.com/playlists/\\d+/[^/]+";
-    private static final String     TYPE_VIDEO                         = "https?://(?:www\\.)?ted\\.com/talks/(?:(?:lang/[a-zA-Z\\-]+/)?\\w+|[\\w_]+\\?language=\\w+)";
-    private static final String     CHECKFAST_VIDEOS                   = "CHECKFAST_VIDEOS";
-    private static final String     CHECKFAST_MP3                      = "CHECKFAST_MP3";
-    private static final String     GRAB_MP3                           = "GRAB_MP3";
-    private static final String     GRAB_ALL_AVAILABLE_SUBTITLES       = "GRAB_ALL_AVAILABLE_SUBTITLES";
-    private static final String     GRAB_SUBTITLE_ALBANIAN             = "GRAB_SUBTITLE_ALBANIAN";
-    private static final String     GRAB_SUBTITLE_ARABIC               = "GRAB_SUBTITLE_ARABIC";
-    private static final String     GRAB_SUBTITLE_ARMENIAN             = "GRAB_SUBTITLE_ARMENIAN";
-    private static final String     GRAB_SUBTITLE_AZERBAIJANI          = "GRAB_SUBTITLE_AZERBAIJANI";
-    private static final String     GRAB_SUBTITLE_BENGALI              = "GRAB_SUBTITLE_BENGALI";
-    private static final String     GRAB_SUBTITLE_BULGARIAN            = "GRAB_SUBTITLE_BULGARIAN";
-    private static final String     GRAB_SUBTITLE_CHINESE_SIMPLIFIED   = "GRAB_SUBTITLE_CHINESE_SIMPLIFIED";
-    private static final String     GRAB_SUBTITLE_CHINESE_TRADITIONAL  = "GRAB_SUBTITLE_CHINESE_TRADITIONAL";
-    private static final String     GRAB_SUBTITLE_CROATIAN             = "GRAB_SUBTITLE_CROATIAN";
-    private static final String     GRAB_SUBTITLE_CZECH                = "GRAB_SUBTITLE_CZECH";
-    private static final String     GRAB_SUBTITLE_DANISH               = "GRAB_SUBTITLE_DANISH";
-    private static final String     GRAB_SUBTITLE_DUTCH                = "GRAB_SUBTITLE_DUTCH";
-    private static final String     GRAB_SUBTITLE_ENGLISH              = "GRAB_SUBTITLE_ENGLISH";
-    private static final String     GRAB_SUBTITLE_ESTONIAN             = "GRAB_SUBTITLE_ESTONIAN";
-    private static final String     GRAB_SUBTITLE_FINNISH              = "GRAB_SUBTITLE_FINNISH";
-    private static final String     GRAB_SUBTITLE_FRENCH               = "GRAB_SUBTITLE_FRENCH";
-    private static final String     GRAB_SUBTITLE_GEORGIAN             = "GRAB_SUBTITLE_GEORGIAN";
-    private static final String     GRAB_SUBTITLE_GERMAN               = "GRAB_SUBTITLE_GERMAN";
-    private static final String     GRAB_SUBTITLE_GREEK                = "GRAB_SUBTITLE_GREEK";
-    private static final String     GRAB_SUBTITLE_HEBREW               = "GRAB_SUBTITLE_HEBREW";
-    private static final String     GRAB_SUBTITLE_HUNGARIAN            = "GRAB_SUBTITLE_HUNGARIAN";
-    private static final String     GRAB_SUBTITLE_INDONESIAN           = "GRAB_SUBTITLE_INDONESIAN";
-    private static final String     GRAB_SUBTITLE_ITALIAN              = "GRAB_SUBTITLE_ITALIAN";
-    private static final String     GRAB_SUBTITLE_JAPANESE             = "GRAB_SUBTITLE_JAPANESE";
-    private static final String     GRAB_SUBTITLE_KOREAN               = "GRAB_SUBTITLE_KOREAN";
-    private static final String     GRAB_SUBTITLE_KURDISH              = "GRAB_SUBTITLE_KURDISH";
-    private static final String     GRAB_SUBTITLE_LITHUANIAN           = "GRAB_SUBTITLE_LITHUANIAN";
-    private static final String     GRAB_SUBTITLE_MACEDONIAN           = "GRAB_SUBTITLE_MACEDONIAN";
-    private static final String     GRAB_SUBTITLE_MALAY                = "GRAB_SUBTITLE_MALAY";
-    private static final String     GRAB_SUBTITLE_NORWEGIAN_BOKMAL     = "GRAB_SUBTITLE_NORWEGIAN_BOKMAL";
-    private static final String     GRAB_SUBTITLE_PERSIAN              = "GRAB_SUBTITLE_PERSIAN";
-    private static final String     GRAB_SUBTITLE_POLISH               = "GRAB_SUBTITLE_POLISH";
-    private static final String     GRAB_SUBTITLE_PORTUGUESE           = "GRAB_SUBTITLE_PORTUGUESE";
-    private static final String     GRAB_SUBTITLE_PORTUGUESE_BRAZILIAN = "GRAB_SUBTITLE_PORTUGUESE_BRAZILIAN";
-    private static final String     GRAB_SUBTITLE_ROMANIAN             = "GRAB_SUBTITLE_ROMANIAN";
-    private static final String     GRAB_SUBTITLE_RUSSIAN              = "GRAB_SUBTITLE_RUSSIAN";
-    private static final String     GRAB_SUBTITLE_SERBIAN              = "GRAB_SUBTITLE_SERBIAN";
-    private static final String     GRAB_SUBTITLE_SLOVAK               = "GRAB_SUBTITLE_SLOVAK";
-    private static final String     GRAB_SUBTITLE_SLOVENIAN            = "GRAB_SUBTITLE_SLOVENIAN";
-    private static final String     GRAB_SUBTITLE_SPANISH              = "GRAB_SUBTITLE_SPANISH";
-    private static final String     GRAB_SUBTITLE_SWEDISH              = "GRAB_SUBTITLE_SWEDISH";
-    private static final String     GRAB_SUBTITLE_THAI                 = "GRAB_SUBTITLE_THAI";
-    private static final String     GRAB_SUBTITLE_TURKISH              = "GRAB_SUBTITLE_TURKISH";
-    private static final String     GRAB_SUBTITLE_UKRAINIAN            = "GRAB_SUBTITLE_UKRAINIAN";
-    private static final String     GRAB_SUBTITLE_VIETNAMESE           = "GRAB_SUBTITLE_VIETNAMESE";
-    private ArrayList<DownloadLink> decryptedLinks                     = new ArrayList<DownloadLink>();
-    private String                  parameter                          = null;
-    private SubConfiguration        cfg                                = null;
+    private static final String     TYPE_PLAYLIST  = "https?://(?:www\\.)?ted\\.com/playlists/\\d+/[^/]+";
+    private static final String     TYPE_VIDEO     = "https?://(?:www\\.)?ted\\.com/talks/(?:(?:lang/[a-zA-Z\\-]+/)?\\w+|[\\w_]+\\?language=\\w+)";
+
+    private ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
+    private String                  parameter      = null;
+    private SubConfiguration        cfg            = null;
 
     @Override
     public Browser createNewBrowserInstance() {
@@ -113,7 +66,6 @@ public class TedCom extends PluginForDecrypt {
     @Override
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         parameter = param.toString();
-
         cfg = getPluginConfig();
         br.setFollowRedirects(true);
         br.getPage(parameter);
@@ -126,8 +78,8 @@ public class TedCom extends PluginForDecrypt {
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
     private void crawlAll() throws Exception {
-        final LinkedHashMap<String, String[]> formats = jd.plugins.hoster.TedCom.formats;
-        final LinkedHashMap<String, DownloadLink> foundVideoLinks = new LinkedHashMap();
+        final Map<String, String[]> formats = jd.plugins.hoster.TedCom.formats;
+        final Map<String, DownloadLink> foundVideoLinks = new LinkedHashMap();
         String json;
         if (parameter.matches(TYPE_PLAYLIST)) {
             /*
@@ -150,13 +102,24 @@ public class TedCom extends PluginForDecrypt {
             }
             final Map<String, Object> entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(json);
             final Map<String, Object> playlist = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "props/pageProps/playlist");
+            FilePackage fp = null;
+            final String title = (String) playlist.get("title");
+            if (title != null && cfg.getBooleanProperty(jd.plugins.hoster.TedCom.PLAYLIST_PACKAGE, true)) {
+                fp = FilePackage.getInstance();
+                fp.setProperty(LinkCrawler.PACKAGE_ALLOW_INHERITANCE, true);
+                fp.setName(title);
+            }
             final List<Map<String, Object>> videos = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(playlist, "videos/nodes");
             for (final Map<String, Object> video : videos) {
                 final String url_single_video = (String) video.get("canonicalUrl");
                 if (StringUtils.isEmpty(url_single_video)) {
                     throw new DecrypterException("Decrypter broken");
                 }
-                decryptedLinks.add(createDownloadlink(url_single_video));
+                final DownloadLink dl = createDownloadlink(url_single_video);
+                if (fp != null) {
+                    fp._add(dl);
+                }
+                decryptedLinks.add(dl);
             }
         } else {
             /** Look for external links */
@@ -222,7 +185,7 @@ public class TedCom extends PluginForDecrypt {
                     dl.setProperty("type", "video");
                     dl.setProperty("selectedvideoquality", bitrate);
                     dl.setReferrerUrl(br.getURL());
-                    if (cfg.getBooleanProperty(CHECKFAST_VIDEOS, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.CHECKFAST_VIDEOS, false)) {
                         dl.setAvailable(true);
                     }
                     final String finalName = title + "_" + bitrate + ".mp4";
@@ -270,7 +233,7 @@ public class TedCom extends PluginForDecrypt {
                     dl.setProperty("directlink", url_http);
                     dl.setProperty("type", "video");
                     dl.setProperty("selectedvideoquality", qualityKey);
-                    if (cfg.getBooleanProperty(CHECKFAST_VIDEOS, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.CHECKFAST_VIDEOS, false)) {
                         dl.setAvailable(true);
                     }
                     final String[] vidinfo = formats.get(qualityKey);
@@ -327,7 +290,7 @@ public class TedCom extends PluginForDecrypt {
             }
             // TODO: check after HLS support
             decryptedLinks.addAll(foundVideoLinks.values());
-            if (url_mp3 != null && cfg.getBooleanProperty(GRAB_MP3, false)) {
+            if (url_mp3 != null && cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_MP3, false)) {
                 final DownloadLink dl = createDownloadlink("decrypted://decryptedtedcom.com/" + System.currentTimeMillis() + new Random().nextInt(100000));
                 final String finalName = title + "_mp3.mp3";
                 dl.setFinalFileName(finalName);
@@ -335,7 +298,7 @@ public class TedCom extends PluginForDecrypt {
                 if (filesize_mp3 > 0) {
                     dl.setDownloadSize(filesize_mp3);
                     dl.setAvailable(true);
-                } else if (cfg.getBooleanProperty(CHECKFAST_MP3, false)) {
+                } else if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.CHECKFAST_MP3, false)) {
                     dl.setAvailable(true);
                 }
                 dl.setProperty("directlink", url_mp3);
@@ -369,144 +332,144 @@ public class TedCom extends PluginForDecrypt {
                         foundSubtitles.put(langCode, "https://hls.ted.com/project_masters/" + project_masterID + "/subtitles/" + langCode + "/full.vtt");
                     }
                 }
-                if (cfg.getBooleanProperty(GRAB_ALL_AVAILABLE_SUBTITLES, false)) {
+                if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_ALL_AVAILABLE_SUBTITLES, false)) {
                     for (final String[] subtitleValue : allSubtitleValues) {
                         selectedSubtitles.add(subtitleValue);
                     }
                 } else {
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_ALBANIAN, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_ALBANIAN, false)) {
                         selectedSubtitles.add(new String[] { "sq", "Albanian" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_ARABIC, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_ARABIC, false)) {
                         selectedSubtitles.add(new String[] { "ar", "Arabic" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_ARMENIAN, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_ARMENIAN, false)) {
                         selectedSubtitles.add(new String[] { "hy", "Armenian" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_AZERBAIJANI, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_AZERBAIJANI, false)) {
                         selectedSubtitles.add(new String[] { "az", "Azerbaijani" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_BENGALI, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_BENGALI, false)) {
                         selectedSubtitles.add(new String[] { "bn", "Bengali" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_BULGARIAN, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_BULGARIAN, false)) {
                         selectedSubtitles.add(new String[] { "bg", "Bulgarian" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_CHINESE_SIMPLIFIED, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_CHINESE_SIMPLIFIED, false)) {
                         selectedSubtitles.add(new String[] { "zh-cn", "Chinese, Simplified" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_CHINESE_TRADITIONAL, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_CHINESE_TRADITIONAL, false)) {
                         selectedSubtitles.add(new String[] { "zh-tw", "Chinese, Traditional" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_CROATIAN, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_CROATIAN, false)) {
                         selectedSubtitles.add(new String[] { "hr", "Croatian" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_CZECH, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_CZECH, false)) {
                         selectedSubtitles.add(new String[] { "cs", "Czech" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_DANISH, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_DANISH, false)) {
                         selectedSubtitles.add(new String[] { "da", "Danish" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_DUTCH, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_DUTCH, false)) {
                         selectedSubtitles.add(new String[] { "nl", "Dutch" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_ENGLISH, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_ENGLISH, false)) {
                         selectedSubtitles.add(new String[] { "en", "English" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_ESTONIAN, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_ESTONIAN, false)) {
                         selectedSubtitles.add(new String[] { "et", "Estonian" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_FINNISH, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_FINNISH, false)) {
                         selectedSubtitles.add(new String[] { "fi", "Finnish" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_FRENCH, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_FRENCH, false)) {
                         selectedSubtitles.add(new String[] { "fr", "French" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_GEORGIAN, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_GEORGIAN, false)) {
                         selectedSubtitles.add(new String[] { "ka", "Georgian" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_GERMAN, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_GERMAN, false)) {
                         selectedSubtitles.add(new String[] { "de", "German" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_GREEK, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_GREEK, false)) {
                         selectedSubtitles.add(new String[] { "el", "Greek" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_HEBREW, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_HEBREW, false)) {
                         selectedSubtitles.add(new String[] { "he", "Hebrew" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_HUNGARIAN, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_HUNGARIAN, false)) {
                         selectedSubtitles.add(new String[] { "hu", "Hungarian" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_INDONESIAN, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_INDONESIAN, false)) {
                         selectedSubtitles.add(new String[] { "id", "Indonesian" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_ITALIAN, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_ITALIAN, false)) {
                         selectedSubtitles.add(new String[] { "it", "Italian" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_JAPANESE, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_JAPANESE, false)) {
                         selectedSubtitles.add(new String[] { "ja", "Japanese" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_KOREAN, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_KOREAN, false)) {
                         selectedSubtitles.add(new String[] { "ko", "Korean" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_KURDISH, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_KURDISH, false)) {
                         selectedSubtitles.add(new String[] { "ku", "Kurdish" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_LITHUANIAN, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_LITHUANIAN, false)) {
                         selectedSubtitles.add(new String[] { "lt", "Lithuanian" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_MACEDONIAN, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_MACEDONIAN, false)) {
                         selectedSubtitles.add(new String[] { "mk", "Macedonian" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_MALAY, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_MALAY, false)) {
                         selectedSubtitles.add(new String[] { "ms", "Malay" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_NORWEGIAN_BOKMAL, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_NORWEGIAN_BOKMAL, false)) {
                         selectedSubtitles.add(new String[] { "nb", "Norwegian Bokmal" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_PERSIAN, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_PERSIAN, false)) {
                         selectedSubtitles.add(new String[] { "fa", "Persian" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_POLISH, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_POLISH, false)) {
                         selectedSubtitles.add(new String[] { "pl", "Polish" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_PORTUGUESE, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_PORTUGUESE, false)) {
                         selectedSubtitles.add(new String[] { "pt", "Portuguese" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_PORTUGUESE_BRAZILIAN, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_PORTUGUESE_BRAZILIAN, false)) {
                         selectedSubtitles.add(new String[] { "pt-br", "Portuguese, Brazilian" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_ROMANIAN, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_ROMANIAN, false)) {
                         selectedSubtitles.add(new String[] { "ro", "Romanian" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_RUSSIAN, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_RUSSIAN, false)) {
                         selectedSubtitles.add(new String[] { "ru", "Russian" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_SERBIAN, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_SERBIAN, false)) {
                         selectedSubtitles.add(new String[] { "sr", "Serbian" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_SLOVAK, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_SLOVAK, false)) {
                         selectedSubtitles.add(new String[] { "sk", "Slovak" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_SLOVENIAN, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_SLOVENIAN, false)) {
                         selectedSubtitles.add(new String[] { "sl", "Slovenian" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_SPANISH, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_SPANISH, false)) {
                         selectedSubtitles.add(new String[] { "es", "Spanish" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_SWEDISH, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_SWEDISH, false)) {
                         selectedSubtitles.add(new String[] { "sv", "Swedish" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_THAI, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_THAI, false)) {
                         selectedSubtitles.add(new String[] { "th", "Thai" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_TURKISH, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_TURKISH, false)) {
                         selectedSubtitles.add(new String[] { "tr", "Turkish" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_UKRAINIAN, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_UKRAINIAN, false)) {
                         selectedSubtitles.add(new String[] { "uk", "Ukrainian" });
                     }
-                    if (cfg.getBooleanProperty(GRAB_SUBTITLE_VIETNAMESE, false)) {
+                    if (cfg.getBooleanProperty(jd.plugins.hoster.TedCom.GRAB_SUBTITLE_VIETNAMESE, false)) {
                         selectedSubtitles.add(new String[] { "vi", "Vietnamese" });
                     }
                 }
