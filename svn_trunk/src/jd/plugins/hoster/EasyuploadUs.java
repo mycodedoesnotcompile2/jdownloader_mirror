@@ -18,12 +18,12 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.Request;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -35,7 +35,11 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 52582 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+
+@HostPlugin(revision = "$Revision: 53517 $", interfaceVersion = 3, names = {}, urls = {})
 public class EasyuploadUs extends PluginForHost {
     public EasyuploadUs(PluginWrapper wrapper) {
         super(wrapper);
@@ -113,8 +117,8 @@ public class EasyuploadUs extends PluginForHost {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String filename = br.getRegex("class=\"filebox-title mb-1\">([^<]+)</p>").getMatch(0);
-        String filesize = br.getRegex("File size(?:\\s*:)?\\s*</strong>([^<]+)</p>").getMatch(0);
+        String filename = br.getRegex("class=\"filebox-title mb-1\">\\s*([^<]+)\\s*</p>").getMatch(0);
+        String filesize = br.getRegex("File size\\s*(?:\\s*:)?\\s*</strong>\\s*([^<]*?)\\s*</p>").getMatch(0);
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
             link.setName(filename);
@@ -138,7 +142,22 @@ public class EasyuploadUs extends PluginForHost {
         requestFileInformation(link);
         String dllink = br.getRegex("class=\"download-link\"[^>]*href=\"(https?://[^\"]+)\"").getMatch(0);
         if (StringUtils.isEmpty(dllink)) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
+            final String token = br.getRegex("csrf-token\"\\s*content\\s*=\\s*\"(.*?)\"").getMatch(0);
+            if (token == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            sleep(TimeUnit.SECONDS.toMillis(5), link);
+            final Request request = br.createPostRequest("/" + getFID(link) + "/download/create", "");
+            request.getHeaders().put("X-CSRF-TOKEN", token);
+            br.getPage(request);
+            final Map<String, Object> response = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            if (!"success".equals(response.get("type"))) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            dllink = (String) response.get("download_link");
+            if (dllink == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
+            }
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
         this.handleConnectionErrors(br, dl.getConnection());

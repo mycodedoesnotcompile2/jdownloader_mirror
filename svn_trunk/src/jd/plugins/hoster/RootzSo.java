@@ -35,7 +35,7 @@ import jd.plugins.PluginForHost;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 
-@HostPlugin(revision = "$Revision: 53513 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53516 $", interfaceVersion = 3, names = {}, urls = {})
 public class RootzSo extends PluginForHost {
     public RootzSo(PluginWrapper wrapper) {
         super(wrapper);
@@ -137,6 +137,9 @@ public class RootzSo extends PluginForHost {
         link.setVerifiedFileSize(((Number) data.get("size")).longValue());
         /* This id is required for downloading. */
         internal_file_id = data.get("fileId").toString();
+        if ("deleted".equals(data.get("status"))) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         return AvailableStatus.TRUE;
     }
 

@@ -22,11 +22,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.Files;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.downloader.text.TextDownloader;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -43,7 +38,12 @@ import jd.plugins.decrypter.CumStCrawler;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 
-@HostPlugin(revision = "$Revision: 53329 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.Files;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.downloader.text.TextDownloader;
+
+@HostPlugin(revision = "$Revision: 53518 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { CumStCrawler.class })
 public class CumSt extends PluginForHost {
     public CumSt(PluginWrapper wrapper) {
@@ -61,8 +61,10 @@ public class CumSt extends PluginForHost {
     public static final String   PROPERTY_POST_ID            = "post_id";
     /* Content type of the item: "post" or "dm" */
     public static final String   PROPERTY_CONTENT_TYPE       = "content_type";
-    /* Published date as unix timestamp in seconds */
+    /* Published date as UTC date string */
     public static final String   PROPERTY_DATE               = "date";
+    /* Published date as unix timestamp in seconds */
+    public static final String   PROPERTY_DATE_TS            = "datets";
     public static final String   PROPERTY_POST_CONTENT_INDEX = "postContentIndex";
     public static final String   UNIQUE_ID_PREFIX            = "cumst://";
     private static final Pattern HASH_PATTERN                = Pattern.compile("/([a-fA-F0-9]{64})");
@@ -252,7 +254,11 @@ public class CumSt extends PluginForHost {
                 /**
                  * We return the date when the content was published instead of the import date.
                  */
-                final String publishedDateStr = getDownloadLink().getStringProperty(PROPERTY_DATE);
+                String publishedDateStr = getDownloadLink().getStringProperty(PROPERTY_DATE_TS);
+                if (publishedDateStr == null || !publishedDateStr.matches("\\d+")) {
+                    // old links had timestamp stored in this property
+                    publishedDateStr = getDownloadLink().getStringProperty(PROPERTY_DATE);
+                }
                 if (publishedDateStr == null || !publishedDateStr.matches("\\d+")) {
                     /* Missing/invalid property */
                     return super.getLastModifiedTimestamp();

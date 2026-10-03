@@ -20,16 +20,14 @@ import java.util.List;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.YetiShareCore;
 
-@HostPlugin(revision = "$Revision: 53466 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53520 $", interfaceVersion = 2, names = {}, urls = {})
 public class LoadedfilesOrg extends YetiShareCore {
     public LoadedfilesOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -49,16 +47,6 @@ public class LoadedfilesOrg extends YetiShareCore {
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "loadedfiles.net", "loadedfiles.st", "loadedfiles.org" });
         return ret;
-    }
-
-    @Override
-    public String[] scanInfo(DownloadLink link, String[] fileInfo) {
-        fileInfo[0] = StringUtils.trim(Encoding.htmlOnlyDecode(br.getRegex("<div class\\s*=\\s*\"[^\"]*dl__name\"[^>]*>\\s*(.*?)\\s*</div>").getMatch(0)));
-        fileInfo[1] = StringUtils.trim(Encoding.htmlOnlyDecode(br.getRegex("<div class\\s*=\\s*\"[^\"]*dl__size\"[^>]*>\\s*(.*?)\\s*(</div>|·)").getMatch(0)));
-        if (fileInfo[0] != null) {
-            return fileInfo;
-        }
-        return super.scanInfo(link, fileInfo);
     }
 
     @Override

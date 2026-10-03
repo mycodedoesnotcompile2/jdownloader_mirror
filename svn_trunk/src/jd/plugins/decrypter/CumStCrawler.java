@@ -29,16 +29,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Files;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.CumStConfig;
-import org.jdownloader.plugins.components.config.CumStConfig.TextCrawlMode;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -57,7 +47,17 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.CumSt;
 
-@DecrypterPlugin(revision = "$Revision: 53447 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Files;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.CumStConfig;
+import org.jdownloader.plugins.components.config.CumStConfig.TextCrawlMode;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 53518 $", interfaceVersion = 3, names = {}, urls = {})
 public class CumStCrawler extends PluginForDecrypt {
     public CumStCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -461,10 +461,12 @@ public class CumStCrawler extends PluginForDecrypt {
             }
             if (publishedDateStr != null) {
                 if (publishedDateStr.matches("^\\d+$")) {
+                    result.setProperty(CumSt.PROPERTY_DATE_TS, publishedDateStr);
                     final String isoDate = Instant.ofEpochSecond(Long.parseLong(publishedDateStr)).atZone(ZoneId.of("UTC")).toLocalDateTime().toString();
                     result.setProperty(CumSt.PROPERTY_DATE, isoDate);
+                } else {
+                    result.setProperty(CumSt.PROPERTY_DATE, publishedDateStr);
                 }
-                result.setProperty(CumSt.PROPERTY_DATE, publishedDateStr);
             }
             result.setProperty(CumSt.PROPERTY_SERVICE, service);
             result.setProperty(CumSt.PROPERTY_CREATOR_ID, creatorID);
@@ -558,14 +560,13 @@ public class CumStCrawler extends PluginForDecrypt {
     }
 
     private static Map<String, String> ID_TO_CREATORNAME = new LinkedHashMap<String, String>() {
-        protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
-            return size() > 100;
-        };
-    };
+                                                             protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+                                                                 return size() > 100;
+                                                             };
+                                                         };
 
     /**
-     * Returns the creators' username for the given service + creatorID. </br>
-     * Uses API to find the username and caches the result. </br>
+     * Returns the creators' username for the given service + creatorID. </br> Uses API to find the username and caches the result. </br>
      * Returns null if it is unable to find the username.
      */
     private String findCreatorName(final String service, final String creatorID) throws Exception {

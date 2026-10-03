@@ -15,6 +15,7 @@ import java.util.Random;
 import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
+import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -67,8 +68,9 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 53465 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53519 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class YetiShareCore extends antiDDoSForHost {
+
     public YetiShareCore(PluginWrapper wrapper) {
         super(wrapper);
         // this.enablePremium(getPurchasePremiumURL());
@@ -533,6 +535,18 @@ public abstract class YetiShareCore extends antiDDoSForHost {
         final String fuid = this.getFUID(link);
         final boolean currentUrlIsFileInfoURL = br.getURL().contains(fuid + "~i");
         if (this.isNewYetiShareVersion(null) || supports_availablecheck_over_info_page(link) || currentUrlIsFileInfoURL) {
+            // YetiShare 6.2.0, shareplace.org, "loadedfiles.net
+            final String dl__name = StringUtils.trim(Encoding.htmlOnlyDecode(br.getRegex("<div class\\s*=\\s*\"[^\"]*dl__name\"[^>]*>\\s*(.*?)\\s*</div>").getMatch(0)));
+            final String dl__size = StringUtils.trim(Encoding.htmlOnlyDecode(br.getRegex("<div class\\s*=\\s*\"[^\"]*dl__size\"[^>]*>\\s*(.*?)\\s*(</div>|·)").getMatch(0)));
+            if (dl__name != null) {
+                fileInfo[0] = dl__name;
+            }
+            if (dl__size != null) {
+                fileInfo[1] = dl__size;
+            }
+            if (StringUtils.isAllNotEmpty(fileInfo)) {
+                return fileInfo;
+            }
             /*
              * 2021-11-19: YetiShare sometimes have a bug where it URL-encodes "_20" to "%20" but at this place this bug does not occur -->
              * Prefer to get filename from here.
@@ -1785,11 +1799,27 @@ public abstract class YetiShareCore extends antiDDoSForHost {
         }
     }
 
+    private SubConfiguration cfg;
+
+    @Override
+    public void clean() {
+        cfg = null;
+        super.clean();
+    }
+
+    protected SubConfiguration cfg() {
+        final SubConfiguration ret = this.cfg;
+        if (ret != null) {
+            return ret;
+        }
+        return this.cfg = getPluginConfig();
+    }
+
     protected boolean isNewYetiShareVersion(final Account account) {
         if (account != null) {
             return account.getBooleanProperty(PROPERTY_IS_NEW_YETISHARE_VERSION, false);
         } else {
-            return this.getPluginConfig().getBooleanProperty(PROPERTY_IS_NEW_YETISHARE_VERSION, false);
+            return cfg().getBooleanProperty(PROPERTY_IS_NEW_YETISHARE_VERSION, false);
         }
     }
 
@@ -1797,17 +1827,19 @@ public abstract class YetiShareCore extends antiDDoSForHost {
      * Access any YetiShare website via browser before and call this once to auto set flag for new YetiShare version! </br> New version =
      * YetiShare 5.0 and above, see: https://yetishare.com/release_history.html
      */
-    protected void parseAndSetYetiShareVersion(final Browser br, final Account account) {
+    protected boolean parseAndSetYetiShareVersion(final Browser br, final Account account) {
         if (br.containsHTML("https?://[^/]+/(account|register|account/login|account/logout)\"")) {
-            this.getPluginConfig().setProperty(PROPERTY_IS_NEW_YETISHARE_VERSION, true);
+            cfg().setProperty(PROPERTY_IS_NEW_YETISHARE_VERSION, true);
             if (account != null) {
                 account.setProperty(PROPERTY_IS_NEW_YETISHARE_VERSION, true);
             }
+            return true;
         } else {
-            this.getPluginConfig().removeProperty(PROPERTY_IS_NEW_YETISHARE_VERSION);
+            cfg().removeProperty(PROPERTY_IS_NEW_YETISHARE_VERSION);
             if (account != null) {
                 account.removeProperty(PROPERTY_IS_NEW_YETISHARE_VERSION);
             }
+            return false;
         }
     }
 
@@ -1890,6 +1922,8 @@ public abstract class YetiShareCore extends antiDDoSForHost {
             /* This is crucial!! */
             this.parseAndSetYetiShareVersion(br, account);
             getPage(getAccountNameSpaceLogin(account));
+            // YetiShare 6.2.0, now protected via csrf token
+            final String csrfToken[] = br.getRegex("([a-z_]*csrf[a-z_]*token[a-z_]*)\"\\s*value\\s*=\\s*\"(.*?)\"").getRow(0);
             if (br.containsHTML("flow-login\\.js") && !enforce_old_login_method()) {
                 final String loginstart = new Regex(br.getURL(), "(https?://(www\\.)?)").getMatch(0);
                 /* New (ajax) login method - mostly used - example: iosddl.net */
@@ -1921,14 +1955,22 @@ public abstract class YetiShareCore extends antiDDoSForHost {
                 logger.info("Using non-ajax login method");
                 Form loginform = br.getFormbyProperty("id", "form_login");
                 if (loginform == null) {
-                    loginform = br.getFormbyKey("loginUsername");
-                }
-                if (loginform == null) {
-                    logger.info("Fallback to custom built loginform");
-                    loginform = new Form();
-                    loginform.setMethod(MethodType.POST);
-                    loginform.put("submit", "Login");
-                    loginform.put("submitme", "1");
+                    if (isNewYetiShareVersion(account)) {
+                        loginform = br.getFormbyActionRegex(".*/account/login");
+                    }
+                    if (loginform == null) {
+                        loginform = br.getFormbyKey("loginUsername");
+                    }
+                    if (loginform == null) {
+                        logger.info("Fallback to custom built loginform");
+                        loginform = new Form();
+                        loginform.setMethod(MethodType.POST);
+                        loginform.put("submit", "Login");
+                        loginform.put("submitme", "1");
+                        if (csrfToken != null) {
+                            loginform.put(csrfToken[0], csrfToken[1]);
+                        }
+                    }
                 }
                 fillWebsiteLoginForm(br, loginform, account);
                 if (CaptchaHelperHostPluginRecaptchaV2.containsRecaptchaV2Class(loginform)) {
