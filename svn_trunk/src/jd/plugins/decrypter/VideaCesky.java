@@ -19,6 +19,7 @@ import java.util.ArrayList;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.parser.html.HTMLSearch;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -28,7 +29,9 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 46877 $", interfaceVersion = 3, names = { "videacesky.cz" }, urls = { "https?://(?:www\\.)?(?:videacesky\\.cz)/(?:video)/[A-Za-z0-9-]+" })
+import org.appwork.utils.StringUtils;
+
+@DecrypterPlugin(revision = "$Revision: 53526 $", interfaceVersion = 3, names = { "videacesky.cz" }, urls = { "https?://(?:www\\.)?(?:videacesky\\.cz)/(?:video)/[A-Za-z0-9-]+" })
 public class VideaCesky extends PluginForDecrypt {
     public VideaCesky(PluginWrapper wrapper) {
         super(wrapper);
@@ -43,25 +46,32 @@ public class VideaCesky extends PluginForDecrypt {
         } else if (br.containsHTML("(?i)Toto video je dočasně nedostupné")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        final String ogVideo = HTMLSearch.searchMetaTagProperty(br.getRequest(), "og:video");
+        if (StringUtils.containsIgnoreCase(ogVideo, "youtube.com")) {
+            ret.add(createDownloadlink(ogVideo));
+            return ret;
+        }
         final String link = this.br.getRegex("file:\\s*'(http[^<>\"]*?)'").getMatch(0);
-        final String title = this.br.getRegex("title:\\s*'(.*?)'").getMatch(0);
-        final String srtfile = this.br.getRegex("file:\\s*\"(.*?)\"").getMatch(0);
-        final String srtlabel = this.br.getRegex("label:\\s*\"(.*?)\"").getMatch(0);
         if (link == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        final String title = this.br.getRegex("title:\\s*'(.*?)'").getMatch(0);
         final FilePackage fp = FilePackage.getInstance();
         fp.setAllowInheritance(true);
         fp.setName(title);
         // Add link to youtube video
         ret.add(createDownloadlink(link));
-        // Add link to srt file for player
-        final DownloadLink subtitle = createDownloadlink(br.getURL(srtfile).toString());
-        final String subtitleFilename = title + "." + srtlabel + ".srt";
-        subtitle.setProperty(DirectHTTP.FIXNAME, subtitleFilename);
-        subtitle.setFinalFileName(subtitleFilename);
-        subtitle.setAvailable(true);
-        ret.add(subtitle);
+        final String srtfile = this.br.getRegex("file:\\s*\"(.*?)\"").getMatch(0);
+        final String srtlabel = this.br.getRegex("label:\\s*\"(.*?)\"").getMatch(0);
+        if (StringUtils.isAllNotEmpty(srtfile, srtlabel)) {
+            // Add link to srt file for player
+            final DownloadLink subtitle = createDownloadlink(br.getURL(srtfile).toString());
+            final String subtitleFilename = title + "." + srtlabel + ".srt";
+            subtitle.setProperty(DirectHTTP.FIXNAME, subtitleFilename);
+            subtitle.setFinalFileName(subtitleFilename);
+            subtitle.setAvailable(true);
+            ret.add(subtitle);
+        }
         fp.addLinks(ret);
         return ret;
     }

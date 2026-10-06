@@ -18,14 +18,10 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.Map;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.youtube.YoutubeHelper;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -41,7 +37,12 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.OkRu;
 
-@DecrypterPlugin(revision = "$Revision: 53277 $", interfaceVersion = 3, names = { "ok.ru" }, urls = { "https?://(?:[A-Za-z0-9]+\\.)?(?:ok\\.ru|odnoklassniki\\.ru)/(?:video|videoembed|web-api/video/moviePlayer|live)/(\\d+(-\\d+)?)|https?://ok\\.ru/video/c(\\d+)|https://(?:www\\.)?ok\\.ru/profile/\\d+/video/c\\d+" })
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.youtube.YoutubeHelper;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 53521 $", interfaceVersion = 3, names = { "ok.ru" }, urls = { "https?://(?:[A-Za-z0-9]+\\.)?(?:ok\\.ru|odnoklassniki\\.ru)/(?:video|videoembed|web-api/video/moviePlayer|live)/(\\d+(-\\d+)?)|https?://ok\\.ru/video/c(\\d+)|https://(?:www\\.)?ok\\.ru/profile/\\d+/video/c\\d+" })
 public class OkRuDecrypter extends PluginForDecrypt {
     public OkRuDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -49,6 +50,12 @@ public class OkRuDecrypter extends PluginForDecrypt {
 
     private static final String TYPE_CHANNEL  = "(?i)https?://[^/]+/video/c(\\d+)";
     private static final String TYPE_PLAYLIST = "(?i)https?://[^/]+/profile/(\\d+)/video/(c\\d+)";
+
+    @Override
+    public void init() {
+        super.init();
+        Browser.setRequestIntervalLimitGlobal(getHost(), 250);
+    }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
@@ -98,7 +105,7 @@ public class OkRuDecrypter extends PluginForDecrypt {
                     query.add("st.lastelem", lastElementID);
                     query.add("gwt.requested", gwtHash);
                     br.postPage("https://ok.ru/video/c" + channelID + "?st.cmd=anonymVideo&st.m=ALBUM&st.aid=c" + channelID + "&st.ft=album&cmd=VideoAlbumBlock", query);
-                    lastElementID = br.getRequest().getResponseHeader("lastelem").toString();
+                    lastElementID = StringUtils.valueOfOrNull(br.getRequest().getResponseHeader("lastelem"));
                 }
                 final String[] videoIDs = br.getRegex("/video/(\\d+)").getColumn(0);
                 int addedItems = 0;

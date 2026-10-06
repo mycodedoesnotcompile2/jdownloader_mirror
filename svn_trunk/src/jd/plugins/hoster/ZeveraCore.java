@@ -107,9 +107,25 @@ abstract public class ZeveraCore extends UseNet {
         return true;
     }
 
+    /**
+     * Returns how many max. chunks per file are allowed based on account availability and account type. </br>
+     * Override this function to set chunks settings! </br>
+     * 0 = maximum number of chunks, 1 = single connection.
+     */
     public int getMaxChunks(final Account account) {
-        /* 2024-02-21: Workaround until "X-Cached" auto handling is working as expected. */
-        return 1;
+        final AccountType type = account != null ? account.getType() : null;
+        if (type == null) {
+            /* Free(anonymous) and unknown account type */
+            return 0;
+        }
+        switch (type) {
+        case PREMIUM:
+            /* Premium account */
+            return 0;
+        default:
+            /* Free(anonymous) and unknown account type */
+            return 0;
+        }
     }
 
     @Override
@@ -128,20 +144,6 @@ abstract public class ZeveraCore extends UseNet {
             return UrlQuery.parse(link.getPluginPatternMatcher()).get("id");
         } catch (final Throwable e) {
             return null;
-        }
-    }
-
-    /**
-     * Returns how many max. chunks per file are allowed for current download mode based on account availability and account type. <br />
-     * Override this function to set chunks settings!
-     */
-    public int getDownloadModeMaxChunks(final Account account) {
-        if (account != null && account.getType() == AccountType.PREMIUM) {
-            /* Premium account */
-            return 0;
-        } else {
-            /* Free(anonymous) and unknown account type */
-            return 0;
         }
     }
 
@@ -285,12 +287,6 @@ abstract public class ZeveraCore extends UseNet {
                 final String hash_sha1 = link.getSha1Hash();
                 final String hash_sha256 = link.getSha256Hash();
                 /* https://app.swaggerhub.com/apis-docs/premiumize.me/api/1.6.7#/transfer/transferDirectdl */
-                /**
-                 * If enabled, API key will be included in URL even though we're already sending it via Authorization header to work around
-                 * a server side bug. <br>
-                 * 2026-04-14: It's unknown whether or not this workaround is still needed.
-                 */
-                final boolean useAPIKeyWorkaround = true;
                 final boolean isCacheHost;
                 synchronized (global_cache_hosts) {
                     isCacheHost = global_cache_hosts.contains(link.getHost());
@@ -299,7 +295,8 @@ abstract public class ZeveraCore extends UseNet {
                     /* Host is "cache only host" which means that we can only download it if it's in the cache of this multihoster. */
                     String url = "https://www." + account.getHoster() + "/api/cache/check";
                     final UrlQuery query = new UrlQuery();
-                    if (!useAPIKeyWorkaround && !usePairingLogin(account)) {
+                    /* Authenticate via apikey parameter (we never set an auth header or auth cookie). */
+                    if (!usePairingLogin(account)) {
                         query.appendEncoded("apikey", getAPIKey(account));
                     }
                     query.appendEncoded("items[]", external_url);
@@ -315,7 +312,8 @@ abstract public class ZeveraCore extends UseNet {
                     }
                 }
                 String url = "https://www." + account.getHoster() + "/api/transfer/directdl";
-                if (!useAPIKeyWorkaround && !usePairingLogin(account)) {
+                /* Authenticate via apikey parameter (we never set an auth header or auth cookie). */
+                if (!usePairingLogin(account)) {
                     url += "?apikey=" + getAPIKey(account);
                 }
                 final PostFormDataRequest req = br.createPostFormDataRequest(url);
@@ -325,7 +323,7 @@ abstract public class ZeveraCore extends UseNet {
                     req.addFormData(new FormData("hash_md5", hash_md5));
                 }
                 if (hash_sha1 != null) {
-                    req.addFormData(new FormData("hash_sha1", hash_md5));
+                    req.addFormData(new FormData("hash_sha1", hash_sha1));
                 }
                 if (hash_sha256 != null) {
                     req.addFormData(new FormData("hash_sha256", hash_sha256));
@@ -421,7 +419,7 @@ abstract public class ZeveraCore extends UseNet {
     private void probeDownload(final DownloadLink link, final Account account, final String dllink, final boolean isMultihostHandling) throws Exception {
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), getMaxChunks(account));
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-            br.followConnection();
+            br.followConnection(true);
             if (isMultihostHandling) {
                 /* Only check for API issues if we got a json response. */
                 if (br.getHttpConnection().getContentType().contains("application/json")) {
@@ -562,10 +560,6 @@ abstract public class ZeveraCore extends UseNet {
     private Map<String, Object> login(final Browser br, final Account account, final boolean validateCookies) throws Exception {
         synchronized (account) {
             br.setCookiesExclusive(true);
-            final boolean useWorkaround = true;
-            if (useWorkaround) {
-                br.setCookie(getHost(), "sdk_login", getAPIKey(account));
-            }
             if (usePairingLogin(account)) {
                 /*
                  * 2019-06-26: New: TODO: We need a way to get the usenet logindata without exposing the original account logindata/apikey!

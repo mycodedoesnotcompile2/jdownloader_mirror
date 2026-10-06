@@ -37,6 +37,24 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.imageio.ImageIO;
 
+import jd.controlling.downloadcontroller.DiskSpaceReservation;
+import jd.controlling.downloadcontroller.ExceptionRunnable;
+import jd.controlling.downloadcontroller.FileIsLockedException;
+import jd.controlling.downloadcontroller.ManagedThrottledConnectionHandler;
+import jd.http.Browser;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.Formatter;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.download.DownloadInterface;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.Downloadable;
+import jd.plugins.download.raf.FileBytesMap;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
@@ -96,24 +114,6 @@ import org.jdownloader.plugins.SkipReason;
 import org.jdownloader.plugins.SkipReasonException;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.translate._JDT;
-
-import jd.controlling.downloadcontroller.DiskSpaceReservation;
-import jd.controlling.downloadcontroller.ExceptionRunnable;
-import jd.controlling.downloadcontroller.FileIsLockedException;
-import jd.controlling.downloadcontroller.ManagedThrottledConnectionHandler;
-import jd.http.Browser;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.Formatter;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.download.DownloadInterface;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.Downloadable;
-import jd.plugins.download.raf.FileBytesMap;
 
 //http://tools.ietf.org/html/draft-pantos-http-live-streaming-13
 public class HLSDownloader extends DownloadInterface {
@@ -1417,6 +1417,32 @@ public class HLSDownloader extends DownloadInterface {
         finalServer.registerRequestHandler(new HttpRequestHandler() {
             final byte[] readBuf = new byte[512];
 
+            final class RetryLocation {
+                protected final String location;
+                protected final int    count;
+                protected final int    max;
+                protected final int    delay = 250;
+
+                protected RetryLocation(final String location, final int count, final int max) {
+                    this.location = location;
+                    this.count = count;
+                    this.max = max;
+                }
+
+                protected void handle(final Browser br, HttpRequest request, HttpResponse response) throws Exception {
+                    Thread.sleep(500 + (count * delay));
+                    if (count > max * 0.5d) {
+                        final String browserHost = br.getHost();
+                        if (browserHost != null) {
+                            logger.info("setRequestIntervalLimitGlobal:" + browserHost + " to " + delay);
+                            Browser.setRequestIntervalLimitGlobal(browserHost, delay);
+                        }
+                    }
+                    response.setResponseCode(ResponseCode.REDIRECT_FOUND);
+                    response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_LOCATION, location));
+                }
+            }
+
             @Override
             public boolean onPostRequest(AbstractPostRequest request, HttpResponse response) {
                 requestsInProcess.incrementAndGet();
@@ -1453,20 +1479,18 @@ public class HLSDownloader extends DownloadInterface {
                 }
             }
 
-            private final Map<String, Object> parseRetryMap(HttpRequest request) throws Exception {
+            private final Map<String, Object> parseRetryMap(final HttpRequest request) throws Exception {
                 final String value = request.getParameterbyKey("retryMap");
                 if (value == null) {
-                    return null;
+                    return new HashMap<String, Object>();
                 }
                 return ((DownloadLinkDownloadable) getDownloadable()).getPlugin().restoreFromString(value, TypeRef.MAP);
             }
 
-            private final String retry(HttpRequest request, int responseCode, int maxRetry) throws Exception {
-                Map<String, Object> retryMap = parseRetryMap(request);
-                if (retryMap == null) {
-                    retryMap = new HashMap<String, Object>();
-                }
-                Number retryCount = (Number) retryMap.get(String.valueOf(responseCode));
+            private final RetryLocation retry(HttpRequest request, int responseCode, int maxRetry) throws Exception {
+                final Map<String, Object> retryMap = parseRetryMap(request);
+                final String key = "responseCode=" + responseCode;
+                Number retryCount = (Number) retryMap.get(key);
                 if (retryCount == null) {
                     retryCount = 1;
                 } else {
@@ -1475,26 +1499,22 @@ public class HLSDownloader extends DownloadInterface {
                 if (retryCount.intValue() > maxRetry) {
                     throw new IOException("retry(" + retryCount + ") limit(" + maxRetry + ") reached for responseCode=" + responseCode);
                 }
-                retryMap.put(String.valueOf(responseCode), retryCount);
-                String ret = request.getRequestedURL();
-                final String retryMapString = URLEncode.encodeURIComponent(new SimpleMapper().setPrettyPrintEnabled(false).objectToString(retryMap));
-                if (!ret.contains("retryMap=")) {
-                    ret = ret + "&retryMap=" + retryMapString;
+                retryMap.put(key, retryCount);
+                String retryLocation = request.getRequestedURL();
+                final String retryMapJsonQuery = URLEncode.encodeURIComponent(new SimpleMapper().setPrettyPrintEnabled(false).objectToString(retryMap));
+                if (!retryLocation.contains("retryMap=")) {
+                    retryLocation = retryLocation + "&retryMap=" + retryMapJsonQuery;
                 } else {
-                    ret = ret.replaceFirst("(retryMap=.*?)(&|$)", "retryMap=" + Matcher.quoteReplacement(retryMapString));
+                    retryLocation = retryLocation.replaceFirst("(retryMap=.*?)(&|$)", "retryMap=" + Matcher.quoteReplacement(retryMapJsonQuery));
                 }
-                return ret;
+                return new RetryLocation(retryLocation, retryCount.intValue(), maxRetry);
             }
 
-            private final boolean handleRetry(HttpRequest request, HttpResponse response, URLConnectionAdapter connection) throws Exception {
+            private final RetryLocation handleRetry(HttpRequest request, HttpResponse response, URLConnectionAdapter connection) throws Exception {
                 if (connection.getResponseCode() == 429) {
-                    final String location = retry(request, 429, 2);
-                    Thread.sleep(1000);
-                    response.setResponseCode(ResponseCode.get(302));
-                    response.getResponseHeaders().add(new HTTPHeader(HTTPConstants.HEADER_RESPONSE_LOCATION, location));
-                    return true;
+                    return retry(request, 429, 5);
                 }
-                return false;
+                return null;
             }
 
             @Override
@@ -1683,7 +1703,9 @@ public class HLSDownloader extends DownloadInterface {
                                     try {
                                         ffmpeg.updateLastUpdateTimestamp(getRequest.getConnectTimeout() + getRequest.getReadTimeout() + timeoutBuffer);
                                         connection = br.openRequestConnection(getRequest);
-                                        if (handleRetry(request, response, connection)) {
+                                        final RetryLocation retryLocation = handleRetry(request, response, connection);
+                                        if (retryLocation != null) {
+                                            retryLocation.handle(br, request, response);
                                             return true;
                                         } else if (connection.getResponseCode() != 200 && connection.getResponseCode() != 206) {
                                             throw new IOException("ResponseCode(" + connection.getResponseCode() + ") must be 200 or 206!");

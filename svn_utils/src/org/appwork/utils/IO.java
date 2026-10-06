@@ -135,38 +135,20 @@ public class IO {
             if (progress != null) {
                 progress.setBytesTotal(in.length());
             }
-            if (CrossSystem.isWindows()) {
-                // magic number for Windows, 64Mb - 32Kb)
-                // On the Windows plateform, you can't copy a file bigger
-                // than
-                // 64Mb,
-                // an Exception in thread "main" java.io.IOException:
-                // Insufficient
-                // system resources exist to complete the requested service
-                // is
-                // thrown.
-                //
-                // For a discussion about this see :
-                // http://forum.java.sun.com/thread.jspa?threadID=439695&messageID=2917510
-                final int maxCount = 64 * 1024 * 1024 - 32 * 1024;
-                final long size = inChannel.size();
-                long position = 0;
-                while (position < size) {
-                    position += inChannel.transferTo(position, maxCount, outChannel);
-                    if (progress != null) {
-                        progress.setBytesProcessed(position);
-                    }
-                }
-            } else {
-                /* we also loop here to make sure all data got transfered! */
-                final int maxCount = 64 * 1024 * 1024 - 32 * 1024;
-                final long size = inChannel.size();
-                long position = 0;
-                while (position < size) {
-                    position += inChannel.transferTo(position, maxCount, outChannel);
-                    if (progress != null) {
-                        progress.setBytesProcessed(position);
-                    }
+            /*
+             * The per-call transfer size is capped at a magic number (64MB - 32KB). This cap originates from an old Windows limitation:
+             * copying more than ~64MB in a single transferTo call could fail with "Insufficient system resources exist to complete the
+             * requested service" (see http://forum.java.sun.com/thread.jspa?threadID=439695&messageID=2917510). We loop until the whole file
+             * has been transferred, which is also required on non-Windows platforms because transferTo is not guaranteed to move all bytes in
+             * one call. The behaviour is identical on all platforms, so there is no platform-specific branch.
+             */
+            final int maxCount = 64 * 1024 * 1024 - 32 * 1024;
+            final long size = inChannel.size();
+            long position = 0;
+            while (position < size) {
+                position += inChannel.transferTo(position, maxCount, outChannel);
+                if (progress != null) {
+                    progress.setBytesProcessed(position);
                 }
             }
             if (sync != null) {

@@ -86,7 +86,7 @@ import org.jdownloader.plugins.components.kvs.Script;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 53504 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53521 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -122,6 +122,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         FUID_SLUG_NO_VIDEOS(Pattern.compile("/(?:[a-z]{2}/)?(\\d+)/([\\w\\-]+)/?", Pattern.CASE_INSENSITIVE), true),
         FUID_ONLY(Pattern.compile("/(\\d+)/?", Pattern.CASE_INSENSITIVE), true),
         SLUG_NO_FUID(Pattern.compile("/(?:[a-z]{2}/)?([a-z0-9\\-]+)/?", Pattern.CASE_INSENSITIVE), false),
+        SLUG_FUID_AT_START(Pattern.compile("/(?:[a-z]{2}/)?(\\d+)-([a-z0-9\\-]+)/?", Pattern.CASE_INSENSITIVE), true),
         SLUG_NO_FUID_HTML(Pattern.compile("/(?:[a-z]{2}/)?([a-z0-9\\-]+)\\.html", Pattern.CASE_INSENSITIVE), false);
 
         private final Pattern pattern;
@@ -155,6 +156,8 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
             }
             final String path = getUrlPath(url);
             switch (this) {
+            case SLUG_FUID_AT_START:
+                return new Regex(path, pattern).getMatch(0);
             case EMBED:
             case FUID_ONLY:
             case VIDEOS_FUID_SLUG:
@@ -174,6 +177,8 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
             }
             final String path = getUrlPath(url);
             switch (this) {
+            case SLUG_FUID_AT_START:
+                return new Regex(path, pattern).getMatch(1);
             case VIDEOS_FUID_SLUG:
             case VIDEO_FUID_SLUG:
             case FUID_SLUG_NO_VIDEOS:

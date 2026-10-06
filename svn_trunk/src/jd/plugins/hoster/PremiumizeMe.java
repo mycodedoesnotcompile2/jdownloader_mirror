@@ -27,7 +27,7 @@ import jd.plugins.components.MultiHosterManagement;
 import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
 import org.jdownloader.plugins.components.usenet.UsenetServer;
 
-@HostPlugin(revision = "$Revision: 52755 $", interfaceVersion = 3, names = { "premiumize.me" }, urls = { "https?://(?:[a-z0-9\\.\\-]+)?premiumize\\.me/file\\?id=([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 53527 $", interfaceVersion = 3, names = { "premiumize.me" }, urls = { "https?://(?:[a-z0-9\\.\\-]+)?premiumize\\.me/file\\?id=([A-Za-z0-9\\-_]+)" })
 public class PremiumizeMe extends ZeveraCore {
     protected static MultiHosterManagement mhm = new MultiHosterManagement("premiumize.me");
 
@@ -50,14 +50,20 @@ public class PremiumizeMe extends ZeveraCore {
     }
 
     @Override
-    public int getDownloadModeMaxChunks(final Account account) {
-        if (account != null && account.getType() == AccountType.FREE) {
+    public int getMaxChunks(final Account account) {
+        final AccountType type = account != null ? account.getType() : null;
+        if (type == null) {
+            /* Free(anonymous) and unknown account type */
+            return 0;
+        }
+        switch (type) {
+        case FREE:
             /* Free Account */
             return 0;
-        } else if (account != null && account.getType() == AccountType.PREMIUM) {
+        case PREMIUM:
             /* Premium account */
             return 0;
-        } else {
+        default:
             /* Free(anonymous) and unknown account type */
             return 0;
         }

@@ -73,7 +73,7 @@ import org.jdownloader.plugins.components.config.Keep2shareConfig.LinkcheckMode;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 53518 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53521 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class K2SApi extends PluginForHost {
     private final String        lng                                                    = getLanguage();
     private final String        PROPERTY_ACCOUNT_AUTHTOKEN                             = "auth_token";
@@ -290,7 +290,7 @@ public abstract class K2SApi extends PluginForHost {
      * @author Jiaz
      */
     protected long getAPIRevision() {
-        return Math.max(0, Formatter.getRevision("$Revision: 53518 $"));
+        return Math.max(0, Formatter.getRevision("$Revision: 53521 $"));
     }
 
     /**
@@ -868,7 +868,15 @@ public abstract class K2SApi extends PluginForHost {
                 postdata.put("captcha_challenge", challenge);
                 postdata.put("captcha_response", code);
             }
-            Map<String, Object> geturlResponse = postPageRaw(this.br, "/geturl", postdata, account, link);
+            Map<String, Object> geturlResponse = null;
+            try {
+                geturlResponse = postPageRaw(this.br, "/geturl", postdata, account, link);
+            } catch (PluginException e) {
+                if (e.getLinkStatus() == LinkStatus.ERROR_CAPTCHA && !isFree) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, null, e);
+                }
+                throw e;
+            }
             final String free_download_key = (String) geturlResponse.get("free_download_key");
             if (!StringUtils.isEmpty(free_download_key)) {
                 /**
@@ -923,14 +931,7 @@ public abstract class K2SApi extends PluginForHost {
             }
             dllink = (String) geturlResponse.get("url");
             if (StringUtils.isEmpty(dllink)) {
-                try {
-                    this.handleErrorsAPI(account, link, this.br);
-                } catch (PluginException e) {
-                    if (e.getLinkStatus() == LinkStatus.ERROR_CAPTCHA && !isFree) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, null, e);
-                    }
-                    throw e;
-                }
+                this.handleErrorsAPI(account, link, this.br);
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             logger.info("dllink = " + dllink);

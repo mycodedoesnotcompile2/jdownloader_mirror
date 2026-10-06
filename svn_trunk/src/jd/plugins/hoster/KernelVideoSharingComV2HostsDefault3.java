@@ -21,9 +21,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-import org.jdownloader.plugins.components.config.KVSConfig;
-
-@HostPlugin(revision = "$Revision: 52834 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53521 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault3 extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault3(final PluginWrapper wrapper) {
         super(wrapper);
@@ -31,13 +29,7 @@ public class KernelVideoSharingComV2HostsDefault3 extends KernelVideoSharingComV
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        ret.add(new String[] { "shameless.com" });
-        ret.add(new String[] { "bravotube.net" });
-        ret.add(new String[] { "hellporno.com" });
-        ret.add(new String[] { "alphaporno.com" });
-        ret.add(new String[] { "upskirt.tv" });
-        ret.add(new String[] { "xmegadrive.com" });
-        ret.add(new String[] { "wow.xxx" });
+        ret.add(new String[] { "pisshamster.com" });
         return ret;
     }
 
@@ -46,36 +38,33 @@ public class KernelVideoSharingComV2HostsDefault3 extends KernelVideoSharingComV
     }
 
     @Override
+    protected KVSUrlType[] getKVSUrlType(String url) {
+        // wrong KVSUrlType can lead for false FUID
+        return new KVSUrlType[] { KVSUrlType.SLUG_FUID_AT_START };
+    }
+
+    @Override
+    protected Integer labelToHeight(String label) {
+        if ("high".equalsIgnoreCase(label)) {
+            return 1080;
+        } else if ("low".equalsIgnoreCase(label)) {
+            return 240;
+        } else {
+            return super.labelToHeight(label);
+        }
+    }
+
+    @Override
     public String[] siteSupportedNames() {
         return buildSupportedNames(getPluginDomains());
     }
 
     public static String[] getAnnotationUrls() {
-        return KernelVideoSharingComV2.buildAnnotationUrlsDefaultVideosPatternWithoutFileID(getPluginDomains());
+        return KernelVideoSharingComV2.buildAnnotationUrlsDefault(getPluginDomains(), KVSUrlType.SLUG_FUID_AT_START);
     }
 
     @Override
-    protected KVSUrlType[] getKVSUrlType(String url) {
-        // wrong KVSUrlType can lead for false FUID
-        return new KVSUrlType[] { KVSUrlType.EMBED, KVSUrlType.VIDEOS_SLUG_NO_FUID };
-    }
-
-    @Override
-    public Class<? extends KVSConfig> getConfigInterface() {
-        if ("wow.xxx".equals(getHost())) {
-            return KVSConfig.class;
-        } else {
-            return null;
-        }
-    }
-
-    @Override
-    protected boolean hasFUIDInsideURL(final String url) {
-        return false;
-    }
-
-    @Override
-    protected String generateContentURL(final String host, final String fuid, final String urlTitle) {
-        return generateContentURLDefaultVideosPatternWithoutFileID(host, fuid, urlTitle);
+    protected String generateContentURL(final String host, final String fuid, final String urlSlug) {
+        return this.getProtocol() + appendWWWIfRequired(host) + "/" + fuid + "-" + urlSlug + "/";
     }
 }

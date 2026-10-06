@@ -5,6 +5,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -68,7 +69,7 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 53519 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53521 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class YetiShareCore extends antiDDoSForHost {
 
     public YetiShareCore(PluginWrapper wrapper) {
@@ -1024,22 +1025,37 @@ public abstract class YetiShareCore extends antiDDoSForHost {
         }
     }
 
-    protected Map<String, Object> getDlTimer(final Browser br) {
+    protected Map<String, Object> getDataMap(final Browser br) {
         final String dlTimer = br.getRegex("dlTimer\\((\\{.*?\\})\\)").getMatch(0);
-        if (dlTimer == null) {
-            return null;
+        // there can be several x-data objects
+        final String xData[] = br.getRegex("x-data\\s*=\\s*\"\\s*(\\{.*?\\})\\s*\"\\s*>").getColumn(0);
+        final List<String> jsonArray = new ArrayList<String>();
+        jsonArray.add(dlTimer);
+        if (xData != null) {
+            jsonArray.addAll(Arrays.asList(xData));
         }
-        try {
-            final Map<String, Object> ret = JavaScriptEngineFactory.jsonToJavaMap(dlTimer);
+        final Map<String, Object> ret = new HashMap<String, Object>();
+        for (String json : jsonArray) {
+            if (json == null) {
+                continue;
+            }
+            try {
+                final Map<String, Object> map = JavaScriptEngineFactory.jsonToJavaMap(json);
+                if (map != null) {
+                    ret.putAll(map);
+                }
+            } catch (Exception e) {
+                logger.log(e);
+            }
+        }
+        if (ret.size() > 0) {
             return ret;
-        } catch (Exception e) {
-            logger.log(e);
-            return null;
         }
+        return null;
     }
 
     protected String getContinueLink(final Browser br) throws Exception {
-        final Map<String, Object> map = getDlTimer(br);
+        final Map<String, Object> map = getDataMap(br);
         if (map != null) {
             final String continue_link = (String) map.get("link");
             if (continue_link != null) {
@@ -1646,9 +1662,12 @@ public abstract class YetiShareCore extends antiDDoSForHost {
 
     /** Returns pre-download-waittime (seconds) from inside HTML. */
     public String regexWaittime(final Browser br) {
-        final Map<String, Object> map = getDlTimer(br);
+        final Map<String, Object> map = getDataMap(br);
         if (map != null) {
-            final Object seconds = map.get("seconds");
+            Object seconds = map.get("seconds");
+            if (seconds == null) {
+                seconds = map.get("cooldown");
+            }
             if (seconds instanceof Number) {
                 // can be double due to Javascript Object Map
                 return "" + ((Number) seconds).intValue();

@@ -66,6 +66,7 @@ import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.ImageProvider.ImageProvider;
 import org.appwork.utils.images.IconIO;
+import org.appwork.utils.images.svg.SVGFactory;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.net.PublicSuffixList;
@@ -1058,7 +1059,11 @@ public class FavIcons {
             BufferedImage ret = null;
             if (StringUtils.endsWithCaseInsensitive(con.getURL().getPath(), ".svg")) {
                 try {
-                    final Image img = IconIO.getSvgFactory().getImageFromSVG(is, null, 64, 64, null);
+                    final SVGFactory svgFactory = IconIO.getSvgFactory();
+                    if (svgFactory == null) {
+                        return null;
+                    }
+                    final Image img = svgFactory.getImageFromSVG(is, null, 64, 64, null);
                     if (img == null) {
                         return null;
                     }

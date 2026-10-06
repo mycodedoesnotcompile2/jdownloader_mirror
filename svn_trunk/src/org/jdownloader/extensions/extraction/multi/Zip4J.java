@@ -12,6 +12,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 
+import jd.controlling.downloadcontroller.IfFileExistsDialogInterface;
+import net.lingala.zip4j.ZipFile;
+import net.lingala.zip4j.exception.ZipException;
+import net.lingala.zip4j.io.inputstream.ZipInputStream;
+import net.lingala.zip4j.model.ExtraDataRecord;
+import net.lingala.zip4j.model.FileHeader;
+import net.sf.sevenzipjbinding.SevenZipException;
+
 import org.appwork.utils.Files;
 import org.appwork.utils.Hash;
 import org.appwork.utils.Regex;
@@ -38,14 +46,6 @@ import org.jdownloader.extensions.extraction.content.ContentView;
 import org.jdownloader.extensions.extraction.content.PackedFile;
 import org.jdownloader.extensions.extraction.gui.iffileexistsdialog.IfFileExistsDialog;
 import org.jdownloader.settings.IfFileExistsAction;
-
-import jd.controlling.downloadcontroller.IfFileExistsDialogInterface;
-import net.lingala.zip4j.ZipFile;
-import net.lingala.zip4j.exception.ZipException;
-import net.lingala.zip4j.io.inputstream.ZipInputStream;
-import net.lingala.zip4j.model.ExtraDataRecord;
-import net.lingala.zip4j.model.FileHeader;
-import net.sf.sevenzipjbinding.SevenZipException;
 
 public class Zip4J extends IExtraction {
     private volatile int              crack                   = 0;
@@ -521,7 +521,7 @@ public class Zip4J extends IExtraction {
                         throw new CheckException("Wrong firstArchiveFile(" + firstArchiveFile + ") for Archive(" + archive.getName() + ")");
                     }
                 }
-                if (ret.isComplete()) {
+                if (ret.isComplete(true)) {
                     final ZipFile zipFile = new ZipFile(archive.getArchiveFiles().get(0).getFilePath());
                     try {
                         final List<File> splitZipFiles = zipFile.getSplitZipFiles();

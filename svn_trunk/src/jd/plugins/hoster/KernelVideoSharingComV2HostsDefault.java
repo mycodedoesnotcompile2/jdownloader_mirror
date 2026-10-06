@@ -34,7 +34,7 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.config.KVSConfig;
 import org.jdownloader.plugins.components.config.KVSConfigFullpornxxx;
 
-@HostPlugin(revision = "$Revision: 53511 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53521 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
@@ -167,7 +167,7 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         ret.add(new String[] { "bravotube.net" });
         ret.add(new String[] { "shameless.com" });
         ret.add(new String[] { "femdomtb.com" });
-        ret.add(new String[] { "wow.xxx" });
+        ret.add(new String[] { "wowxxx.to", "wow.xxx" });
         ret.add(new String[] { "neporn.com" });
         ret.add(new String[] { "ooxxx.com" });
         ret.add(new String[] { "porndos.com" });

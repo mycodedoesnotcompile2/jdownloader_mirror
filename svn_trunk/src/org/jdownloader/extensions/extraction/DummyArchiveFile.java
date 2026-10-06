@@ -10,14 +10,19 @@ import org.jdownloader.extensions.extraction.bindings.file.FileArchiveFile;
 
 public class DummyArchiveFile {
     private final String      name;
-    private final boolean     missing;
     private final ArchiveFile archiveFile;
 
     public ArchiveFile getArchiveFile() {
         return archiveFile;
     }
 
+    public boolean exists() {
+        final ArchiveFile archiveFile = getArchiveFile();
+        return archiveFile != null && archiveFile.exists();
+    }
+
     public Boolean isIncomplete() {
+        final ArchiveFile archiveFile = getArchiveFile();
         if (archiveFile == null) {
             return Boolean.TRUE;
         } else {
@@ -30,16 +35,17 @@ public class DummyArchiveFile {
     }
 
     public boolean isMissing() {
-        return missing;
+        final ArchiveFile archiveFile = getArchiveFile();
+        return archiveFile == null || archiveFile instanceof MissingArchiveFile;
     }
 
     public DummyArchiveFile(String miss, File folder) {
         name = miss;
-        missing = true;
         this.archiveFile = null;
     }
 
     public String toString() {
+        final ArchiveFile archiveFile = getArchiveFile();
         if (archiveFile != null) {
             return archiveFile.toString();
         } else {
@@ -49,11 +55,6 @@ public class DummyArchiveFile {
 
     public DummyArchiveFile(ArchiveFile af) {
         name = af.getName();
-        if (af instanceof MissingArchiveFile) {
-            missing = true;
-        } else {
-            missing = false;
-        }
         archiveFile = af;
     }
 
@@ -62,6 +63,7 @@ public class DummyArchiveFile {
     }
 
     public AvailableStatus getOnlineStatus() {
+        final ArchiveFile archiveFile = getArchiveFile();
         if (archiveFile != null) {
             if (archiveFile instanceof CrawledLinkArchiveFile) {
                 return ((CrawledLinkArchiveFile) archiveFile).getAvailableStatus();
@@ -79,6 +81,7 @@ public class DummyArchiveFile {
     }
 
     public boolean isLocalFileAvailable() {
+        final ArchiveFile archiveFile = getArchiveFile();
         return archiveFile != null && archiveFile.exists();
     }
 }
