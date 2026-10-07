@@ -37,6 +37,24 @@ public class AccountFilter {
         // Default constructor with no criteria
     }
 
+    protected AccountFilter(AccountFilter source) {
+        if (source != null) {
+            this.hosts = source.hosts;
+            this.enabled = source.enabled;
+            this.valid = source.valid;
+            this.accountTypes = source.accountTypes;
+            this.expired = source.expired;
+            this.temporarilyDisabled = source.temporarilyDisabled;
+            this.multiHostAccount = source.multiHostAccount;
+            this.minimumTrafficLeft = source.minimumTrafficLeft;
+            this.minimumBalance = source.minimumBalance;
+            this.features = source.features;
+            this.maxResultsNum = source.maxResultsNum;
+            this.username = source.username;
+            this.multiHostSupport = source.multiHostSupport;
+        }
+    }
+
     /**
      * Creates a new account filter for multiple hosts
      *
@@ -57,6 +75,26 @@ public class AccountFilter {
         setHosts(hosts);
     }
 
+    public AccountFilter lock() {
+        return new AccountFilter(this) {
+            @Override
+            public boolean isLocked() {
+                return true;
+            }
+
+        };
+    }
+
+    protected void checkLockedStatus() throws IllegalStateException {
+        if (isLocked()) {
+            throw new IllegalStateException("cannot modify locked filter");
+        }
+    }
+
+    public boolean isLocked() {
+        return false;
+    }
+
     /**
      * Filter accounts by enabled status
      *
@@ -65,6 +103,7 @@ public class AccountFilter {
      * @return this filter for chaining
      */
     public AccountFilter setEnabled(Boolean enabled) {
+        checkLockedStatus();
         this.enabled = enabled;
         return this;
     }
@@ -77,6 +116,7 @@ public class AccountFilter {
      * @return this filter for chaining
      */
     public AccountFilter setValid(Boolean valid) {
+        checkLockedStatus();
         this.valid = valid;
         return this;
     }
@@ -89,6 +129,7 @@ public class AccountFilter {
      * @return this filter for chaining
      */
     public AccountFilter setAccountTypes(AccountType... accountTypes) {
+        checkLockedStatus();
         if (accountTypes != null && accountTypes.length > 0) {
             this.accountTypes = Arrays.asList(accountTypes);
         } else {
@@ -109,6 +150,7 @@ public class AccountFilter {
      * @return this filter for chaining
      */
     public AccountFilter setExpired(Boolean expired) {
+        checkLockedStatus();
         this.expired = expired;
         return this;
     }
@@ -121,6 +163,7 @@ public class AccountFilter {
      * @return this filter for chaining
      */
     public AccountFilter setTemporarilyDisabled(Boolean temporarilyDisabled) {
+        checkLockedStatus();
         this.temporarilyDisabled = temporarilyDisabled;
         return this;
     }
@@ -133,11 +176,13 @@ public class AccountFilter {
      * @return this filter for chaining
      */
     public AccountFilter setMultiHostAccount(Boolean multiHostAccount) {
+        checkLockedStatus();
         this.multiHostAccount = multiHostAccount;
         return this;
     }
 
     public AccountFilter setMultiHostSupported(String multiHostSupport) {
+        checkLockedStatus();
         this.multiHostSupport = StringUtils.toLowerCaseOrNull(multiHostSupport);
         return this;
     }
@@ -150,6 +195,7 @@ public class AccountFilter {
      * @return this filter for chaining
      */
     public AccountFilter setMinimumTrafficLeft(Long minimumTrafficLeft) {
+        checkLockedStatus();
         this.minimumTrafficLeft = minimumTrafficLeft;
         return this;
     }
@@ -162,6 +208,7 @@ public class AccountFilter {
      * @return this filter for chaining
      */
     public AccountFilter setMinimumBalance(Double minimumBalance) {
+        checkLockedStatus();
         this.minimumBalance = minimumBalance;
         return this;
     }
@@ -174,6 +221,7 @@ public class AccountFilter {
      * @return this filter for chaining
      */
     public AccountFilter setFeature(FEATURE... features) {
+        checkLockedStatus();
         if (features != null && features.length > 0) {
             this.features = Arrays.asList(features);
         } else {
@@ -190,6 +238,7 @@ public class AccountFilter {
      * @return this filter for chaining
      */
     public AccountFilter setHosts(String... hosts) {
+        checkLockedStatus();
         if (hosts != null && hosts.length > 0) {
             this.hosts = Arrays.asList(hosts);
         } else {
@@ -206,6 +255,7 @@ public class AccountFilter {
      * @return this filter for chaining
      */
     public AccountFilter setMaxResultsNum(Integer maxResultsNum) {
+        checkLockedStatus();
         this.maxResultsNum = maxResultsNum;
         return this;
     }
@@ -224,6 +274,7 @@ public class AccountFilter {
     }
 
     public AccountFilter setUsername(String username) {
+        checkLockedStatus();
         this.username = username;
         return this;
     }

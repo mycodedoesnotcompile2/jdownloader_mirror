@@ -11,6 +11,7 @@ import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptcha
 import jd.controlling.captcha.SkipException;
 import jd.plugins.Account;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
 /**
@@ -62,16 +63,25 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
     }
 
     /**
-     * Combines the user's configured max simultaneous captchas limit (if enabled) with the solver service's own server-side limit
-     * ({@link abstractPluginForCaptchaSolver#getServerSideMaxSimultaneousCaptchaThreadsLimit(Account)}), whichever is smaller, but always
-     * at least 1.
+     * The user's configured max simultaneous captchas limit (if enabled), but always at least 1. It is the user's limit for this solver as
+     * a whole, i.e. it applies to all accounts of the solver service together (the per-account server-side limit is handled separately by
+     * {@link #getFinalMaxCaptchaThreadsPerAccount()}).
      */
     @Override
     public final int getFinalMaxCaptchaThreads() {
         final CaptchaSolverConfigV3 cfg = service.getConfigV3();
         final int configured = cfg.isLimitMaxSimultaneousCaptchasEnabled() ? cfg.getMaxSimultaneousCaptchas() : Integer.MAX_VALUE;
-        final int serverSide = plugin.getServerSideMaxSimultaneousCaptchaThreadsLimit(account);
-        return Math.max(1, Math.min(configured, serverSide));
+        return Math.max(1, configured);
+    }
+
+    /**
+     * The solver service's own server-side limit for this solver's account
+     * ({@link abstractPluginForCaptchaSolver#getServerSideMaxSimultaneousCaptchaThreadsLimit(Account)}), but always at least 1. It applies
+     * to every account on its own, so a second account of the same solver service has its own, independent budget.
+     */
+    @Override
+    public final int getFinalMaxCaptchaThreadsPerAccount() {
+        return Math.max(1, plugin.getServerSideMaxSimultaneousCaptchaThreadsLimit(account));
     }
 
     /*
@@ -196,7 +206,15 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
             plugin.solve(cesJob, account);
         } catch (final PluginException e) {
             // TODO: Set detailed failure feedback on SolverJob e.g. if failure was account related.
-            plugin.handleAccountException(account, plugin.getLogger(), e);
+            if (e.getLinkStatus() == LinkStatus.ERROR_CAPTCHA) {
+                /*
+                 * Captcha could not be solved (e.g. unsolvable captcha). This is a problem of the captcha itself and not of the account ->
+                 * Only log it and do not set an account error.
+                 */
+                plugin.getLogger().log(e);
+            } else {
+                plugin.handleAccountException(account, plugin.getLogger(), e);
+            }
         } catch (Exception e) {
             // TODO
             e.printStackTrace();

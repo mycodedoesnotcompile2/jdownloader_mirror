@@ -7,6 +7,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -39,6 +40,13 @@ public class SolverJob<T> {
     private final AtomicInteger                                  LOCK        = new AtomicInteger();
     private final AtomicBoolean                                  alive       = new AtomicBoolean(true);
     private long                                                 created;
+    /**
+     * Random tie-break ordinal per external solver id, drawn once per job (see {@link #getExternalTieBreakOrder(String)}). Used by
+     * {@link org.jdownloader.captcha.v2.JobRunnable#getDefaultWaitFor} to pick, at random for this one captcha, which of several equally
+     * ranked external solvers is tried first.
+     */
+    private final HashMap<String, Integer>                       externalTieBreakOrder = new HashMap<String, Integer>();
+    private static final Random                                  TIEBREAK_RANDOM       = new Random();
 
     public String toString() {
         return "CaptchaJob: " + new Date(created) + " " + challenge + " Solver: " + solverList;
@@ -222,6 +230,25 @@ public class SolverJob<T> {
 
     public Challenge<T> getChallenge() {
         return challenge;
+    }
+
+    /**
+     * Returns the random tie-break ordinal for the given external solver id. The ordinal is drawn once (randomly) the first time it is
+     * needed within this job and then kept stable for the rest of this job, so the resulting "who waits for whom" direction is consistent
+     * across all solver threads of this job, its wait-loop validation and its logging. A fresh job (i.e. the next captcha) starts with an
+     * empty map and therefore draws fresh ordinals, which is what re-randomizes the external solver that goes first for every captcha that
+     * gets solved.
+     */
+    public int getExternalTieBreakOrder(final String solverID) {
+        synchronized (externalTieBreakOrder) {
+            final Integer order = externalTieBreakOrder.get(solverID);
+            if (order != null) {
+                return order.intValue();
+            }
+            final int newOrder = TIEBREAK_RANDOM.nextInt();
+            externalTieBreakOrder.put(solverID, Integer.valueOf(newOrder));
+            return newOrder;
+        }
     }
 
     public ChallengeSolverJobEventSender getEventSender() {

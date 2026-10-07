@@ -132,7 +132,7 @@ public class IconIO {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see javax.swing.Icon#getIconHeight()
          */
         @Override
@@ -142,7 +142,7 @@ public class IconIO {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see javax.swing.Icon#getIconWidth()
          */
         @Override
@@ -152,7 +152,7 @@ public class IconIO {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see org.appwork.swing.components.IdentifierInterface#toIdentifier()
          */
         @Override
@@ -174,7 +174,7 @@ public class IconIO {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see javax.swing.Icon#paintIcon(java.awt.Component, java.awt.Graphics, int, int)
          */
         @Override
@@ -418,6 +418,7 @@ public class IconIO {
                         return factory;
                     }
                 } catch (Throwable e) {
+                    org.appwork.loggingv3.LogV3.log(e);
                     if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                         throw new WTFException(e);
                     }
@@ -547,19 +548,20 @@ public class IconIO {
      */
     public static Icon loadVectorIcon(final URL resource, final int w, int h) {
         if (resource != null && StringUtils.endsWithCaseInsensitive(resource.getPath(), ".svg")) {
-            if (getSvgFactory() != null) {
-                try {
-                    final InputStream is = resource.openStream();
-                    try {
-                        return getSvgFactory().getIconFromSVG(is, null, w, h, null);
-                    } finally {
-                        is.close();
-                    }
-                } catch (IOException e) {
-                    LogV3.log(e);
-                }
-            } else {
+            final SVGFactory svgFactory = getSvgFactory();
+            if (svgFactory == null) {
                 LogV3.warning("SVG Factory not found!");
+                return null;
+            }
+            try {
+                final InputStream is = resource.openStream();
+                try {
+                    return svgFactory.getIconFromSVG(is, null, w, h, null);
+                } finally {
+                    is.close();
+                }
+            } catch (IOException e) {
+                LogV3.log(e);
             }
         }
         return null;

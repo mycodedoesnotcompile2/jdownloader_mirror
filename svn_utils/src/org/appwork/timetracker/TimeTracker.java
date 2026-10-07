@@ -67,28 +67,43 @@ public class TimeTracker {
     }
 
     public void addRule(TrackerRule rule) {
-        if (rule != null) {
-            rules.addIfAbsent(rule);
+        if (rule == null) {
+            return;
         }
+        rules.addIfAbsent(rule);
     }
 
     public void wait(final TrackerJob job) throws InterruptedException {
         if (rules.size() == 0 || job == null) {
             return;
-        } else {
-            final TrackedEntry entry;
-            synchronized (this) {
-                final long waitFor = getWaitFor(job.getWeight());
-                entry = createEntry(waitFor, job.getWeight());
-                entries.add(entry);
-            }
-            if (entry.getWaitFor() > 0) {
-                logger.info("Wait " + TimeFormatter.formatMilliSeconds(entry.getWaitFor(), 0));
-                job.waitForNextSlot(entry.getWaitFor());
-            }
-            job.run();
-            logger.info("RUN");
         }
+        final TrackedEntry entry;
+        synchronized (this) {
+            final long waitFor = getWaitFor(job.getWeight());
+            entry = createEntry(waitFor, job.getWeight());
+            entries.add(entry);
+        }
+        if (entry.getWaitFor() > 0) {
+            logger.info("Wait " + TimeFormatter.formatMilliSeconds(entry.getWaitFor(), 0));
+            boolean waited = false;
+            try {
+                job.waitForNextSlot(entry.getWaitFor());
+                waited = true;
+            } finally {
+                if (!waited) {
+                    /*
+                     * The wait was aborted (e.g. InterruptedException because the download/crawl was stopped), so job.run() will never be
+                     * executed and nothing was requested. Give the reserved slot back, otherwise aborted jobs keep blocking quota (entries
+                     * are scheduled in the future) and the limit is already reached on the next start.
+                     */
+                    synchronized (this) {
+                        entries.remove(entry);
+                    }
+                }
+            }
+        }
+        job.run();
+        logger.info("RUN");
     }
 
     /**

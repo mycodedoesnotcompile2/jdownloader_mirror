@@ -11,6 +11,7 @@ import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import javax.swing.JPopupMenu;
 import javax.swing.JSeparator;
@@ -39,7 +40,6 @@ import org.jdownloader.updatev2.gui.LAFOptions;
 import jd.gui.swing.jdgui.BasicJDTable;
 
 public class VariantsMapTable extends BasicJDTable<AbstractVariantWrapper> {
-
     public VariantsMapTable(VariantsMapTableModel model) {
         super(model);
         setSearchEnabled(true);
@@ -53,7 +53,6 @@ public class VariantsMapTable extends BasicJDTable<AbstractVariantWrapper> {
 
     @Override
     protected JPopupMenu onContextMenu(JPopupMenu popup, AbstractVariantWrapper contextObject, final List<AbstractVariantWrapper> selection, ExtColumn<AbstractVariantWrapper> column, MouseEvent mouseEvent) {
-
         popup.add(new AppAction() {
             {
                 setSmallIcon(new AbstractIcon(IconKey.ICON_ADD, 20));
@@ -62,14 +61,10 @@ public class VariantsMapTable extends BasicJDTable<AbstractVariantWrapper> {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-
                 ArrayList<VariantIDStorable> variants = new ArrayList<VariantIDStorable>();
-
                 HashSet<String> type = new HashSet<String>();
                 HashSet<String> extensions = new HashSet<String>();
-
                 AbstractVariantWrapper best = null;
-
                 for (AbstractVariantWrapper w : selection) {
                     variants.add(w.getVariableIDStorable());
                     if (best == null || best.variant.compareTo(w.variant) == -1) {
@@ -89,10 +84,8 @@ public class VariantsMapTable extends BasicJDTable<AbstractVariantWrapper> {
                         type.add(w.variant.getGroup().getLabel());
                     }
                     if (w.variant instanceof VideoVariant) {
-
                         switch (((VideoVariant) w.variant).getProjection()) {
                         case ANAGLYPH_3D:
-
                             type.add("3D " + w.variant.getGroup().getLabel());
                             break;
                         case NORMAL:
@@ -103,29 +96,24 @@ public class VariantsMapTable extends BasicJDTable<AbstractVariantWrapper> {
                             break;
                         case SPHERICAL_3D:
                             type.add("3D 360° " + w.variant.getGroup().getLabel());
-
                             break;
                         }
                     }
                 }
-
                 StringBuilder sb = new StringBuilder();
                 if (type.size() == 1) {
                     sb.append(type.iterator().next());
-
                 }
                 if (extensions.size() == 1) {
                     if (sb.length() > 0) {
                         sb.append(" ");
                     }
                     sb.append(extensions.iterator().next());
-
                 }
                 if (sb.length() > 0) {
                     sb.append(" ");
                 }
                 sb.append("Max " + best.variant._getName(null));
-
                 String name = UIOManager.I().show(InputDialogInterface.class, new InputDialog(0, _GUI.T.lit_name(), "", sb.toString(), null, null, null)).getText();
                 if (StringUtils.isNotEmpty(name)) {
                     YoutubeVariantCollection link = new YoutubeVariantCollection(name, variants);
@@ -134,9 +122,7 @@ public class VariantsMapTable extends BasicJDTable<AbstractVariantWrapper> {
                     CFG_YOUTUBE.CFG.setCollections(links);
                 }
             }
-
         });
-
         popup.add(new JSeparator());
         popup.add(new AppAction() {
             {
@@ -151,9 +137,7 @@ public class VariantsMapTable extends BasicJDTable<AbstractVariantWrapper> {
                 }
                 getModel().updateEnabledMap();
             }
-
         });
-
         popup.add(new AppAction() {
             {
                 setSmallIcon(new CheckBoxIcon(false));
@@ -167,7 +151,6 @@ public class VariantsMapTable extends BasicJDTable<AbstractVariantWrapper> {
                 }
                 getModel().updateEnabledMap();
             }
-
         });
         return popup;
     }
@@ -177,7 +160,6 @@ public class VariantsMapTable extends BasicJDTable<AbstractVariantWrapper> {
     @Override
     public void paintComponent(Graphics g) {
         super.paintComponent(g);
-
         Graphics2D g2 = (Graphics2D) g;
         Composite comp = g2.getComposite();
         final Rectangle visibleRect = this.getVisibleRect();
@@ -191,7 +173,6 @@ public class VariantsMapTable extends BasicJDTable<AbstractVariantWrapper> {
             g2.setColor(LAFOptions.getInstance().getColorForTableAccountErrorRowForeground());
             g2.drawString(str, (getWidth() - g2.getFontMetrics().stringWidth(str)) / 2, (int) (getHeight() * 0.5d));
         }
-
         g2.setComposite(comp);
     }
 
@@ -201,7 +182,6 @@ public class VariantsMapTable extends BasicJDTable<AbstractVariantWrapper> {
             // this.getModel().addExtComponentRowHighlighter(new
             // AlternateHighlighter<AbstractVariantWrapper>((LAFOptions.getInstance().getColorForTableAlternateRowForeground()),
             // (LAFOptions.getInstance().getColorForTableAlternateRowBackground()), null));
-
         }
     }
 
@@ -217,10 +197,8 @@ public class VariantsMapTable extends BasicJDTable<AbstractVariantWrapper> {
         if (link == null) {
             return;
         }
-
-        ArrayList<AbstractVariantWrapper> selection = new ArrayList<AbstractVariantWrapper>();
-        HashSet<String> idSet = link.createUniqueIDSet();
-
+        List<AbstractVariantWrapper> selection = new ArrayList<AbstractVariantWrapper>();
+        Set<String> idSet = link.createUniqueIDSet();
         for (AbstractVariantWrapper v : getModel().getTableData()) {
             if (idSet.contains(v.getVariableIDStorable().createUniqueID())) {
                 selection.add(v);
@@ -229,7 +207,6 @@ public class VariantsMapTable extends BasicJDTable<AbstractVariantWrapper> {
             } else if (StringUtils.equals(v.getVariableIDStorable().createGroupingID(), link.getGroupingID())) {
                 selection.add(v);
             }
-
         }
         getModel().setSelectedObjects(selection);
         scrollToSelection(0);
@@ -237,5 +214,4 @@ public class VariantsMapTable extends BasicJDTable<AbstractVariantWrapper> {
 
     public void onEnabledMapUpdate(CounterMap<String> enabledMap) {
     }
-
 }

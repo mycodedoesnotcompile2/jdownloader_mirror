@@ -49,14 +49,16 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 53511 $", interfaceVersion = 3, names = { "world-debrid.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53530 $", interfaceVersion = 3, names = { "world-debrid.com" }, urls = { "" })
 public class WorldDebridCom extends PluginForHost {
-    private final String                 API_BASE               = "https://world-debrid.com/api/v1";
-
     private static MultiHosterManagement mhm                    = new MultiHosterManagement("world-debrid.com");
     private final String                 PROPERTY_ACCESS_TOKEN  = "access_token";
     private final String                 PROPERTY_TOKEN_EXPIRES = "access_token_expires";
     private final String                 PROPERTY_DIRECTURL     = "worlddebrid_directurl_";
+
+    private String getApiBase() {
+        return "https://" + getHost() + "/api/v1";
+    }
 
     /* The API answered 402: no active subscription on this account. */
     private static class SubscriptionRequiredException extends Exception {
@@ -69,7 +71,7 @@ public class WorldDebridCom extends PluginForHost {
 
     public WorldDebridCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://world-debrid.com/plans?utm_source=jdownloader&utm_medium=affiliate");
+        this.enablePremium("https://" + getHost() + "/plans?utm_source=jdownloader&utm_medium=affiliate");
     }
 
     @Override
@@ -79,7 +81,7 @@ public class WorldDebridCom extends PluginForHost {
 
     @Override
     protected String getAPILoginHelpURL() {
-        return "https://world-debrid.com/auth/account";
+        return "https://" + getHost() + "/auth/account";
     }
 
     @Override
@@ -89,7 +91,7 @@ public class WorldDebridCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://world-debrid.com/terms";
+        return "https://" + getHost() + "/terms";
     }
 
     @Override
@@ -274,12 +276,12 @@ public class WorldDebridCom extends PluginForHost {
             }
             final String linkToken = account.getPass() == null ? "" : account.getPass().trim();
             if (!looksLikeValidAPIKey(linkToken)) {
-                throw new AccountInvalidException("Enter your World-Debrid link token (wdu_live_...). Create it on world-debrid.com, account page, Integrations, JDownloader.");
+                throw new AccountInvalidException("Enter your World-Debrid link token (wdu_live_...). Create it on " + getHost() + ", account page, Integrations, JDownloader.");
             }
             final Map<String, Object> body = new HashMap<String, Object>();
             body.put("link_token", linkToken);
             final Browser api = api();
-            final Request req = api.createJSonPostRequest(API_BASE + "/auth/token", JSonStorage.serializeToJson(body));
+            final Request req = api.createJSonPostRequest(getApiBase() + "/auth/token", JSonStorage.serializeToJson(body));
             /* Identifies JDownloader as a client. Not a secret: every request also needs the user's own link token. */
             req.getHeaders().put("Authorization", "Bearer " + "wdp_live_70478c57ad653b34cd4dd27c46fd8462eba5ad05a12e7a00");
             api.getPage(req);
@@ -297,7 +299,7 @@ public class WorldDebridCom extends PluginForHost {
         for (int attempt = 0; attempt < 2; attempt++) {
             final String token = getAccessToken(account, attempt > 0);
             final Browser api = api();
-            final Request req = json == null ? api.createGetRequest(API_BASE + path) : api.createJSonPostRequest(API_BASE + path, json);
+            final Request req = json == null ? api.createGetRequest(getApiBase() + path) : api.createJSonPostRequest(getApiBase() + path, json);
             req.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + token);
             api.getPage(req);
             if (api.getHttpConnection().getResponseCode() == 401 && attempt == 0) {

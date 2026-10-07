@@ -559,6 +559,7 @@ public abstract class Request {
                 } else {
                     return "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.10; rv:" + firefoxRevision + ") Gecko/20100101 Firefox/" + firefoxRevision;
                 }
+            case LINUX:
             default:
                 if (CrossSystem.is64BitArch()) {
                     return "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:" + firefoxRevision + ") Gecko/20100101 Firefox/" + firefoxRevision;

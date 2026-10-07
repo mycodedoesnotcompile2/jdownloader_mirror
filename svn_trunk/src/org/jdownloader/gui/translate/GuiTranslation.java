@@ -5411,6 +5411,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Allow usage of regex for domain column" })
     String CaptchaRules_regex_tooltip();
 
+    @Default(lngs = { "en" }, values = { "<html>Blacklist = If this rule matches, the selected solver will not be used<br>Whitelist = If this rule matches, the selected solver will be used</html>" })
+    String CaptchaRules_ruleType_tooltip();
+
     @Default(lngs = { "en" }, values = { "The static example rule cannot be removed" })
     String CaptchaRules_remove_disabled_static();
 
@@ -5446,6 +5449,9 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "In error state, check MyJD config" })
     String CaptchaSolverService_status_myjd_error();
+
+    @Default(lngs = { "en" }, values = { "Open account manager" })
+    String SolverOrderTable_context_openAccountManager();
 
     @Default(lngs = { "en" }, values = { "Number of supported Captcha Types" })
     String SolverOrderTableModel_column_supportedCaptchaTypes();
@@ -5764,6 +5770,15 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Solver Overview & Settings" })
     String CaptchaConfigPanel_solverOverviewAndSettings();
+
+    @Default(lngs = { "en" }, values = { "Table display mode:" })
+    String CaptchaTypesTable_displayMode();
+
+    @Default(lngs = { "en" }, values = { "Supported captcha types only" })
+    String CaptchaTypesTable_displayMode_supportedOnly();
+
+    @Default(lngs = { "en" }, values = { "All captcha types" })
+    String CaptchaTypesTable_displayMode_all();
 
     @Default(lngs = { "en" }, values = { "Name" })
     String CaptchaTypesTable_column_name();

@@ -2,18 +2,24 @@ package jd.gui.swing.jdgui.views.settings.panels.anticaptcha;
 
 import java.awt.Container;
 import java.awt.Dimension;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
 
+import javax.swing.ButtonGroup;
 import javax.swing.JLabel;
+import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
 
+import org.appwork.swing.MigPanel;
 import org.appwork.utils.swing.SwingUtils;
 import org.jdownloader.captcha.v2.CaptchaSolverCaptchaTypesSettingsPanelBuilder;
 import org.jdownloader.captcha.v2.CaptchaSolverCaptchaTypesSettingsPanelBuilder.SolverServiceCaptchaTypeAccessor;
 import org.jdownloader.captcha.v2.SolverService;
 import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSolverService;
 
@@ -31,10 +37,19 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
     private JLabel                     limitsLabel;
     private JLabel                     settingsLabel;
     private JScrollPane                configScrollPane;
+    private MigPanel                   displayModePanel;
+    /** The solver currently shown below the solver table, or null if none is selected. */
+    private SolverService              selectedSolver;
+    /**
+     * Display mode of the captcha types table: true = only the captcha types the solver supports, false = all captcha types. Global, i.e.
+     * not stored per solver, so it stays as the user last chose it when another solver gets selected. Not persisted: after a restart the
+     * default (supported types only) applies again.
+     */
+    private boolean                    showOnlySupportedCaptchaTypes = true;
 
     public SolverOrderContainer(SolverOrderTable urlOrder) {
         /* gapy 0: no implicit inter-row gaps, so the height reserved in getConstraints() stays exact (all gaps are set explicitly). */
-        super("ins 0, gapy 0", "[grow,fill]", "[][][][][][][]");
+        super("ins 0, gapy 0", "[grow,fill]", "[][][][][][][][]");
         this.solverOrder = urlOrder;
         /* Main solver order table. Slightly narrower on the right; never shows any scrollbar. */
         final JScrollPane sp = new JScrollPane(urlOrder);
@@ -51,6 +66,33 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
         descriptionLabel = new JLabel();
         descriptionLabel.setVisible(false);
         add(descriptionLabel, "growx, wmin 10, gapright 40, wrap");
+        /* "Table display mode" switch above the captcha types table: supported captcha types only vs. all captcha types. */
+        displayModePanel = new MigPanel("ins 0", "[][][]", "[]");
+        SwingUtils.setOpaque(displayModePanel, false);
+        final JRadioButton supportedOnlyRadio = new JRadioButton(_GUI.T.CaptchaTypesTable_displayMode_supportedOnly(), showOnlySupportedCaptchaTypes);
+        final JRadioButton allRadio = new JRadioButton(_GUI.T.CaptchaTypesTable_displayMode_all(), !showOnlySupportedCaptchaTypes);
+        supportedOnlyRadio.setOpaque(false);
+        allRadio.setOpaque(false);
+        final ButtonGroup displayModeGroup = new ButtonGroup();
+        displayModeGroup.add(supportedOnlyRadio);
+        displayModeGroup.add(allRadio);
+        supportedOnlyRadio.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(final ActionEvent e) {
+                setShowOnlySupportedCaptchaTypes(true);
+            }
+        });
+        allRadio.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(final ActionEvent e) {
+                setShowOnlySupportedCaptchaTypes(false);
+            }
+        });
+        displayModePanel.add(new JLabel(_GUI.T.CaptchaTypesTable_displayMode()));
+        displayModePanel.add(supportedOnlyRadio);
+        displayModePanel.add(allRadio);
+        displayModePanel.setVisible(false);
+        add(displayModePanel, "gaptop 6, wrap");
         // Detail table, initially hidden
         detailScrollPane = new JScrollPane();
         /* Never scroll: the detail table is always shown at full size (all rows). */
@@ -70,14 +112,21 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
         /* Config panel of the selected solver, shown below the "Settings" header. */
         configScrollPane = new JScrollPane();
         configScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        /*
+         * Like the two scroll panes above, this one is sized to show its content in full, so it never needs its own scrollbar; forward the
+         * mouse wheel to the surrounding scroll pane so scrolling keeps working while the mouse is over the solver's settings panel.
+         */
+        passMouseWheelToParent(configScrollPane);
         configScrollPane.setVisible(false);
         add(configScrollPane, "gaptop 6, growx");
         urlOrder.setSelectionListener(new SolverOrderTable.SelectionListener() {
             @Override
             public void onSolverSelected(SolverService solver) {
+                selectedSolver = solver;
                 if (solver == null) {
                     detailLabel.setVisible(false);
                     descriptionLabel.setVisible(false);
+                    displayModePanel.setVisible(false);
                     limitsLabel.setVisible(false);
                     settingsLabel.setVisible(false);
                     detailScrollPane.setVisible(false);
@@ -105,17 +154,8 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
                     /* Settings header below the table names the selected solver, e.g. "9kw.eu Settings". */
                     settingsLabel.setText(solver.getName() + " Settings");
                     settingsLabel.setVisible(true);
-                    // Build detail table from a no-account builder
-                    final CaptchaSolverCaptchaTypesSettingsPanelBuilder builder = new CaptchaSolverCaptchaTypesSettingsPanelBuilder(new SolverServiceCaptchaTypeAccessor(solver));
-                    detailTable = builder.getCaptchaTypesTable();
-                    /* Size the scroll pane to fit header plus all rows so every row is shown without a scrollbar. */
-                    final int fullHeight = detailTableFullHeight();
-                    final Dimension fullSize = new Dimension(detailTable.getPreferredSize().width, fullHeight);
-                    detailTable.setPreferredScrollableViewportSize(new Dimension(detailTable.getPreferredSize().width, detailTable.getPreferredSize().height));
-                    detailScrollPane.setViewportView(detailTable);
-                    detailScrollPane.setPreferredSize(fullSize);
-                    detailScrollPane.setMinimumSize(fullSize);
-                    detailScrollPane.setVisible(true);
+                    displayModePanel.setVisible(true);
+                    buildDetailTable(solver);
                     /*
                      * Server-side limits info line: only meaningful for plugin-based (account) solvers, which are the only ones that
                      * implement getServerSideMaxSimultaneousCaptchaThreadsLimit()/getServerSideMaxPollingTimeoutMillis().
@@ -126,7 +166,7 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
                         final long maxPollingMillis = pluginSolver.getServerSideMaxPollingTimeoutMillis();
                         final String maxThreadsText = maxThreads == Integer.MAX_VALUE ? "~" : String.valueOf(maxThreads);
                         final String maxPollingText = maxPollingMillis == Long.MAX_VALUE ? "~" : String.valueOf(maxPollingMillis / 1000L);
-                        limitsLabel.setText("<html>Max concurrent captcha threads: " + maxThreadsText + "<br>Server side max polling time: " + maxPollingText + "s</html>");
+                        limitsLabel.setText("<html>Max concurrent captcha threads per account: " + maxThreadsText + "<br>Server side max polling time: " + maxPollingText + "s</html>");
                         limitsLabel.setVisible(true);
                     } else {
                         limitsLabel.setVisible(false);
@@ -146,14 +186,52 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
                     configScrollPane.setViewportView(configComponent);
                     configScrollPane.setVisible(true);
                 }
-                revalidate();
-                repaint();
-                if (getParent() != null) {
-                    getParent().revalidate();
-                    getParent().repaint();
-                }
+                refreshLayout();
             }
         });
+    }
+
+    /**
+     * Builds the captcha types table of the given solver for the current display mode (see {@link #showOnlySupportedCaptchaTypes}) and
+     * shows it, sized to fit.
+     */
+    private void buildDetailTable(final SolverService solver) {
+        // Build detail table from a no-account builder
+        final CaptchaSolverCaptchaTypesSettingsPanelBuilder builder = new CaptchaSolverCaptchaTypesSettingsPanelBuilder(new SolverServiceCaptchaTypeAccessor(solver), showOnlySupportedCaptchaTypes);
+        detailTable = builder.getCaptchaTypesTable();
+        /* Size the scroll pane to fit header plus all rows so every row is shown without a scrollbar. */
+        final int fullHeight = detailTableFullHeight();
+        final Dimension fullSize = new Dimension(detailTable.getPreferredSize().width, fullHeight);
+        detailTable.setPreferredScrollableViewportSize(new Dimension(detailTable.getPreferredSize().width, detailTable.getPreferredSize().height));
+        detailScrollPane.setViewportView(detailTable);
+        detailScrollPane.setPreferredSize(fullSize);
+        detailScrollPane.setMinimumSize(fullSize);
+        detailScrollPane.setVisible(true);
+    }
+
+    /**
+     * Switches the display mode of the captcha types table. The mode is global: it stays the same when another solver gets selected. The
+     * table of the currently selected solver (if any) is rebuilt, since its row count and with it the height reserved in
+     * {@link #getConstraints()} change.
+     */
+    private void setShowOnlySupportedCaptchaTypes(final boolean showOnlySupported) {
+        if (this.showOnlySupportedCaptchaTypes == showOnlySupported) {
+            return;
+        }
+        this.showOnlySupportedCaptchaTypes = showOnlySupported;
+        if (selectedSolver != null) {
+            buildDetailTable(selectedSolver);
+            refreshLayout();
+        }
+    }
+
+    private void refreshLayout() {
+        revalidate();
+        repaint();
+        if (getParent() != null) {
+            getParent().revalidate();
+            getParent().repaint();
+        }
     }
 
     /**
@@ -206,6 +284,10 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
             height += 15 + detailLabel.getPreferredSize().height;
             if (descriptionLabel.isVisible()) {
                 height += descriptionLabel.getPreferredSize().height;
+            }
+            if (displayModePanel.isVisible()) {
+                /* gaptop 6 above the "Table display mode" switch. */
+                height += 6 + displayModePanel.getPreferredSize().height;
             }
             /* gaptop 6 above the captcha-types table. */
             height += 6 + detailTableFullHeight();

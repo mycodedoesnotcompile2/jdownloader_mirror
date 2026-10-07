@@ -42,7 +42,7 @@ import jd.plugins.PluginException;
  * Docs: https://api.captchas.io/document/#/methods <br>
  * Formerly known as captchasolutions.com
  */
-@HostPlugin(revision = "$Revision: 53502 $", interfaceVersion = 3, names = { "captchas.io" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53529 $", interfaceVersion = 3, names = { "captchas.io" }, urls = { "" })
 public class PluginForCaptchaSolverCaptchasIo extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -240,7 +240,12 @@ public class PluginForCaptchaSolverCaptchasIo extends abstractPluginForCaptchaSo
             final long wait = 1 * 60 * 1000;
             throw new AccountUnavailableException(msg, wait);
         }
-        final int status = ((Number) entries.get("status")).intValue();
+        final Object statusO = entries.get("status");
+        if (statusO == null) {
+            /* A null status means "no error", see e.g. response {"status":null,"request":"10"}. */
+            return entries;
+        }
+        final int status = ((Number) statusO).intValue();
         if (status == 1) {
             /* No error */
             return entries;

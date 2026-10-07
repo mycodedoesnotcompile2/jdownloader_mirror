@@ -58,6 +58,7 @@ public class WeisjJSVGFactory implements SVGFactory {
             }
             return SUPPORTED;
         } catch (ClassNotFoundException e) {
+            org.appwork.loggingv3.LogV3.log(e);
             SUPPORTED = false;
             return false;
         }

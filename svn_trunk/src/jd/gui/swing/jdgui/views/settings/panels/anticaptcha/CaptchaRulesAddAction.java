@@ -27,7 +27,25 @@ public class CaptchaRulesAddAction extends AbstractAddAction {
 
     @Override
     public void actionPerformed(final ActionEvent e) {
-        final List<SolverService> services = new ArrayList<SolverService>(ChallengeResponseController.getInstance().listServices());
+        /*
+         * Only solvers that are usable right now ("Ready") are offered, so the choice is limited to what the user can actually solve with
+         * (e.g. an external solver only shows up once it has a valid account). A rule for a currently unusable solver would have no effect
+         * anyway.
+         */
+        final List<SolverService> allServices = new ArrayList<SolverService>(ChallengeResponseController.getInstance().listServices());
+        final List<SolverService> services = new ArrayList<SolverService>();
+        for (final SolverService service : allServices) {
+            if (service.isReady()) {
+                services.add(service);
+            }
+        }
+        if (services.isEmpty()) {
+            /*
+             * Special case: not a single solver is ready right now. Rather than offering nothing, fall back to listing all solvers, so the
+             * user can still create a rule (e.g. in advance for a solver they are about to set up).
+             */
+            services.addAll(allServices);
+        }
         if (services.isEmpty()) {
             Dialog.getInstance().showErrorDialog(_GUI.T.CaptchaRules_add_no_solver());
             return;

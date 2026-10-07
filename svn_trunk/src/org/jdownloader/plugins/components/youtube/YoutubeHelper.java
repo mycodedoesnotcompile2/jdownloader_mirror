@@ -14,8 +14,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -37,23 +35,6 @@ import javax.xml.datatype.XMLGregorianCalendar;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
-
-import jd.controlling.AccountController;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.Request;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.http.requests.PostRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.DownloadLink;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
@@ -124,6 +105,23 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
+import jd.controlling.AccountController;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.http.requests.PostRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.DownloadLink;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
 public class YoutubeHelper {
     private static final String REGEX_DASHMPD_FROM_JSPLAYER_SETUP          = "\"dashmpd\"\\s*:\\s*(\".*?\")";
     private static final String REGEX_ADAPTIVE_FMTS_FROM_JSPLAYER_SETUP    = "\"adaptive_fmts\"\\s*:\\s*(\".*?\")";
@@ -176,20 +174,20 @@ public class YoutubeHelper {
     // public Map<String, YoutubeBasicVariant> getVariantsMap() {
     // return variantsMap;
     // }
-    private static final Map<String, YoutubeReplacer> REPLACER_MAP = new HashMap<String, YoutubeReplacer>();
+    private static final Map<String, YoutubeReplacer> REPLACER_MAP = new LinkedHashMap<String, YoutubeReplacer>();
     public static final List<YoutubeReplacer>         REPLACER     = new ArrayList<YoutubeReplacer>() {
-        @Override
-        public boolean add(final YoutubeReplacer e) {
-            for (final String tag : e.getTags()) {
-                if (REPLACER_MAP.put(tag, e) != null) {
-                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                        throw new WTFException("Duplicate error:" + tag);
-                    }
-                }
-            }
-            return super.add(e);
-        };
-    };
+                                                                       @Override
+                                                                       public boolean add(final YoutubeReplacer e) {
+                                                                           for (final String tag : e.getTags()) {
+                                                                               if (REPLACER_MAP.put(tag, e) != null) {
+                                                                                   if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                                                                                       throw new WTFException("Duplicate error:" + tag);
+                                                                                   }
+                                                                               }
+                                                                           }
+                                                                           return super.add(e);
+                                                                       };
+                                                                   };
 
     public static String applyReplacer(String name, YoutubeHelper helper, DownloadLink link) {
         final Matcher tagMatcher = Pattern.compile("(?i)([A-Z0-9\\_]+)(\\[[^\\]]*\\])?").matcher("");
@@ -1335,23 +1333,23 @@ public class YoutubeHelper {
         private String src;
     }
 
-    private Map<String, Object>      jsCache                 = new HashMap<String, Object>();
-    private HashSet<String>          subtitleUrls;
-    private HashSet<StreamMap>       fmtMaps;
-    private LinkedHashSet<StreamMap> mpdUrls;
-    private Account                  account;
-    private final boolean            hlsEnabled              = true;
-    private final boolean            dashMpdEnabled          = true;
-    private final boolean            adaptiveFmtsEnabled     = true;
-    private final boolean            fmtMapEnabled           = true;
-    private String                   html5PlayerJs;
-    private YoutubeClipData          vid;
-    private String                   playlistID              = null;
-    private Map<String, Object>      ytInitialData;
-    private Map<String, Object>      ytInitialPlayerResponse = null;
-    private Map<String, Object>      ytPlayerConfig;
-    private Map<String, Object>      ytCfgSet;
-    private List<YoutubeStreamData>  playlistThumbnails      = null;
+    private Map<String, Object>     jsCache                 = new LinkedHashMap<String, Object>();
+    private Set<String>             subtitleUrls;
+    private Set<StreamMap>          fmtMaps;
+    private Set<StreamMap>          mpdUrls;
+    private Account                 account;
+    private final boolean           hlsEnabled              = true;
+    private final boolean           dashMpdEnabled          = true;
+    private final boolean           adaptiveFmtsEnabled     = true;
+    private final boolean           fmtMapEnabled           = true;
+    private String                  html5PlayerJs;
+    private YoutubeClipData         vid;
+    private String                  playlistID              = null;
+    private Map<String, Object>     ytInitialData;
+    private Map<String, Object>     ytInitialPlayerResponse = null;
+    private Map<String, Object>     ytPlayerConfig;
+    private Map<String, Object>     ytCfgSet;
+    private List<YoutubeStreamData> playlistThumbnails      = null;
 
     /**
      * @return the ytInitialData
@@ -1421,36 +1419,36 @@ public class YoutubeHelper {
                 function = (String) jsCache.get(functionCacheKey);
                 if (function == null) {
                     find: {
-                    function = new Regex(ensurePlayerSource(), "(?s)[;\n](?:function\\s+|(?:var\\s+)?)([a-zA-Z0-9_$]+)\\s*(?:|=\\s*function\\s*)\\(([a-zA-Z0-9_$]+)\\)\\s*\\{(?:(?![a-zA-Z0-9_$]+=function).)+\\}\\s*catch\\(\\s*[a-zA-Z0-9_$]+\\s*\\)\\s*\\{\\s*return\\s+[a-zA-Z0-9_$]+\\[\\d+\\]\\s*\\+\\s*\\2\\s*\\}\\s*return\\s+[^\\}]+\\}[;\n]").getMatch(-1);
-                    if (function != null) {
-                        break find;
+                        function = new Regex(ensurePlayerSource(), "(?s)[;\n](?:function\\s+|(?:var\\s+)?)([a-zA-Z0-9_$]+)\\s*(?:|=\\s*function\\s*)\\(([a-zA-Z0-9_$]+)\\)\\s*\\{(?:(?![a-zA-Z0-9_$]+=function).)+\\}\\s*catch\\(\\s*[a-zA-Z0-9_$]+\\s*\\)\\s*\\{\\s*return\\s+[a-zA-Z0-9_$]+\\[\\d+\\]\\s*\\+\\s*\\2\\s*\\}\\s*return\\s+[^\\}]+\\}[;\n]").getMatch(-1);
+                        if (function != null) {
+                            break find;
+                        }
+                        function = new Regex(ensurePlayerSource(), "(?s)[;\n](?:function\\s+|(?:var\\s+)?)([a-zA-Z0-9_$]+)\\s*(?:|=\\s*function\\s*)\\(([a-zA-Z0-9_$]+)\\)\\s*\\{(?:(?!\\}[;\n]).)+\\}\\s*catch\\(\\s*[a-zA-Z0-9_$]+\\s*\\)\\s*\\{\\s*return\\s+[a-zA-Z0-9_$]+\\[\\d+\\]\\s*\\+\\s*\\2\\s*\\}\\s*return\\s+[^}]+\\}[;\n]").getMatch(-1);
+                        if (function != null) {
+                            break find;
+                        }
+                        function = new Regex(ensurePlayerSource(), "(=function\\((\\w+)\\)\\{var \\w+\\s*=\\s*\\2\\.split\\(\\2\\.slice\\(0,0\\)\\),\\w+\\s*=\\s*\\[.*?\\};)\n").getMatch(0);
+                        if (function != null) {
+                            break find;
+                        }
+                        function = new Regex(ensurePlayerSource(), "(=function\\(a\\)\\{var b=a\\.split\\(a\\.slice\\(0,0\\)\\),c=\\[.*?\\};)\n").getMatch(0);
+                        if (function != null) {
+                            break find;
+                        }
+                        function = new Regex(ensurePlayerSource(), "(=function\\(a\\)\\{var b=String\\.prototype\\.split\\.call\\(a,\\(\"\"\\,\"\"\\)\\),c=\\[.*?\\};)\n").getMatch(0);
+                        if (function != null) {
+                            break find;
+                        }
+                        function = new Regex(ensurePlayerSource(), "(=function\\(a\\)\\{var b=String\\.prototype\\.split\\.call\\(a,\"\"\\),c=\\[.*?\\};)\n").getMatch(0);
+                        if (function != null) {
+                            break find;
+                        }
+                        function = new Regex(ensurePlayerSource(), "(=function\\(a\\)\\{var b=a\\.split\\(\"\"\\),c=\\[.*?\\};)\n").getMatch(0);
+                        if (function != null) {
+                            break find;
+                        }
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
-                    function = new Regex(ensurePlayerSource(), "(?s)[;\n](?:function\\s+|(?:var\\s+)?)([a-zA-Z0-9_$]+)\\s*(?:|=\\s*function\\s*)\\(([a-zA-Z0-9_$]+)\\)\\s*\\{(?:(?!\\}[;\n]).)+\\}\\s*catch\\(\\s*[a-zA-Z0-9_$]+\\s*\\)\\s*\\{\\s*return\\s+[a-zA-Z0-9_$]+\\[\\d+\\]\\s*\\+\\s*\\2\\s*\\}\\s*return\\s+[^}]+\\}[;\n]").getMatch(-1);
-                    if (function != null) {
-                        break find;
-                    }
-                    function = new Regex(ensurePlayerSource(), "(=function\\((\\w+)\\)\\{var \\w+\\s*=\\s*\\2\\.split\\(\\2\\.slice\\(0,0\\)\\),\\w+\\s*=\\s*\\[.*?\\};)\n").getMatch(0);
-                    if (function != null) {
-                        break find;
-                    }
-                    function = new Regex(ensurePlayerSource(), "(=function\\(a\\)\\{var b=a\\.split\\(a\\.slice\\(0,0\\)\\),c=\\[.*?\\};)\n").getMatch(0);
-                    if (function != null) {
-                        break find;
-                    }
-                    function = new Regex(ensurePlayerSource(), "(=function\\(a\\)\\{var b=String\\.prototype\\.split\\.call\\(a,\\(\"\"\\,\"\"\\)\\),c=\\[.*?\\};)\n").getMatch(0);
-                    if (function != null) {
-                        break find;
-                    }
-                    function = new Regex(ensurePlayerSource(), "(=function\\(a\\)\\{var b=String\\.prototype\\.split\\.call\\(a,\"\"\\),c=\\[.*?\\};)\n").getMatch(0);
-                    if (function != null) {
-                        break find;
-                    }
-                    function = new Regex(ensurePlayerSource(), "(=function\\(a\\)\\{var b=a\\.split\\(\"\"\\),c=\\[.*?\\};)\n").getMatch(0);
-                    if (function != null) {
-                        break find;
-                    }
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
                 }
                 final String varName = new Regex(function, "=function\\((\\w+)\\)").getMatch(0);
                 function = function.replaceAll("if\\s*\\(typeof\\s*[^=]*+\\s*===\\s*(?:\\\"undefined\\\"|[^\\[\\(\\) ]+\\[\\d+\\])\\)\\s*return\\s*" + Pattern.quote(varName) + "\\s*;", "");
@@ -1469,7 +1467,7 @@ public class YoutubeHelper {
                     return trusted;
                 }
             };
-            final Map<String, String> additionalMap = new HashMap<String, String>();
+            final Map<String, String> additionalMap = new LinkedHashMap<String, String>();
             synchronized (jsCache) {
                 final Map<String, String> cachedAdditionalMap = (Map<String, String>) jsCache.get(functionCacheKey + "_additional");
                 if (cachedAdditionalMap != null) {
@@ -1498,7 +1496,7 @@ public class YoutubeHelper {
                             throw new Exception("Invalid result:" + result);
                         } else {
                             synchronized (jsCache) {
-                                jsCache.put(functionCacheKey + "_additional", new HashMap<String, String>(additionalMap));
+                                jsCache.put(functionCacheKey + "_additional", new LinkedHashMap<String, String>(additionalMap));
                                 jsCache.put(resultCacheKey, output);
                             }
                             break;
@@ -1580,52 +1578,52 @@ public class YoutubeHelper {
             descrambler = (String) jsCache.get(resultCacheKey + "descrambler");
             if (descrambler == null) {
                 find: {
-                descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)&&\\(\\1\\s*=\\s*([a-zA-Z0-9_$]{2,})\\(decodeURIComponent\\(\\1\\)\\)").getMatch(1);
-                if (descrambler != null) {
-                    break find;
+                    descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)&&\\(\\1\\s*=\\s*([a-zA-Z0-9_$]{2,})\\(decodeURIComponent\\(\\1\\)\\)").getMatch(1);
+                    if (descrambler != null) {
+                        break find;
+                    }
+                    descrambler = new Regex(ensurePlayerSource(), "\"signature\"\\s*,\\s*([\\$\\w]+)\\([\\$\\w\\.]+\\s*\\)\\s*\\)(\\s*\\)\\s*){0,};").getMatch(0);
+                    if (descrambler != null) {
+                        break find;
+                    }
+                    descrambler = new Regex(ensurePlayerSource(), "(?:^|[^a-zA-Z0-9_$])([a-zA-Z0-9_$]{2})\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\(\"\"\\)").getMatch(0);
+                    if (descrambler != null) {
+                        break find;
+                    }
+                    descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\(\"\"\\)").getMatch(0);
+                    if (descrambler != null) {
+                        break find;
+                    }
+                    descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\((\"\"|\\w+\\[\\d+\\])\\)").getMatch(0);
+                    if (descrambler != null) {
+                        break find;
+                    }
+                    descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)\\s*=\\s*function\\((\\w+)\\)\\{[^=]+=\\s*\\2\\.split\\((\"\"|\\w+\\[\\d+\\]|\\2\\.)").getMatch(0);
+                    if (descrambler != null) {
+                        break find;
+                    }
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                descrambler = new Regex(ensurePlayerSource(), "\"signature\"\\s*,\\s*([\\$\\w]+)\\([\\$\\w\\.]+\\s*\\)\\s*\\)(\\s*\\)\\s*){0,};").getMatch(0);
-                if (descrambler != null) {
-                    break find;
+                logger.info("FunctionName:" + descrambler);
+                final String func = "(?<!\\.)" + Pattern.quote(descrambler) + "\\s*=\\s*function\\(([^)]+)\\)\\{(.+?return.*?)\\};";
+                final String des = new Regex(ensurePlayerSource(), Pattern.compile(func, Pattern.DOTALL)).getMatch(1);
+                all = new Regex(ensurePlayerSource(), Pattern.compile(func, Pattern.DOTALL)).getMatch(-1);
+                logger.info("Function:" + all);
+                if (all == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                descrambler = new Regex(ensurePlayerSource(), "(?:^|[^a-zA-Z0-9_$])([a-zA-Z0-9_$]{2})\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\(\"\"\\)").getMatch(0);
-                if (descrambler != null) {
-                    break find;
+                final String requiredObjectName = new Regex(des, "([\\w\\d\\$]+)\\.([\\w\\d]{2})\\(").getMatch(0);
+                if (requiredObjectName != null) {
+                    final String requiredObject = new Regex(ensurePlayerSource(), Pattern.compile("var " + Pattern.quote(requiredObjectName) + "=\\{.*?\\}\\};", Pattern.DOTALL)).getMatch(-1);
+                    if (requiredObject == null) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Missing object:" + requiredObject);
+                    }
+                    all += requiredObject;
                 }
-                descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\(\"\"\\)").getMatch(0);
-                if (descrambler != null) {
-                    break find;
-                }
-                descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\((\"\"|\\w+\\[\\d+\\])\\)").getMatch(0);
-                if (descrambler != null) {
-                    break find;
-                }
-                descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)\\s*=\\s*function\\((\\w+)\\)\\{[^=]+=\\s*\\2\\.split\\((\"\"|\\w+\\[\\d+\\]|\\2\\.)").getMatch(0);
-                if (descrambler != null) {
-                    break find;
-                }
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            logger.info("FunctionName:" + descrambler);
-            final String func = "(?<!\\.)" + Pattern.quote(descrambler) + "\\s*=\\s*function\\(([^)]+)\\)\\{(.+?return.*?)\\};";
-            final String des = new Regex(ensurePlayerSource(), Pattern.compile(func, Pattern.DOTALL)).getMatch(1);
-            all = new Regex(ensurePlayerSource(), Pattern.compile(func, Pattern.DOTALL)).getMatch(-1);
-            logger.info("Function:" + all);
-            if (all == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            final String requiredObjectName = new Regex(des, "([\\w\\d\\$]+)\\.([\\w\\d]{2})\\(").getMatch(0);
-            if (requiredObjectName != null) {
-                final String requiredObject = new Regex(ensurePlayerSource(), Pattern.compile("var " + Pattern.quote(requiredObjectName) + "=\\{.*?\\}\\};", Pattern.DOTALL)).getMatch(-1);
-                if (requiredObject == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Missing object:" + requiredObject);
-                }
-                all += requiredObject;
-            }
-            all += ";";
-            logger.info("Complete Function:" + all);
-            jsCache.put(resultCacheKey + "all", all);
-            jsCache.put(resultCacheKey + "descrambler", descrambler);
+                all += ";";
+                logger.info("Complete Function:" + all);
+                jsCache.put(resultCacheKey + "all", all);
+                jsCache.put(resultCacheKey + "descrambler", descrambler);
             }
         }
         while (true) {
@@ -1697,7 +1695,7 @@ public class YoutubeHelper {
         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
 
-    private static final Map<String, String> PLAYERJS_CACHE = new HashMap<String, String>();
+    private static final Map<String, String> PLAYERJS_CACHE = new LinkedHashMap<String, String>();
 
     private String ensurePlayerSource() throws IOException {
         final String html5PlayerJs = this.html5PlayerJs;
@@ -1708,7 +1706,10 @@ public class YoutubeHelper {
         synchronized (PLAYERJS_CACHE) {
             String ret = PLAYERJS_CACHE.get(key);
             if (ret == null) {
-                ret = br.cloneBrowser().getPage(html5PlayerJs);
+                Browser brc = br.cloneBrowser();
+                brc.setDebug(true);
+                brc.setVerbose(false);
+                ret = brc.getPage(html5PlayerJs);
                 PLAYERJS_CACHE.put(key, ret);
             }
             return ret;
@@ -2399,12 +2400,12 @@ public class YoutubeHelper {
         return false;
     }
 
-    protected Map<String, List<YoutubeStreamData>> streamDataCache = new HashMap<String, List<YoutubeStreamData>>();
+    protected Map<String, List<YoutubeStreamData>> streamDataCache = new LinkedHashMap<String, List<YoutubeStreamData>>();
 
     public void refreshVideo(final YoutubeClipData vid) throws Exception {
         account = login(logger, false);
         this.vid = vid;
-        final Map<YoutubeITAG, StreamCollection> ret = new HashMap<YoutubeITAG, StreamCollection>();
+        final Map<YoutubeITAG, StreamCollection> ret = new LinkedHashMap<YoutubeITAG, StreamCollection>();
         final YoutubeConfig cfg = PluginJsonConfig.get(YoutubeConfig.class);
         br.setFollowRedirects(true);
         /* this cookie makes html5 available and skip controversy check */
@@ -2423,14 +2424,14 @@ public class YoutubeHelper {
         }
         vid.approxThreedLayout = br.getRegex("\"approx_threed_layout\"\\s*\\:\\s*\"([^\"]*)").getMatch(0);
         String[][] keyWordsGrid = br.getRegex("<meta\\s+property=\"([^\"]*)\"\\s+content=\"yt3d\\:([^\"]+)=([^\"]+)\">").getMatches();
-        vid.keywords3D = new HashMap<String, String>();
+        vid.keywords3D = new LinkedHashMap<String, String>();
         if (keyWordsGrid != null) {
             for (String[] keyValue : keyWordsGrid) {
                 vid.keywords3D.put(keyValue[1], keyValue[2]);
             }
         }
         String keywords = br.getRegex("<meta name=\"keywords\" content=\"([^\"]*)").getMatch(0);
-        vid.keywords = new HashSet<String>();
+        vid.keywords = new LinkedHashSet<String>();
         if (keywords != null) {
             for (String s : keywords.split("[,]+")) {
                 vid.keywords.add(s);
@@ -2461,7 +2462,6 @@ public class YoutubeHelper {
             } catch (AccountRequiredException e) {
                 logger.log(e);
             }
-
         }
         if (collected <= 0) {
             collected = collectMapsFromPlayerResponse(map, br.getURL());
@@ -2999,7 +2999,7 @@ public class YoutubeHelper {
      * @throws PluginException
      */
     public YoutubeStreamData convert(final UrlQuery query, final String src) throws PluginException {
-        final Map<String, Object> qualityMap = new HashMap<String, Object>();
+        final Map<String, Object> qualityMap = new LinkedHashMap<String, Object>();
         for (final Entry<String, String> es : query.toMap(true).entrySet()) {
             qualityMap.put(es.getKey(), es.getValue());
         }
@@ -4053,7 +4053,7 @@ public class YoutubeHelper {
             }
         }
         if (defaultLanguage != null) {
-            final Set<Locale> autoTranslatedSubtitlesSet = new HashSet<Locale>();
+            final Set<Locale> autoTranslatedSubtitlesSet = new LinkedHashSet<Locale>();
             final List<String> autoTranslatedSubtitles = CFG_YOUTUBE.CFG.getAutoTranslatedSubtitles();
             if (autoTranslatedSubtitles != null && autoTranslatedSubtitles.size() > 0) {
                 for (String autoTranslatedSubtitle : autoTranslatedSubtitles) {
@@ -4369,7 +4369,7 @@ public class YoutubeHelper {
             // there are many of these on the page
             final String ytcfgSet[] = br.getRegex("ytcfg\\.set\\((\\{.*?\\})\\);").getColumn(0);
             if (ytcfgSet != null) {
-                final Map<String, Object> set = new HashMap<String, Object>();
+                final Map<String, Object> set = new LinkedHashMap<String, Object>();
                 for (final String ytcfg : ytcfgSet) {
                     final Map<String, Object> map = jsonToJavaMap(ytcfg, false);
                     if (map != null && map.size() > 0) {

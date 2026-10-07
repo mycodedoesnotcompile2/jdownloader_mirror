@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.appwork.exceptions.WTFException;
+import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.logging2.LogInterface;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.CaptchaSolverCaptchaTypesSettingsPanelBuilder.AccountCaptchaTypeAccessor;
@@ -175,9 +176,10 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
     }
 
     /**
-     * Returns the maximum number of captchas this solver service itself allows to be solved simultaneously, as enforced server-side by the
-     * service (not to be confused with the user's own local JDownloader setting, {@link CaptchaSolverConfigV3#getMaxSimultaneousCaptchas()}).
-     * May depend on the given account (e.g. plan/tier-based limits), but does not have to. <br>
+     * Returns the maximum number of captchas this solver service itself allows to be solved simultaneously <b>per account</b>, as enforced
+     * server-side by the service (not to be confused with the user's own local JDownloader setting, which applies to the solver as a
+     * whole: {@link CaptchaSolverConfigV3#getMaxSimultaneousCaptchas()}). May depend on the given account (e.g. plan/tier-based limits),
+     * but does not have to. <br>
      * {@link Integer#MAX_VALUE} = unlimited/unknown (default, no server-side limit documented for this service).
      */
     public int getServerSideMaxSimultaneousCaptchaThreadsLimit(final Account account) {
@@ -238,7 +240,16 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
         final long intervalMillis = getPollingIntervalMillis(account);
         final long elapsedMillis = System.currentTimeMillis() - challenge.getCreated();
         final long approximateAttempt = intervalMillis > 0 ? elapsedMillis / intervalMillis + 1 : 1;
-        getLogger().info("Captcha polling attempt #" + approximateAttempt + ", elapsed " + elapsedMillis + "ms, interval " + intervalMillis + "ms");
+        final long maxMillis = new PluginChallengeSolver<Object>(this, account).getFinalTimeoutMillis();
+        final StringBuilder sb = new StringBuilder();
+        sb.append("Captcha polling attempt #").append(approximateAttempt);
+        sb.append(", elapsed ").append(TimeFormatter.formatMilliSeconds(elapsedMillis, 0));
+        if (maxMillis > 0) {
+            sb.append(" of max ").append(TimeFormatter.formatMilliSeconds(maxMillis, 0));
+            sb.append(" (").append(Math.min(100, elapsedMillis * 100 / maxMillis)).append("%)");
+        }
+        sb.append(", interval ").append(TimeFormatter.formatMilliSeconds(intervalMillis, 0));
+        getLogger().info(sb.toString());
         long remainingMillis = intervalMillis;
         while (remainingMillis > 0) {
             Thread.sleep(Math.min(1000L, remainingMillis));

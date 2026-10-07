@@ -11,8 +11,9 @@ import java.awt.event.MouseListener;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import javax.swing.Icon;
 import javax.swing.JComponent;
@@ -66,12 +67,10 @@ import jd.plugins.PluginConfigPanelNG;
 import net.miginfocom.swing.MigLayout;
 
 public class YoutubeVariantsListChooser extends AbstractDialog<Object> implements KeyListener, ListSelectionListener, MouseListener {
-
     protected CustomVariantsMapTable table;
 
     @Override
     public void mouseReleased(MouseEvent e) {
-
     }
 
     @Override
@@ -81,7 +80,6 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
 
     @Override
     public void valueChanged(ListSelectionEvent e) {
-
     }
 
     @Override
@@ -90,24 +88,19 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
     }
 
     protected AbstractVariantWrapper            selectedVariant;
-
-    private HashSet<VariantGroup>               allowedGroups;
-    private HashSet<FileContainer>              allowedFileTypes;
-    private HashSet<Projection>                 allowedProjections;
-    private HashSet<VideoResolution>            allowedResolutions;
-    private HashSet<VideoFrameRate>             allowedFps;
-    private HashSet<VideoCodec>                 allowedVCodec;
-    private HashSet<AudioCodec>                 allowedACodec;
-    protected HashSet<AudioBitrate>             allowedABitrate;
+    private Set<VariantGroup>                   allowedGroups;
+    private Set<FileContainer>                  allowedFileTypes;
+    private Set<Projection>                     allowedProjections;
+    private Set<VideoResolution>                allowedResolutions;
+    private Set<VideoFrameRate>                 allowedFps;
+    private Set<VideoCodec>                     allowedVCodec;
+    private Set<AudioCodec>                     allowedACodec;
+    protected Set<AudioBitrate>                 allowedABitrate;
     protected ArrayList<AbstractVariantWrapper> variantWrapperList;
-
     private List<AbstractVariant>               variants;
-
     private YoutubeVariantCollection            collection;
-
-    private HashSet<AbstractVariantWrapper>     defaultSelection;
-
-    private HashSet<AbstractVariantWrapper>     selection;
+    private Set<AbstractVariantWrapper>         defaultSelection;
+    private Set<AbstractVariantWrapper>         selection;
 
     @Override
     public ModalityType getModalityType() {
@@ -115,16 +108,13 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
     }
 
     public YoutubeVariantsListChooser(YoutubeVariantCollection collection) {
-
         super(Dialog.STYLE_HIDE_ICON, _GUI.T.youtube_choose_quick_selection_dropdown_table(collection.getName()), null, _GUI.T.lit_save(), null);
         setDimensor(new RememberLastDialogDimension("YoutubeVariantsListChooser"));
         setLocator(new RememberRelativeDialogLocator("YoutubeVariantsListChooser", JDGui.getInstance().getMainFrame()));
         this.collection = collection;
-
         initVariants();
-        defaultSelection = new HashSet<AbstractVariantWrapper>();
-
-        HashSet<String> idSet = collection.createUniqueIDSet();
+        defaultSelection = new LinkedHashSet<AbstractVariantWrapper>();
+        Set<String> idSet = collection.createUniqueIDSet();
         for (AbstractVariantWrapper v : variantWrapperList) {
             String id = v.getVariableIDStorable().createUniqueID();
             if (idSet.contains(id)) {
@@ -134,31 +124,24 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
             } else if (StringUtils.equals(v.getVariableIDStorable().createGroupingID(), collection.getGroupingID())) {
                 defaultSelection.add(v);
             }
-
         }
-
-        selection = new HashSet<AbstractVariantWrapper>();
+        selection = new LinkedHashSet<AbstractVariantWrapper>();
         if (collection.getDropdown() != null && collection.getDropdown().size() > 0) {
             idSet = collection.createUniqueIDSetForDropDownList();
             for (AbstractVariantWrapper v : variantWrapperList) {
-
                 String id = v.getVariableIDStorable().createUniqueID();
-
                 if (idSet.contains(id)) {
                     selection.add(v);
                 }
-
             }
-
         }
         if (selection.size() == 0) {
             selection.addAll(defaultSelection);
         }
-
     }
 
     public List<VariantIDStorable> getSelection() {
-        HashSet<AbstractVariantWrapper> checkChanges = new HashSet<AbstractVariantWrapper>(defaultSelection);
+        Set<AbstractVariantWrapper> checkChanges = new LinkedHashSet<AbstractVariantWrapper>(defaultSelection);
         if (defaultSelection.size() == selection.size()) {
             checkChanges.removeAll(selection);
             if (checkChanges.size() == 0) {
@@ -176,29 +159,23 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
     protected void initVariants() {
         List<String> dupe = new ArrayList<String>();
         variants = new ArrayList<AbstractVariant>(AbstractVariant.listVariants());
-
         Collections.sort(variants);
-
         variantWrapperList = new ArrayList<AbstractVariantWrapper>();
-
-        allowedGroups = new HashSet<VariantGroup>();
-        allowedFileTypes = new HashSet<FileContainer>();
-        allowedProjections = new HashSet<Projection>();
-        allowedResolutions = new HashSet<VideoResolution>();
-        allowedFps = new HashSet<VideoFrameRate>();
-        allowedVCodec = new HashSet<VideoCodec>();
-        allowedACodec = new HashSet<AudioCodec>();
-        allowedABitrate = new HashSet<AudioBitrate>();
-
+        allowedGroups = new LinkedHashSet<VariantGroup>();
+        allowedFileTypes = new LinkedHashSet<FileContainer>();
+        allowedProjections = new LinkedHashSet<Projection>();
+        allowedResolutions = new LinkedHashSet<VideoResolution>();
+        allowedFps = new LinkedHashSet<VideoFrameRate>();
+        allowedVCodec = new LinkedHashSet<VideoCodec>();
+        allowedACodec = new LinkedHashSet<AudioCodec>();
+        allowedABitrate = new LinkedHashSet<AudioBitrate>();
         allowedGroups.addAll(Arrays.asList(VariantGroup.values()));
-
         for (AbstractVariant vi : variants) {
             if (allowedGroups.contains(vi.getGroup())) {
                 VariantIDStorable stor = new VariantIDStorable(vi);
                 if (dupe.add(stor.createUniqueID())) {
                     AbstractVariantWrapper avw;
                     variantWrapperList.add(avw = new AbstractVariantWrapper(vi));
-
                     allowedFileTypes.add(vi.getContainer());
                     if (vi instanceof VideoVariant) {
                         VideoVariant vVar = (VideoVariant) vi;
@@ -217,7 +194,6 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
                         allowedResolutions.add(VideoResolution.getByHeight(iVar.getHeight()));
                     }
                 }
-
             }
         }
     }
@@ -229,7 +205,6 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
     @Override
     public JComponent layoutDialogContent() {
         PluginConfigPanelNG ret = new PluginConfigPanelNG() {
-
             @Override
             public void reset() {
             }
@@ -241,26 +216,19 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
             @Override
             public void updateContents() {
             }
-
         };
-
         int height = new JLabel("Test").getPreferredSize().height;
         ret.setLayout(new MigLayout("ins 0, wrap 2", "[][grow,fill]", "[]"));
         CustomVariantsMapTableModel model = createTableModel();
         table = createTable(model);
         JScrollPane sp;
-
         table.getSelectionModel().setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
-
         ret.addDescriptionPlain(getDescriptionText());
         //
-
         addFilter(ret);
-
         //
         table.load();
         ret.add(sp = new JScrollPane(table), "pushx,growx,spanx,pushy,growy");
-
         table.getSelectionModel().addListSelectionListener(this);
         table.addKeyListener(this);
         table.addMouseListener(this);
@@ -269,7 +237,6 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
         // table.getModel().setSelectedObject(current);
         // table.scrollToSelection(0);
         // }
-
         return ret;
     }
 
@@ -289,12 +256,9 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
                         for (AbstractVariantWrapper w : s) {
                             selection.add(w);
                         }
-
                         table.getModel().refreshSort();
                     }
-
                 });
-
                 popup.add(new AppAction() {
                     {
                         setSmallIcon(new CheckBoxIcon(false));
@@ -308,12 +272,10 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
                         }
                         table.getModel().refreshSort();
                     }
-
                 });
                 return popup;
             }
         };
-
     }
 
     protected CustomVariantsMapTableModel createTableModel() {
@@ -321,9 +283,7 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
             @Override
             protected void initColumns() {
                 addColumn(new ExtCheckColumn<AbstractVariantWrapper>("") {
-
                     public ExtTableHeaderRenderer getHeaderRenderer(final JTableHeader jTableHeader) {
-
                         final ExtTableHeaderRenderer ret = new ExtTableHeaderRenderer(this, jTableHeader) {
                             private final Icon ok = NewTheme.I().getIcon(IconKey.ICON_OK, 14);
 
@@ -335,15 +295,12 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
                                 setText(null);
                                 return this;
                             }
-
                         };
-
                         return ret;
                     }
 
                     @Override
                     public int getMaxWidth() {
-
                         return 30;
                     }
 
@@ -373,15 +330,12 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
     }
 
     protected String getDescriptionText() {
-
         return _GUI.T.youtube_choose_dropdown_list();
-
     }
 
     private class CustEnumMultiComboBox<T> extends EnumMultiComboBox<T> implements Filter {
-
-        private T[]        allValues;
-        private HashSet<T> set = new HashSet<T>();
+        private T[]    allValues;
+        private Set<T> set = new LinkedHashSet<T>();
 
         public CustEnumMultiComboBox(T[] allValues, List<T> values, ObjectKeyHandler keyHandler) {
             super(values, keyHandler, true);
@@ -400,7 +354,6 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
 
         @Override
         protected void loadValuesFromKeyHandler() {
-
             ArrayList<T> selected = new ArrayList<T>(getValues());
             List<T> blacklisted = (List<T>) keyHandler.getValue();
             if (blacklisted != null) {
@@ -412,7 +365,6 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
         @Override
         protected void saveValuesToKeyHandler() {
             List<T> selected = getSelectedItems();
-
             ArrayList<T> all = new ArrayList<T>(Arrays.asList(allValues));
             all.removeAll(selected);
             keyHandler.setValue(all);
@@ -420,9 +372,8 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
 
         @Override
         public void onChanged() {
-            set = new HashSet<T>(selectedItems);
+            set = new LinkedHashSet<T>(selectedItems);
             super.onChanged();
-
         }
 
         @Override
@@ -430,63 +381,44 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
             if (allValues[0] instanceof VariantGroup) {
                 return !set.contains(variant.getGroup());
             }
-
             if (allValues[0] instanceof FileContainer) {
                 return !set.contains(variant.getContainer());
             }
             if (variant instanceof AudioInterface) {
                 if (allValues[0] instanceof AudioCodec) {
-
                     return !set.contains(((AudioInterface) variant).getAudioCodec());
-
                 }
-
                 if (allValues[0] instanceof AudioBitrate) {
-
                     return !set.contains(((AudioInterface) variant).getAudioBitrate());
                 }
-
             }
-
             if (variant instanceof VideoVariant) {
                 if (allValues[0] instanceof VideoCodec) {
-
                     return !set.contains(((VideoVariant) variant).getVideoCodec());
-
                 }
                 if (allValues[0] instanceof VideoFrameRate) {
-
                     return !set.contains(((VideoVariant) variant).getiTagVideo().getVideoFrameRate());
-
                 }
                 if (allValues[0] instanceof Projection) {
-
                     return !set.contains(((VideoVariant) variant).getProjection());
-
                 }
                 if (allValues[0] instanceof VideoResolution) {
-
                     return !set.contains(((VideoVariant) variant).getVideoResolution());
-
                 }
             }
             if (variant instanceof ImageVariant) {
                 if (allValues[0] instanceof VideoResolution) {
-
                     return !set.contains(VideoResolution.getByHeight(((ImageVariant) variant).getHeight()));
-
                 }
             }
             return false;
         }
-
     }
 
     private void addFilter(PluginConfigPanelNG ret) {
         List<VariantGroup> groups = new ArrayList<VariantGroup>(allowedGroups);
         Collections.sort(groups, LabelInterface.COMPARATOR_ASC);
         CustEnumMultiComboBox<VariantGroup> typeSel = new CustEnumMultiComboBox<VariantGroup>(VariantGroup.values(), groups, CFG_YOUTUBE.CHOOSE_VARIANT_DIALOG_BLACKLISTED_GROUPS);
-
         List<FileContainer> container = new ArrayList<FileContainer>(allowedFileTypes);
         Collections.sort(container, LabelInterface.COMPARATOR_ASC);
         CustEnumMultiComboBox<FileContainer> containerSel = new CustEnumMultiComboBox<FileContainer>(FileContainer.values(), container, CFG_YOUTUBE.CHOOSE_VARIANT_DIALOG_BLACKLISTED_FILE_CONTAINERS) {
@@ -503,15 +435,12 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
                 return sc.getTooltip();
             }
         };
-
         List<VideoResolution> heights = new ArrayList<VideoResolution>(allowedResolutions);
         Collections.sort(heights, IntegerInterface.COMPARATOR_DESC);
         CustEnumMultiComboBox<VideoResolution> resolutionSelect = new CustEnumMultiComboBox<VideoResolution>(VideoResolution.values(), heights, CFG_YOUTUBE.CHOOSE_VARIANT_DIALOG_BLACKLISTED_RESOLUTIONS);
-
         List<VideoFrameRate> fpss = new ArrayList<VideoFrameRate>(allowedFps);
         Collections.sort(fpss, IntegerInterface.COMPARATOR_DESC);
         CustEnumMultiComboBox<VideoFrameRate> fpsSelect = new CustEnumMultiComboBox<VideoFrameRate>(VideoFrameRate.values(), fpss, CFG_YOUTUBE.CHOOSE_VARIANT_DIALOG_BLACKLISTED_VIDEO_FRAMERATES);
-
         List<VideoCodec> videoCodecs = new ArrayList<VideoCodec>(allowedVCodec);
         Collections.sort(videoCodecs, LabelInterface.COMPARATOR_ASC);
         CustEnumMultiComboBox<VideoCodec> vcodec = new CustEnumMultiComboBox<VideoCodec>(VideoCodec.values(), videoCodecs, CFG_YOUTUBE.CHOOSE_VARIANT_DIALOG_BLACKLISTED_VIDEO_CODECS) {
@@ -520,7 +449,6 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
                 return sc.getTooltip();
             }
         };
-
         List<AudioCodec> audioCodecs = new ArrayList<AudioCodec>(allowedACodec);
         Collections.sort(audioCodecs, LabelInterface.COMPARATOR_ASC);
         CustEnumMultiComboBox<AudioCodec> acodec = new CustEnumMultiComboBox<AudioCodec>(AudioCodec.values(), audioCodecs, CFG_YOUTUBE.CHOOSE_VARIANT_DIALOG_BLACKLISTED_AUDIO_CODECS) {
@@ -529,11 +457,9 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
                 return sc.getTooltip();
             }
         };
-
         List<AudioBitrate> bitrates = new ArrayList<AudioBitrate>(allowedABitrate);
         Collections.sort(bitrates, IntegerInterface.COMPARATOR_DESC);
         CustEnumMultiComboBox<AudioBitrate> aBitrate = new CustEnumMultiComboBox<AudioBitrate>(AudioBitrate.values(), bitrates, CFG_YOUTUBE.CHOOSE_VARIANT_DIALOG_BLACKLISTED_AUDIO_BITRATES);
-
         typeSel.setShrinkedMode(true);
         containerSel.setShrinkedMode(true);
         projectionSelect.setShrinkedMode(true);
@@ -542,7 +468,6 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
         vcodec.setShrinkedMode(true);
         acodec.setShrinkedMode(true);
         aBitrate.setShrinkedMode(true);
-
         if (typeSel.getValues().size() > 1) {
             table.addFilter(typeSel);
             ret.addPair(_GUI.T.YOUTUBE_CONFIG_PANEL_TABLE_TYPE(), null, typeSel);
@@ -580,7 +505,6 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
     @Override
     protected void packed() {
         super.packed();
-
     }
 
     @Override
@@ -590,7 +514,6 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
     }
 
     public List<LinkVariant> getVariants() {
-
         List<AbstractVariantWrapper> wrapper = table.getModel().getSelectedObjects();
         List<LinkVariant> ret = new ArrayList<LinkVariant>();
         for (AbstractVariantWrapper w : wrapper) {
@@ -643,5 +566,4 @@ public class YoutubeVariantsListChooser extends AbstractDialog<Object> implement
     @Override
     public void mouseExited(MouseEvent e) {
     }
-
 }

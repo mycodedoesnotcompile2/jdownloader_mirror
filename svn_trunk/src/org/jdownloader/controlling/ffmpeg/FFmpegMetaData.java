@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 public class FFmpegMetaData {
-
     public static enum KEY {
         TITLE("title"),
         ARTIST("artist"),
@@ -28,7 +27,6 @@ public class FFmpegMetaData {
     }
 
     public static class MetaDataEntry extends LinkedHashMap<String, Object> {
-
         private final String type;
 
         public MetaDataEntry(final String type) {
@@ -38,11 +36,9 @@ public class FFmpegMetaData {
         public String getType() {
             return type;
         }
-
     }
 
     private final Map<KEY, String>    values  = new LinkedHashMap<KEY, String>();
-
     private final List<MetaDataEntry> entries = new ArrayList<MetaDataEntry>();
 
     public String getValue(final KEY key) {
@@ -131,6 +127,7 @@ public class FFmpegMetaData {
         for (final MetaDataEntry metaDataEntry : entries) {
             final String type = metaDataEntry.getType();
             if (type != null && metaDataEntry.size() > 0) {
+                ret.append("\n");
                 ret.append("[" + type + "]");
                 ret.append("\n");
                 for (Entry<String, Object> entry : metaDataEntry.entrySet()) {
@@ -139,7 +136,6 @@ public class FFmpegMetaData {
                     ret.append(toEscapedString(entry.getValue()));
                     ret.append("\n");
                 }
-
             }
         }
         return ret.toString();
@@ -149,5 +145,4 @@ public class FFmpegMetaData {
     public String toString() {
         return getFFmpegMetaData();
     }
-
 }

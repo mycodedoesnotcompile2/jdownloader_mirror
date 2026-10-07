@@ -9,16 +9,35 @@ import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
  * Filter class to query plugins with specific criteria
  */
 public class LazyHostPluginFilter {
-    private List<String>  hosts         = null;
-    private Boolean       premium       = null;
-    private List<FEATURE> features      = null;
-    private Integer       maxResultsNum = null;
+    /**
+     * Ready-made filter matching all multihoster plugins ({@link FEATURE#MULTIHOST}). Shared instance; treat it as read-only and do not
+     * reconfigure it (create a new {@link LazyHostPluginFilter} instead if other criteria are needed).
+     */
+    public static final LazyHostPluginFilter ALL_MULTIHOSTERS    = new LazyHostPluginFilter().setFeatures(FEATURE.MULTIHOST).lock();
+    /**
+     * Ready-made filter matching all captcha solver plugins ({@link FEATURE#CAPTCHA_SOLVER}). Shared instance; treat it as read-only and do
+     * not reconfigure it (create a new {@link LazyHostPluginFilter} instead if other criteria are needed).
+     */
+    public static final LazyHostPluginFilter ALL_CAPTCHA_SOLVERS = new LazyHostPluginFilter().setFeatures(FEATURE.CAPTCHA_SOLVER).lock();
+    protected List<String>                   hosts               = null;
+    protected Boolean                        premium             = null;
+    protected List<FEATURE>                  features            = null;
+    protected Integer                        maxResultsNum       = null;
 
     /**
      * Creates a new plugin filter with no criteria (matches all plugins)
      */
     public LazyHostPluginFilter() {
         // Default constructor with no criteria
+    }
+
+    protected LazyHostPluginFilter(LazyHostPluginFilter source) {
+        if (source != null) {
+            this.hosts = source.hosts;
+            this.premium = source.premium;
+            this.maxResultsNum = source.maxResultsNum;
+            this.features = source.features;
+        }
     }
 
     /**
@@ -29,6 +48,26 @@ public class LazyHostPluginFilter {
      */
     public LazyHostPluginFilter(List<String> hosts) {
         this(hosts != null ? hosts.toArray(new String[0]) : null);
+    }
+
+    public LazyHostPluginFilter lock() {
+        return new LazyHostPluginFilter(this) {
+            @Override
+            public boolean isLocked() {
+                return true;
+            }
+
+        };
+    }
+
+    protected void checkLockedStatus() throws IllegalStateException {
+        if (isLocked()) {
+            throw new IllegalStateException("cannot modify locked filter");
+        }
+    }
+
+    public boolean isLocked() {
+        return false;
     }
 
     /**
@@ -49,6 +88,7 @@ public class LazyHostPluginFilter {
      * @return this filter for chaining
      */
     public LazyHostPluginFilter setPremium(Boolean premium) {
+        checkLockedStatus();
         this.premium = premium;
         return this;
     }
@@ -61,6 +101,7 @@ public class LazyHostPluginFilter {
      * @return this filter for chaining
      */
     public LazyHostPluginFilter setFeatures(FEATURE... features) {
+        checkLockedStatus();
         if (features != null && features.length > 0) {
             this.features = Arrays.asList(features);
         } else {
@@ -81,6 +122,7 @@ public class LazyHostPluginFilter {
      * @return this filter for chaining
      */
     public LazyHostPluginFilter setHosts(String... hosts) {
+        checkLockedStatus();
         if (hosts != null && hosts.length > 0) {
             this.hosts = Arrays.asList(hosts);
         } else {
@@ -106,6 +148,7 @@ public class LazyHostPluginFilter {
      * @return this filter for chaining
      */
     public LazyHostPluginFilter setMaxResultsNum(Integer maxResultsNum) {
+        checkLockedStatus();
         this.maxResultsNum = maxResultsNum;
         return this;
     }

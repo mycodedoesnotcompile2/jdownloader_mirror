@@ -341,11 +341,24 @@ public abstract class ChallengeSolver<T> {
     }
 
     /**
-     * Returns the actual, safe maximum number of captchas this solver may work on at the same time. Default: unlimited (no local or
-     * server-side limit applies to this solver type). See {@link PluginChallengeSolver#getFinalMaxCaptchaThreads()} for the
-     * plugin-/account-based override.
+     * Returns the maximum number of captchas this solver (i.e. its {@link SolverService}, summed over all of its accounts, if any) may
+     * work on at the same time. Default: unlimited (no local limit applies to this solver type). See
+     * {@link PluginChallengeSolver#getFinalMaxCaptchaThreads()} for the plugin-based override (the user's own limit). <br>
+     * Not to be confused with {@link #getFinalMaxCaptchaThreadsPerAccount()}, which is a separate limit that applies to every single
+     * account on its own.
      */
     public int getFinalMaxCaptchaThreads() {
+        return Integer.MAX_VALUE;
+    }
+
+    /**
+     * Returns the maximum number of captchas this solver may work on at the same time with the one account it is bound to, independent of
+     * how many other accounts the same solver service has. Only meaningful for account based solvers; default: unlimited. See
+     * {@link PluginChallengeSolver#getFinalMaxCaptchaThreadsPerAccount()} for the plugin-based override (the service's server-side limit).
+     * Enforced by {@link ChallengeResponseController#reserveCaptchaSlot(ChallengeSolver)} next to
+     * {@link #getFinalMaxCaptchaThreads()}.
+     */
+    public int getFinalMaxCaptchaThreadsPerAccount() {
         return Integer.MAX_VALUE;
     }
 

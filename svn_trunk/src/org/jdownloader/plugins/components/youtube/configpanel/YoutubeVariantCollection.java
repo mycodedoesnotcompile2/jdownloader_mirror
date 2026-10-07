@@ -1,8 +1,9 @@
 package org.jdownloader.plugins.components.youtube.configpanel;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.appwork.storage.Storable;
 import org.appwork.utils.StringUtils;
@@ -14,7 +15,6 @@ import org.jdownloader.plugins.components.youtube.variants.VariantGroup;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
 
 public class YoutubeVariantCollection implements Storable {
-
     public YoutubeVariantCollection(/* storable */) {
     }
 
@@ -79,8 +79,8 @@ public class YoutubeVariantCollection implements Storable {
 
     public static List<YoutubeVariantCollection> load() {
         final List<YoutubeVariantCollection> links = CFG_YOUTUBE.CFG.getCollections();
-        final ArrayList<YoutubeVariantCollection> ret = new ArrayList<YoutubeVariantCollection>();
-        final HashSet<String> groupIds = new HashSet<String>();
+        final List<YoutubeVariantCollection> ret = new ArrayList<YoutubeVariantCollection>();
+        final Set<String> groupIds = new LinkedHashSet<String>();
         if (links != null) {
             for (YoutubeVariantCollection l : links) {
                 if (l != null) {
@@ -99,8 +99,8 @@ public class YoutubeVariantCollection implements Storable {
         return ret;
     }
 
-    public HashSet<String> createUniqueIDSet() {
-        final HashSet<String> ret = new HashSet<String>();
+    public Set<String> createUniqueIDSet() {
+        final Set<String> ret = new LinkedHashSet<String>();
         if (variants != null) {
             for (VariantIDStorable v : variants) {
                 ret.add(v.createUniqueID());
@@ -109,8 +109,8 @@ public class YoutubeVariantCollection implements Storable {
         return ret;
     }
 
-    public HashSet<String> createUniqueIDSetForDropDownList() {
-        final HashSet<String> ret = new HashSet<String>();
+    public Set<String> createUniqueIDSetForDropDownList() {
+        final Set<String> ret = new LinkedHashSet<String>();
         if (dropdown != null) {
             for (VariantIDStorable v : dropdown) {
                 ret.add(v.createUniqueID());
@@ -142,5 +142,4 @@ public class YoutubeVariantCollection implements Storable {
         }
         return ret;
     }
-
 }

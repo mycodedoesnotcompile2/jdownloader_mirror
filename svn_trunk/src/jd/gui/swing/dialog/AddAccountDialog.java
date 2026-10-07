@@ -70,6 +70,7 @@ import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChi
 import org.jdownloader.plugins.controller.UpdateRequiredClassNotFoundException;
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
+import org.jdownloader.plugins.controller.host.LazyHostPluginFilter;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.translate._JDT;
 
@@ -87,9 +88,19 @@ import net.miginfocom.swing.MigLayout;
 
 public class AddAccountDialog extends AbstractDialog<Integer> implements InputChangedCallbackInterface {
     public static void showDialog(PluginForHost preSelectedPlugin, Account preFillAccount) {
+        showDialog(preSelectedPlugin, preFillAccount, null);
+    }
+
+    /**
+     * @param pluginFilter
+     *            when non-null, the hoster chooser only lists plugins matching this filter (on top of the "premium only" base rule),
+     *            instead of all premium hoster plugins. Used e.g. when adding an account from the captcha solver table, where the filter
+     *            narrows the list down to captcha solver plugins and offering normal hosters would make no sense.
+     */
+    public static void showDialog(PluginForHost preSelectedPlugin, Account preFillAccount, final LazyHostPluginFilter pluginFilter) {
         try {
             while (true) {
-                final AddAccountDialog dialog = new AddAccountDialog(preSelectedPlugin, preFillAccount);
+                final AddAccountDialog dialog = new AddAccountDialog(preSelectedPlugin, preFillAccount, pluginFilter);
                 Dialog.getInstance().showDialog(dialog);
                 if (dialog.getHoster() == null) {
                     return;
@@ -213,10 +224,13 @@ public class AddAccountDialog extends AbstractDialog<Integer> implements InputCh
     private JLabel                       header2;
     private JButton                      link;
 
-    private AddAccountDialog(final PluginForHost preSelectedPlugin, final Account preFillAccount) {
+    private final LazyHostPluginFilter pluginFilter;
+
+    private AddAccountDialog(final PluginForHost preSelectedPlugin, final Account preFillAccount, final LazyHostPluginFilter pluginFilter) {
         super(UserIO.NO_ICON, _GUI.T.jd_gui_swing_components_AccountDialog_title(), null, _GUI.T.lit_save(), null);
         this.preFillAccount = preFillAccount;
         this.preSelectedPlugin = preSelectedPlugin;
+        this.pluginFilter = pluginFilter;
         cl = PluginClassLoader.getInstance().getChild();
         setLocator(new RememberRelativeDialogLocator("AddAccountDialog2", JDGui.getInstance().getMainFrame()));
         setDimensor(new RememberLastDialogDimension("AddAccountDialog2"));
@@ -235,12 +249,19 @@ public class AddAccountDialog extends AbstractDialog<Integer> implements InputCh
     @Override
     public JComponent layoutDialogContent() {
         final Collection<LazyHostPlugin> allPLugins = HostPluginController.getInstance().list();
-        // Filter - only premium plugins should be here
+        /*
+         * Only premium plugins can have accounts, so only those are offered. When a plugin filter is given (e.g. opened from the captcha
+         * solver table), the list is further narrowed to plugins matching it, so unrelated hosters are not offered there.
+         */
         final java.util.List<LazyHostPlugin> plugins = new ArrayList<LazyHostPlugin>();
         for (LazyHostPlugin lhp : allPLugins) {
-            if (lhp.isPremium()) {
-                plugins.add(lhp);
+            if (!lhp.isPremium()) {
+                continue;
             }
+            if (pluginFilter != null && !pluginFilter.matches(lhp)) {
+                continue;
+            }
+            plugins.add(lhp);
         }
         if (plugins.size() == 0) {
             throw new RuntimeException("No Plugins Loaded Exception");

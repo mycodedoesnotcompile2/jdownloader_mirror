@@ -465,6 +465,12 @@ public class CaptchaRulesTableModel extends ExtTableModel<CaptchaChallengeFilter
                 return !rule.isStaticRule();
             }
 
+            /* Tooltip for the column HEADER only (explains the blacklist vs. whitelist behaviour of this column), not for every cell/row. */
+            @Override
+            public String getHeaderTooltip() {
+                return _GUI.T.CaptchaRules_ruleType_tooltip();
+            }
+
             @Override
             protected JComponent getInternalEditorComponent(final CaptchaChallengeFilter value, final boolean isSelected, final int row, final int column) {
                 return editorBox;
@@ -732,6 +738,29 @@ public class CaptchaRulesTableModel extends ExtTableModel<CaptchaChallengeFilter
             public void resetRenderer() {
             }
         });
+        addColumn(new ExtTextColumn<CaptchaChallengeFilter>("Domains comma separated / Regex") {
+            @Override
+            public boolean isEnabled(final CaptchaChallengeFilter rule) {
+                return rule.isEnabled();
+            }
+
+            @Override
+            public String getStringValue(final CaptchaChallengeFilter rule) {
+                return rule.getDomain();
+            }
+
+            @Override
+            public boolean isEditable(final CaptchaChallengeFilter rule) {
+                return !rule.isStaticRule();
+            }
+
+            @Override
+            protected void setStringValue(final String value, final CaptchaChallengeFilter rule) {
+                rule.setDomain(value);
+                CaptchaChallengeFilterController.getInstance().persist();
+            }
+        });
+        /* Last column: the regex switch only modifies how the domain column right before it is interpreted. */
         addColumn(new ExtCheckColumn<CaptchaChallengeFilter>(_GUI.T.CaptchaRules_column_regex()) {
             @Override
             public boolean isEnabled(final CaptchaChallengeFilter rule) {
@@ -771,28 +800,6 @@ public class CaptchaRulesTableModel extends ExtTableModel<CaptchaChallengeFilter
             @Override
             protected void setBooleanValue(final boolean regex, final CaptchaChallengeFilter rule) {
                 rule.setRegex(regex);
-                CaptchaChallengeFilterController.getInstance().persist();
-            }
-        });
-        addColumn(new ExtTextColumn<CaptchaChallengeFilter>("Domains comma separated / Regex") {
-            @Override
-            public boolean isEnabled(final CaptchaChallengeFilter rule) {
-                return rule.isEnabled();
-            }
-
-            @Override
-            public String getStringValue(final CaptchaChallengeFilter rule) {
-                return rule.getDomain();
-            }
-
-            @Override
-            public boolean isEditable(final CaptchaChallengeFilter rule) {
-                return !rule.isStaticRule();
-            }
-
-            @Override
-            protected void setStringValue(final String value, final CaptchaChallengeFilter rule) {
-                rule.setDomain(value);
                 CaptchaChallengeFilterController.getInstance().persist();
             }
         });

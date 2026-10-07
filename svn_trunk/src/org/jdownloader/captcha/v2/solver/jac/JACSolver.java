@@ -131,30 +131,30 @@ public class JACSolver extends ChallengeSolver<String> {
             if (jac.isExtern()) {
                 /* external captchaCode Response */
                 job.addAnswer(new CaptchaResponse(captchaChallenge, this, captchaCode));
-            } else {
-                /* internal captchaCode Response */
-                final LetterComperator[] lcs = captcha.getLetterComperators();
-                double vp = 0.0;
-                if (lcs != null && lcs.length > 0) {
-                    for (final LetterComperator element : lcs) {
-                        if (element == null) {
-                            vp = 0;
-                            break;
-                        }
-                        vp += element.getValityPercent();
-                    }
-                    vp /= lcs.length;
-                }
-                int trust = 120 - (int) vp;
-                final int orgTrust = trust;
-                synchronized (threshold) {
-                    final AutoTrust trustValue = threshold.get(getTrustID(captchaChallenge));
-                    if (trustValue != null && trust > trustValue.getValue() * THRESHOLD_DEFAULT) {
-                        trust = 100;
-                    }
-                }
-                job.addAnswer(new JACCaptchaResponse(captchaChallenge, this, captchaCode, trust, orgTrust));
+                return;
             }
+            /* internal captchaCode Response */
+            final LetterComperator[] lcs = captcha.getLetterComperators();
+            double vp = 0.0;
+            if (lcs != null && lcs.length > 0) {
+                for (final LetterComperator element : lcs) {
+                    if (element == null) {
+                        vp = 0;
+                        break;
+                    }
+                    vp += element.getValityPercent();
+                }
+                vp /= lcs.length;
+            }
+            int trust = 120 - (int) vp;
+            final int orgTrust = trust;
+            synchronized (threshold) {
+                final AutoTrust trustValue = threshold.get(getTrustID(captchaChallenge));
+                if (trustValue != null && trust > trustValue.getValue() * THRESHOLD_DEFAULT) {
+                    trust = 100;
+                }
+            }
+            job.addAnswer(new JACCaptchaResponse(captchaChallenge, this, captchaCode, trust, orgTrust));
         } catch (IOException e) {
             job.getChallenge().sendStatsError(this, e);
             throw new SolverException(e);

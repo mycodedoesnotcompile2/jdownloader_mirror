@@ -4,27 +4,33 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import jd.PluginWrapper;
-import jd.controlling.AccountController;
-import jd.plugins.Account;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-import jd.plugins.HostPlugin;
-
 import org.appwork.utils.Time;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolverTwoCaptchaAPIV2;
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigTwoCaptcha;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 53503 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
+import jd.PluginWrapper;
+import jd.controlling.AccountController;
+import jd.plugins.Account;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.HostPlugin;
+
+@HostPlugin(revision = "$Revision: 53540 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
-    /*
-     * hCaptcha support is cached per account via account properties (not an instance field): abstractPluginForCaptchaSolver creates a
-     * fresh plugin instance for every single challenge (see getPluginChallengeSolver()), so an instance field would never actually persist
-     * anything across solve attempts.
+    /**
+     * hCaptcha support is cached per account via account properties (not an instance field): abstractPluginForCaptchaSolver creates a fresh
+     * plugin instance for every single challenge (see getPluginChallengeSolver()), so an instance field would never actually persist
+     * anything across solve attempts. <br>
+     * 2026-10-07: I've tested hCaptcha again with 3 different accounts, here are my findings: <br>
+     * 1. I was able to submit hCaptcha challenges just fine with all accounts. <br>
+     * 2. They timed out each time with: {"errorId":12,"errorCode":"ERROR_CAPTCHA_UNSOLVABLE","errorDescription":"Workers could not solve
+     * the Captcha"} <br>
+     * This could mean different things, especially that the special handling for hCaptcha might not be needed anymore but we'll leave it
+     * for now.
      */
-    private static final String PROPERTY_HCAPTCHA_SUPPORTED               = "hcaptcha_supported";
-    private static final String PROPERTY_HCAPTCHA_LAST_FAILURE_TIMESTAMP  = "hcaptcha_last_failure_timestamp";
+    private static final String PROPERTY_HCAPTCHA_SUPPORTED              = "hcaptcha_supported";
+    private static final String PROPERTY_HCAPTCHA_LAST_FAILURE_TIMESTAMP = "hcaptcha_last_failure_timestamp";
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -50,8 +56,10 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
-        /*
+        /**
          * 2025-12-22: hCaptcha is officially not supported anymore. Some accounts support it -> Add it if at least one account supports it.
+         * <br>
+         * TODO: 2026-10-06: Special handling is currently broken because the line below this one returns null in download mode.
          */
         final List<Account> accounts = AccountController.getInstance().getValidAccounts(this.getHost());
         if (accounts != null && accounts.size() > 0) {
@@ -93,12 +101,12 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
 
     /* Returns true if account supports hCaptcha. */
     private Boolean supportsHcaptcha(final Account account) {
-        if (account.getBooleanProperty(PROPERTY_HCAPTCHA_SUPPORTED, false)) {
-            /* Account supports hCaptcha */
+        final Object hc_supported = account.getProperty(PROPERTY_HCAPTCHA_SUPPORTED);
+        if (hc_supported instanceof Boolean) {
             return Boolean.TRUE;
         }
         if (account.hasProperty(PROPERTY_HCAPTCHA_LAST_FAILURE_TIMESTAMP)) {
-            /* Last failure timestamp must be given -> We know that this account doesn't support hCaptcha */
+            /* Last failure timestamp is given -> We know that this account doesn't support hCaptcha */
             return Boolean.FALSE;
         }
         /* hCaptcha status hasn't been evaluated yet */

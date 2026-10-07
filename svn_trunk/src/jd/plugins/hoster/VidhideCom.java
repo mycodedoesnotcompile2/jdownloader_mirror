@@ -38,7 +38,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
-@HostPlugin(revision = "$Revision: 52174 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53534 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidhideCom extends XFileSharingProBasic {
     public VidhideCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -64,9 +64,9 @@ public class VidhideCom extends XFileSharingProBasic {
         final ArrayList<String> deadDomains = new ArrayList<String>();
         deadDomains.add("azipcdn.com");
         deadDomains.add("filelions.com"); // 2024-08-02
-        deadDomains.add("filelions.site"); // 2024-08-02
         deadDomains.add("alions.pro"); // 2024-08-02
         deadDomains.add("filelions.site"); // 2024-11-25
+        deadDomains.add("vidhidehub.com");
         return deadDomains;
     }
 
@@ -91,7 +91,7 @@ public class VidhideCom extends XFileSharingProBasic {
      *
      * <b>IMPORTANT:</b> Keep this up2date!
      */
-    private static final String MAIN_DOWNLOAD_DOMAIN = "vidhidehub.com";
+    private static final String MAIN_DOWNLOAD_DOMAIN = "vidhidepro.com";
 
     public static String[] getAnnotationNames() {
         return buildAnnotationNames(getPluginDomains());
@@ -439,6 +439,10 @@ public class VidhideCom extends XFileSharingProBasic {
 
     @Override
     protected String getPreferredHost(final DownloadLink link, URL url) {
+        final List<String> deadDomains = this.getDeadDomains();
+        if (deadDomains == null || (!deadDomains.contains(url.getHost()) && !deadDomains.contains(url.getHost().replaceFirst("(?i)www\\.", "")))) {
+            return url.getHost();
+        }
         return MAIN_DOWNLOAD_DOMAIN;
     }
 }

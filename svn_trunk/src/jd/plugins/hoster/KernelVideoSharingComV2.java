@@ -86,7 +86,7 @@ import org.jdownloader.plugins.components.kvs.Script;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 53521 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53541 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -95,6 +95,8 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
+        // 153.0 ESR, default 76.0 (windows only) is blocked by some sites
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, Request.getSuggestedUserAgent("153.0"));
         br.setFollowRedirects(true);
         return br;
     }
@@ -457,7 +459,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         final String pathPattern = buildPathPattern(types);
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + pathPattern);
+            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + pathPattern);
         }
         return ret.toArray(new String[0]);
     }
@@ -500,7 +502,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
         final String pathPattern = buildPathPattern(KVSUrlType.EMBED, KVSUrlType.FUID_ONLY);
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + pathPattern);
+            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + pathPattern);
         }
         return ret.toArray(new String[0]);
     }

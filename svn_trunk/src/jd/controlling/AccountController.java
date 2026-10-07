@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 
 import jd.controlling.accountchecker.AccountChecker;
 import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.controlling.downloadcontroller.AccountCache.CachedAccount;
 import jd.controlling.downloadcontroller.SingleDownloadController;
 import jd.gui.swing.jdgui.JDGui;
 import jd.gui.swing.jdgui.WarnLevel;
@@ -957,15 +958,17 @@ public class AccountController implements AccountControllerListener, AccountProp
         }
         final Thread currentThread = Thread.currentThread();
         if (currentThread instanceof SingleDownloadController) {
-            // requestFileInformation must use the account from DownloadLinkCandidate of SingleDownloadController
+            // plugins have to the account from DownloadLinkCandidate.getCachedAccount of current SingleDownloadController for matching host
             final SingleDownloadController controller = (SingleDownloadController) currentThread;
-            final Account acc = controller.getAccount();
-            if (acc == null) {
+            final CachedAccount cachedAccount = controller.getDownloadLinkCandidate().getCachedAccount();
+            if (host.equalsIgnoreCase(cachedAccount.getHost())) {
+                final Account acc = cachedAccount.getAccount();
+                if (acc != null && host.equalsIgnoreCase(acc.getHosterByPlugin())) {
+                    final ArrayList<Account> ret = new ArrayList<Account>();
+                    ret.add(acc);
+                    return ret;
+                }
                 return null;
-            } else if (StringUtils.equals(acc.getHosterByPlugin(), host)) {
-                final ArrayList<Account> ret = new ArrayList<Account>();
-                ret.add(acc);
-                return ret;
             }
         }
         final ArrayList<Account> ret = listAccounts(new AccountFilter(host).setEnabled(true).setValid(true).setTemporarilyDisabled(false));

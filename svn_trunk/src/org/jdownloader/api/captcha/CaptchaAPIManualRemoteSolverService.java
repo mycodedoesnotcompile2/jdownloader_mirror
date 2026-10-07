@@ -125,7 +125,15 @@ public class CaptchaAPIManualRemoteSolverService extends AbstractSolverService {
 
     @Override
     public void onStatusAction() {
-        /* Open the closable My.JDownloader tab (same as the "Open My.JDownloader.org tab" button in the MyJD settings). */
+        openConfiguration();
+    }
+
+    /**
+     * Opens the closable My.JDownloader tab (same as the "Open My.JDownloader.org tab" button in the MyJD settings), where this solver is
+     * configured. Used both by the status action and by the solver table's "Configure" context menu action (available regardless of the
+     * solver's ready/connection state).
+     */
+    public void openConfiguration() {
         JDGui.getInstance().setContent(MyJDownloaderView.getInstance(), true);
     }
 

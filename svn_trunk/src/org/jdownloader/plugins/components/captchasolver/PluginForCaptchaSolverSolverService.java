@@ -1,6 +1,5 @@
 package org.jdownloader.plugins.components.captchasolver;
 
-import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
 import java.util.Currency;
 import java.util.List;
 
@@ -10,9 +9,11 @@ import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
 import org.jdownloader.DomainInfo;
 import org.jdownloader.captcha.v2.CaptchaSolverConfigV3;
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
 import org.jdownloader.captcha.v2.solver.service.AbstractSolverService;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.host.LazyHostPluginFilter;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 
@@ -89,10 +90,10 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
     }
 
     /**
-     * The states the Status column can be in for this solver, in priority order: a globally disabled usage-of-solver-accounts setting
-     * takes priority over everything else (it blocks the solver regardless of account state), followed by having no account at all
-     * (routine "Add Account" case), followed by having accounts that all exist but are unusable (disabled or invalid; needs the user's
-     * attention, unlike the routine "no account yet" case), and finally the normal ready state.
+     * The states the Status column can be in for this solver, in priority order: a globally disabled usage-of-solver-accounts setting takes
+     * priority over everything else (it blocks the solver regardless of account state), followed by having no account at all (routine "Add
+     * Account" case), followed by having accounts that all exist but are unusable (disabled or invalid; needs the user's attention, unlike
+     * the routine "no account yet" case), and finally the normal ready state.
      */
     private enum Status {
         ACCOUNTS_GLOBALLY_DISABLED,
@@ -184,9 +185,18 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
         case NO_ACCOUNT:
         case READY:
         default:
-            AddAccountDialog.showDialog(plugin, null);
+            /* Captcha solver table: restrict the hoster chooser to captcha solver plugins (no other hosters). */
+            AddAccountDialog.showDialog(plugin, null, LazyHostPluginFilter.ALL_CAPTCHA_SOLVERS);
             return;
         }
+    }
+
+    /**
+     * Opens the Account Manager and, if this solver already has at least one account, selects/highlights its first one. Used by the solver
+     * table's context menu action for external solvers; available regardless of the solver's ready state.
+     */
+    public void openAccountManagerSelectingFirstMatchingAccount() {
+        openAccountManager(getFirstAccountOrNull());
     }
 
     private Account getFirstAccountOrNull() {

@@ -54,16 +54,28 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
     private final boolean             shouldShowJDownloaderSupportedColumn;
     private int                       numberofNonJDSupportedCaptchaTypes = 0;
 
+    /** Lists all processable captcha types. */
     public CaptchaSolverCaptchaTypesSettingsPanelBuilder(final CaptchaTypeAccessor accessor) {
+        this(accessor, false);
+    }
+
+    /**
+     * @param onlySupportedCaptchaTypes
+     *            true: only list the captcha types the accessor's target supports (see {@link CaptchaTypeAccessor#isSupported}); false:
+     *            list all processable captcha types.
+     */
+    public CaptchaSolverCaptchaTypesSettingsPanelBuilder(final CaptchaTypeAccessor accessor, final boolean onlySupportedCaptchaTypes) {
         if (accessor == null) {
             throw new IllegalArgumentException("accessor must not be null");
         }
         this.accessor = accessor;
-        final List<CAPTCHA_TYPE> ctypes = CaptchaType.getProcessableCaptchaTypes();
-        this.captchaTypes = ctypes;
-        // Determine which columns should be visible by default
+        final List<CAPTCHA_TYPE> allCaptchaTypes = CaptchaType.getProcessableCaptchaTypes();
+        /*
+         * Which columns exist is always decided from ALL captcha types, not only the listed ones, so the set of columns (and with it the
+         * stored column layout of the table) does not change when the list is narrowed down to the supported types.
+         */
         boolean showJDownloaderSupported = false;
-        for (final CAPTCHA_TYPE ctype : captchaTypes) {
+        for (final CAPTCHA_TYPE ctype : allCaptchaTypes) {
             if (!showJDownloaderSupported && !ctype.isJDownloaderSupported()) {
                 showJDownloaderSupported = true;
             }
@@ -72,6 +84,17 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
             }
         }
         this.shouldShowJDownloaderSupportedColumn = showJDownloaderSupported;
+        if (onlySupportedCaptchaTypes) {
+            final List<CAPTCHA_TYPE> supportedCaptchaTypes = new ArrayList<CAPTCHA_TYPE>();
+            for (final CAPTCHA_TYPE ctype : allCaptchaTypes) {
+                if (accessor.isSupported(ctype)) {
+                    supportedCaptchaTypes.add(ctype);
+                }
+            }
+            this.captchaTypes = supportedCaptchaTypes;
+        } else {
+            this.captchaTypes = allCaptchaTypes;
+        }
     }
 
     public List<CAPTCHA_TYPE> getCaptchaTypes() {

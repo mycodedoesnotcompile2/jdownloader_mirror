@@ -22,9 +22,9 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -102,7 +102,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52914 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53537 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int     DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -294,7 +294,7 @@ public class TbCmV2 extends PluginForDecrypt {
     protected Object putGlobalProperty(final String targetID, final String key, final Object value) {
         Map<String, Object> map = globalPropertiesForDownloadLink.get(targetID);
         if (map == null) {
-            map = new HashMap<String, Object>();
+            map = new LinkedHashMap<String, Object>();
             globalPropertiesForDownloadLink.put(targetID, map);
         }
         return map.put(key, value);
@@ -333,7 +333,7 @@ public class TbCmV2 extends PluginForDecrypt {
         playlistID = null;
         channelID = null;
         userName = null;
-        globalPropertiesForDownloadLink = new HashMap<String, Map<String, Object>>();
+        globalPropertiesForDownloadLink = new LinkedHashMap<String, Map<String, Object>>();
         playlistHandlingHumanReadableTypeOfUrlToCrawl = null;
         playlistHandlingHumanReadableTitle = null;
         channelOrPlaylistPackage = null;
@@ -1016,12 +1016,12 @@ public class TbCmV2 extends PluginForDecrypt {
             varList.add(new VariantIDStorable(requestedVariant));
             links.add(new YoutubeVariantCollection("Dummy", varList));
         }
-        final HashMap<String, AbstractVariant> allowedVariantsMap = new HashMap<String, AbstractVariant>();
+        final Map<String, AbstractVariant> allowedVariantsMap = new LinkedHashMap<String, AbstractVariant>();
         for (AbstractVariant v : enabledVariants) {
             final VariantIDStorable storable = new VariantIDStorable(v);
             allowedVariantsMap.put(storable.createUniqueID(), v);
         }
-        final HashMap<VariantInfo, String[]> foundVariableMap = new HashMap<VariantInfo, String[]>();
+        final Map<VariantInfo, String[]> foundVariableMap = new LinkedHashMap<VariantInfo, String[]>();
         for (VariantInfo v : foundVariants) {
             final VariantIDStorable storable = new VariantIDStorable(v.getVariant());
             foundVariableMap.put(v, new String[] { storable.createUniqueID(), storable.createGroupingID(), storable.getContainer() });
@@ -1033,7 +1033,7 @@ public class TbCmV2 extends PluginForDecrypt {
                 }
                 final ArrayList<VariantInfo> linkVariants = new ArrayList<VariantInfo>();
                 final ArrayList<VariantInfo> cutLinkVariantsDropdown = new ArrayList<VariantInfo>();
-                final HashSet<String> customAlternateSet = yvc.createUniqueIDSetForDropDownList();
+                final Set<String> customAlternateSet = yvc.createUniqueIDSetForDropDownList();
                 if (customAlternateSet.size() > 0) {
                     for (Entry<VariantInfo, String[]> foundVariant : foundVariableMap.entrySet()) {
                         final String uId = foundVariant.getValue()[0];
@@ -1061,7 +1061,7 @@ public class TbCmV2 extends PluginForDecrypt {
                         }
                     }
                 } else if (yvc.getVariants() != null && yvc.getVariants().size() > 0) {
-                    HashSet<String> idSet = yvc.createUniqueIDSet();
+                    Set<String> idSet = yvc.createUniqueIDSet();
                     for (Entry<VariantInfo, String[]> foundVariant : foundVariableMap.entrySet()) {
                         final String uId = foundVariant.getValue()[0];
                         if (idSet.contains(uId)) {
@@ -1623,8 +1623,8 @@ public class TbCmV2 extends PluginForDecrypt {
                 logger.info("Cannot apply sort: missing INNERTUBE variables, proceeding with default order");
                 break sort;
             }
-            final Map<String, Object> sortContext = new HashMap<String, Object>();
-            final Map<String, Object> sortClient = new HashMap<String, Object>();
+            final Map<String, Object> sortContext = new LinkedHashMap<String, Object>();
+            final Map<String, Object> sortClient = new LinkedHashMap<String, Object>();
             /* visitorData is required for /@profile/shorts but not for regular playlists */
             final String sortVisitorData = ytConfigData != null ? (String) ytConfigData.get("visitorData") : null;
             if (sortVisitorData != null) {
@@ -1634,7 +1634,7 @@ public class TbCmV2 extends PluginForDecrypt {
             sortClient.put("clientVersion", INNERTUBE_CLIENT_VERSION);
             sortClient.put("originalUrl", originalURL.toExternalForm());
             sortContext.put("client", sortClient);
-            final Map<String, Object> sortPostData = new HashMap<String, Object>();
+            final Map<String, Object> sortPostData = new LinkedHashMap<String, Object>();
             sortPostData.put("context", sortContext);
             sortPostData.put("continuation", sortToken);
             /* Refresh headers — Authorization tokens contain timestamps and can expire. */
@@ -1794,8 +1794,8 @@ public class TbCmV2 extends PluginForDecrypt {
                 break pagination;
             }
             /* Build the POST body for the next page API request */
-            final Map<String, Object> context = new HashMap<String, Object>();
-            final Map<String, Object> client = new HashMap<String, Object>();
+            final Map<String, Object> context = new LinkedHashMap<String, Object>();
+            final Map<String, Object> client = new LinkedHashMap<String, Object>();
             /* visitorData is required for /@profile/shorts but not for regular playlists */
             final String visitorData = ytConfigData != null ? (String) ytConfigData.get("visitorData") : null;
             if (visitorData != null) {
@@ -1805,7 +1805,7 @@ public class TbCmV2 extends PluginForDecrypt {
             client.put("clientVersion", INNERTUBE_CLIENT_VERSION);
             client.put("originalUrl", originalURL.toExternalForm());
             context.put("client", client);
-            final Map<String, Object> paginationPostData = new HashMap<String, Object>();
+            final Map<String, Object> paginationPostData = new LinkedHashMap<String, Object>();
             paginationPostData.put("context", context);
             paginationPostData.put("continuation", nextPageToken);
             round = antiDdosSleep(round);
