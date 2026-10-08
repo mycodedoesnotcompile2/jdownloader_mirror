@@ -93,7 +93,7 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-@HostPlugin(revision = "$Revision: 53521 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53542 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1040,7 +1040,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (enableAccountApiOnlyMode() || (this.supportsAPIMassLinkcheck() && this.looksLikeValidAPIKey(apiKey))) {
             return massLinkcheckerAPI(urls, apiKey);
         } else if (supportsMassLinkcheckOverWebsite()) {
-            return this.massLinkcheckerWebsite(urls);
+            return this.massLinkcheckerWebsite(br, null, urls);
         } else {
             /* No mass linkchecking possible */
             return false;
@@ -1063,7 +1063,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        return requestFileInformation(link, null);
+        return requestFileInformation(link, AccountController.getInstance().getValidAccount(this));
     }
 
     protected AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
@@ -1073,7 +1073,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             return this.requestFileInformationAPI(link, apikey);
         } else {
             /* Website linkcheck */
-            return requestFileInformationWebsite(link, null);
+            return requestFileInformationWebsite(link, account);
         }
     }
 
@@ -1148,6 +1148,10 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
     }
 
+    protected boolean useAccountForLinkCheck(final Browser br, final Account account, final DownloadLink link) throws Exception {
+        return account != null && !this.enableAccountApiOnlyMode();
+    }
+
     /**
      * Handling for older / standard XFS links for examle: <br>
      * https://xfswebsite.tld/[a-z0-9]{12} <br>
@@ -1214,7 +1218,17 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
         final String[] fileInfo = internal_getFileInfoArray();
         final Browser altbr = br.cloneBrowser();
-        if (isPremiumOnlyURL(this.br)) {
+        if (isPremiumOnlyURL(altbr)) {
+            // dirty hack because loginWebsite doesn't have Browser parameter yet
+            if (useAccountForLinkCheck(altbr, account, link)) {
+                final Browser brOld = this.br;
+                try {
+                    this.br = altbr;
+                    loginWebsite(link, account, false);
+                } finally {
+                    this.br = brOld;
+                }
+            }
             /*
              * Hosts whose urls are all premiumonly usually don't display any information about the URL at all - only maybe online/offline.
              * There are 2 alternative ways to get this information anyways!
@@ -1226,7 +1240,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             }
             /* Find filesize */
             if (this.internal_supports_availablecheck_alt()) {
-                getFilesizeViaAvailablecheckAlt(altbr, link);
+                getFilesizeViaAvailablecheckAlt(altbr, account, link);
             }
         } else {
             /* Normal handling */
@@ -1260,7 +1274,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             /* Filesize fallback */
             if (StringUtils.isEmpty(fileInfo[1]) && this.internal_supports_availablecheck_alt()) {
                 /* Failed to find filesize? Try alternative way! */
-                getFilesizeViaAvailablecheckAlt(altbr, link);
+                getFilesizeViaAvailablecheckAlt(altbr, account, link);
             }
         }
         processFileInfo(fileInfo, altbr, link);
@@ -1944,8 +1958,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     /** Check single URL via mass-linkchecker. Throws PluginException if URL has been detected as offline. */
-    public AvailableStatus requestFileInformationWebsiteMassLinkcheckerSingle(final DownloadLink link) throws IOException, PluginException {
-        massLinkcheckerWebsite(new DownloadLink[] { link });
+    public AvailableStatus requestFileInformationWebsiteMassLinkcheckerSingle(final Browser br, final Account account, final DownloadLink link) throws IOException, PluginException {
+        massLinkcheckerWebsite(br, account, new DownloadLink[] { link });
         if (!link.isAvailabilityStatusChecked()) {
             return AvailableStatus.UNCHECKED;
         } else if (!link.isAvailable()) {
@@ -2000,7 +2014,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * - The contentURLs contain a filename as a fallback e.g. https://host.tld/<fuid>/someFilename.png.html <br>
      * - If the normal way via website is blocked somehow e.g. 'site-verification' captcha <br>
      */
-    protected boolean massLinkcheckerWebsite(final DownloadLink[] urls) {
+    protected boolean massLinkcheckerWebsite(final Browser br, final Account account, final DownloadLink[] urls) {
         if (urls == null || urls.length == 0) {
             return false;
         }
@@ -2010,7 +2024,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         final String checkTypeOld = "checkfiles";
         final String checkTypeNew = "check_files";
         final SubConfiguration cfg = this.getPluginConfig();
-        final Browser br = createNewBrowserInstance();
+
         this.prepBrowser(br, getMainPage(br));
         br.setCookiesExclusive(true);
         try {
@@ -2269,9 +2283,9 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * @return isOnline
      * @throws IOException
      */
-    protected boolean getFilesizeViaAvailablecheckAlt(final Browser br, final DownloadLink link) throws PluginException, IOException {
+    protected boolean getFilesizeViaAvailablecheckAlt(final Browser br, final Account account, final DownloadLink link) throws PluginException, IOException {
         logger.info("Trying getFilesizeViaAvailablecheckAlt");
-        requestFileInformationWebsiteMassLinkcheckerSingle(link);
+        requestFileInformationWebsiteMassLinkcheckerSingle(br, account, link);
         if (link.isAvailabilityStatusChecked()) {
             logger.info("Successfully checked URL via website massLinkcheck | filesize: " + link.getView().getBytesTotal());
             return true;

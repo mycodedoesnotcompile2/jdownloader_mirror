@@ -15,10 +15,12 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
 
+import org.appwork.utils.net.httpconnection.trust.interfaces.JDKTrustProviderInterface;
+
 /**
  * Trust provider using the JRE default CA keystore (cacerts).
  */
-public class CurrentJRETrustProvider extends AbstractTrustProvider {
+public class CurrentJRETrustProvider extends AbstractTrustProvider implements JDKTrustProviderInterface {
     private static final CurrentJRETrustProvider INSTANCE = new CurrentJRETrustProvider();
 
     public static CurrentJRETrustProvider getInstance() {

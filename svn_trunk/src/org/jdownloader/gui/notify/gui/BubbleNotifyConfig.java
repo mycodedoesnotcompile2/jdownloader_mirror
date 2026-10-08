@@ -29,22 +29,22 @@ public interface BubbleNotifyConfig extends ConfigInterface {
 
     @AboutConfig
     @DefaultEnumValue("SYSTEM_DEFAULT")
-    @DescriptionForConfigEntry("Position Anchor for the First Bubble. TOP_RIGHT means, that the topright corner of the bubble is the reference anchor")
+    @DescriptionForConfigEntry("Position Anchor for the First Notification. TOP_RIGHT means, that the topright corner of the notification is the reference anchor")
     public Anchor getFinalPositionAnchor();
 
     @AboutConfig
     @DefaultIntValue(-1)
-    @DescriptionForConfigEntry("X Position of the first bubble. 0 is left screen edge -1 is right screen edge")
+    @DescriptionForConfigEntry("X Position of the first notification. 0 is left screen edge -1 is right screen edge")
     public int getFinalPositionX();
 
     @AboutConfig
     @DefaultIntValue(-1)
-    @DescriptionForConfigEntry("Y Position of the first bubble. 0 is top screen edge -1 is bottom screen edge")
+    @DescriptionForConfigEntry("Y Position of the first notification. 0 is top screen edge -1 is bottom screen edge")
     public int getFinalPositionY();
 
     @AboutConfig
     @DefaultEnumValue("SYSTEM_DEFAULT")
-    @DescriptionForConfigEntry("Animation End Anchor. TOP_RIGHT means, that the topright corner of the bubble is the reference anchor")
+    @DescriptionForConfigEntry("Animation End Anchor. TOP_RIGHT means, that the topright corner of the notification is the reference anchor")
     public Anchor getAnimationEndPositionAnchor();
 
     @AboutConfig
@@ -59,12 +59,12 @@ public interface BubbleNotifyConfig extends ConfigInterface {
 
     @DefaultStringValue("\\Display9999")
     @AboutConfig
-    @DescriptionForConfigEntry("The bubbles iuse the current active screen. That means the screen that is used by the Main Window. You can set a hardcoded screen ID here. Like \\Display0 for your main screen")
+    @DescriptionForConfigEntry("The notifications use the current active screen. That means the screen that is used by the Main Window. You can set a hardcoded screen ID here. Like \\Display0 for your main screen")
     public String getScreenID();
 
     @AboutConfig
     @DefaultEnumValue("SYSTEM_DEFAULT")
-    @DescriptionForConfigEntry("Animation Start Anchor. TOP_RIGHT means, that the topright corner of the bubble is the reference anchor")
+    @DescriptionForConfigEntry("Animation Start Anchor. TOP_RIGHT means, that the topright corner of the notification is the reference anchor")
     public Anchor getAnimationStartPositionAnchor();
 
     @AboutConfig
@@ -88,6 +88,13 @@ public interface BubbleNotifyConfig extends ConfigInterface {
     @DefaultBooleanValue(true)
     @AboutConfig
     public boolean isBubbleNotifyOnUpdateAvailableEnabled();
+
+    @DefaultBooleanValue(true)
+    @AboutConfig
+    @DescriptionForConfigEntry("Show a notification when the account of an external captcha solver has low credits. Shown after every account check until it is hidden for the account via the notification's button (until JDownloader is restarted). Also needs 'Warn on low credits' to be enabled for the external captcha solver.")
+    public boolean isBubbleNotifyOnLowCaptchaCreditsEnabled();
+
+    public void setBubbleNotifyOnLowCaptchaCreditsEnabled(boolean b);
 
     @DefaultBooleanValue(true)
     @AboutConfig
@@ -201,7 +208,7 @@ public interface BubbleNotifyConfig extends ConfigInterface {
 
     @AboutConfig
     @DefaultIntValue(100)
-    @DescriptionForConfigEntry("Transparency of the Bubbles. 0 = invisible 100= no Transparency")
+    @DescriptionForConfigEntry("Transparency of the notifications. 0 = invisible 100= no Transparency")
     @SpinnerValidator(min = 1, max = 100, step = 1)
     public int getTransparency();
 
@@ -312,7 +319,7 @@ public interface BubbleNotifyConfig extends ConfigInterface {
 
     @AboutConfig()
     @DefaultBooleanValue(true)
-    public boolean isCaptchaExchangeSolverBubbleImageVisible();
+    public boolean isExternalCaptchaSolverNotificationImageVisible();
 
-    public void setCaptchaExchangeSolverBubbleImageVisible(boolean b);
+    public void setExternalCaptchaSolverNotificationImageVisible(boolean b);
 }

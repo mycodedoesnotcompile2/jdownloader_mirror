@@ -22,6 +22,7 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
 
+import org.appwork.utils.net.httpconnection.trust.interfaces.OSTrustProviderInterface;
 import org.appwork.utils.os.CrossSystem;
 
 /**
@@ -47,7 +48,7 @@ import org.appwork.utils.os.CrossSystem;
  *
  * @see org.appwork.utils.net.httpconnection.trust.TrustUtils#getOSProvider()
  */
-public class MacTrustProvider extends AbstractTrustProvider {
+public class MacTrustProvider extends AbstractTrustProvider implements OSTrustProviderInterface {
     /** KeychainStore: system and user keychains on macOS (Java 14+ / Apple JDK). */
     protected static final String         KEYCHAIN_STORE     = "KeychainStore";
     /** macOS system CA PEM (symlink); fallback when KeychainStore is not available (e.g. Java &lt; 14). */

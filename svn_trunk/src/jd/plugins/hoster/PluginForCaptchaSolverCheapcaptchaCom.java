@@ -24,6 +24,7 @@ import org.jdownloader.captcha.v2.challenge.stringcaptcha.CaptchaResponse;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.TokenCaptchaResponse;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
+import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigCheapcaptchaCom;
 import org.jdownloader.plugins.controller.LazyPlugin;
@@ -42,7 +43,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 53502 $", interfaceVersion = 3, names = { "cheapcaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53549 $", interfaceVersion = 3, names = { "cheapcaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -118,7 +119,8 @@ public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCapt
         final Double creditsInDollar = creditsInDollarCent / 100;
         final AccountInfo ai = new AccountInfo();
         ai.setAccountBalance(creditsInDollar, Currency.getInstance("USD"));
-        ai.setStatus("Balance: " + ai.getAccountBalanceFormatted() + " | Rate: " + entries.get("rate"));
+        /* The balance part is translated, the rate is specific to this service and stays untranslated. */
+        ai.setStatus(_GUI.T.CaptchaSolverAccount_balance(ai.getAccountBalanceFormatted()) + " | Rate: " + entries.get("rate"));
         return ai;
     }
 

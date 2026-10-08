@@ -155,6 +155,18 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
         };
     }
 
+    /** Text column which is grayed out for captcha types that are disabled (enabled column unchecked). */
+    private abstract class DisabledAwareTextColumn extends ExtTextColumn<CAPTCHA_TYPE> {
+        public DisabledAwareTextColumn(final String name) {
+            super(name);
+        }
+
+        @Override
+        public boolean isEnabled(final CAPTCHA_TYPE ctype) {
+            return accessor.isEnabled(ctype);
+        }
+    }
+
     private ExtCheckColumn<CAPTCHA_TYPE> createEnabledColumn() {
         return new ExtCheckColumn<CAPTCHA_TYPE>(_GUI.T.premiumaccounttablemodel_column_enabled()) {
             @Override
@@ -198,7 +210,7 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
     }
 
     private ExtTextColumn<CAPTCHA_TYPE> createNameColumn() {
-        return new ExtTextColumn<CAPTCHA_TYPE>(_GUI.T.CaptchaTypesTable_column_name()) {
+        return new DisabledAwareTextColumn(_GUI.T.CaptchaTypesTable_column_name()) {
             {
                 setRowSorter(new ExtDefaultRowSorter<CAPTCHA_TYPE>() {
                     @Override
@@ -243,7 +255,7 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
     }
 
     private ExtTextColumn<CAPTCHA_TYPE> createDomainColumn() {
-        return new ExtTextColumn<CAPTCHA_TYPE>(_GUI.T.multihost_detailed_host_info_table_column_domain()) {
+        return new DisabledAwareTextColumn(_GUI.T.multihost_detailed_host_info_table_column_domain()) {
             @Override
             public String getStringValue(final CAPTCHA_TYPE ctype) {
                 final String domain = ctype.getDomain();
@@ -263,7 +275,7 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
     }
 
     private ExtTextColumn<CAPTCHA_TYPE> createDescriptionColumn() {
-        return new ExtTextColumn<CAPTCHA_TYPE>(_GUI.T.CaptchaTypesTable_column_description()) {
+        return new DisabledAwareTextColumn(_GUI.T.CaptchaTypesTable_column_description()) {
             @Override
             public String getStringValue(final CAPTCHA_TYPE ctype) {
                 final String description = ctype.getDescription();
@@ -286,7 +298,7 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
     private ExtTextColumn<CAPTCHA_TYPE> createSupportedColumn() {
         final Icon icon_okay = NewTheme.I().getIcon(IconKey.ICON_OK, 16);
         final Icon icon_error = NewTheme.I().getIcon(IconKey.ICON_ERROR, 16);
-        return new ExtTextColumn<CAPTCHA_TYPE>(_GUI.T.CaptchaTypesTable_column_supportedBySolver()) {
+        return new DisabledAwareTextColumn(_GUI.T.CaptchaTypesTable_column_supportedBySolver()) {
             @Override
             public String getStringValue(final CAPTCHA_TYPE ctype) {
                 return accessor.isSupported(ctype) ? _GUI.T.lit_yes() : _GUI.T.lit_no();
@@ -312,7 +324,7 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
     private ExtTextColumn<CAPTCHA_TYPE> createEverNeededColumn() {
         final Icon icon_okay = NewTheme.I().getIcon(IconKey.ICON_OK, 16);
         final Icon icon_error = NewTheme.I().getIcon(IconKey.ICON_ERROR, 16);
-        return new ExtTextColumn<CAPTCHA_TYPE>(_GUI.T.CaptchaTypesTable_column_everUsed()) {
+        return new DisabledAwareTextColumn(_GUI.T.CaptchaTypesTable_column_everUsed()) {
             private boolean wasEverNeeded(final CAPTCHA_TYPE ctype) {
                 final List<CaptchaHistoryEntry> entries = CaptchaHistoryManager.getInstance().getEntriesByCaptchaType(ctype);
                 return entries != null && !entries.isEmpty();
@@ -342,7 +354,7 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
 
     /** "number of captchas ever used" column: total captchas (download + login) used for this type by this JD instance. */
     private ExtTextColumn<CAPTCHA_TYPE> createNumberOfCaptchasColumn() {
-        return new ExtTextColumn<CAPTCHA_TYPE>(_GUI.T.CaptchaTypesTable_column_numberOfCaptchas()) {
+        return new DisabledAwareTextColumn(_GUI.T.CaptchaTypesTable_column_numberOfCaptchas()) {
             {
                 setRowSorter(new ExtDefaultRowSorter<CAPTCHA_TYPE>() {
                     @Override
@@ -396,7 +408,7 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
     }
 
     private ExtTextColumn<CAPTCHA_TYPE> createLastUsedColumn() {
-        return new ExtTextColumn<CAPTCHA_TYPE>(_GUI.T.CaptchaTypesTable_column_lastUsed()) {
+        return new DisabledAwareTextColumn(_GUI.T.CaptchaTypesTable_column_lastUsed()) {
             {
                 setRowSorter(new ExtDefaultRowSorter<CAPTCHA_TYPE>() {
                     @Override
@@ -470,7 +482,7 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
     }
 
     private ExtTextColumn<CAPTCHA_TYPE> createUsedForServicesColumn() {
-        return new ExtTextColumn<CAPTCHA_TYPE>(_GUI.T.CaptchaTypesTable_column_usedForServices()) {
+        return new DisabledAwareTextColumn(_GUI.T.CaptchaTypesTable_column_usedForServices()) {
             @Override
             public String getStringValue(final CAPTCHA_TYPE ctype) {
                 final List<CaptchaHistoryEntry> entries = CaptchaHistoryManager.getInstance().getEntriesByCaptchaType(ctype);
@@ -532,7 +544,7 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
     }
 
     private ExtTextColumn<CAPTCHA_TYPE> createDemoUrlColumn() {
-        return new ExtTextColumn<CAPTCHA_TYPE>(_GUI.T.CaptchaTypesTable_column_demoUrl()) {
+        return new DisabledAwareTextColumn(_GUI.T.CaptchaTypesTable_column_demoUrl()) {
             @Override
             public String getStringValue(final CAPTCHA_TYPE ctype) {
                 final String demoUrl = ctype.getDemoUrl();
@@ -703,7 +715,7 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
     private ExtTextColumn<CAPTCHA_TYPE> createSupportedByJDownloaderColumn() {
         final Icon icon_okay = NewTheme.I().getIcon(IconKey.ICON_OK, 16);
         final Icon icon_error = NewTheme.I().getIcon(IconKey.ICON_ERROR, 16);
-        return new ExtTextColumn<CAPTCHA_TYPE>(_GUI.T.CaptchaTypesTable_column_supportedByJD()) {
+        return new DisabledAwareTextColumn(_GUI.T.CaptchaTypesTable_column_supportedByJD()) {
             @Override
             public String getStringValue(final CAPTCHA_TYPE ctype) {
                 return ctype.isJDownloaderSupported() ? _GUI.T.lit_yes() : _GUI.T.lit_no();

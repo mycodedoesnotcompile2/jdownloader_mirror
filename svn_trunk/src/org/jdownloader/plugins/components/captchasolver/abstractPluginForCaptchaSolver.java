@@ -10,8 +10,10 @@ import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.CaptchaSolverCaptchaTypesSettingsPanelBuilder.AccountCaptchaTypeAccessor;
 import org.jdownloader.captcha.v2.CaptchaSolverConfigV3;
 import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.ChallengeSolver;
 import org.jdownloader.captcha.v2.ChallengeSolver.ChallengeVetoReason;
 import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
+import org.jdownloader.captcha.v2.JobRunnable;
 import org.jdownloader.captcha.v2.PluginChallengeSolver;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
@@ -24,9 +26,7 @@ import jd.plugins.AccountInfo;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
-import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
 /**
@@ -161,25 +161,28 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
     }
 
     /**
-     * Determines whether the user should be notified when the account balance is low.
-     *
-     * @return true if the user should be notified on low balance, false otherwise
+     * Returns interval used for polling when waiting for captcha solution from solver: the user's configured polling interval, but never
+     * shorter than the minimum the service itself requires ({@link #getServerSideMinPollingIntervalMillis()}).
      */
-    public boolean notifyOnLowBalance(final Account account) {
-        // TODO: Implement logic
-        return getDefaultConfig().isWarnOnLowCredits();
+    public int getPollingIntervalMillis(final Account account) {
+        return (int) Math.max(getDefaultConfig().getPollingIntervalSeconds() * 1000L, getServerSideMinPollingIntervalMillis());
     }
 
-    /** Returns interval used for polling when waiting for captcha solution from solver. */
-    public int getPollingIntervalMillis(final Account account) {
-        return getDefaultConfig().getPollingIntervalSeconds() * 1000;
+    /**
+     * Returns the minimum time in milliseconds this solver service itself wants between two polling requests (e.g. documented rate limit or
+     * recommended polling interval of the service's API). The user's polling interval setting cannot go below this value, see
+     * {@link #getPollingIntervalMillis(Account)}. This is a property of the remote service, not a user setting. <br>
+     * 0 = no minimum (default, no minimum documented for this service).
+     */
+    public long getServerSideMinPollingIntervalMillis() {
+        return 0;
     }
 
     /**
      * Returns the maximum number of captchas this solver service itself allows to be solved simultaneously <b>per account</b>, as enforced
-     * server-side by the service (not to be confused with the user's own local JDownloader setting, which applies to the solver as a
-     * whole: {@link CaptchaSolverConfigV3#getMaxSimultaneousCaptchas()}). May depend on the given account (e.g. plan/tier-based limits),
-     * but does not have to. <br>
+     * server-side by the service (not to be confused with the user's own local JDownloader setting, which applies to the solver as a whole:
+     * {@link CaptchaSolverConfigV3#getMaxSimultaneousCaptchas()}). May depend on the given account (e.g. plan/tier-based limits), but does
+     * not have to. <br>
      * {@link Integer#MAX_VALUE} = unlimited/unknown (default, no server-side limit documented for this service).
      */
     public int getServerSideMaxSimultaneousCaptchaThreadsLimit(final Account account) {
@@ -187,19 +190,13 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
     }
 
     /**
-     * Returns the maximum time in milliseconds this solver service itself keeps polling a submitted task available/pollable before giving up
-     * on it server-side (e.g. the task result expires and further status checks will fail). This is a property of the remote service, not a
-     * user setting. <br>
+     * Returns the maximum time in milliseconds this solver service itself keeps polling a submitted task available/pollable before giving
+     * up on it server-side (e.g. the task result expires and further status checks will fail). This is a property of the remote service,
+     * not a user setting. <br>
      * {@link Long#MAX_VALUE} = unlimited/unknown (default, no server-side polling timeout documented for this service).
      */
     public long getServerSideMaxPollingTimeoutMillis() {
         return Long.MAX_VALUE;
-    }
-
-    /** Returns interval used for polling when waiting for captcha solution from solver. */
-    public int getMaxCaptchasPerHour(final Account account) {
-        // TODO: Implement functionality
-        return getDefaultConfig().getMaxCaptchasPerHour();
     }
 
     /**
@@ -230,8 +227,8 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      * {@link PluginChallengeSolver#getTimeoutMillis()} / {@link ChallengeSolver#getFinalTimeoutMillis()}, which arms a timer in
      * {@link JobRunnable} that kills (interrupts) this solver once it is exceeded -- checked here via the plain
      * {@link InterruptedException} below, no separate timeout tracking needed. <br>
-     * Sleeps in at most 1 second chunks (mirrors {@link jd.plugins.PluginForHost#sleep(long, jd.plugins.DownloadLink)}) instead of one
-     * long {@link Thread#sleep(long)}, so an interrupt is noticed within a second instead of only after the full polling interval. <br>
+     * Sleeps in at most 1 second chunks (mirrors {@link jd.plugins.PluginForHost#sleep(long, jd.plugins.DownloadLink)}) instead of one long
+     * {@link Thread#sleep(long)}, so an interrupt is noticed within a second instead of only after the full polling interval. <br>
      * Logs the approximate polling attempt number (derived from elapsed time / interval, no extra counter state needed), the total elapsed
      * time and the configured polling interval.
      */
@@ -260,6 +257,9 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
 
     /**
      * Returns false if the solver does not have enough balance to solve the given captcha challenge. <br>
+     * In theory if we know how much a challenge would cost for the current solver, plugins cloud override this and place individual checks.
+     * <br>
+     * In reality this is a small detail which we can often ignore.
      */
     public boolean enoughBalanceFor(final Challenge<?> c, final Account account) {
         if (account.getAccountInfo() != null && account.getAccountInfo().getAccountBalance() <= 0) {
@@ -284,7 +284,8 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
         return CaptchaSolverPluginConfig.class;
     }
 
-    protected CaptchaSolverPluginConfig getDefaultConfig() {
+    /** Public because the AccountController needs the low credits settings after an account check. */
+    public CaptchaSolverPluginConfig getDefaultConfig() {
         final Class<? extends CaptchaSolverPluginConfig> configInterfaceClass = this.getConfigInterface();
         final CaptchaSolverPluginConfig cfg = get(configInterfaceClass);
         return cfg;

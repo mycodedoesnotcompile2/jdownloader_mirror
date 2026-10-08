@@ -19,6 +19,8 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
 
+import org.appwork.utils.net.httpconnection.trust.interfaces.CustomTrustStoreProviderInterface;
+
 /**
  * Trust provider using custom CA certificates. Can load certificates from:
  * <ul>
@@ -32,12 +34,12 @@ import javax.net.ssl.X509TrustManager;
  *
  * <pre>
  * File cacertsFile = new File(System.getProperty(&quot;java.home&quot;), &quot;lib/security/cacerts&quot;);
- * CustomTrustProvider provider = new CustomTrustProvider(cacertsFile, &quot;changeit&quot;.toCharArray(), &quot;JKS&quot;);
+ *                                                                                       CustomTrustProvider provider = new CustomTrustProvider(cacertsFile, &quot;changeit&quot;.toCharArray(), &quot;JKS&quot;);
  * </pre>
  *
  * </p>
  */
-public class CustomTrustProvider extends AbstractTrustProvider {
+public class CustomTrustProvider extends AbstractTrustProvider implements CustomTrustStoreProviderInterface {
     private final X509Certificate[]   caCertificates;
     private final String              id;
     private volatile X509TrustManager trustManager;

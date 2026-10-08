@@ -26,15 +26,7 @@ public interface CaptchaSolverConfigV3 extends PluginConfigInterface {
         }
 
         public String getEnableCaptchaFeedback_label() {
-            return "Report correct/incorrect captchas to captcha service?";
-        }
-
-        public String getMaxCaptchasPerHourEnabled_label() {
-            return "Limit max captchas per hour?";
-        }
-
-        public String getMaxCaptchasPerHour_label() {
-            return "Max captchas per hour";
+            return "Report correct/incorrect captchas to the captcha solver?";
         }
 
         public String getLimitMaxSimultaneousCaptchasEnabled_label() {
@@ -55,7 +47,7 @@ public interface CaptchaSolverConfigV3 extends PluginConfigInterface {
     }
 
     @AboutConfig(inGUIVisible = false)
-    @DescriptionForConfigEntry("Enable/Disable this captcha solver service")
+    @DescriptionForConfigEntry("Enable/Disable this captcha solver")
     @DefaultBooleanValue(true)
     @Order(100)
     boolean isEnabled();
@@ -63,7 +55,7 @@ public interface CaptchaSolverConfigV3 extends PluginConfigInterface {
     void setEnabled(boolean b);
 
     @AboutConfig
-    @DescriptionForConfigEntry("Send correct/incorrect captcha feedback to captcha service to improve recognition accuracy and avoid wasting credits")
+    @DescriptionForConfigEntry("Send correct/incorrect captcha feedback to the captcha solver to improve recognition accuracy and avoid wasting credits")
     @DefaultBooleanValue(true)
     @Order(200)
     boolean isEnableCaptchaFeedback();
@@ -86,23 +78,6 @@ public interface CaptchaSolverConfigV3 extends PluginConfigInterface {
     int getMaxSimultaneousCaptchas();
 
     void setMaxSimultaneousCaptchas(int max);
-
-    @AboutConfig
-    @DescriptionForConfigEntry("Limit max captchas per hour")
-    @DefaultBooleanValue(false)
-    @Order(650)
-    boolean isMaxCaptchasPerHourEnabled();
-
-    void setMaxCaptchasPerHourEnabled(boolean b);
-
-    @AboutConfig
-    @DescriptionForConfigEntry("Max captchas per hour")
-    @SpinnerValidator(min = 1, max = 10000, step = 1)
-    @DefaultIntValue(1000)
-    @Order(651)
-    int getMaxCaptchasPerHour();
-
-    void setMaxCaptchasPerHour(int max);
 
     @AboutConfig
     @DescriptionForConfigEntry("Limit the maximum time to wait/poll for a captcha solution before giving up")

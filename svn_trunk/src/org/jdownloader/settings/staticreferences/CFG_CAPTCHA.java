@@ -30,10 +30,10 @@ public class CFG_CAPTCHA {
      **/
     public static final BooleanKeyHandler               DIALOG_COUNTDOWN_FOR_DOWNLOADS_ENABLED         = SH.getKeyHandler("DialogCountdownForDownloadsEnabled", BooleanKeyHandler.class);
     /**
-     * If the CES Bubble Support is enable, the bubble gives the user a chance to cancel the CES usage. This is the timeout for this skip
+     * If the notifications for external captcha solvers are enabled, the notification gives the user a chance to cancel the usage of the external captcha solver. This is the timeout for this skip
      * option
      **/
-    public static final IntegerKeyHandler               CAPTCHA_EXCHANGE_CHANCE_TO_SKIP_BUBBLE_TIMEOUT = SH.getKeyHandler("CaptchaExchangeChanceToSkipBubbleTimeout", IntegerKeyHandler.class);
+    public static final IntegerKeyHandler               EXTERNAL_CAPTCHA_SOLVER_CHANCE_TO_SKIP_NOTIFICATION_TIMEOUT = SH.getKeyHandler("ExternalCaptchaSolverChanceToSkipNotificationTimeout", IntegerKeyHandler.class);
     /**
      * True to enable a countdown in crawler captcha dialogs. Dialog will close automated after the coundown
      **/

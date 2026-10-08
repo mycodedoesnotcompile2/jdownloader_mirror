@@ -32,6 +32,10 @@ public interface KemonoPartyConfig extends PluginConfigInterface {
             return text_PostTextLinkFilterPattern;
         }
 
+        public String getFileVersionMode_label() {
+            return "Which file versions to add:";
+        }
+
         public String getTextCrawlMode_label() {
             return text_TextCrawlMode;
         }
@@ -148,6 +152,36 @@ public interface KemonoPartyConfig extends PluginConfigInterface {
             return this;
         }
     }
+
+    public static enum FileVersionMode implements LabelInterface {
+        ORIGINAL {
+            @Override
+            public String getLabel() {
+                return "Add original files";
+            }
+        },
+        PREVIEW {
+            @Override
+            public String getLabel() {
+                return "Add previews";
+            }
+        },
+        ORIGINAL_AND_PREVIEW {
+            @Override
+            public String getLabel() {
+                return "Add original files & previews";
+            }
+        };
+    }
+
+    @AboutConfig
+    @DefaultEnumValue("ORIGINAL")
+    @DescriptionForConfigEntry("Define which file versions to add: Original files and/or previews. If only previews are available, only previews will be added regardless of this setting.")
+    @DefaultOnNull
+    @Order(15)
+    FileVersionMode getFileVersionMode();
+
+    void setFileVersionMode(FileVersionMode mode);
 
     @AboutConfig
     @DefaultEnumValue("ONLY_IF_NO_MEDIA_ITEMS_ARE_FOUND")

@@ -19,6 +19,7 @@ import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
 
 import org.appwork.JNAHelper;
+import org.appwork.utils.net.httpconnection.trust.interfaces.OSTrustProviderInterface;
 import org.appwork.utils.os.CrossSystem;
 
 import com.sun.jna.Library;
@@ -26,7 +27,7 @@ import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.ptr.PointerByReference;
 
-public class JNAMacTrustProvider extends AbstractTrustProvider {
+public class JNAMacTrustProvider extends AbstractTrustProvider implements OSTrustProviderInterface {
     protected interface SecurityFramework extends Library {
         final static SecurityFramework INSTANCE                     = Native.load("Security", SecurityFramework.class);
         final int                      kSecTrustSettingsDomainUser  = 0;

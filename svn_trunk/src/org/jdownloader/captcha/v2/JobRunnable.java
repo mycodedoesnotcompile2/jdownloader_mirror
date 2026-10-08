@@ -133,15 +133,23 @@ public class JobRunnable<T> implements Runnable {
                         job.getLogger().log(e);
                     }
                 }
-                if (ChallengeResponseController.getInstance().reserveCaptchaSlot(solver)) {
+                switch (ChallengeResponseController.getInstance().reserveCaptchaSlot(solver)) {
+                case RESERVED:
                     try {
                         job.getLogger().info("Solver Start: " + solver);
                         solver.solve(job);
                     } finally {
                         ChallengeResponseController.getInstance().releaseCaptchaSlot(solver);
                     }
-                } else {
+                    break;
+                case CUSTOM_LIMIT_REACHED:
+                    /* The controller already logged which custom limit rule is used up. */
+                    job.getLogger().info(solver + " has reached one of its custom limits -> Skipping this solver for this job.");
+                    break;
+                case NO_FREE_SLOT:
+                default:
                     job.getLogger().info(solver + " gave up waiting for a free max-simultaneous-captchas slot -> Skipping this solver for this job.");
+                    break;
                 }
             } catch (SkipException e) {
                 ChallengeResponseController.getInstance().setSkipRequest(e.getSkipRequest(), solver, job.getChallenge());

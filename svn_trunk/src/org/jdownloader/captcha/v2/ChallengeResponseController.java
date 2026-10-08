@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
@@ -241,8 +242,24 @@ public class ChallengeResponseController {
      * increment the service and the account counter together atomically.
      */
     private final Object                                            CAPTCHA_SLOT_LOCK                = new Object();
+    /**
+     * Start times (ms, ascending) of the captchas recently started per solver service (key: {@link SolverService#getID()}): the basis of
+     * the custom limit rules ({@link ChallengeSolver#getCustomLimitRules()}). Only kept in memory, so a restart of JDownloader resets them,
+     * and only filled for solvers that have enabled custom limit rules. Guarded by {@link #CAPTCHA_SLOT_LOCK}.
+     */
+    private final HashMap<String, ArrayList<Long>>                  captchaStartTimesByServiceID     = new HashMap<String, ArrayList<Long>>();
     /** Max time to wait for a solver's max-simultaneous-captchas limit to free up before giving up on using that solver for a job. */
     private static final long                                       CAPTCHA_SLOT_WAIT_TIMEOUT_MILLIS = 60 * 1000L;
+
+    /** Outcome of {@link #reserveCaptchaSlot(ChallengeSolver)}. */
+    public enum CaptchaSlotResult {
+        /** A slot was reserved (and the captcha counted against the custom limits): the caller must release it afterwards. */
+        RESERVED,
+        /** One of the solver's enabled custom limit rules is used up -> the caller must not run this solver. */
+        CUSTOM_LIMIT_REACHED,
+        /** A max-simultaneous-captchas limit was still reached after waiting -> the caller must not run this solver. */
+        NO_FREE_SLOT
+    }
 
     private static <K> int getActiveCaptchas(final ConcurrentHashMap<K, AtomicInteger> counters, final K key) {
         final AtomicInteger counter = counters.get(key);
@@ -279,33 +296,107 @@ public class ChallengeResponseController {
     }
 
     /**
+     * Returns a description of the first used up rule, or null if every rule still has room for one more captcha. Also forgets the start
+     * times that are older than the longest rule interval. The caller must hold {@link #CAPTCHA_SLOT_LOCK}.
+     */
+    private String getExhaustedCustomLimit(final String serviceID, final List<CaptchaSolverLimitRule> rules, final long now) {
+        final ArrayList<Long> startTimes = captchaStartTimesByServiceID.get(serviceID);
+        if (startTimes == null) {
+            return null;
+        }
+        long longestIntervalMillis = 0;
+        for (final CaptchaSolverLimitRule rule : rules) {
+            longestIntervalMillis = Math.max(longestIntervalMillis, rule._getIntervalMillis());
+        }
+        while (!startTimes.isEmpty() && startTimes.get(0).longValue() < now - longestIntervalMillis) {
+            startTimes.remove(0);
+        }
+        for (final CaptchaSolverLimitRule rule : rules) {
+            final long intervalMillis = rule._getIntervalMillis();
+            int startedInInterval = 0;
+            for (final Long startTime : startTimes) {
+                if (startTime.longValue() >= now - intervalMillis) {
+                    startedInInterval++;
+                }
+            }
+            if (startedInInterval < rule.getMaxCaptchas()) {
+                continue;
+            }
+            /* The rule is usable again as soon as enough of the oldest captchas in the interval have left it. */
+            final long usableAgainAt = startTimes.get(startTimes.size() - rule.getMaxCaptchas()).longValue() + intervalMillis;
+            final String name = rule.getName() != null && rule.getName().length() > 0 ? " \"" + rule.getName() + "\"" : "";
+            return "rule" + name + ": " + startedInInterval + "/" + rule.getMaxCaptchas() + " captchas in the last " + rule.getInterval() + " " + rule.getUnit().name().toLowerCase(Locale.ENGLISH) + ", usable again in " + TimeFormatter.formatMilliSeconds(Math.max(0, usableAgainAt - now), 0);
+        }
+        return null;
+    }
+
+    /**
+     * True if one of the solver's enabled custom limit rules (see {@link ChallengeSolver#getCustomLimitRules()}) is currently used up, so
+     * the solver must not get another captcha. Used to veto the solver for new challenges; logs which rule is used up.
+     */
+    public boolean isCustomLimitReached(final ChallengeSolver<?> solver) {
+        final List<CaptchaSolverLimitRule> rules = solver.getCustomLimitRules();
+        if (rules == null || rules.isEmpty()) {
+            return false;
+        }
+        final String exhausted;
+        synchronized (CAPTCHA_SLOT_LOCK) {
+            exhausted = getExhaustedCustomLimit(solver.getService().getID(), rules, System.currentTimeMillis());
+        }
+        if (exhausted == null) {
+            return false;
+        }
+        logger.info(solver + " is not used because of a custom limit " + exhausted);
+        return true;
+    }
+
+    /**
      * Reserves a "slot" for the given solver against both its {@link ChallengeSolver#getFinalMaxCaptchaThreads()} limit (all accounts of the
      * service together) and, for account based solvers, its {@link ChallengeSolver#getFinalMaxCaptchaThreadsPerAccount()} limit (its own
      * account only). If either limit is currently reached, this waits up to {@link #CAPTCHA_SLOT_WAIT_TIMEOUT_MILLIS} for a slot to free up.
+     * <br>
+     * The solver's enabled custom limit rules ({@link ChallengeSolver#getCustomLimitRules()}) are checked at the same time, atomically with
+     * counting the new captcha, so parallel jobs cannot both slip through the last free place of a rule. A used up rule is not waited for
+     * (it may stay used up for hours); the solver is skipped instead. <br>
      * Every successful reservation must be paired with a matching {@link #releaseCaptchaSlot(ChallengeSolver)} once the solve attempt
-     * (whether it succeeded, failed, or was skipped) is finished.
-     *
-     * @return true if a slot was reserved, false if a limit was still reached after waiting -> the caller must not run this solver.
+     * (whether it succeeded, failed, or was skipped) is finished. The captcha stays counted against the custom limits afterwards.
      */
-    public boolean reserveCaptchaSlot(final ChallengeSolver<?> solver) throws InterruptedException {
+    public CaptchaSlotResult reserveCaptchaSlot(final ChallengeSolver<?> solver) throws InterruptedException {
         final int maxThreads = solver.getFinalMaxCaptchaThreads();
         final int maxThreadsPerAccount = solver.getFinalMaxCaptchaThreadsPerAccount();
-        final AtomicInteger serviceCounter = getOrCreateActiveCaptchasCounter(activeCaptchasByServiceID, solver.getService().getID());
+        final String serviceID = solver.getService().getID();
+        final List<CaptchaSolverLimitRule> limitRules = solver.getCustomLimitRules();
+        final AtomicInteger serviceCounter = getOrCreateActiveCaptchasCounter(activeCaptchasByServiceID, serviceID);
         final UniqueAlltimeID accountID = getSlotAccountID(solver);
         final AtomicInteger accountCounter = accountID != null ? getOrCreateActiveCaptchasCounter(activeCaptchasByAccountID, accountID) : null;
         final long deadline = System.currentTimeMillis() + CAPTCHA_SLOT_WAIT_TIMEOUT_MILLIS;
         synchronized (CAPTCHA_SLOT_LOCK) {
             while (true) {
+                if (limitRules != null) {
+                    final String exhausted = getExhaustedCustomLimit(serviceID, limitRules, System.currentTimeMillis());
+                    if (exhausted != null) {
+                        logger.info(solver + " is skipped because of a custom limit " + exhausted);
+                        return CaptchaSlotResult.CUSTOM_LIMIT_REACHED;
+                    }
+                }
                 if (serviceCounter.get() < maxThreads && (accountCounter == null || accountCounter.get() < maxThreadsPerAccount)) {
                     serviceCounter.incrementAndGet();
                     if (accountCounter != null) {
                         accountCounter.incrementAndGet();
                     }
-                    return true;
+                    if (limitRules != null) {
+                        ArrayList<Long> startTimes = captchaStartTimesByServiceID.get(serviceID);
+                        if (startTimes == null) {
+                            startTimes = new ArrayList<Long>();
+                            captchaStartTimesByServiceID.put(serviceID, startTimes);
+                        }
+                        startTimes.add(Long.valueOf(System.currentTimeMillis()));
+                    }
+                    return CaptchaSlotResult.RESERVED;
                 }
                 final long remaining = deadline - System.currentTimeMillis();
                 if (remaining <= 0) {
-                    return false;
+                    return CaptchaSlotResult.NO_FREE_SLOT;
                 }
                 CAPTCHA_SLOT_LOCK.wait(remaining);
             }

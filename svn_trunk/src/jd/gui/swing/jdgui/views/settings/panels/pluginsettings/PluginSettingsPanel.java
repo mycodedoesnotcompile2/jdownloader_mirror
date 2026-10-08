@@ -52,6 +52,7 @@ import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import jd.gui.swing.jdgui.JDGui;
 import jd.gui.swing.jdgui.interfaces.SwitchPanel;
 import jd.gui.swing.jdgui.views.settings.components.SettingsComponent;
+import jd.gui.swing.jdgui.views.settings.panels.anticaptcha.CaptchaConfigPanel;
 import jd.gui.swing.jdgui.views.settings.components.StateUpdateListener;
 import jd.gui.swing.jdgui.views.settings.sidebar.AddonConfig;
 import jd.plugins.Account;
@@ -249,6 +250,11 @@ public class PluginSettingsPanel extends JPanel implements SettingsComponent, Ac
             @Override
             protected void runInEDT() {
                 if (plugin == null) {
+                    return;
+                }
+                if (plugin instanceof LazyHostPlugin && ((LazyHostPlugin) plugin).hasFeature(FEATURE.CAPTCHA_SOLVER)) {
+                    /* Captcha solver plugins have their settings in the captcha settings. */
+                    CaptchaConfigPanel.showSolver(((LazyHostPlugin) plugin).getHost());
                     return;
                 }
                 if (searchCombobox.getModel().getSize() > 0) {

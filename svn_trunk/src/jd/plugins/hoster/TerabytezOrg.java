@@ -20,8 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
@@ -32,7 +30,9 @@ import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52221 $", interfaceVersion = 3, names = {}, urls = {})
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 53544 $", interfaceVersion = 3, names = {}, urls = {})
 public class TerabytezOrg extends XFileSharingProBasic {
     public TerabytezOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -162,13 +162,13 @@ public class TerabytezOrg extends XFileSharingProBasic {
     }
 
     @Override
-    public AvailableStatus requestFileInformationWebsiteMassLinkcheckerSingle(final DownloadLink link) throws IOException, PluginException {
+    public AvailableStatus requestFileInformationWebsiteMassLinkcheckerSingle(final Browser br, final Account account, final DownloadLink link) throws IOException, PluginException {
         final String xfs_fuid = link.getStringProperty(PROPERTY_XFS_FUID);
         if (new Regex(link.getPluginPatternMatcher(), PATTERN_OLD).patternFind() && xfs_fuid == null) {
             /* Mass-linkchecker can't be used for older links && when new XFS unique fileID is not known. */
             return AvailableStatus.UNCHECKED;
         } else {
-            return super.requestFileInformationWebsiteMassLinkcheckerSingle(link);
+            return super.requestFileInformationWebsiteMassLinkcheckerSingle(br, account, link);
         }
     }
 
@@ -199,13 +199,11 @@ public class TerabytezOrg extends XFileSharingProBasic {
         final String url_without_filename = new Regex(url, "^(https?://[^/]+/[a-z0-9]{12})").getMatch(0);
         if (url_without_filename != null) {
             /**
-             * 2025-08-12: Small workaround to allow "massLinkcheckerWebsite" to work, else it may fail with error "Filename don't match!".
-             * <br>
+             * 2025-08-12: Small workaround to allow "massLinkcheckerWebsite" to work, else it may fail with error "Filename don't match!". <br>
              * More details: https://board.jdownloader.org/showthread.php?p=550013#post550013
              */
             return url_without_filename;
-        } else {
-            return url;
         }
+        return url;
     }
 }

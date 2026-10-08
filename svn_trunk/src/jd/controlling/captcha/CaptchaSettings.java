@@ -42,14 +42,14 @@ public interface CaptchaSettings extends ConfigInterface {
 
     @AboutConfig
     @DefaultBooleanValue(true)
-    @DescriptionForConfigEntry("Enable the CES & Remote Captcha Bubbles")
+    @DescriptionForConfigEntry("Enable the notifications for external captcha solvers")
     boolean isRemoteCaptchaBubbleEnabled();
 
     void setRemoteCaptchaBubbleEnabled(boolean b);
 
     @AboutConfig
     @DefaultBooleanValue(true)
-    @DescriptionForConfigEntry("Affects login captchas only: If a login captcha is required and at least one manual captcha solver is available, only manual captcha solvers will be allowed to solve this login captcha. Background: Captcha solver services can take a long time to solve captchas but when the user is adding an account or an account gets checked and a captcha is required, it should typically be solved faster and the manual solvers are typically faster. If you disable this setting, login captchas are handled exactly the same way as any other captchas.")
+    @DescriptionForConfigEntry("Affects login captchas only: If a login captcha is required and at least one manual captcha solver is available, only manual captcha solvers will be allowed to solve this login captcha. Background: External captcha solvers can take a long time to solve captchas but when the user is adding an account or an account gets checked and a captcha is required, it should typically be solved faster and the manual solvers are typically faster. If you disable this setting, login captchas are handled exactly the same way as any other captchas.")
     boolean isAvoidAutoSolverForLoginCaptchas();
 
     void setAvoidAutoSolverForLoginCaptchas(boolean b);
@@ -123,10 +123,10 @@ public interface CaptchaSettings extends ConfigInterface {
 
     @AboutConfig
     @DefaultIntValue(10000)
-    @DescriptionForConfigEntry("If the CES Bubble Support is enable, the bubble gives the user a chance to cancel the CES usage. This is the timeout for this skip option")
-    int getCaptchaExchangeChanceToSkipBubbleTimeout();
+    @DescriptionForConfigEntry("If the notifications for external captcha solvers are enabled, the notification gives the user a chance to cancel the usage of the external captcha solver. This is the timeout for this skip option")
+    int getExternalCaptchaSolverChanceToSkipNotificationTimeout();
 
-    void setCaptchaExchangeChanceToSkipBubbleTimeout(int ms);
+    void setExternalCaptchaSolverChanceToSkipNotificationTimeout(int ms);
 
     @AboutConfig
     @DefaultBooleanValue(true)
@@ -160,7 +160,7 @@ public interface CaptchaSettings extends ConfigInterface {
     void setCaptchaHistoryEntries(CopyOnWriteArrayList<CaptchaHistoryEntry> entry);
 
     @AboutConfig
-    @DescriptionForConfigEntry("Privacy level for interactive captchas ('Browser captchas'). For such captchas, the URL of the website where the captcha needs to be solved might be opened in your browser or sent to your configured captcha solver services. This URL may contain information about the file you are about to download e.g. 'https://example.com/file/123456/test.rar'. Set this to strict then only the base URL will be used instead e.g. 'https://example.com/'. WARNING: This can cause problems with captcha solving such as invalid captcha responses or make the captchas harder to solve in your browser.")
+    @DescriptionForConfigEntry("Privacy level for interactive captchas ('Browser captchas'). For such captchas, the URL of the website where the captcha needs to be solved might be opened in your browser or sent to your external captcha solvers. This URL may contain information about the file you are about to download e.g. 'https://example.com/file/123456/test.rar'. Set this to strict then only the base URL will be used instead e.g. 'https://example.com/'. WARNING: This can cause problems with captcha solving such as invalid captcha responses or make the captchas harder to solve in your browser.")
     @DefaultEnumValue("AUTO")
     INTERACTIVE_CAPTCHA_PRIVACY_LEVEL getInteractiveCaptchaPrivacyLevel();
 

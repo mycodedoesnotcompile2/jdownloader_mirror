@@ -19,10 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.config.XFSConfigVideoHotlinkCc;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -40,7 +36,11 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.config.XFSConfigVideoHotlinkCc;
+
+@HostPlugin(revision = "$Revision: 53542 $", interfaceVersion = 3, names = {}, urls = {})
 public class HotlinkCc extends XFileSharingProBasic {
     public HotlinkCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -159,7 +159,7 @@ public class HotlinkCc extends XFileSharingProBasic {
                      * find the real status!
                      */
                     logger.info("Checking if link is really offline or only available for premium users");
-                    final AvailableStatus status = requestFileInformationWebsiteMassLinkcheckerSingle(link);
+                    final AvailableStatus status = requestFileInformationWebsiteMassLinkcheckerSingle(br, account, link);
                     if (status == AvailableStatus.FALSE) {
                         logger.info("Link really is offline");
                         link.removeProperty(PROPERTY_account_required);

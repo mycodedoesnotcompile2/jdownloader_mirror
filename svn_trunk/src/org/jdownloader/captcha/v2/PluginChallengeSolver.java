@@ -1,5 +1,6 @@
 package org.jdownloader.captcha.v2;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
@@ -7,6 +8,7 @@ import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSolverService;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
+import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
 
 import jd.controlling.captcha.SkipException;
 import jd.plugins.Account;
@@ -84,6 +86,30 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
         return Math.max(1, plugin.getServerSideMaxSimultaneousCaptchaThreadsLimit(account));
     }
 
+    /**
+     * The enabled custom limit rules of this solver (they apply to the solver as a whole, i.e. to all of its accounts together), or null if
+     * the user has not switched custom limits on or no rule is enabled. The rule list in the config is the very list the settings table
+     * edits, so it is copied here (as a snapshot) before it gets iterated.
+     */
+    @Override
+    public List<CaptchaSolverLimitRule> getCustomLimitRules() {
+        final CaptchaSolverPluginConfig cfg = ((PluginForCaptchaSolverSolverService) service).getPluginConfig();
+        if (!cfg.isCustomLimitsEnabled()) {
+            return null;
+        }
+        final ArrayList<CaptchaSolverLimitRule> stored = cfg.getLimitRules();
+        if (stored == null) {
+            return null;
+        }
+        final List<CaptchaSolverLimitRule> ret = new ArrayList<CaptchaSolverLimitRule>();
+        for (final CaptchaSolverLimitRule rule : stored.toArray(new CaptchaSolverLimitRule[0])) {
+            if (rule.isEnabled()) {
+                ret.add(rule);
+            }
+        }
+        return ret.isEmpty() ? null : ret;
+    }
+
     /*
      * Distinguishes the various per-account/per-plugin instances of this solver in log output (otherwise they all just print
      * "PluginChallengeSolver", see ChallengeSolver#toString()).
@@ -134,7 +160,18 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
         if (ctype != null && all_supported_captcha_types != null && account_supported_captcha_types != null && all_supported_captcha_types.contains(ctype) && !account_supported_captcha_types.contains(ctype)) {
             return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER_ACCOUNT;
         }
-        return super.getChallengeVetoReason(c);
+        final ChallengeVetoReason superVeto = super.getChallengeVetoReason(c);
+        if (superVeto != null) {
+            return superVeto;
+        }
+        /*
+         * Checked last: this solver could solve the challenge, so the only reason left not to use it is that it would exceed one of the
+         * user's custom limits (and the check logs which one, which is only interesting for challenges the solver is eligible for).
+         */
+        if (ChallengeResponseController.getInstance().isCustomLimitReached(this)) {
+            return ChallengeVetoReason.CUSTOM_LIMIT_REACHED;
+        }
+        return null;
     }
 
     @Override

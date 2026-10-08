@@ -451,7 +451,7 @@ public interface GeneralSettings extends ConfigInterface {
      */
     @AboutConfig
     @DefaultBooleanValue(true)
-    @DescriptionForConfigEntry("Use available accounts for external captcha solver services (excludes local solvers and the MyJDownloader remote solver)")
+    @DescriptionForConfigEntry("Use available accounts for external captcha solvers (excludes local solvers and the MyJDownloader remote solver)")
     boolean isUseAvailableCaptchaSolverAccounts();
 
     void setUseAvailableCaptchaSolverAccounts(boolean b);

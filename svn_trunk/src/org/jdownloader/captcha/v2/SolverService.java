@@ -54,6 +54,12 @@ public interface SolverService {
     public abstract boolean isStatusActionWarning();
 
     /**
+     * Returns true when {@link #getStatusText()} contains a warning (e.g. low credits) which the solver overview should display in the
+     * theme's error color.
+     */
+    public abstract boolean isStatusTextWarning();
+
+    /**
      * Returns true if this solver is ready to be used right now (e.g. has a valid account / is connected). Not-ready solvers are sorted to
      * the bottom of the solver overview.
      */

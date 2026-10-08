@@ -66,7 +66,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 53502 $", interfaceVersion = 3, names = { "deathbycaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53549 $", interfaceVersion = 3, names = { "deathbycaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -196,7 +196,8 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
             /* Set unique username for accounts which were added via token login */
             account.setUser(entries.get("user").toString());
         }
-        ai.setStatus("Balance: " + ai.getAccountBalanceFormatted() + " | Rate: " + entries.get("rate"));
+        /* The balance part is translated, the rate is specific to this service and stays untranslated. */
+        ai.setStatus(_GUI.T.CaptchaSolverAccount_balance(ai.getAccountBalanceFormatted()) + " | Rate: " + entries.get("rate"));
         return ai;
     }
 

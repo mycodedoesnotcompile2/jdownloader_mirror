@@ -507,6 +507,25 @@ public class CaptchaSolverSettingsMigration {
         if (filters != null) {
             CaptchaChallengeFilterController.getInstance().addAll(filters);
         }
+        /*
+         * Migrate the max captchas per hour/minute limits (0 = no limit) to the custom limit rules: every valid old limit becomes a new,
+         * enabled rule ("migrated 9kw minutes limit" / "migrated 9kw hours limit"), followed by the usual (disabled) example rules, and the
+         * custom limits are switched on as soon as at least one valid limit exists.
+         */
+        final int limitPerHour = cfgOld.gethour();
+        final int limitPerMinute = cfgOld.getminute();
+        if (limitPerHour > 0 || limitPerMinute > 0) {
+            final ArrayList<CaptchaSolverLimitRule> limitRules = new ArrayList<CaptchaSolverLimitRule>();
+            if (limitPerMinute > 0) {
+                limitRules.add(new CaptchaSolverLimitRule("migrated 9kw minutes limit", true, 1, CaptchaSolverLimitRule.IntervalUnit.MINUTES, Math.min(limitPerMinute, CaptchaSolverLimitRule.MAX_MAX_CAPTCHAS)));
+            }
+            if (limitPerHour > 0) {
+                limitRules.add(new CaptchaSolverLimitRule("migrated 9kw hours limit", true, 1, CaptchaSolverLimitRule.IntervalUnit.HOURS, Math.min(limitPerHour, CaptchaSolverLimitRule.MAX_MAX_CAPTCHAS)));
+            }
+            limitRules.addAll(CaptchaSolverLimitRule.createExampleRules());
+            cfgNew.setLimitRules(limitRules);
+            cfgNew.setCustomLimitsEnabled(true);
+        }
         if (userHasAccount && userHasEnabledExistingAccount) {
             /* Migrate some settings only if user has an active account */
             if (!cfgOld.isfeedback()) {

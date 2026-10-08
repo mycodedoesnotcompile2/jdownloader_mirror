@@ -2752,7 +2752,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Silent Mode" })
     String SilentModeToggleAction_getNameWhenEnabled_();
 
-    @Default(lngs = { "en" }, values = { "Captcha Chance To Skip Bubble Timeout" })
+    @Default(lngs = { "en" }, values = { "Captcha Chance To Skip Notification Timeout" })
     String CaptchaExchangeSpinnerAction_skipbubbletimeout_();
 
     @Default(lngs = { "en" }, values = { "More..." })
@@ -3121,7 +3121,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Plugins" })
     String PluginSettings_getTitle();
 
-    @Default(lngs = { "en" }, values = { "Many services ask you to enter a so called 'Captcha'. Usually, a captcha is a tiny image that contains a few letters. You have to type these letters to proove that you are human. JDownloader will try to solve these captchas without asking you. However, there are captchas that are too hard to read for JDownloader - thus JD will ask you." })
+    @Default(lngs = { "en" }, values = { "Many websites ask you to solve a so-called captcha, e.g. before a download or when logging in, to prove that you are human.\r\nCaptcha solvers solve these captchas for JDownloader: you can solve captchas yourself (in a dialog or in your browser), let My.JDownloader apps solve them remotely, or use external captcha solvers. External captcha solvers are third-party services which solve captchas automatically, usually for a fee. They need an account, which you can add in the account manager.\r\nBelow you can see all captcha solvers with their status, configure them and see which captcha types they support. With captcha rules you can define which solvers are used for which captchas." })
     String AntiCaptchaConfigPanel_onShow_description();
 
     @Default(lngs = { "en" }, values = { "Play Notify Sound for Captchas" })
@@ -3129,12 +3129,6 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Download Captchas auto close after timeout" })
     String AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_countdown_download();
-
-    @Default(lngs = { "en" }, values = { "The my.JDownloader.org Service tries to solve all captchas fully automated by sending them to our Captcha Solver Service" })
-    String MyJDownloaderService_createPanel_description_2();
-
-    @Default(lngs = { "en" }, values = { "Earn 'credits' by solving captchas for others. In return, others solve your captchas while you are not in front of your computer. Check out the service's website for more details." })
-    String AntiCaptchaConfigPanel_onShow_description_ces();
 
     @Default(lngs = { "en" }, values = { "Visit the Website" })
     String lit_open_website();
@@ -3958,9 +3952,6 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Captcha solved by My.JDownloader Remote Applications (Webinterface,Mobile Apps,...)" })
     String MyJDownloaderService_getDescription_tt_();
 
-    @Default(lngs = { "en" }, values = { "Captchas solved by the 9kw.eu Captcha Exchange System" })
-    String NinekwService_getDescription_tt_();
-
     @Default(lngs = { "en" }, values = { "Always" })
     String BubbleNotifyConfigPanel_BubbleNotifyConfigPanel_always();
 
@@ -4270,8 +4261,32 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Icons & Artwork:" })
     String jd_gui_swing_components_AboutDialog_icons();
 
-    @Default(lngs = { "en" }, values = { "a Remote Captcha Services are running" })
+    @Default(lngs = { "en" }, values = { "an external captcha solver is solving a captcha" })
     String CESBubbleSupport_CESBubbleSupport();
+
+    @Default(lngs = { "en" }, values = { "Buy credits" })
+    String SolverOrderTable_context_buyCredits();
+
+    @Default(lngs = { "en" }, values = { "an external captcha solver account has low credits" })
+    String LowCaptchaCreditsBubbleSupport_label();
+
+    @Default(lngs = { "en" }, values = { "%s1: Low credits" })
+    String LowCaptchaCreditsBubble_caption(String domain);
+
+    @Default(lngs = { "en" }, values = { "Credits are low! Remaining: %s1\r\nWarning threshold: %s2" })
+    String LowCaptchaCreditsBubble_text(String balance, String threshold);
+
+    @Default(lngs = { "en" }, values = { "Open account manager" })
+    String LowCaptchaCreditsBubble_button_accountManager();
+
+    @Default(lngs = { "en" }, values = { "Buy credits" })
+    String LowCaptchaCreditsBubble_button_buyCredits();
+
+    @Default(lngs = { "en" }, values = { "Hide this session" })
+    String LowCaptchaCreditsBubble_button_doNotShowAgain();
+
+    @Default(lngs = { "en" }, values = { "Low credits (below %s1)" })
+    String CaptchaSolverAccount_status_lowCredits(String threshold);
 
     @Default(lngs = { "en" }, values = { "%s2 via %s1" })
     String CESBubble_CESBubble2(String string, String string2);
@@ -5354,6 +5369,15 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Ready" })
     String CaptchaSolverService_status_ready();
 
+    @Default(lngs = { "en" }, values = { "Reset the settings of the selected captcha solver to default." })
+    String SolverOrderContainer_reset_tooltip();
+
+    @Default(lngs = { "en" }, values = { "Are you sure that you want to reset all settings of the %s1 captcha solver?\r\nThis includes the enabled captcha types, wait times and custom limit rules." })
+    String SolverOrderContainer_reset_are_you_sure(String solver);
+
+    @Default(lngs = { "en" }, values = { "Balance: %s1" })
+    String CaptchaSolverAccount_balance(String balance);
+
     @Default(lngs = { "en" }, values = { "Ready | Balance: %s1" })
     String CaptchaSolverService_status_ready_balance(String balance);
 
@@ -5462,7 +5486,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Avoid external solvers for login captchas?" })
     String CaptchaConfigPanel_avoidAutoSolverForLoginCaptchas();
 
-    @Default(lngs = { "en" }, values = { "Affects login captchas only: If a login captcha is required and at least one manual captcha solver is available, only manual captcha solvers will be allowed to solve this login captcha. Background: Captcha solver services can take a long time to solve captchas but when the user is adding an account or an account gets checked and a captcha is required, it should typically be solved faster and the manual solvers are typically faster. If you disable this setting, login captchas are handled exactly the same way as any other captchas." })
+    @Default(lngs = { "en" }, values = { "Affects login captchas only: If a login captcha is required and at least one manual captcha solver is available, only manual captcha solvers will be allowed to solve this login captcha. Background: External captcha solvers can take a long time to solve captchas but when the user is adding an account or an account gets checked and a captcha is required, it should typically be solved faster and the manual solvers are typically faster. If you disable this setting, login captchas are handled exactly the same way as any other captchas." })
     String CaptchaConfigPanel_avoidAutoSolverForLoginCaptchas_tooltip();
 
     @Default(lngs = { "en" }, values = { "External Solver comparison Table" })
@@ -5486,7 +5510,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Solver" })
     String CaptchaSolverComparison_column_solver();
 
-    @Default(lngs = { "en" }, values = { "Supports %s1 captcha types\r\nDouble click to open buy account page" })
+    @Default(lngs = { "en" }, values = { "Supports %s1 captcha types\r\nDoubleclick opens buy credits page" })
     String CaptchaSolverComparison_solver_tooltip(String supportedCount);
 
     @Default(lngs = { "en" }, values = { "Supports %s1 captcha types" })
@@ -5771,7 +5795,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Solver Overview & Settings" })
     String CaptchaConfigPanel_solverOverviewAndSettings();
 
-    @Default(lngs = { "en" }, values = { "Table display mode:" })
+    @Default(lngs = { "en" }, values = { "Captcha types to display:" })
     String CaptchaTypesTable_displayMode();
 
     @Default(lngs = { "en" }, values = { "Supported captcha types only" })
@@ -5779,6 +5803,42 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "All captcha types" })
     String CaptchaTypesTable_displayMode_all();
+
+    @Default(lngs = { "en" }, values = { "Enable custom limit rules" })
+    String CaptchaSolverLimits_enable();
+
+    @Default(lngs = { "en" }, values = { "Limit how many captchas this solver may solve within a time interval.\r\nAll enabled limits below apply at the same time." })
+    String CaptchaSolverLimits_enable_tooltip();
+
+    @Default(lngs = { "en" }, values = { "Custom limits allow you to avoid wasting credits: once one of the enabled limits is reached, this solver will not be used for further captchas until the interval has passed.\r\nAll enabled limits apply at the same time." })
+    String CaptchaSolverLimits_hint();
+
+    @Default(lngs = { "en" }, values = { "Add rule..." })
+    String CaptchaSolverLimits_add();
+
+    @Default(lngs = { "en" }, values = { "Restore example rules" })
+    String CaptchaSolverLimits_restoreExamples();
+
+    @Default(lngs = { "en" }, values = { "New limit rule" })
+    String CaptchaSolverLimits_new_name();
+
+    @Default(lngs = { "en" }, values = { "Interval" })
+    String CaptchaSolverLimits_column_interval();
+
+    @Default(lngs = { "en" }, values = { "Unit" })
+    String CaptchaSolverLimits_column_unit();
+
+    @Default(lngs = { "en" }, values = { "Max captchas" })
+    String CaptchaSolverLimits_column_maxCaptchas();
+
+    @Default(lngs = { "en" }, values = { "Minutes" })
+    String CaptchaSolverLimits_unit_minutes();
+
+    @Default(lngs = { "en" }, values = { "Hours" })
+    String CaptchaSolverLimits_unit_hours();
+
+    @Default(lngs = { "en" }, values = { "Days" })
+    String CaptchaSolverLimits_unit_days();
 
     @Default(lngs = { "en" }, values = { "Name" })
     String CaptchaTypesTable_column_name();
@@ -5867,20 +5927,8 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "JAntiCaptcha" })
     String JACSolver_gettypeName_();
 
-    @Default(lngs = { "en" }, values = { "Fully automated remote Captcha Solving" })
-    String Captcha9kwSolver_getName_();
-
     @Default(lngs = { "en" }, values = { "9kw.eu" })
     String Captcha9kwSolver_gettypeName_();
-
-    @Default(lngs = { "en" }, values = { "Fully automated remote Captcha Solving" })
-    String CaptchaMyJDSolver_getName();
-
-    @Default(lngs = { "en" }, values = { "Fully automated remote Captcha Solving" })
-    String CBSolver_getName_();
-
-    @Default(lngs = { "en" }, values = { "Fully automated remote Captcha Solving" })
-    String TwoCaptcha_getName_();
 
     @Default(lngs = { "en" }, values = { "My.JDownloader.org" })
     String CaptchaMyJDSolver_gettypeName();
@@ -6227,9 +6275,6 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Reset Solver Timing" })
     String AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_reset();
 
-    @Default(lngs = { "en" }, values = { "Are you sure that you want to reset all timing setups. \r\nThis will reset the order your captcha solvers run." })
-    String AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_reset_lit_are_you_sure();
-
     @Default(lngs = { "en" }, values = { " & delete files from disk" })
     String deleteaction_and_delete_files();
 
@@ -6481,15 +6526,6 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "EndCaptcha.com" })
     String EndCaptchaSolver_gettypeName_();
-
-    @Default(lngs = { "en" }, values = { "Register for a paid captcha service. In return, these services will solve almost all your captchas while you are not in front of your computer. Check out the service's website for more details." })
-    String AntiCaptchaConfigPanel_onShow_description_paid_service();
-
-    @Default(lngs = { "en" }, values = { "(PAID) Fully automated remote Captcha Solving" })
-    String CaptchaSolver_Type_paid_online();
-
-    @Default(lngs = { "en" }, values = { "(PAID) Fully automated remote Captcha Solving (OCR)" })
-    String CaptchaSolver_Type_paid_online_ocr();
 
     @Default(lngs = { "en" }, values = { "2160p" })
     String YoutubeVariant_filenametag_MP4_ORIGINAL();
@@ -7012,9 +7048,6 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "API Key" })
     String lit_api_key();
-
-    @Default(lngs = { "en" }, values = { "(PAID) Fully automated remote Captcha Solving" })
-    String AntiCaptchaCom_getName_();
 
     @Default(lngs = { "en" }, values = { "This captcha is harder to solve than others. JDownloader needs help from our browser extension to continue. This works without MyJDownloader account, no need to login or register! Just install the extension and start the download again." })
     String extension_required_description();

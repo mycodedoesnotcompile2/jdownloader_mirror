@@ -66,7 +66,7 @@ public class CESBubbleContent extends AbstractBubbleContentPanel {
         progressCircle = createProgress(solver.getService().getIcon(20));
         add(progressCircle, "width 32!,height 32!,pushx,growx,pushy,growy,aligny top");
         add(east);
-        if (CFG_BUBBLE.CFG.isCaptchaExchangeSolverBubbleImageVisible()) {
+        if (CFG_BUBBLE.CFG.isExternalCaptchaSolverNotificationImageVisible()) {
             final Challenge<?> ic = cesSolverJob.getChallenge();
             if (ic instanceof ImageCaptchaChallenge) {
                 try {

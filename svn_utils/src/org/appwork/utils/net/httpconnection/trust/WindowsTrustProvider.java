@@ -19,6 +19,7 @@ import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
 
 import org.appwork.utils.DebugMode;
+import org.appwork.utils.net.httpconnection.trust.interfaces.OSTrustProviderInterface;
 import org.appwork.utils.os.CrossSystem;
 
 /**
@@ -27,7 +28,7 @@ import org.appwork.utils.os.CrossSystem;
  * Automatically selects the appropriate revocation handler based on Java version: - Java 8+: Uses TrustRevocationHandler1_8
  * (PKIXRevocationChecker) - Java 1.6+: Uses TrustRevocationHandler1_6 (global properties)
  */
-public class WindowsTrustProvider extends AbstractTrustProvider {
+public class WindowsTrustProvider extends AbstractTrustProvider implements OSTrustProviderInterface {
     /** https://marschall.github.io/2018/11/23/java-native-truststore-types.html **/
     protected static final String             WINDOWS_USER_ROOT    = "Windows-ROOT";
     /** Windows-ROOT-LOCALMACHINE: available from Java 11.0.20 / 17.0.8 (SunMSCAPI). May require elevated access. */

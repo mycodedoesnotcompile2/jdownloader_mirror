@@ -331,12 +331,12 @@ public abstract class LazyPlugin<T extends Plugin> implements MinTimeWeakReferen
         BUBBLE_NOTIFICATION {
             @Override
             public String getLabel() {
-                return "This plugin can display bubble notifications";
+                return "This plugin can display notifications";
             }
 
             @Override
             public String getTooltip() {
-                return "This plugin can display bubble notifications";
+                return "This plugin can display notifications";
             }
 
             @Override

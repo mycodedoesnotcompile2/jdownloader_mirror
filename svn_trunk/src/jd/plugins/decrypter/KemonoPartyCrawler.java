@@ -67,7 +67,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.KemonoParty;
 
-@DecrypterPlugin(revision = "$Revision: 53447 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53546 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -330,7 +330,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         final String service = urlinfo.getMatch(0);
         final String usernameOrUserID = urlinfo.getMatch(1);
         final String postID = urlinfo.getMatch(2);
-        final String revisionID = urlinfo.getMatch(4);
+        final String revisionID = urlinfo.getMatch(5);
         return crawlPostAPI(br, service, usernameOrUserID, postID, revisionID);
     }
 
@@ -440,12 +440,10 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         }
         final Map<String, Object> filemap = (Map<String, Object>) postmap.get("file");
         if (!filemap.isEmpty() && filemap.get("path") != null) {
-            final DownloadLink media = buildFileDownloadLinkAPI(dupes, useAdvancedDupecheck, filemap, index, has_full);
-            /* null = item is a duplicate */
-            if (media != null) {
-                directResults.add(media);
-                index++;
-            }
+            final List<DownloadLink> mediaItems = buildFileDownloadLinksAPI(dupes, useAdvancedDupecheck, filemap, index, has_full);
+            /* Empty list = item is a duplicate or was skipped due to file version mode */
+            directResults.addAll(mediaItems);
+            index += mediaItems.size();
             numberofResultsSimpleCount++;
         }
         final List<Map<String, Object>> attachments = (List<Map<String, Object>>) postmap.get("attachments");
@@ -471,12 +469,10 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                     /* Early-skip invalid items */
                     continue;
                 }
-                final DownloadLink media = buildFileDownloadLinkAPI(dupes, useAdvancedDupecheck, attachment, index, has_full);
-                /* null = item is a duplicate */
-                if (media != null) {
-                    directResults.add(media);
-                    index++;
-                }
+                final List<DownloadLink> mediaItems = buildFileDownloadLinksAPI(dupes, useAdvancedDupecheck, attachment, index, has_full);
+                /* Empty list = item is a duplicate or was skipped due to file version mode */
+                directResults.addAll(mediaItems);
+                index += mediaItems.size();
                 numberofResultsSimpleCount++;
             }
         }
@@ -703,29 +699,85 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         return ret;
     }
 
-    private DownloadLink buildFileDownloadLinkAPI(final HashSet<String> dupes, final boolean advancedDupeCheck, final Map<String, Object> filemap, final int index, final Boolean has_full) throws PluginException {
+    /**
+     * Returns the items to add for the given file/attachment map depending on the availability of the original and the configured crawl
+     * mode. <br>
+     * If only a preview is available, only the preview is returned regardless of the file version mode. <br>
+     * Returns an empty list if the item is a duplicate or if it was skipped due to the file version mode.
+     */
+    private List<DownloadLink> buildFileDownloadLinksAPI(final HashSet<String> dupes, final boolean advancedDupeCheck, final Map<String, Object> filemap, final int index, final Boolean has_full) throws PluginException {
+        final List<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final Object filepathO = filemap.get("path");
+        if (filepathO == null) {
+            /* file map has no downloadable path (e.g. covers/thumbnail-only structure) */
+            return ret;
+        }
+        /**
+         * The has_full field is no always available. <br>
+         * Available for e.g. pawchive.pw <br>
+         * Not available for e.g. kemono.cr
+         */
+        boolean has_full_final = has_full == null ? true : Boolean.TRUE.equals(has_full);
+        if (Boolean.TRUE.equals(filemap.get("preview_only"))) {
+            // pawchive.pw
+            has_full_final = false;
+        }
+        final String filepath = filepathO.toString();
+        /* Evaluate the file type based on the path extension (path is always given). Only images have a real thumbnail. */
+        final boolean isImage = CompiledFiletypeFilter.getExtensionsFilterInterface(Files.getExtension(filepath, true)) instanceof CompiledFiletypeFilter.ImageExtensions;
+        final boolean addOriginal;
+        final boolean addPreview;
+        if (!has_full_final) {
+            /* Only a preview is available -> Takes precedence over the user setting. */
+            addOriginal = false;
+            addPreview = true;
+        } else {
+            switch (cfg.getFileVersionMode()) {
+            case PREVIEW:
+                addOriginal = false;
+                /* Non-image items have no preview and are skipped. */
+                addPreview = isImage;
+                break;
+            case ORIGINAL_AND_PREVIEW:
+                addOriginal = true;
+                addPreview = isImage;
+                break;
+            case ORIGINAL:
+            default:
+                addOriginal = true;
+                addPreview = false;
+                break;
+            }
+        }
+        int currentIndex = index;
+        if (addOriginal) {
+            final DownloadLink original = buildFileDownloadLinkAPI(dupes, advancedDupeCheck, filemap, filepath, currentIndex, true, isImage);
+            /* null = item is a duplicate */
+            if (original != null) {
+                ret.add(original);
+                currentIndex++;
+            }
+        }
+        if (addPreview) {
+            final DownloadLink preview = buildFileDownloadLinkAPI(dupes, advancedDupeCheck, filemap, filepath, currentIndex, false, isImage);
+            if (preview != null) {
+                ret.add(preview);
+            }
+        }
+        return ret;
+    }
+
+    private DownloadLink buildFileDownloadLinkAPI(final HashSet<String> dupes, final boolean advancedDupeCheck, final Map<String, Object> filemap, final String filepath, final int index, final boolean has_full_final, final boolean isImage) throws PluginException {
         /**
          * 2025-06-02: Looks like the "name" field is not always given though it missing can also mean that the original file is
          * broken/missing on the server. <br>
          * Example: /fanbox/user/64937143/post/2095805
          */
         String filename = (String) filemap.get("name");
-        final Object filepathO = filemap.get("path");
-        if (filepathO == null) {
-            /* file map has no downloadable path (e.g. covers/thumbnail-only structure) */
-            return null;
-        }
-        boolean has_full_final = Boolean.TRUE.equals(has_full);
-        if (Boolean.TRUE.equals(filemap.get("preview_only"))) {
-            // pawchive.pw
-            has_full_final = false;
-        }
-        final String filepath = filepathO.toString();
         /*
-         * Evaluate the file type based on the path extension (path is always given). When only a preview is available (has_full == false),
-         * only images have a real thumbnail; any non-image item is offline as it cannot have a thumbnail (e.g. archives).
+         * When only a preview is available (has_full == false), only images have a real thumbnail; any non-image item is offline as it
+         * cannot have a thumbnail (e.g. archives).
          */
-        final boolean isImage = CompiledFiletypeFilter.getExtensionsFilterInterface(Files.getExtension(filepath, true)) instanceof CompiledFiletypeFilter.ImageExtensions;
         final boolean isOfflinePreview = !has_full_final && !isImage;
         String url;
         if (has_full_final) {
@@ -758,7 +810,8 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         if (advancedDupeCheck && sha256hash != null) {
             dupeCheckString = sha256hash;
         } else {
-            dupeCheckString = filepath;
+            /* Prefix for previews so original and preview of the same path are not treated as dupes. */
+            dupeCheckString = has_full_final ? filepath : "thumb_" + filepath;
         }
         if (!dupes.add(dupeCheckString)) {
             /* Skip dupe */

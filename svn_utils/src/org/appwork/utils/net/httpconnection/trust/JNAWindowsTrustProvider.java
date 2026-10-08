@@ -25,6 +25,7 @@ import org.appwork.utils.net.httpconnection.IllegalSSLHostnameException;
 import org.appwork.utils.net.httpconnection.NativeHTTPConnectionImpl.HostnameVerifiedDelegate;
 import org.appwork.utils.net.httpconnection.TrustResult;
 import org.appwork.utils.net.httpconnection.TrustResult.TrustType;
+import org.appwork.utils.net.httpconnection.trust.interfaces.OSTrustProviderInterface;
 import org.appwork.utils.os.CrossSystem;
 
 import com.sun.jna.Library;
@@ -90,7 +91,7 @@ import com.sun.jna.ptr.PointerByReference;
  * Freigeben des <code>CERT_CHAIN_CONTEXT</code> die Root ausgelesen und zurückgegeben werden.
  * </p>
  */
-public class JNAWindowsTrustProvider implements TrustProviderInterface {
+public class JNAWindowsTrustProvider implements OSTrustProviderInterface {
     /**
      * JNA interface for the subset of Windows Crypt32 API (crypt32.dll) used by {@link JNAWindowsTrustProvider} for certificate chain
      * validation. Contains only the two functions required to create a certificate context from encoded bytes and to add encoded

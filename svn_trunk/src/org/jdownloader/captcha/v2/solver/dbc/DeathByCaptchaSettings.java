@@ -43,7 +43,7 @@ public interface DeathByCaptchaSettings extends ChallengeSolverConfig {
 
     @AboutConfig
     @DefaultJsonObject("{\"jdownloader.org\":60000}")
-    @DescriptionForConfigEntry("Host bound Waittime before using CES. Use CaptchaExchangeChanceToSkipBubbleTimeout for a global timeout")
+    @DescriptionForConfigEntry("Host bound Waittime before using CES. Use ExternalCaptchaSolverChanceToSkipNotificationTimeout for a global timeout")
     HashMap<String, Integer> getBubbleTimeoutByHostMap();
 
     void setBubbleTimeoutByHostMap(HashMap<String, Integer> map);

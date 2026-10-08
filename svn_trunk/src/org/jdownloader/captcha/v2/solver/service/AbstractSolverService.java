@@ -56,6 +56,11 @@ public abstract class AbstractSolverService implements SolverService {
         return false;
     }
 
+    @Override
+    public boolean isStatusTextWarning() {
+        return false;
+    }
+
     /**
      * Default: a solver is ready when it does not require a status action (e.g. "Add Account"/"Configure"). Overridable.
      */

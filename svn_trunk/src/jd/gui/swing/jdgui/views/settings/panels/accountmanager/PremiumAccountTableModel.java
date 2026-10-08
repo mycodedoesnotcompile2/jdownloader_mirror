@@ -47,6 +47,7 @@ import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
+import org.jdownloader.updatev2.gui.LAFOptions;
 
 import jd.SecondLevelLaunch;
 import jd.controlling.AccountController;
@@ -130,7 +131,7 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
                 if (ai != null) {
                     balanceStr = ai.getAccountBalanceFormatted();
                 }
-                return "Balance: " + balanceStr;
+                return _GUI.T.CaptchaSolverAccount_balance(balanceStr);
             }
             final AccountTrafficView accountTrafficView = acc.getAccountTrafficView();
             if (accountTrafficView == null) {
@@ -518,6 +519,22 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
             // return obj.getAccount().getHoster();
             // }
             @Override
+            public void resetRenderer() {
+                super.resetRenderer();
+                /* Back to the inherited default color (the warning color below is set per cell). */
+                this.rendererField.setForeground(null);
+            }
+
+            @Override
+            public void configureRendererComponent(AccountEntry value, boolean isSelected, boolean hasFocus, int row, int column) {
+                super.configureRendererComponent(value, isSelected, hasFocus, row, column);
+                if (AccountController.getInstance().isLowCredits(value.getAccount())) {
+                    /* Captcha solver account with low credits: show its status text (which contains the low credits warning) in the theme's error color. */
+                    this.rendererField.setForeground(LAFOptions.getInstance().getColorForErrorForeground());
+                }
+            }
+
+            @Override
             public String getStringValue(AccountEntry value) {
                 return accountToStatusString(value.getAccount());
             }
@@ -669,7 +686,8 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
 
             @Override
             public boolean isEnabled(AccountEntry obj) {
-                return true;
+                /* Gray out the button for accounts without settings. */
+                return obj.hasConfiguration();
             }
 
             @Override
@@ -679,7 +697,8 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
 
             @Override
             public boolean isEditable(AccountEntry obj) {
-                return super.isEditable(obj);
+                /* A button without settings behind it must not be clickable. */
+                return obj.hasConfiguration() && super.isEditable(obj);
             }
 
             @Override

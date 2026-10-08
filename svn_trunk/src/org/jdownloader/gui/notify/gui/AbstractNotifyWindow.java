@@ -25,6 +25,7 @@ import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.util.List;
 
+import javax.swing.Icon;
 import javax.swing.JLabel;
 import javax.swing.JSeparator;
 import javax.swing.SwingConstants;
@@ -408,6 +409,16 @@ public abstract class AbstractNotifyWindow<T extends AbstractBubbleContentPanel>
             @Override
             protected void runInEDT() {
                 headerLbl.setText(txt);
+            }
+        };
+    }
+
+    /** Sets an (small) icon in front of the header text, e.g. a favicon. */
+    public void setHeaderIcon(final Icon icon) {
+        new EDTRunner() {
+            @Override
+            protected void runInEDT() {
+                headerLbl.setIcon(icon);
             }
         };
     }

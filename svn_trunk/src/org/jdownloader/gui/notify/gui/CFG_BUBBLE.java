@@ -27,6 +27,11 @@ public class CFG_BUBBLE {
     public static final IntegerKeyHandler                  BUBBLE_NOTIFY_ON_NEW_LINKGRABBER_LINKS_END_NOTIFY_DELAY = SH.getKeyHandler("BubbleNotifyOnNewLinkgrabberLinksEndNotifyDelay", IntegerKeyHandler.class);
     public static final BooleanKeyHandler                  BUBBLE_NOTIFY_ON_UPDATE_AVAILABLE_ENABLED               = SH.getKeyHandler("BubbleNotifyOnUpdateAvailableEnabled", BooleanKeyHandler.class);
     /**
+     * Show a notification when the account of an external captcha solver has low credits. Shown after every account check until it is hidden for the account via the notification's button (until JDownloader is restarted). Also needs 'Warn
+     * on low credits' to be enabled for the external captcha solver.
+     **/
+    public static final BooleanKeyHandler                  BUBBLE_NOTIFY_ON_LOW_CAPTCHA_CREDITS_ENABLED            = SH.getKeyHandler("BubbleNotifyOnLowCaptchaCreditsEnabled", BooleanKeyHandler.class);
+    /**
      * The bubbles iuse the current active screen. That means the screen that is used by the Main Window. You can set a hardcoded screen ID
      * here. Like \display0 for your main screen
      **/

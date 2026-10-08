@@ -3,6 +3,7 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.DebugMode;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolverTwoCaptchaAPIV2;
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigCapmonster;
 import org.jdownloader.plugins.controller.LazyPlugin;
@@ -11,7 +12,7 @@ import jd.PluginWrapper;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 53503 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53549 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
 public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -33,6 +34,10 @@ public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCapt
         types.add(CAPTCHA_TYPE.IMAGE);
         types.add(CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA);
         types.add(CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
+        /* 2026-10-07: Works according to them but failed for me. */
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            types.add(CAPTCHA_TYPE.HCAPTCHA);
+        }
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);

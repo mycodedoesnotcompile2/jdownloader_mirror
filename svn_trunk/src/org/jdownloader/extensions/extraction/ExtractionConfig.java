@@ -160,7 +160,7 @@ public interface ExtractionConfig extends ExtensionConfigInterface {
 
     @DefaultBooleanValue(true)
     @AboutConfig
-    @DescriptionForConfigEntry("Show Bubbles for Extration Jobs")
+    @DescriptionForConfigEntry("Show notifications for extraction jobs")
     boolean isBubbleEnabledIfArchiveExtractionIsInProgress();
 
     void setBubbleEnabledIfArchiveExtractionIsInProgress(boolean b);

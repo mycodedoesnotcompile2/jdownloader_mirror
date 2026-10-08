@@ -136,6 +136,10 @@ public class PremiumAccountTable extends BasicJDTable<AccountEntry> {
             } else {
                 popup.add(new NewAction());
                 popup.add(new EditAction(selection));
+                /* Same as the button in the settings column, but only for an account whose plugin has settings. */
+                if (selection.size() == 1 && selection.get(0).hasConfiguration()) {
+                    popup.add(new SettingsAction(selection));
+                }
                 popup.add(new RemoveAction(selection, false));
                 popup.add(new RefreshAction(selection));
             }

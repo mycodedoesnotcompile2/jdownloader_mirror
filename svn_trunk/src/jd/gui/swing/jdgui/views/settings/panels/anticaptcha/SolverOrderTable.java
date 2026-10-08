@@ -62,7 +62,8 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
      * Context menu actions, depending on the type of the right-clicked solver (all independent of the solver's ready state):
      * <ul>
      * <li>MyJDownloader remote solver -> "Configure" (opens the My.JDownloader tab).</li>
-     * <li>External (plugin based) solver -> "Open account manager" (and selects the solver's first account, if it has one).</li>
+     * <li>External (plugin based) solver -> "Open account manager" (and selects the solver's first account, if it has one) and, if the
+     * solver has a buy page, "Buy credits".</li>
      * </ul>
      * All other solver types (local JAC, dialog, browser) get no context menu actions.
      */
@@ -91,6 +92,17 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
                 }
             });
             popup.add(openAccountManager);
+            if (external.getBuyURL() != null) {
+                /* Paid solver: same "Buy" icon and affiliate/redirect link logic as the account manager. */
+                final JMenuItem buyCredits = new JMenuItem(_GUI.T.SolverOrderTable_context_buyCredits(), new AbstractIcon(IconKey.ICON_BUY, 18));
+                buyCredits.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(final ActionEvent e) {
+                        external.openBuyPage("captchasolver/solvertable/context");
+                    }
+                });
+                popup.add(buyCredits);
+            }
             return popup;
         }
         /* No context menu actions for any other solver type. */

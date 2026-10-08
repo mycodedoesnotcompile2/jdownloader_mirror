@@ -22,6 +22,7 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
 
+import org.appwork.utils.net.httpconnection.trust.interfaces.OSTrustProviderInterface;
 import org.appwork.utils.os.CrossSystem;
 
 /**
@@ -47,7 +48,7 @@ import org.appwork.utils.os.CrossSystem;
  *
  * @see org.appwork.utils.net.httpconnection.trust.TrustUtils#getOSProvider()
  */
-public class TrustLinuxProvider extends AbstractTrustProvider {
+public class TrustLinuxProvider extends AbstractTrustProvider implements OSTrustProviderInterface {
     /** Debian/Ubuntu and derivatives (ca-certificates package). */
     protected static final String           LINUX_CA_DEBIAN   = "/etc/ssl/certs/ca-certificates.crt";
     /** Fedora/RHEL and derivatives. */

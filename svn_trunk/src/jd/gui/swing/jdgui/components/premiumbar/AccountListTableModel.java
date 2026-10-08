@@ -464,7 +464,7 @@ public class AccountListTableModel extends ExtTableModel<AccountEntry> implement
                     if (ai != null) {
                         balanceStr = ai.getAccountBalanceFormatted();
                     }
-                    return "Balance: " + balanceStr;
+                    return _GUI.T.CaptchaSolverAccount_balance(balanceStr);
                 }
                 final AccountTrafficView accountTrafficView = acc.getAccountTrafficView();
                 if (accountTrafficView == null) {

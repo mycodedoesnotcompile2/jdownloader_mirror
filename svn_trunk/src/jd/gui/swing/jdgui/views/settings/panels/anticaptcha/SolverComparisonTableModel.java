@@ -22,6 +22,7 @@ import org.jdownloader.captcha.v2.SolverService;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
+import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSolverService;
 
 import jd.plugins.CaptchaType;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
@@ -66,13 +67,20 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
         return _GUI.T.CaptchaSolverComparison_solver_tooltip(supportedCount);
     }
 
-    /** Opens the page where an account for the given solver can be bought. Returns true if a page was opened. */
+    /**
+     * Opens the page where an account for the given solver can be bought, with the same affiliate/redirect link logic as the account
+     * manager. Returns true if a page was opened.
+     */
     public static boolean openBuyPage(final SolverService solver) {
         final String buyURL = solver.getBuyURL();
         if (buyURL == null || !CrossSystem.isOpenBrowserSupported()) {
             return false;
         }
-        CrossSystem.openURL(buyURL);
+        if (solver instanceof PluginForCaptchaSolverSolverService) {
+            ((PluginForCaptchaSolverSolverService) solver).openBuyPage("captchasolver/comparisontable");
+        } else {
+            CrossSystem.openURL(buyURL);
+        }
         return true;
     }
 

@@ -92,6 +92,8 @@ public abstract class ChallengeSolver<T> {
         ACCOUNT_DISABLED,
         ACCOUNT_IN_ERROR_STATE,
         ACCOUNT_NOT_ENOUGH_CREDITS,
+        /** One of the solver's enabled custom limit rules (max captchas per time interval) is currently used up. */
+        CUSTOM_LIMIT_REACHED,
         /**
          * The user globally disabled external (plugin based) captcha solver accounts, see
          * GeneralSettings#isUseAvailableCaptchaSolverAccounts.
@@ -360,6 +362,17 @@ public abstract class ChallengeSolver<T> {
      */
     public int getFinalMaxCaptchaThreadsPerAccount() {
         return Integer.MAX_VALUE;
+    }
+
+    /**
+     * Returns the custom limit rules (max captchas per time interval) that currently apply to this solver, i.e. only the enabled ones, and
+     * only while the solver's custom limits are switched on. Default: null (no custom limits). The returned list is a snapshot and may be
+     * freely iterated. It is evaluated by {@link ChallengeResponseController}: a solver with a used up rule is vetoed for new challenges (see
+     * {@link ChallengeVetoReason#CUSTOM_LIMIT_REACHED}) and every started captcha counts against all rules of the solver. See
+     * {@link PluginChallengeSolver#getCustomLimitRules()} for the plugin-based override.
+     */
+    public List<CaptchaSolverLimitRule> getCustomLimitRules() {
+        return null;
     }
 
     public String toString() {

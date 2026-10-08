@@ -1,5 +1,6 @@
 package jd.gui.swing.jdgui.views.settings.panels.anticaptcha;
 
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Insets;
@@ -49,6 +50,7 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 import org.jdownloader.settings.staticreferences.CFG_MYJD;
+import org.jdownloader.updatev2.gui.LAFOptions;
 
 import jd.controlling.AccountController;
 import jd.controlling.AccountControllerEvent;
@@ -273,8 +275,10 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
             private final JButton          editorBtn;
             private final Icon             addIcon     = new AbstractIcon(IconKey.ICON_ADD, 14);
             private final Icon             warningIcon = new AbstractIcon(IconKey.ICON_WARNING, 14);
+            private final Color            defaultStatusForeground;
             {
                 rendererLabel = new RenderLabel();
+                defaultStatusForeground = rendererLabel.getForeground();
                 rendererBtn = new JButton();
                 rendererBtn.setIcon(addIcon);
                 rendererBtn.setHorizontalAlignment(SwingConstants.LEFT);
@@ -379,6 +383,8 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
                     rendererLabel.setText(value.getStatusText());
                     /* Ready solvers get a green check; solvers that need an action (button rows) never get one. */
                     rendererLabel.setIcon(value.isReady() ? NewTheme.I().getIcon(IconKey.ICON_OK, 14) : null);
+                    /* The renderer is reused for all rows, so the foreground has to be set (or reset) for every row. */
+                    rendererLabel.setForeground(value.isStatusTextWarning() ? LAFOptions.getInstance().getColorForErrorForeground() : defaultStatusForeground);
                     rendererLabel.setVisible(true);
                     rendererBtn.setVisible(false);
                 }

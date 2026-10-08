@@ -12,6 +12,7 @@ import org.jdownloader.captcha.v2.CaptchaSolverConfigV3;
 import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
 import org.jdownloader.captcha.v2.solver.service.AbstractSolverService;
 import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.host.LazyHostPluginFilter;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
@@ -136,7 +137,23 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
             return _GUI.T.CaptchaSolverService_status_ready_accounts(Integer.toString(validAccounts.size()), balanceText);
         }
         /* Single account: keep the established "Ready | Balance: <localized amount>" layout. */
-        return _GUI.T.CaptchaSolverService_status_ready_balance(balanceText);
+        final String statusText = _GUI.T.CaptchaSolverService_status_ready_balance(balanceText);
+        if (isStatusTextWarning()) {
+            final String thresholdText = AccountInfo.formatCaptchaSolverBalance(getPluginConfig().getLowCreditsWarningThreshold(), currency);
+            return statusText + " | ⚠ " + _GUI.T.CaptchaSolverAccount_status_lowCredits(thresholdText);
+        }
+        return statusText;
+    }
+
+    /**
+     * True if the solver has exactly one usable account and its credits are below the user's warning threshold (see
+     * {@link AccountController#isLowCredits(Account)}). With several accounts the status text only shows the total balance, which says
+     * nothing about the single accounts, so no warning is shown then.
+     */
+    @Override
+    public boolean isStatusTextWarning() {
+        final List<Account> validAccounts = AccountController.getInstance().getValidAccounts(plugin.getHost());
+        return validAccounts != null && validAccounts.size() == 1 && AccountController.getInstance().isLowCredits(validAccounts.get(0));
     }
 
     @Override
@@ -211,7 +228,7 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
      * Opens the Account Manager settings tab (its "Accounts" sub-tab) and, if given, selects/highlights the given account in the account
      * list. Mirrors {@code jd.plugins.PluginConfigPanelNG#switchToAccountManager}.
      */
-    private static void openAccountManager(final Account accountToSelect) {
+    public static void openAccountManager(final Account accountToSelect) {
         JsonConfig.create(GraphicalUserInterfaceSettings.class).setConfigViewVisible(true);
         JDGui.getInstance().setContent(ConfigurationView.getInstance(), true);
         ConfigurationView.getInstance().setSelectedSubPanel(AccountManagerSettings.class);
@@ -242,6 +259,11 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
     /** Returns the underlying plugin's own captcha solver config (per-plugin storage). */
     @Override
     public CaptchaSolverConfigV3 getConfigV3() {
+        return getPluginConfig();
+    }
+
+    /** Same as {@link #getConfigV3()}, but typed as the plugin config, which also carries the settings only external solvers have. */
+    public CaptchaSolverPluginConfig getPluginConfig() {
         return PluginJsonConfig.get(plugin.getLazyP(), plugin.getConfigInterface());
     }
 
@@ -263,9 +285,28 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
         return plugin.getServerSideMaxPollingTimeoutMillis();
     }
 
+    /**
+     * Returns this service's server-side minimum polling interval in milliseconds (see
+     * {@link abstractPluginForCaptchaSolver#getServerSideMinPollingIntervalMillis()}), 0 = none, for display purposes.
+     */
+    public long getServerSideMinPollingIntervalMillis() {
+        return plugin.getServerSideMinPollingIntervalMillis();
+    }
+
     @Override
     public String getBuyURL() {
         return plugin.getBuyPremiumUrl();
+    }
+
+    /**
+     * Opens the "buy premium" page of this solver in the browser. Uses the same affiliate/redirect link logic as the account manager's
+     * buy/renew actions ({@link AccountController#openAfflink}).
+     *
+     * @param source
+     *            Identifies where the link was opened from (part of the redirect link)
+     */
+    public void openBuyPage(final String source) {
+        AccountController.openAfflink(plugin.getLazyP(), plugin, source);
     }
 
     @Override

@@ -69,7 +69,7 @@ public class CESSolverJob<T> {
 
     public void showBubble() throws InterruptedException {
         if (!org.appwork.utils.Application.isHeadless()) {
-            showBubble(CFG_CAPTCHA.CFG.getCaptchaExchangeChanceToSkipBubbleTimeout());
+            showBubble(CFG_CAPTCHA.CFG.getExternalCaptchaSolverChanceToSkipNotificationTimeout());
         }
     }
 
