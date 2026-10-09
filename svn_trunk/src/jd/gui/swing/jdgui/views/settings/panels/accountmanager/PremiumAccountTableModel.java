@@ -125,13 +125,19 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
                 return _GUI.T.premiumaccounttablemodel_column_trafficleft_tempdisabled(TimeFormatter.formatMilliSeconds(timeout, 0));
             }
             if (plg != null && plg.hasFeature(FEATURE.CAPTCHA_SOLVER)) {
-                /* Captcha solver accounts have no download traffic */
-                String balanceStr = "0";
+                /**
+                 * Captcha solver accounts have no download traffic: show the AccountInfo status text instead (or nothing) <br>
+                 * The account status text will usually contain info about balance like: "Balance: 13,37€"
+                 */
                 final AccountInfo ai = acc.getAccountInfo();
+                String ret = null;
                 if (ai != null) {
-                    balanceStr = ai.getAccountBalanceFormatted();
+                    final String balanceformatted = ai.getAccountBalanceFormatted();
+                    if (balanceformatted != null) {
+                        ret = _GUI.T.CaptchaSolverAccount_balance(balanceformatted);
+                    }
                 }
-                return _GUI.T.CaptchaSolverAccount_balance(balanceStr);
+                return StringUtils.isEmpty(ret) ? "" : ret;
             }
             final AccountTrafficView accountTrafficView = acc.getAccountTrafficView();
             if (accountTrafficView == null) {
@@ -528,8 +534,11 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
             @Override
             public void configureRendererComponent(AccountEntry value, boolean isSelected, boolean hasFocus, int row, int column) {
                 super.configureRendererComponent(value, isSelected, hasFocus, row, column);
-                if (AccountController.getInstance().isLowCredits(value.getAccount())) {
-                    /* Captcha solver account with low credits: show its status text (which contains the low credits warning) in the theme's error color. */
+                if (AccountController.getInstance().isLowBalance(value.getAccount())) {
+                    /*
+                     * Captcha solver account with low credits: show its status text (which contains the low credits warning) in the theme's
+                     * error color.
+                     */
                     this.rendererField.setForeground(LAFOptions.getInstance().getColorForErrorForeground());
                 }
             }
@@ -869,8 +878,8 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
                     return savedValue;
                 }
                 /*
-                 * No explicit user preference stored yet: this column only adds information once the account list mixes
-                 * different account types, so only show it automatically when at least two different types are present.
+                 * No explicit user preference stored yet: this column only adds information once the account list mixes different account
+                 * types, so only show it automatically when at least two different types are present.
                  */
                 final Set<AccountManagerType> types = new HashSet<AccountManagerType>();
                 for (final AccountEntry entry : PremiumAccountTableModel.this.getTableData()) {
@@ -1003,9 +1012,8 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
                         return errString;
                     }
                     ret = _GUI.T.PremiumAccountTableModel_getStringValue_temp_disabled2(ret);
-                } else {
-                    ret = _GUI.T.PremiumAccountTableModel_getStringValue_account_ok_2(ret);
                 }
+                /* Account is ok: show the plain status without a redundant "Account is ok:" prefix */
             }
             return ret;
         }

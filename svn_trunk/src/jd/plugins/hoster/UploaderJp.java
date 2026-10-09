@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -32,7 +33,7 @@ import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.components.antiDDoSForHost;
 
-@HostPlugin(revision = "$Revision: 53521 $", interfaceVersion = 2, names = { "uploader.jp" }, urls = { "https?://u[a-z0-9]\\.getuploader\\.com/([a-z0-9\\-_]+)/download/(\\d+)" })
+@HostPlugin(revision = "$Revision: 53556 $", interfaceVersion = 2, names = { "uploader.jp" }, urls = { "https?://u[a-z0-9]\\.getuploader\\.com/([a-z0-9\\-_]+)/download/(\\d+)" })
 public class UploaderJp extends antiDDoSForHost {
     public UploaderJp(PluginWrapper wrapper) {
         super(wrapper);
@@ -95,6 +96,15 @@ public class UploaderJp extends antiDDoSForHost {
 
     public static boolean isOffline(final Browser br) {
         return br.getHttpConnection() == null || br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("(?i)404 File Not found<|Page not found");
+    }
+
+    @Override
+    protected boolean looksLikeDownloadableContent(URLConnectionAdapter urlConnection) {
+        if (urlConnection.getResponseCode() == 200 && urlConnection.getCompleteContentLength() == 0 && getDownloadLink().getKnownDownloadSize() == 0) {
+            // allow zero/0 byte length file downloads
+            return true;
+        }
+        return super.looksLikeDownloadableContent(urlConnection);
     }
 
     @Override

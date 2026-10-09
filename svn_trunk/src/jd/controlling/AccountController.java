@@ -446,11 +446,11 @@ public class AccountController implements AccountControllerListener, AccountProp
      * Captcha solver accounts whose credits were below the warning threshold at their last account check (RAM only, weak keys). Used by the
      * account manager to display the status text as a warning.
      */
-    private final Set<Account> lowCreditsAccounts           = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<Account, Boolean>()));
+    private final Set<Account> lowBalanceAccounts           = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<Account, Boolean>()));
 
     /** True if the credits of the given captcha solver account were below the user's warning threshold at its last account check. */
-    public boolean isLowCredits(final Account account) {
-        return lowCreditsAccounts.contains(account);
+    public boolean isLowBalance(final Account account) {
+        return lowBalanceAccounts.contains(account);
     }
 
     /** Stops the low credits bubble for the given account until JDownloader is restarted. */
@@ -480,16 +480,16 @@ public class AccountController implements AccountControllerListener, AccountProp
             account.setError(AccountError.INVALID, -1, "Zero balance");
         }
         /* Low credits warning */
-        lowCreditsAccounts.remove(account);
+        lowBalanceAccounts.remove(account);
         final CaptchaSolverPluginConfig cfg = ((abstractPluginForCaptchaSolver) plugin).getDefaultConfig();
-        if (!cfg.isWarnOnLowCredits()) {
+        if (!cfg.isWarnOnLowBalance()) {
             return;
         }
-        final double threshold = cfg.getLowCreditsWarningThreshold();
+        final double threshold = cfg.getLowBalanceWarningThreshold();
         if (ai.getAccountBalance() >= threshold) {
             return;
         }
-        lowCreditsAccounts.add(account);
+        lowBalanceAccounts.add(account);
         final String thresholdFormatted = AccountInfo.formatCaptchaSolverBalance(threshold, ai.getCurrency());
         ai.setStatus(ai.getStatus() + " | ⚠ " + _GUI.T.CaptchaSolverAccount_status_lowCredits(thresholdFormatted));
         if (!lowCreditsSuppressedAccounts.contains(account)) {

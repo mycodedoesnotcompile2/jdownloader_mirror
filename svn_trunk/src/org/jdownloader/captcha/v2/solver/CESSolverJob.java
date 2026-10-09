@@ -68,9 +68,40 @@ public class CESSolverJob<T> {
     }
 
     public void showBubble() throws InterruptedException {
-        if (!org.appwork.utils.Application.isHeadless()) {
-            showBubble(CFG_CAPTCHA.CFG.getExternalCaptchaSolverChanceToSkipNotificationTimeout());
+        if (org.appwork.utils.Application.isHeadless()) {
+            /* No GUI -> no bubble. */
+        } else if (hasManualSolver()) {
+            showBubble(CFG_CAPTCHA.CFG.getExternalCaptchaSolverChanceToAbortExternalCaptchaSolver());
+        } else if (CESBubbleSupport.getInstance().isEnabled()) {
+            /*
+             * The bubble delays the upload to give the user a chance to solve the captcha manually or to abort the upload. Without a manual
+             * solver that delay is pointless -> send the captcha right away.
+             */
+            getLogger().info("Bubble is enabled but not shown: no manual solver available for this challenge, not delaying the captcha upload to " + solver + " | Solvers: " + job.getSolverList());
         }
+    }
+
+    /**
+     * True if the job has a solver that is still working on the challenge and requires a human: dialog, browser or remote API (e.g. MyJD)
+     * solver. Automatic local solvers and external solvers do not count.
+     */
+    private boolean hasManualSolver() {
+        for (final ChallengeSolver<T> other : job.getSolverList()) {
+            if (job.isDone(other)) {
+                continue;
+            }
+            switch (other.getSolverType()) {
+            case JD_LOCAL_DIALOG:
+            case JD_LOCAL_BROWSER:
+            case JD_REMOTE_API:
+                return true;
+            case JD_LOCAL:
+            case EXTERNAL:
+            default:
+                break;
+            }
+        }
+        return false;
     }
 
     public void showBubble(int timeout) throws InterruptedException {

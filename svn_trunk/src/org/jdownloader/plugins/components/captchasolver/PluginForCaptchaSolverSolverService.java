@@ -5,6 +5,17 @@ import java.util.List;
 
 import javax.swing.Icon;
 
+import jd.controlling.AccountController;
+import jd.gui.swing.dialog.AddAccountDialog;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.components.premiumbar.ServiceCollection;
+import jd.gui.swing.jdgui.components.premiumbar.ServicePanelExtender;
+import jd.gui.swing.jdgui.views.settings.ConfigurationView;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountManagerSettings;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
 import org.jdownloader.DomainInfo;
@@ -17,17 +28,6 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.host.LazyHostPluginFilter;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
-
-import jd.controlling.AccountController;
-import jd.gui.swing.dialog.AddAccountDialog;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.components.premiumbar.ServiceCollection;
-import jd.gui.swing.jdgui.components.premiumbar.ServicePanelExtender;
-import jd.gui.swing.jdgui.views.settings.ConfigurationView;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountManagerSettings;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 public class PluginForCaptchaSolverSolverService extends AbstractSolverService implements ServicePanelExtender {
     protected final abstractPluginForCaptchaSolver plugin;
@@ -139,7 +139,7 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
         /* Single account: keep the established "Ready | Balance: <localized amount>" layout. */
         final String statusText = _GUI.T.CaptchaSolverService_status_ready_balance(balanceText);
         if (isStatusTextWarning()) {
-            final String thresholdText = AccountInfo.formatCaptchaSolverBalance(getPluginConfig().getLowCreditsWarningThreshold(), currency);
+            final String thresholdText = AccountInfo.formatCaptchaSolverBalance(getPluginConfig().getLowBalanceWarningThreshold(), currency);
             return statusText + " | ⚠ " + _GUI.T.CaptchaSolverAccount_status_lowCredits(thresholdText);
         }
         return statusText;
@@ -147,13 +147,13 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
 
     /**
      * True if the solver has exactly one usable account and its credits are below the user's warning threshold (see
-     * {@link AccountController#isLowCredits(Account)}). With several accounts the status text only shows the total balance, which says
+     * {@link AccountController#isLowBalance(Account)}). With several accounts the status text only shows the total balance, which says
      * nothing about the single accounts, so no warning is shown then.
      */
     @Override
     public boolean isStatusTextWarning() {
         final List<Account> validAccounts = AccountController.getInstance().getValidAccounts(plugin.getHost());
-        return validAccounts != null && validAccounts.size() == 1 && AccountController.getInstance().isLowCredits(validAccounts.get(0));
+        return validAccounts != null && validAccounts.size() == 1 && AccountController.getInstance().isLowBalance(validAccounts.get(0));
     }
 
     @Override

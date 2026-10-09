@@ -56,6 +56,19 @@ public class CESBubble extends AbstractNotifyWindow<CESBubbleContent> {
         };
     }
 
+    /**
+     * Closes the bubble. {@link CESBubbleSupport#show(ChallengeSolver, CESSolverJob, int)} stops waiting for the remaining timeout as soon
+     * as the bubble is closed, so this (like the close button of the bubble) makes the captcha be sent right away.
+     */
+    public void close() {
+        new EDTRunner() {
+            @Override
+            protected void runInEDT() {
+                onClose();
+            }
+        };
+    }
+
     public void update() {
         new EDTRunner() {
 

@@ -45,7 +45,7 @@ import org.jdownloader.plugins.controller.host.HostPluginController;
  *
  * @author raztoki<br />
  */
-@HostPlugin(revision = "$Revision: 53513 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53561 $", interfaceVersion = 3, names = {}, urls = {})
 public class Offline extends PluginForHost {
     public static String getOfflineVersion() {
         final HostPlugin hostPlugin = Offline.class.getAnnotation(HostPlugin.class);
@@ -348,6 +348,8 @@ public class Offline extends PluginForHost {
         ret.add(new String[] { "vine.co" });
         ret.add(new String[] { "rapidbytez.com" });
         ret.add(new String[] { "anonsharing.com" });
+        ret.add(new String[] { "worldbytez.xyz", "worldbytez.info", "worldbytez.net", "worldbytez.com", "worldbytez.org" });
+        ret.add(new String[] { "up2img.com" });
         if (cache != null) {
             cache.put(cacheID, ret);
         }

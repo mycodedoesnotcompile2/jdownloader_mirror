@@ -11,6 +11,20 @@ import java.util.regex.Pattern;
 
 import javax.swing.TransferHandler;
 
+import jd.controlling.ClipboardMonitoring;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.linkcrawler.CrawledPackageView;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
+import jd.controlling.packagecontroller.AbstractPackageNode;
+import jd.gui.swing.jdgui.MainTabbedPane;
+import jd.parser.Regex;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import jd.plugins.FilePackageView;
+import jd.plugins.download.HashInfo;
+
 import org.appwork.utils.Files;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.os.CrossSystem;
@@ -33,20 +47,6 @@ import org.jdownloader.gui.views.linkgrabber.LinkGrabberTable;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.UrlDisplayType;
 import org.jdownloader.translate._JDT;
-
-import jd.controlling.ClipboardMonitoring;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.linkcrawler.CrawledPackageView;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
-import jd.controlling.packagecontroller.AbstractPackageNode;
-import jd.gui.swing.jdgui.MainTabbedPane;
-import jd.parser.Regex;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import jd.plugins.FilePackageView;
-import jd.plugins.download.HashInfo;
 
 public class CopyGenericContextAction extends CustomizableTableContextAppAction implements ActionContext {
     private static final String PATTERN_NAME                  = "{name}";                      // depends on type
@@ -73,6 +73,9 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
     private static final String PATTERN_TYPE                  = "{type}";
     private static final String PATTERN_EXTENSION             = "{ext}";
     private static final String PATTERN_PATH                  = "{path}";
+    private static final String PATTERN_DATE                  = "{date_HH:mm}";
+    private static final String PATTERN_CREATED_DATE          = "{createdDate_HH:mm}";
+    private static final String PATTERN_FINISHED_DATE         = "{finishedDate_HH:mm}";
 
     public CopyGenericContextAction() {
         super(true, true);
@@ -86,7 +89,7 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
         sb.append("<html>");
         sb.append(_JDT.T.CopyGenericContextAction_getTranslationForPatternPackages_v3());
         sb.append("<br><ul>");
-        for (final String pattern : new String[] { PATTERN_TYPE, PATTERN_PATH, PATTERN_COMMENT, PATTERN_FILESIZE_RAW, PATTERN_FILESIZE_B, PATTERN_FILESIZE_KIB, PATTERN_FILESIZE_MIB, PATTERN_FILESIZE_GIB, PATTERN_NEWLINE, PATTERN_TAB, PATTERN_NAME, PATTERN_PACKAGE_NAME }) {
+        for (final String pattern : new String[] { PATTERN_TYPE, PATTERN_PATH, PATTERN_COMMENT, PATTERN_FILESIZE_RAW, PATTERN_FILESIZE_B, PATTERN_FILESIZE_KIB, PATTERN_FILESIZE_MIB, PATTERN_FILESIZE_GIB, PATTERN_NEWLINE, PATTERN_TAB, PATTERN_NAME, PATTERN_PACKAGE_NAME, PATTERN_DATE, PATTERN_CREATED_DATE, PATTERN_FINISHED_DATE }) {
             sb.append("<li>").append(pattern).append("</li>");
         }
         sb.append("</ul></html>");
@@ -98,7 +101,7 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
         sb.append("<html>");
         sb.append(_JDT.T.CopyGenericContextAction_getTranslationForPatternLinks_v3());
         sb.append("<br><ul>");
-        for (final String pattern : new String[] { PATTERN_TYPE, PATTERN_PATH, PATTERN_COMMENT, PATTERN_AVAILABILITY, PATTERN_FILESIZE_RAW, PATTERN_FILESIZE_B, PATTERN_FILESIZE_KIB, PATTERN_FILESIZE_MIB, PATTERN_FILESIZE_GIB, PATTERN_NEWLINE, PATTERN_TAB, PATTERN_NAME, PATTERN_PACKAGE_NAME, PATTERN_HOST, PATTERN_NAME_NOEXT, PATTERN_EXTENSION, PATTERN_HASH, PATTERN_URL, PATTERN_URL_CONTAINER, PATTERN_URL_CONTENT, PATTERN_URL_ORIGIN, PATTERN_URL_REFERRER, PATTERN_ARCHIVE_PASSWORD, PATTERN_DOWNLOADLINK_PROPERTY }) {
+        for (final String pattern : new String[] { PATTERN_TYPE, PATTERN_PATH, PATTERN_COMMENT, PATTERN_AVAILABILITY, PATTERN_FILESIZE_RAW, PATTERN_FILESIZE_B, PATTERN_FILESIZE_KIB, PATTERN_FILESIZE_MIB, PATTERN_FILESIZE_GIB, PATTERN_NEWLINE, PATTERN_TAB, PATTERN_NAME, PATTERN_PACKAGE_NAME, PATTERN_HOST, PATTERN_NAME_NOEXT, PATTERN_EXTENSION, PATTERN_HASH, PATTERN_URL, PATTERN_URL_CONTAINER, PATTERN_URL_CONTENT, PATTERN_URL_ORIGIN, PATTERN_URL_REFERRER, PATTERN_ARCHIVE_PASSWORD, PATTERN_DOWNLOADLINK_PROPERTY, PATTERN_DATE, PATTERN_CREATED_DATE, PATTERN_FINISHED_DATE }) {
             sb.append("<li>").append(pattern).append("</li>");
         }
         sb.append("</ul></html>");
@@ -267,13 +270,18 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
         }
     }
 
-    private final String replaceDate(String line) {
+    private final String replaceDate(String line, final String key, final Long timeStamp) {
+        final Pattern pattern = Pattern.compile("(\\{" + key + "_(.*?)\\})");
         while (true) {
-            final String timeFormat[] = new Regex(line, "(\\{date_(.*?)\\})").getRow(0);
+            final String timeFormat[] = new Regex(line, pattern).getRow(0);
             if (timeFormat != null) {
+                if (timeStamp == null) {
+                    line = line.replace(timeFormat[0], "");
+                    continue;
+                }
                 try {
                     final SimpleDateFormat dateFormat = new SimpleDateFormat(timeFormat[1], Locale.ENGLISH);
-                    line = line.replace(timeFormat[0], dateFormat.format(new Date(System.currentTimeMillis())));
+                    line = line.replace(timeFormat[0], dateFormat.format(new Date(timeStamp.longValue())));
                 } catch (final Throwable e) {
                     line = line.replace(timeFormat[0], "");
                 }
@@ -299,8 +307,11 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
         String line = null;
         if (pv instanceof FilePackage) {
             line = getPatternPackages();
-            line = replaceDate(line);
+            line = replaceDate(line, "date", System.currentTimeMillis());
             final FilePackage pkg = (FilePackage) pv;
+            final long finishedDate = pkg.getFinishedDate();
+            line = replaceDate(line, "finishedDate", finishedDate == -1 ? null : finishedDate);
+            line = replaceDate(line, "createdDate", pkg.getCreated());
             final FilePackageView fpv = new FilePackageView(pkg);
             fpv.aggregate();
             line = line.replace(PATTERN_TYPE, "Package");
@@ -319,9 +330,12 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
             line = line.replace(PATTERN_PACKAGE_NAME, nulltoString(name));
         } else if (pv instanceof DownloadLink) {
             line = getPatternLinks();
-            line = replaceDate(line);
+            line = replaceDate(line, "date", System.currentTimeMillis());
             line = replaceArchiveInfos(pv, line);
             final DownloadLink link = (DownloadLink) pv;
+            final long finishedDate = link.getFinishedDate();
+            line = replaceDate(line, "finishedDate", finishedDate == -1 ? null : finishedDate);
+            line = replaceDate(line, "createdDate", link.getCreated());
             final FilePackage fp = link.getFilePackage();
             line = line.replace(PATTERN_TYPE, "Link");
             line = line.replace(PATTERN_HOST, nulltoString(link.getHost()));
@@ -364,9 +378,12 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
             line = line.replace(PATTERN_URL_REFERRER, nulltoString(LinkTreeUtils.getUrlByType(UrlDisplayType.REFERRER, link)));
         } else if (pv instanceof CrawledLink) {
             line = getPatternLinks();
-            line = replaceDate(line);
+            line = replaceDate(line, "date", System.currentTimeMillis());
             line = replaceArchiveInfos(pv, line);
             final CrawledLink link = (CrawledLink) pv;
+            final long finishedDate = link.getFinishedDate();
+            line = replaceDate(line, "finishedDate", finishedDate == -1 ? null : finishedDate);
+            line = replaceDate(line, "createdDate", link.getCreated());
             final CrawledPackage cp = link.getParentNode();
             line = line.replace(PATTERN_TYPE, "Link");
             line = line.replace(PATTERN_HOST, nulltoString(link.getHost()));
@@ -409,8 +426,11 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
             line = line.replace(PATTERN_URL_REFERRER, nulltoString(LinkTreeUtils.getUrlByType(UrlDisplayType.REFERRER, link)));
         } else if (pv instanceof CrawledPackage) {
             line = getPatternPackages();
-            line = replaceDate(line);
+            line = replaceDate(line, "date", System.currentTimeMillis());
             final CrawledPackage pkg = (CrawledPackage) pv;
+            final long finishedDate = pkg.getFinishedDate();
+            line = replaceDate(line, "finishedDate", finishedDate == -1 ? null : finishedDate);
+            line = replaceDate(line, "createdDate", pkg.getCreated());
             final CrawledPackageView fpv = new CrawledPackageView(pkg).aggregate();
             line = line.replace(PATTERN_TYPE, "Package");
             line = line.replace(PATTERN_COMMENT, nulltoString(pkg.getComment()));

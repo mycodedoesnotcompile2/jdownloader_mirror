@@ -13,20 +13,15 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.SolverStatus;
-import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickCaptchaChallenge;
-import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2.TYPE;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.CaptchaResponse;
-import org.jdownloader.captcha.v2.challenge.stringcaptcha.ClickCaptchaResponse;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
-import org.jdownloader.captcha.v2.challenge.stringcaptcha.MultiClickCaptchaResponse;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.TokenCaptchaResponse;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.plugins.controller.LazyPlugin;
@@ -95,7 +90,7 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
             if (action != null) {
                 task.put("pageAction", action.get("action"));
             }
-            task.put("isInvisible", TYPE.INVISIBLE.equals(challenge.getType()));
+            task.put("isInvisible", challenge.isInvisible());
             final Double minScore = challenge.getMinScore();
             if (minScore != null) {
                 task.put("minScore", minScore);
@@ -133,19 +128,12 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
             task.put("type", "TurnstileTaskProxyless");
             task.put("websiteURL", challenge.getSiteUrl(this));
             task.put("websiteKey", challenge.getSiteKey());
-        } else if (captchachallenge instanceof ClickCaptchaChallenge) {
-            /* Coordinates task: https://2captcha.com/api-docs/coordinates */
-            final ClickCaptchaChallenge challenge = (ClickCaptchaChallenge) captchachallenge;
-            task.put("type", "CoordinatesTask");
-            task.put("body", challenge.getBase64ImageFile());
-            task.put("minClicks", 1);
-            task.put("maxClicks", 1);
         } else if (captchachallenge instanceof MultiClickCaptchaChallenge) {
             /* Coordinates task: https://2captcha.com/api-docs/coordinates */
             final MultiClickCaptchaChallenge challenge = (MultiClickCaptchaChallenge) captchachallenge;
             task.put("type", "CoordinatesTask");
             task.put("body", challenge.getBase64ImageFile());
-            task.put("minClicks", 1);
+            task.put("minClicks", challenge.getMinClicks());
             if (challenge.getMaxClicks() != -1) {
                 task.put("maxClicks", challenge.getMaxClicks());
             }
@@ -196,7 +184,7 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
             AbstractResponse resp = null;
             if (captchachallenge instanceof RecaptchaV2Challenge || captchachallenge instanceof HCaptchaChallenge || captchachallenge instanceof CloudflareTurnstileChallenge || captchachallenge instanceof CutCaptchaChallenge) {
                 resp = new TokenCaptchaResponse((Challenge<String>) captchachallenge, job.getSolver(), token);
-            } else if (captchachallenge instanceof MultiClickCaptchaChallenge || captchachallenge instanceof ClickCaptchaChallenge) {
+            } else if (captchachallenge instanceof MultiClickCaptchaChallenge) {
                 // TODO: Test this
                 final List<Map<String, Object>> clicklist = (List<Map<String, Object>>) solutionmap.get("coordinates");
                 final int[] x = new int[clicklist.size()];
@@ -208,15 +196,8 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
                     i++;
                 }
                 /* Coordinates task: https://2captcha.com/api-docs/coordinates */
-                if (captchachallenge instanceof MultiClickCaptchaChallenge) {
-                    final MultiClickedPoint mcp = new MultiClickedPoint(x, y);
-                    final MultiClickCaptchaChallenge challenge = (MultiClickCaptchaChallenge) captchachallenge;
-                    resp = new MultiClickCaptchaResponse(challenge, job.getSolver(), mcp);
-                } else {
-                    final ClickCaptchaChallenge challenge = (ClickCaptchaChallenge) captchachallenge;
-                    final ClickedPoint cp = new ClickedPoint(x[0], y[0]);
-                    resp = new ClickCaptchaResponse(challenge, job.getSolver(), cp);
-                }
+                final MultiClickedPoint mcp = new MultiClickedPoint(x, y);
+                resp = new AbstractResponse<MultiClickedPoint>((MultiClickCaptchaChallenge) captchachallenge, job.getSolver(), mcp);
             } else {
                 resp = new CaptchaResponse((Challenge<String>) captchachallenge, job.getSolver(), solutionmap.get("text").toString());
             }

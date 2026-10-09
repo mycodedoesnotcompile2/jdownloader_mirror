@@ -42,6 +42,7 @@ public class CESBubbleContent extends AbstractBubbleContentPanel {
     private JLabel                   timeoutLbl;
     private JLabel                   durationLbl;
     private ExtButton                button;
+    private ExtButton                sendNowButton;
     private CESBubble                bubble;
     private SolverStatus             latestStatus;
     protected IconedProcessIndicator progressCircle = null;
@@ -54,6 +55,19 @@ public class CESBubbleContent extends AbstractBubbleContentPanel {
         // super("ins 0,wrap 2", "[][grow,fill]", "[grow,fill]");
         setLayout(new MigLayout("ins 3 3 0 3,wrap 2", "[fill][grow,fill]", "[]"));
         // , _GUI.T.balloon_reconnect_start_msg(), new AbstractIcon(IconKey.ICON_RECONNECT, 32)
+        /* "Send now": closes the bubble, which makes the captcha be sent immediately instead of waiting for the remaining timeout. */
+        add(sendNowButton = new ExtButton(new AppAction() {
+            {
+                setName(_GUI.T.CESBubbleContent_CESBubbleContent_sendNow());
+            }
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (bubble != null) {
+                    bubble.close();
+                }
+            }
+        }), "hidemode 3,spanx,pushx,growx");
         MigPanel east = new MigPanel("ins 0 0 0 0,wrap 2", "[fill][grow,fill]", "[]");
         east.setOpaque(false);
         east.add(timeoutLbl = new JLabel(_GUI.T.CESBubbleContent_CESBubbleContent_wait(TimeFormatter.formatMilliSeconds(timeoutms, 0), solver.getService().getName())), "hidemode 3,spanx");
@@ -136,6 +150,7 @@ public class CESBubbleContent extends AbstractBubbleContentPanel {
         super.stop();
         update();
         button.setVisible(false);
+        sendNowButton.setVisible(false);
     }
 
     public void update() {
@@ -166,6 +181,8 @@ public class CESBubbleContent extends AbstractBubbleContentPanel {
         update();
         timeoutLbl.setText(_GUI.T.CESBubbleContent_CESBubbleContent_wait(TimeFormatter.formatMilliSeconds(rest, 0), solver.getService().getName()));
         button.setVisible(true);
+        /* Only makes sense while the captcha has not been sent yet. */
+        sendNowButton.setVisible(rest > 0);
         timeoutLbl.setVisible(rest > 0);
         durationLbl.setVisible(rest <= 0);
         duration.setVisible(rest <= 0);

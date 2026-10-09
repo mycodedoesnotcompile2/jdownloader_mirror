@@ -19,8 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -32,7 +30,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50261 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+
+@DecrypterPlugin(revision = "$Revision: 53556 $", interfaceVersion = 3, names = {}, urls = {})
 public class CdVsCom extends PluginForDecrypt {
     public CdVsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -91,7 +92,7 @@ public class CdVsCom extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         /* Results mostly link to blogger.com and final files are then mostly hosted on Google Drive or to seaporn.net. */
-        if (urlsO != null) {
+        if (urlsO instanceof List) {
             final List<String> urls = (List<String>) urlsO;
             for (final String url : urls) {
                 ret.add(createDownloadlink(url));
@@ -100,6 +101,15 @@ public class CdVsCom extends PluginForDecrypt {
         if (urlO != null) {
             final String url = urlO.toString();
             ret.add(createDownloadlink(url));
+        }
+        return ret;
+    }
+
+    @Override
+    protected DownloadLink createDownloadlink(String link) {
+        final DownloadLink ret = super.createDownloadlink(link);
+        if (StringUtils.containsIgnoreCase(link, ".m3u8")) {
+            ret.setReferrerUrl(getCurrentLink().getURL());
         }
         return ret;
     }

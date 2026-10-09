@@ -1,12 +1,12 @@
 package org.jdownloader.gui.views.downloads.action;
 
 import java.awt.event.ActionEvent;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
-import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
 import jd.controlling.packagecontroller.AbstractPackageNode;
-import jd.plugins.DownloadLink;
 
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.utils.os.CrossSystem;
@@ -154,30 +154,13 @@ public class OpenInBrowserAction<PackageType extends AbstractPackageNode<Childre
             setEnabled(false);
             return;
         }
-        if (threshold < 0) {
+        final List<ChildrenType> links = selectionInfo.getChildren();
+        if (threshold < 0 || links.size() <= threshold) {
             setEnabled(true);
             return;
         }
-        final List<ChildrenType> links = selectionInfo.getChildren();
-        if (links.size() > threshold) {
-            setEnabled(false);
-            return;
-        }
-        for (final ChildrenType child : links) {
-            final DownloadLink link;
-            if (child instanceof DownloadLink) {
-                link = (DownloadLink) child;
-            } else if (child instanceof CrawledLink) {
-                link = ((CrawledLink) child).getDownloadLink();
-            } else {
-                link = null;
-            }
-            if (link != null && link.getView().getDisplayUrl() != null) {
-                setEnabled(true);
-                return;
-            }
-        }
-        setEnabled(false);
+        final Set<String> urls = getURLs(getLinkType(), selectionInfo);
+        setEnabled(urls != null && urls.size() <= threshold);
     }
 
     @Override
@@ -188,6 +171,25 @@ public class OpenInBrowserAction<PackageType extends AbstractPackageNode<Childre
         super.actionPerformed(e);
     }
 
+    protected Set<String> getURLs(LinkType linkType, final SelectionInfo<PackageType, ChildrenType> selectionInfo) {
+        final List<String> urls;
+        if (linkType == null || linkType == LinkType.DEFAULT) {
+            urls = LinkTreeUtils.getURLs(selectionInfo, true);
+        } else {
+            urls = LinkTreeUtils.getURLs(selectionInfo, linkType.getUrlDisplayType(), isFallbackToDefault());
+        }
+        if (urls == null || urls.isEmpty()) {
+            /**
+             * Do not open progress dialog on empty list. Can be empty if e.g. users' selected url-type is not available for any item of the
+             * selection. <br>
+             */
+            return null;
+        }
+        /* we don't need to open the same URL multiple times */
+        final Set<String> ret = new LinkedHashSet<String>(urls);
+        return ret;
+    }
+
     @Override
     protected void onActionPerformed(ActionEvent e, SelectionType selectionType, final SelectionInfo<PackageType, ChildrenType> selectionInfo) {
         if (SelectionInfo.isEmpty(selectionInfo)) {
@@ -195,32 +197,22 @@ public class OpenInBrowserAction<PackageType extends AbstractPackageNode<Childre
         } else if (!isEnabled()) {
             return;
         }
+        final LinkType linkType = getLinkType();
         new Thread("OpenInBrowserAction") {
             public void run() {
-                final int delay = getOpenDelay();
-                final LinkType linkType = getLinkType();
-                final List<String> urls;
-                if (linkType == null || linkType == LinkType.DEFAULT) {
-                    urls = LinkTreeUtils.getURLs(selectionInfo, true);
-                } else {
-                    urls = LinkTreeUtils.getURLs(selectionInfo, linkType.getUrlDisplayType(), isFallbackToDefault());
-                }
-                if (urls == null || urls.isEmpty()) {
-                    /**
-                     * Do not open progress dialog on empty list. Can be empty if e.g. users' selected url-type is not available for any
-                     * item of the selection. <br>
-                     */
+                final Set<String> urls = getURLs(linkType, selectionInfo);
+                if (urls == null || urls.size() == 0) {
                     return;
                 }
                 final ProgressDialog pg = new ProgressDialog(new ProgressGetter() {
-                    private int total = -1;
-                    private int current;
+                    private final int total   = urls.size();
+                    private int       current = 0;
 
                     @Override
                     public void run() throws Exception {
-                        total = urls.size();
+                        final int delay = getOpenDelay();
                         current = 0;
-                        for (String url : urls) {
+                        for (final String url : urls) {
                             CrossSystem.openURL(url);
                             current++;
                             if (current >= total) {
@@ -237,9 +229,6 @@ public class OpenInBrowserAction<PackageType extends AbstractPackageNode<Childre
 
                     @Override
                     public int getProgress() {
-                        if (total == 0) {
-                            return -1;
-                        }
                         final int ret = (current * 100) / total;
                         return ret;
                     }

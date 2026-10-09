@@ -20,9 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -35,7 +32,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52698 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+
+@DecrypterPlugin(revision = "$Revision: 53556 $", interfaceVersion = 2, names = {}, urls = {})
 public class Viet69Net extends PluginForDecrypt {
     public Viet69Net(PluginWrapper wrapper) {
         super(wrapper);
@@ -51,7 +51,7 @@ public class Viet69Net extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "viet69.mu", "viet69.moi", "viet69.gg", "viet69.in", "viet69.net", "viet69.co", "viet69.love", "viet69.page", "viet69.vc", "viet69.tube", "viet69.zip", "viet69.ec" });
+        ret.add(new String[] { "viet69.be", "viet69.mu", "viet69.moi", "viet69.gg", "viet69.in", "viet69.net", "viet69.co", "viet69.love", "viet69.page", "viet69.vc", "viet69.tube", "viet69.zip", "viet69.ec" });
         return ret;
     }
 

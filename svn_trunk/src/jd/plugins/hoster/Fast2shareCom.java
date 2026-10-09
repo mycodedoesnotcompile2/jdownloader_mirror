@@ -21,7 +21,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
@@ -36,8 +35,6 @@ import org.jdownloader.gui.translate._GUI;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
-import jd.controlling.AccountControllerEvent;
-import jd.controlling.AccountControllerListener;
 import jd.http.Browser;
 import jd.http.Cookies;
 import jd.nutils.encoding.Encoding;
@@ -55,7 +52,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53252 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53565 $", interfaceVersion = 3, names = {}, urls = {})
 public class Fast2shareCom extends PluginForHost {
     /* API docs: https://fast2share.com/docs */
     private static final String API_BASE                   = "https://api.fast2share.com/v1";
@@ -63,12 +60,6 @@ public class Fast2shareCom extends PluginForHost {
     private static final String PROPERTY_DIRECTURL         = "fast2sharecom_directurl";
     /** Boolean property, set to true for files that can only be downloaded with a premium account ("access":"premium"). */
     private static final String PROPERTY_PREMIUMONLY       = "fast2sharecom_premiumonly";
-    /**
-     * Guards {@link #doRegisterLogoutListener()} so the AccountControllerListener only gets added once per account. Must only be
-     * checked/set on the stable plugin instance cached in {@link Account#getPlugin()}, not on the short-lived instances created for a
-     * single account check/download.
-     */
-    private final AtomicBoolean LOGOUT_LISTENER_REGISTERED = new AtomicBoolean(false);
 
     public Fast2shareCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -362,7 +353,6 @@ public class Fast2shareCom extends PluginForHost {
     @SuppressWarnings("unchecked")
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        this.registerLogoutListener(account);
         final Map<String, Object> user = login(account, true);
         /* These objects and fields always exist for a valid account. */
         final Map<String, Object> plan = (Map<String, Object>) user.get("plan");
@@ -556,50 +546,33 @@ public class Fast2shareCom extends PluginForHost {
         return br.containsHTML("/logout\"");
     }
 
-    /** Invalidates the account's token server-side. Called via the AccountController listener once the account gets removed. */
+    /** Invalidates the account's token server-side. Called once the account gets removed. */
     private void logout(final Account account) {
-        final String token = account.getStringProperty(PROPERTY_ACCOUNT_TOKEN, null);
-        if (token == null) {
-            /* No stored token -> We cannot logout */
-            return;
-        }
-        try {
-            if (br == null) {
-                /* This plugin instance may already have gone through clean() (e.g. after its last account check/download). */
-                setBrowser(createNewBrowserInstance());
+        synchronized (account) {
+            final String token = account.getStringProperty(PROPERTY_ACCOUNT_TOKEN, null);
+            if (token == null) {
+                /* No stored token -> We cannot logout */
+                return;
             }
-            setAuthHeader(token);
-            br.postPageRaw(API_BASE + "/auth/logout", "");
-            logger.info("Logout successful");
-            account.removeProperty(PROPERTY_ACCOUNT_TOKEN);
-        } catch (final Exception e) {
-            logger.log(e);
-            logger.warning("Logout failed");
-        }
-    }
-
-    /** Registers the logout listener exactly once per account, anchored on the stable plugin instance from {@link Account#getPlugin()}. */
-    private void registerLogoutListener(final Account account) {
-        final PluginForHost accPlugin = account.getPlugin();
-        if (accPlugin instanceof Fast2shareCom) {
-            ((Fast2shareCom) accPlugin).doRegisterLogoutListener();
-        }
-    }
-
-    private void doRegisterLogoutListener() {
-        if (LOGOUT_LISTENER_REGISTERED.compareAndSet(false, true)) {
-            AccountController.getInstance().getEventSender().addListener(new AccountControllerListener() {
-                @Override
-                public void onAccountControllerEvent(final AccountControllerEvent event) {
-                    if (AccountControllerEvent.Types.REMOVED.equals(event.getType())) {
-                        final Account removedAccount = event.getAccount();
-                        if (removedAccount != null && getHost().equalsIgnoreCase(removedAccount.getHoster())) {
-                            logout(removedAccount);
-                        }
-                    }
+            try {
+                if (br == null) {
+                    /* This plugin instance may already have gone through clean(). */
+                    setBrowser(createNewBrowserInstance());
                 }
-            });
+                setAuthHeader(token);
+                br.postPageRaw(API_BASE + "/auth/logout", "");
+                logger.info("Logout successful");
+                account.removeProperty(PROPERTY_ACCOUNT_TOKEN);
+            } catch (final Exception e) {
+                logger.log(e);
+                logger.warning("Logout failed");
+            }
         }
+    }
+
+    @Override
+    public void onAccountRemove(final Account account) {
+        logout(account);
     }
 
     /** Parses the JSON response and maps API/HTTP errors to the according exceptions. */

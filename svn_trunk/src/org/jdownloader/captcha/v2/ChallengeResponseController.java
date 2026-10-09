@@ -34,7 +34,6 @@ import org.jdownloader.captcha.event.ChallengeResponseEventSender;
 import org.jdownloader.captcha.v2.ChallengeSolver.ChallengeVetoReason;
 import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
-import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.oauth.AccountOAuthSolver;
 import org.jdownloader.captcha.v2.challenge.oauth.OAuthDialogSolver;
@@ -42,7 +41,6 @@ import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
 import org.jdownloader.captcha.v2.solver.browser.BrowserSolver;
 import org.jdownloader.captcha.v2.solver.gui.DialogBasicCaptchaSolver;
-import org.jdownloader.captcha.v2.solver.gui.DialogClickCaptchaSolver;
 import org.jdownloader.captcha.v2.solver.gui.DialogMultiClickCaptchaSolver;
 import org.jdownloader.captcha.v2.solver.jac.JACSolver;
 import org.jdownloader.captcha.v2.solverjob.ResponseList;
@@ -144,7 +142,6 @@ public class ChallengeResponseController {
         /* Legacy paid captcha solver engines were removed; they are now provided as captcha solver plugins. */
         if (!Application.isHeadless()) {
             addSolver(DialogBasicCaptchaSolver.getInstance());
-            addSolver(DialogClickCaptchaSolver.getInstance());
             addSolver(DialogMultiClickCaptchaSolver.getInstance());
             addSolver(BrowserSolver.getInstance());
             addSolver(OAuthDialogSolver.getInstance());
@@ -221,9 +218,9 @@ public class ChallengeResponseController {
         eventSender.fireEvent(new ChallengeResponseEvent(this, ChallengeResponseEvent.Type.JOB_DONE, job));
     }
 
-    private final List<ChallengeSolver<?>>                 solverList                       = new CopyOnWriteArrayList<ChallengeSolver<?>>();
-    private final List<SolverJob<?>>                       activeJobs                       = new ArrayList<SolverJob<?>>();
-    private final HashMap<UniqueAlltimeID, SolverJob<?>>   challengeIDToJobMap              = new HashMap<UniqueAlltimeID, SolverJob<?>>();
+    private final List<ChallengeSolver<?>>                          solverList                       = new CopyOnWriteArrayList<ChallengeSolver<?>>();
+    private final List<SolverJob<?>>                                activeJobs                       = new ArrayList<SolverJob<?>>();
+    private final HashMap<UniqueAlltimeID, SolverJob<?>>            challengeIDToJobMap              = new HashMap<UniqueAlltimeID, SolverJob<?>>();
     /**
      * Tracks how many solve attempts are currently in-flight per solver service (key: {@link SolverService#getID()}), i.e. summed over all
      * accounts of that service. Counted against {@link ChallengeSolver#getFinalMaxCaptchaThreads()}. Used by {@link #createList(Challenge)}
@@ -351,10 +348,10 @@ public class ChallengeResponseController {
     }
 
     /**
-     * Reserves a "slot" for the given solver against both its {@link ChallengeSolver#getFinalMaxCaptchaThreads()} limit (all accounts of the
-     * service together) and, for account based solvers, its {@link ChallengeSolver#getFinalMaxCaptchaThreadsPerAccount()} limit (its own
-     * account only). If either limit is currently reached, this waits up to {@link #CAPTCHA_SLOT_WAIT_TIMEOUT_MILLIS} for a slot to free up.
-     * <br>
+     * Reserves a "slot" for the given solver against both its {@link ChallengeSolver#getFinalMaxCaptchaThreads()} limit (all accounts of
+     * the service together) and, for account based solvers, its {@link ChallengeSolver#getFinalMaxCaptchaThreadsPerAccount()} limit (its
+     * own account only). If either limit is currently reached, this waits up to {@link #CAPTCHA_SLOT_WAIT_TIMEOUT_MILLIS} for a slot to
+     * free up. <br>
      * The solver's enabled custom limit rules ({@link ChallengeSolver#getCustomLimitRules()}) are checked at the same time, atomically with
      * counting the new captcha, so parallel jobs cannot both slip through the last free place of a rule. A used up rule is not waited for
      * (it may stay used up for hours); the solver is skipped instead. <br>
@@ -466,9 +463,7 @@ public class ChallengeResponseController {
         logger.info("Solver: " + solvers);
         if (solvers == null || solvers.size() == 0) {
             logger.info("No solver available!");
-            if (c instanceof CloudflareTurnstileChallenge) {
-                showNoBrowserSolverInfoDialog(c);
-            } else if (c instanceof CutCaptchaChallenge) {
+            if (isExternalSolverRequired(c)) {
                 showNoBrowserSolverInfoDialog(c);
             }
             /* See: https://support.jdownloader.org/knowledgebase/article/error-skipped-captcha-is-required */
@@ -538,6 +533,31 @@ public class ChallengeResponseController {
                 fireJobDone(job);
             }
             c.onHandled();
+        }
+    }
+
+    /**
+     * True if the given interactive (browser based) challenge cannot be solved by the local {@link BrowserSolver} because it is not
+     * supported by it, which means that the user can only solve it with an external captcha solver. Reasons caused by the user's own
+     * settings (solver/captcha type disabled, blacklisted by captcha rules) do not count.
+     */
+    private boolean isExternalSolverRequired(final Challenge<?> c) {
+        if (!(c instanceof AbstractBrowserChallenge)) {
+            /* Not an interactive captcha (e.g. image captcha) -> No BrowserSolver required */
+            return false;
+        }
+        final ChallengeVetoReason reason = BrowserSolver.getInstance().getChallengeVetoReason(c);
+        if (reason == null) {
+            /* No veto reason -> BrowserSolver would be able to handle that challenge */
+            return false;
+        }
+        switch (reason) {
+        case UNSUPPORTED_BY_SOLVER:
+        case UNSUPPORTED_FOR_INTERNAL_SPECIAL_REASONS:
+        case UNSUPPORTED_BROWSER_NO_URL_OPEN:
+            return true;
+        default:
+            return false;
         }
     }
 
@@ -693,11 +713,11 @@ public class ChallengeResponseController {
                         continue;
                     }
                     /*
-                     * Collect account by domain, keeping only ONE: preferably the one with lowest balance, but an account that is already at
-                     * its own per-account captcha limit loses against one that still has free capacity. If every account of the domain is
-                     * at its limit, the one with the lowest balance is kept anyway (it then waits for a free slot, see
-                     * reserveCaptchaSlot). Only the per-account limit counts here; the user's solver-wide limit is the same for all accounts
-                     * of the domain, so switching the account would not help.
+                     * Collect account by domain, keeping only ONE: preferably the one with lowest balance, but an account that is already
+                     * at its own per-account captcha limit loses against one that still has free capacity. If every account of the domain
+                     * is at its limit, the one with the lowest balance is kept anyway (it then waits for a free slot, see
+                     * reserveCaptchaSlot). Only the per-account limit counts here; the user's solver-wide limit is the same for all
+                     * accounts of the domain, so switching the account would not help.
                      */
                     final String domain = solverAccount.getHoster();
                     final double currentBalance = solverAccount.getAccountInfo().getAccountBalance();

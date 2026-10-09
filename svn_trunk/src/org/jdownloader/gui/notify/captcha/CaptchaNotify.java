@@ -6,7 +6,7 @@ import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.ChallengeSolver;
 import org.jdownloader.captcha.v2.solver.browser.BrowserSolver;
 import org.jdownloader.captcha.v2.solver.gui.DialogBasicCaptchaSolver;
-import org.jdownloader.captcha.v2.solver.gui.DialogClickCaptchaSolver;
+import org.jdownloader.captcha.v2.solver.gui.DialogMultiClickCaptchaSolver;
 import org.jdownloader.captcha.v2.solverjob.ChallengeSolverJobListener;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.gui.IconKey;
@@ -43,7 +43,7 @@ public class CaptchaNotify extends AbstractNotifyWindow<BasicContentPanel> imple
         super.onMouseClicked(m);
 
         DialogBasicCaptchaSolver.getInstance().requestFocus(job.getChallenge());
-        DialogClickCaptchaSolver.getInstance().requestFocus(job.getChallenge());
+        DialogMultiClickCaptchaSolver.getInstance().requestFocus(job.getChallenge());
         BrowserSolver.getInstance().requestFocus(job.getChallenge());
         close();
     }

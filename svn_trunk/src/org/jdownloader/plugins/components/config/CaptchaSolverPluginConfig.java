@@ -15,18 +15,18 @@ import org.jdownloader.plugins.config.Order;
 
 /**
  * Base config for captcha solver plugins. In addition to the generic {@link CaptchaSolverConfigV3} settings it carries the settings which
- * only make sense for external (plugin based) captcha solvers, e.g. the low-credits warning and the API polling interval.
+ * only make sense for external (plugin based) captcha solvers, e.g. the low balance warning and the API polling interval.
  */
 public interface CaptchaSolverPluginConfig extends CaptchaSolverConfigV3 {
     public static final TRANSLATION TRANSLATION = new TRANSLATION();
 
     public static class TRANSLATION {
-        public String getWarnOnLowCredits_label() {
-            return "Warn on low credits (notification after every account check)";
+        public String getWarnOnLowBalance_label() {
+            return "Warn on low balance (notification after every account check)";
         }
 
-        public String getLowCreditsWarningThreshold_label() {
-            return "Low credits warning threshold (in currency of the external captcha solver)";
+        public String getLowBalanceWarningThreshold_label() {
+            return "Low balance warning threshold";
         }
 
         public String getPollingIntervalSeconds_label() {
@@ -35,21 +35,21 @@ public interface CaptchaSolverPluginConfig extends CaptchaSolverConfigV3 {
     }
 
     @AboutConfig
-    @DescriptionForConfigEntry("Warn when the credits of an account fall below the specified threshold. After each account check, the account status text shows a hint while the credits are low, and a notification is shown after every account check. The notification has a button to hide it for the account until JDownloader is restarted.")
+    @DescriptionForConfigEntry("Warn when the balance of an account falls below the specified threshold. After each account check, the account status text shows a hint while the balance is low, and a notification is shown after every account check. The notification has a button to hide it for the account until JDownloader is restarted.")
     @DefaultBooleanValue(true)
     @Order(300)
-    boolean isWarnOnLowCredits();
+    boolean isWarnOnLowBalance();
 
-    void setWarnOnLowCredits(boolean b);
+    void setWarnOnLowBalance(boolean b);
 
     @AboutConfig
-    @DescriptionForConfigEntry("Credit balance below which the low credits warning is triggered (in currency of the external captcha solver). Only used if 'Warn on low credits' is enabled.")
+    @DescriptionForConfigEntry("Balance below which the low balance warning is triggered. Only used if 'Warn on low balance' is enabled.")
     @DoubleSpinnerValidator(min = 0.1, max = 10, step = 0.1)
     @DefaultDoubleValue(0.5)
     @Order(350)
-    double getLowCreditsWarningThreshold();
+    double getLowBalanceWarningThreshold();
 
-    void setLowCreditsWarningThreshold(double threshold);
+    void setLowBalanceWarningThreshold(double threshold);
 
     @AboutConfig
     @DescriptionForConfigEntry("Polling interval in seconds for captcha status checks")

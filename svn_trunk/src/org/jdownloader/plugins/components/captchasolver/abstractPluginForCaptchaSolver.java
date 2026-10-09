@@ -165,7 +165,7 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      * shorter than the minimum the service itself requires ({@link #getServerSideMinPollingIntervalMillis()}).
      */
     public int getPollingIntervalMillis(final Account account) {
-        return (int) Math.max(getDefaultConfig().getPollingIntervalSeconds() * 1000L, getServerSideMinPollingIntervalMillis());
+        return (int) Math.max(getDefaultConfig().getPollingIntervalSeconds() * 1000, getServerSideMinPollingIntervalMillis());
     }
 
     /**

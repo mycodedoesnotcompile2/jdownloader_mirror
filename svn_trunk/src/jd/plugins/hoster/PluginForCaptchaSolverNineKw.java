@@ -1,38 +1,15 @@
 package jd.plugins.hoster;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.exceptions.WTFException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.AbstractResponse;
-import org.jdownloader.captcha.v2.Challenge;
-import org.jdownloader.captcha.v2.PluginChallengeSolver;
-import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
-import org.jdownloader.captcha.v2.SolverStatus;
-import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickCaptchaChallenge;
-import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
-import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
-import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
-import org.jdownloader.captcha.v2.challenge.stringcaptcha.CaptchaResponse;
-import org.jdownloader.captcha.v2.challenge.stringcaptcha.ClickCaptchaResponse;
-import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
-import org.jdownloader.captcha.v2.challenge.stringcaptcha.MultiClickCaptchaResponse;
-import org.jdownloader.captcha.v2.challenge.stringcaptcha.TokenCaptchaResponse;
-import org.jdownloader.captcha.v2.solver.CESSolverJob;
-import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
-import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigNinekw;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
+import jd.http.requests.FormData;
+import jd.http.requests.PostFormDataRequest;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
@@ -43,10 +20,32 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
+import org.appwork.exceptions.WTFException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.AbstractResponse;
+import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
+import org.jdownloader.captcha.v2.PluginChallengeSolver;
+import org.jdownloader.captcha.v2.SolverStatus;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
+import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
+import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
+import org.jdownloader.captcha.v2.challenge.stringcaptcha.CaptchaResponse;
+import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
+import org.jdownloader.captcha.v2.challenge.stringcaptcha.TokenCaptchaResponse;
+import org.jdownloader.captcha.v2.solver.CESSolverJob;
+import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
+import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigNinekw;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 /**
  * Plugin for 9kw captcha solving service (https://9kw.eu/).
  */
-@HostPlugin(revision = "$Revision: 53549 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53561 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
 public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -158,13 +157,21 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
      * @throws PluginException
      */
     private Map<String, Object> callAPI(final UrlQuery query, final Account account) throws IOException, PluginException {
+        return callAPI(query, account, null);
+    }
+
+    /**
+     * @param imageFile
+     *            If given, the request is sent as multipart/form-data POST with this file as "file-upload-01" (the docs require POST for
+     *            usercaptchaupload). Sending the image as base64 inside a GET url is too large and gets the connection reset.
+     */
+    private Map<String, Object> callAPI(final UrlQuery query, final Account account, final File imageFile) throws IOException, PluginException {
         query.appendEncoded("json", "1");
         query.appendEncoded("apikey", account.getPass());
         /* Potentially unneeded params */
         /**
          * 2026-03-17: Do not add jd=2 parameter as this will make API return non-json responses for some cases but we want json whenever
-         * possible. </br>
-         * Known effects when this parameter is sent: <br>
+         * possible. </br> Known effects when this parameter is sent: <br>
          * - Sometimes non-json responses <br>
          * - "captcha_id" field instead of "captchaid" <br>
          */
@@ -172,7 +179,16 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         query.appendEncoded("source", "jd2");
         query.appendEncoded("captchaSource", "jdPlugin");
         query.appendEncoded("version", "1.2");
-        br.getPage(getBaseURL() + "/index.cgi?" + query.toString());
+        if (imageFile != null) {
+            final PostFormDataRequest request = br.createPostFormDataRequest(getBaseURL() + "/index.cgi");
+            for (final Map.Entry<String, String> entry : query.toMap(true).entrySet()) {
+                request.addFormData(new FormData(entry.getKey(), entry.getValue()));
+            }
+            request.addFormData(new FormData("file-upload-01", imageFile.getName(), imageFile));
+            br.getPage(request);
+        } else {
+            br.getPage(getBaseURL() + "/index.cgi?" + query.toString());
+        }
         /* Check for non-json response. This is the best workaround I found in order to "keep things pretty". */
         /* See list of possible errors here: https://www.9kw.eu/api.html#apigeneral-tab */
         final Regex non_json_error_regex = br.getRegex("(\\d{4}) (.+)");
@@ -215,8 +231,8 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
     }
 
     /**
-     * Classifies a 9kw error code (see https://www.9kw.eu/api.html#apigeneral-tab) as a permanent account error, a temporary account
-     * error, or a plain captcha error, and throws the matching exception. Always throws.
+     * Classifies a 9kw error code (see https://www.9kw.eu/api.html#apigeneral-tab) as a permanent account error, a temporary account error,
+     * or a plain captcha error, and throws the matching exception. Always throws.
      */
     private void throwForErrorCode(final int errorcode, final String message) throws PluginException {
         switch (errorcode) {
@@ -260,8 +276,8 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
     }
 
     /**
-     * The 9kw API docs recommend the first request for a solution after 5-10 seconds and further requests every few seconds, so do not
-     * poll faster than every 5 seconds, no matter what the user configured.
+     * The 9kw API docs recommend the first request for a solution after 5-10 seconds and further requests every few seconds, so do not poll
+     * faster than every 5 seconds, no matter what the user configured.
      */
     @Override
     public long getServerSideMinPollingIntervalMillis() {
@@ -274,6 +290,8 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         final UrlQuery upload_query = new UrlQuery();
         upload_query.appendEncoded("action", "usercaptchaupload");
         final Challenge<?> captchachallenge = job.getChallenge();
+        /* Only set for image based challenges. Sent as file upload instead of base64. */
+        File imageFile = null;
         if (captchachallenge instanceof RecaptchaV2Challenge) {
             final RecaptchaV2Challenge challenge = (RecaptchaV2Challenge) captchachallenge;
             upload_query.appendEncoded("data-sitekey", challenge.getSiteKey());
@@ -298,23 +316,14 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
             upload_query.appendEncoded("pageurl", challenge.getSiteUrl(this));
             upload_query.appendEncoded("oldsource", "hcaptcha");
             upload_query.appendEncoded("interactive", "1");
-        } else if (captchachallenge instanceof ClickCaptchaChallenge) {
-            /* Coordinates task: https://2captcha.com/api-docs/coordinates */
-            final ClickCaptchaChallenge challenge = (ClickCaptchaChallenge) captchachallenge;
-            upload_query.appendEncoded("mouse", "1");
-            upload_query.appendEncoded("base64", "1");
-            upload_query.appendEncoded("file-upload-01", challenge.getBase64ImageFile());
         } else if (captchachallenge instanceof MultiClickCaptchaChallenge) {
             /* Coordinates task: https://2captcha.com/api-docs/coordinates */
             final MultiClickCaptchaChallenge challenge = (MultiClickCaptchaChallenge) captchachallenge;
-            upload_query.appendEncoded("multimouse", "1");
-            upload_query.appendEncoded("base64", "1");
-            upload_query.appendEncoded("file-upload-01", challenge.getBase64ImageFile());
+            /* Single click captchas have their own parameter. */
+            upload_query.appendEncoded(challenge.isSingleClick() ? "mouse" : "multimouse", "1");
+            imageFile = challenge.getImageFile();
         } else if (captchachallenge instanceof ImageCaptchaChallenge) {
-            /* Image captcha: https://2captcha.com/api-docs/normal-captcha */
-            final ImageCaptchaChallenge challenge = (ImageCaptchaChallenge<String>) job.getChallenge();
-            upload_query.appendEncoded("base64", "1");
-            upload_query.appendEncoded("file-upload-01", challenge.getBase64ImageFile());
+            imageFile = ((ImageCaptchaChallenge<?>) captchachallenge).getImageFile();
         } else {
             throw new IllegalArgumentException("Unexpected captcha challenge type");
         }
@@ -335,7 +344,7 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         upload_query.appendEncoded("prio", cfg.getPrio() + "");
         upload_query.appendEncoded("selfsolve", cfg.isSelfsolve() + "");
         upload_query.appendEncoded("confirm", cfg.isConfirm() + "");
-        final Map<String, Object> uploadresp = this.callAPI(upload_query, account);
+        final Map<String, Object> uploadresp = this.callAPI(upload_query, account, imageFile);
         final String captcha_id = uploadresp.get("captchaid").toString();
         final UrlQuery polling_query = new UrlQuery();
         polling_query.appendEncoded("action", "usercaptchacorrectdata");
@@ -368,15 +377,10 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
             final AbstractResponse resp;
             if (captchachallenge instanceof RecaptchaV2Challenge || captchachallenge instanceof HCaptchaChallenge) {
                 resp = new TokenCaptchaResponse((Challenge<String>) captchachallenge, job.getSolver(), answer);
-            } else if (captchachallenge instanceof ClickCaptchaChallenge) {
-                // TODO: Test this
-                final String[] splitResult = answer.split("x");
-                final ClickCaptchaChallenge challenge = (ClickCaptchaChallenge) captchachallenge;
-                final ClickedPoint cp = new ClickedPoint(Integer.parseInt(splitResult[0]), Integer.parseInt(splitResult[1]));
-                resp = new ClickCaptchaResponse(challenge, job.getSolver(), cp);
             } else if (captchachallenge instanceof MultiClickCaptchaChallenge) {
                 // TODO: Test this
-                final String[] pairs = answer.split(";"); // e.g. "68x149;81x192"
+                /* e.g. "68x149;81x192", a single click captcha has just one pair */
+                final String[] pairs = answer.split(";");
                 final int[] x = new int[pairs.length];
                 final int[] y = new int[pairs.length];
                 for (int i = 0; i < pairs.length; i++) {
@@ -384,8 +388,7 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
                     x[i] = Integer.parseInt(xy[0]);
                     y[i] = Integer.parseInt(xy[1]);
                 }
-                final MultiClickCaptchaChallenge challenge = (MultiClickCaptchaChallenge) captchachallenge;
-                resp = new MultiClickCaptchaResponse(challenge, job.getSolver(), new MultiClickedPoint(x, y));
+                resp = new AbstractResponse<MultiClickedPoint>((MultiClickCaptchaChallenge) captchachallenge, job.getSolver(), new MultiClickedPoint(x, y));
             } else {
                 resp = new CaptchaResponse((Challenge<String>) captchachallenge, job.getSolver(), answer);
             }

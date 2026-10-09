@@ -91,7 +91,7 @@ public interface BubbleNotifyConfig extends ConfigInterface {
 
     @DefaultBooleanValue(true)
     @AboutConfig
-    @DescriptionForConfigEntry("Show a notification when the account of an external captcha solver has low credits. Shown after every account check until it is hidden for the account via the notification's button (until JDownloader is restarted). Also needs 'Warn on low credits' to be enabled for the external captcha solver.")
+    @DescriptionForConfigEntry("Show a notification when the account of an external captcha solver has low credits. Shown after every account check until it is hidden for the account via the notification's button (until JDownloader is restarted). Also needs 'Warn on low balance' to be enabled for the external captcha solver.")
     public boolean isBubbleNotifyOnLowCaptchaCreditsEnabled();
 
     public void setBubbleNotifyOnLowCaptchaCreditsEnabled(boolean b);

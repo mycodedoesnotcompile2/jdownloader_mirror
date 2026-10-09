@@ -4,10 +4,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.appwork.storage.config.JsonConfig;
+import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
-import org.jdownloader.captcha.v2.challenge.stringcaptcha.MultiClickCaptchaResponse;
 import org.jdownloader.captcha.v2.solver.jac.JACSolver;
 import org.jdownloader.captcha.v2.solver.service.DialogSolverService;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
@@ -37,6 +37,7 @@ public class DialogMultiClickCaptchaSolver extends AbstractDialogSolver<MultiCli
     @Override
     public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
         final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
+        types.add(CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA);
         types.add(CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
         return types;
     }
@@ -75,7 +76,7 @@ public class DialogMultiClickCaptchaSolver extends AbstractDialogSolver<MultiCli
                 handler.run();
                 final MultiClickedPoint result = handler.getResult();
                 if (result != null) {
-                    solverJob.addAnswer(new MultiClickCaptchaResponse(captchaChallenge, this, result));
+                    solverJob.addAnswer(new AbstractResponse<MultiClickedPoint>(captchaChallenge, this, result));
                 }
             }
         }

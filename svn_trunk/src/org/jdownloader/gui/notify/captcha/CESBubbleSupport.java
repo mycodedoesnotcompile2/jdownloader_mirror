@@ -58,18 +58,24 @@ public class CESBubbleSupport extends AbstractBubbleSupport {
             try {
                 if (ret != null) {
                     final long waitUntil = System.currentTimeMillis() + timeoutms;
-                    while (!cesSolverJob.getJob().isSolved()) {
+                    long nextUpdate = 0;
+                    /* Stop waiting as soon as the bubble was closed (close button or "send now"): the captcha is then sent right away. */
+                    while (!cesSolverJob.getJob().isSolved() && !ret.isClosed()) {
                         final long rest = waitUntil - System.currentTimeMillis();
-                        Thread.sleep(1000);
-                        new EDTRunner() {
-                            @Override
-                            protected void runInEDT() {
-                                ret.update(rest);
-                            }
-                        }.waitForEDT();
+                        if (System.currentTimeMillis() >= nextUpdate) {
+                            nextUpdate = System.currentTimeMillis() + 1000;
+                            new EDTRunner() {
+                                @Override
+                                protected void runInEDT() {
+                                    ret.update(rest);
+                                }
+                            }.waitForEDT();
+                        }
                         if (rest <= 0) {
                             return ret;
                         }
+                        /* Short sleeps so that closing the bubble is noticed quickly. */
+                        Thread.sleep(Math.min(200, rest));
                     }
                 }
             } catch (InterruptedException e) {

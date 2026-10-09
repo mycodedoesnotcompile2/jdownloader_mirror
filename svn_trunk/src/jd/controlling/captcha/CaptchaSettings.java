@@ -123,10 +123,10 @@ public interface CaptchaSettings extends ConfigInterface {
 
     @AboutConfig
     @DefaultIntValue(10000)
-    @DescriptionForConfigEntry("If the notifications for external captcha solvers are enabled, the notification gives the user a chance to cancel the usage of the external captcha solver. This is the timeout for this skip option")
-    int getExternalCaptchaSolverChanceToSkipNotificationTimeout();
+    @DescriptionForConfigEntry("Timeout in milliseconds during which the user can abort the upload of a captcha to an external captcha solver. The chance to abort is offered via a notification, so this only has an effect if the external captcha solver notifications are enabled and external solver accounts are used")
+    int getExternalCaptchaSolverChanceToAbortExternalCaptchaSolver();
 
-    void setExternalCaptchaSolverChanceToSkipNotificationTimeout(int ms);
+    void setExternalCaptchaSolverChanceToAbortExternalCaptchaSolver(int ms);
 
     @AboutConfig
     @DefaultBooleanValue(true)

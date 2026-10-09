@@ -2752,7 +2752,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Silent Mode" })
     String SilentModeToggleAction_getNameWhenEnabled_();
 
-    @Default(lngs = { "en" }, values = { "Captcha Chance To Skip Notification Timeout" })
+    @Default(lngs = { "en" }, values = { "Timeout for the chance to abort the upload to external captcha solvers" })
     String CaptchaExchangeSpinnerAction_skipbubbletimeout_();
 
     @Default(lngs = { "en" }, values = { "More..." })
@@ -4297,6 +4297,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Send Captcha to %s2 in %s1" })
     String CESBubbleContent_CESBubbleContent_wait(String string, String service);
 
+    @Default(lngs = { "en" }, values = { "Send now" })
+    String CESBubbleContent_CESBubbleContent_sendNow();
+
     @Default(lngs = { "en" }, values = { "Uploading..." })
     String DeathByCaptchaSolver_solveBasicCaptchaChallenge_uploading();
 
@@ -5462,7 +5465,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Usage of solver accounts is globally disabled, click here to enable" })
     String SolverOrderTableModel_status_enableSolverAccounts();
 
-    @Default(lngs = { "en" }, values = { "Accounts disabled or invalid, click to fix" })
+    @Default(lngs = { "en" }, values = { "Accounts disabled or invalid, click to open account manager" })
     String SolverOrderTableModel_status_accountsUnusable();
 
     @Default(lngs = { "en" }, values = { "Configure" })

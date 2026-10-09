@@ -522,7 +522,6 @@ public class CaptchaSolverSettingsMigration {
             if (limitPerHour > 0) {
                 limitRules.add(new CaptchaSolverLimitRule("migrated 9kw hours limit", true, 1, CaptchaSolverLimitRule.IntervalUnit.HOURS, Math.min(limitPerHour, CaptchaSolverLimitRule.MAX_MAX_CAPTCHAS)));
             }
-            limitRules.addAll(CaptchaSolverLimitRule.createExampleRules());
             cfgNew.setLimitRules(limitRules);
             cfgNew.setCustomLimitsEnabled(true);
         }

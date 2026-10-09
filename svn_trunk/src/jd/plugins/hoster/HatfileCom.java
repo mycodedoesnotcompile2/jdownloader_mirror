@@ -20,16 +20,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.formatter.TimeFormatter;
 
 import jd.PluginWrapper;
-import jd.controlling.AccountController;
-import jd.controlling.AccountControllerEvent;
-import jd.controlling.AccountControllerListener;
 import jd.http.Browser;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -46,7 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
 /** API docs: https://a.hatfile.com/JD2/doc.html */
-@HostPlugin(revision = "$Revision: 53023 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53565 $", interfaceVersion = 3, names = {}, urls = {})
 public class HatfileCom extends PluginForHost {
     public static final String  API_BASE                      = "https://a.hatfile.com/JD2/api.php";
     private static final String PROPERTY_SESSION              = "session";
@@ -56,12 +52,6 @@ public class HatfileCom extends PluginForHost {
     private static final String PROPERTY_PREMIUM_REQUIRED     = "premium_required";
     private static final String PROPERTY_RESUMABLE            = "resumable";
     private static final String PROPERTY_MAXCHUNKS            = "maxchunks";
-    /**
-     * Guards {@link #registerLogoutListener()} so the AccountControllerListener only gets added once per account. Must only be checked/set
-     * on the stable plugin instance cached in {@link Account#getPlugin()}, not on the short-lived instances created for a single account
-     * check/download.
-     */
-    private final AtomicBoolean LOGOUT_LISTENER_REGISTERED    = new AtomicBoolean(false);
 
     public HatfileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -224,57 +214,40 @@ public class HatfileCom extends PluginForHost {
         }
     }
 
-    /** Invalidates the account's session server-side. Called via the AccountController listener once the account gets removed. */
+    /** Invalidates the account's session server-side. Called once the account gets removed. */
     private void logout(final Account account) {
-        final String session = account.getStringProperty(PROPERTY_SESSION, null);
-        if (session == null) {
-            /* No stored session -> We cannot logout */
-            return;
-        }
-        try {
-            if (br == null) {
-                /* This plugin instance may already have gone through clean() (e.g. after its last account check/download). */
-                setBrowser(createNewBrowserInstance());
+        synchronized (account) {
+            final String session = account.getStringProperty(PROPERTY_SESSION, null);
+            if (session == null) {
+                /* No stored session -> We cannot logout */
+                return;
             }
-            final Map<String, Object> postData = new HashMap<String, Object>();
-            postData.put("action", "logout");
-            postData.put("session", session);
-            postAPI(postData);
-            logger.info("Logout successful");
-            account.removeProperty(PROPERTY_SESSION);
-            account.removeProperty(PROPERTY_SESSION_EXPIRES_AT);
-        } catch (final Exception e) {
-            logger.log(e);
-        }
-    }
-
-    /** Registers the logout listener exactly once per account, anchored on the stable plugin instance from {@link Account#getPlugin()}. */
-    private void registerLogoutListener(final Account account) {
-        final PluginForHost accPlugin = account.getPlugin();
-        if (accPlugin instanceof HatfileCom) {
-            ((HatfileCom) accPlugin).doRegisterLogoutListener();
-        }
-    }
-
-    private void doRegisterLogoutListener() {
-        if (LOGOUT_LISTENER_REGISTERED.compareAndSet(false, true)) {
-            AccountController.getInstance().getEventSender().addListener(new AccountControllerListener() {
-                @Override
-                public void onAccountControllerEvent(final AccountControllerEvent event) {
-                    if (AccountControllerEvent.Types.REMOVED.equals(event.getType())) {
-                        final Account removedAccount = event.getAccount();
-                        if (removedAccount != null && getHost().equalsIgnoreCase(removedAccount.getHoster())) {
-                            logout(removedAccount);
-                        }
-                    }
+            try {
+                if (br == null) {
+                    /* This plugin instance may already have gone through clean(). */
+                    setBrowser(createNewBrowserInstance());
                 }
-            });
+                final Map<String, Object> postData = new HashMap<String, Object>();
+                postData.put("action", "logout");
+                postData.put("session", session);
+                postAPI(postData);
+                logger.info("Logout successful");
+                account.removeProperty(PROPERTY_SESSION);
+                account.removeProperty(PROPERTY_SESSION_EXPIRES_AT);
+            } catch (final Exception e) {
+                logger.log(e);
+                logger.warning("Logout failed");
+            }
         }
     }
 
     @Override
+    public void onAccountRemove(final Account account) {
+        logout(account);
+    }
+
+    @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        // registerLogoutListener(account);
         final String session = getSession(account, false);
         final Map<String, Object> data = accountCheck(session);
         final AccountInfo ai = new AccountInfo();

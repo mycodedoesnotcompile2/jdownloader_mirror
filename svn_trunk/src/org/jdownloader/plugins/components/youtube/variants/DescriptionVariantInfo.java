@@ -21,7 +21,13 @@ public class DescriptionVariantInfo extends VariantInfo {
 
     @Override
     public int compareTo(VariantInfo o) {
-        return this.getVariant()._getName(null).compareToIgnoreCase(o.getVariant()._getName(null));
-
+        final int ret = super.compareTo(o);
+        if (ret != 0) {
+            return ret;
+        } else if (o instanceof DescriptionVariantInfo) {
+            return this.getVariant()._getName(null).compareToIgnoreCase(o.getVariant()._getName(null));
+        } else {
+            return 0;
+        }
     }
 }

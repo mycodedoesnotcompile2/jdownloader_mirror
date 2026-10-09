@@ -18,8 +18,10 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
@@ -43,7 +45,7 @@ import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHos
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.components.antiDDoSForHost;
 
-@HostPlugin(revision = "$Revision: 53521 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53556 $", interfaceVersion = 3, names = {}, urls = {})
 public class MixdropCo extends antiDDoSForHost {
     public MixdropCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -66,7 +68,7 @@ public class MixdropCo extends antiDDoSForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "mixdrop.ag", "mixdrop.co", "mixdrop.to", "mixdrop.club", "mixdrop.sx", "mixdrop.bz", "mixdroop.bz", "mixdrop.vc", "mixdrop.to", "mdy48tn97.com", "mdbekjwqa.pw", "mdfx9dc8n.net", "mdzsmutpcvykb.net", "mixdrop.ms", "mixdrop.is", "mixdrop.si", "mixdrop.ps", "mixdrop.my", "mixdrop.sn", "mixdrop.cfd", "mixdrop.cv", "mixdrop23.net", "mxdrop.to", "m1xdrop.net", "m1xdrop.com", "m1xdrop.bz", "m1xdrop.click", "mixdrp.click", "miixdrop.net", "miiixdrop.net", "miiiixdrop.net", "miixdrop.com", "miixdrop.top", "mixdrop.vip" });
+        ret.add(new String[] { "mixdrop.ag", "mixdrop.co", "mixdrop.to", "mixdrop.top", "mixdrop.club", "mixdrop.sx", "mixdrop.bz", "mixdroop.bz", "mixdrop.vc", "mdy48tn97.com", "mdbekjwqa.pw", "mdfx9dc8n.net", "mdzsmutpcvykb.net", "mixdrop.ms", "mixdrop.is", "mixdrop.si", "mixdrop.ps", "mixdrop.my", "mixdrop.sn", "mixdrop.cfd", "mixdrop.cv", "mixdrop23.net", "mxdrop.to", "m1xdrop.net", "m1xdrop.com", "m1xdrop.bz", "m1xdrop.click", "mixdrp.click", "miixdrop.net", "miiixdrop.net", "miiiixdrop.net", "miixdrop.com", "miixdrop.top", "mixdrop.vip", "mxdrop.sx", "mxdrop.top" });
         return ret;
     }
 
@@ -141,14 +143,36 @@ public class MixdropCo extends antiDDoSForHost {
         }
     }
 
-    private String getNormalFileURL(final DownloadLink link) {
+    private String getNormalFileURL(final Set<String> avoidDomains, final DownloadLink link) {
         String url = link.getPluginPatternMatcher().replaceFirst("(?i)/(e|emb)/", "/f/").replaceAll("(?i)http://", "https://");
         final List<String> deadDomains = getDeadDomains();
         final String domainFromURL = Browser.getHost(url, false);
-        if (deadDomains.contains(domainFromURL)) {
+        if (deadDomains.contains(domainFromURL) || avoidDomains.contains(domainFromURL)) {
             url = url.replaceFirst(Pattern.quote(domainFromURL), this.getHost());
         }
         return url;
+    }
+
+    private static Set<String> AVOIDDOMAINS = new HashSet<String>();
+
+    private void getNormalFilePage(final Browser br, final DownloadLink link) throws Exception {
+        final Set<String> avoidDomains = new HashSet<String>();
+        synchronized (AVOIDDOMAINS) {
+            avoidDomains.addAll(AVOIDDOMAINS);
+        }
+        for (int i = 0; i < 5; i++) {
+            // not every domain supports /f/, retry max 5 times to find a working one
+            getPage(br, getNormalFileURL(avoidDomains, link));
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                avoidDomains.add(br.getHost());
+                continue;
+            }
+            synchronized (AVOIDDOMAINS) {
+                AVOIDDOMAINS.addAll(avoidDomains);
+            }
+            return;
+        }
+        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
 
     private String getFID(final DownloadLink link) {
@@ -206,7 +230,7 @@ public class MixdropCo extends antiDDoSForHost {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
         } else {
-            getPage(getNormalFileURL(link));
+            getNormalFilePage(br, link);
             if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("/imgs/illustration-notfound\\.png")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -232,7 +256,7 @@ public class MixdropCo extends antiDDoSForHost {
         if (dllink == null) {
             requestFileInformation(link);
             if (USE_API_FOR_LINKCHECK) {
-                getPage(getNormalFileURL(link));
+                getNormalFilePage(br, link);
             }
             /** 2021-03-03: E.g. extra step needed for .mp4 files but not for .zip files (which they call "folders"). */
             final String continueURL = br.getRegex("((?://[^/]+/f/[a-z0-9]+)?\\?download)").getMatch(0);
