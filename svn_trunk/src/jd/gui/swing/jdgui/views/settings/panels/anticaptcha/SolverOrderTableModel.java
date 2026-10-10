@@ -53,6 +53,8 @@ import org.jdownloader.settings.staticreferences.CFG_MYJD;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
 import jd.controlling.AccountController;
+import org.jdownloader.captcha.v2.solver.service.BrowserSolverService;
+
 import jd.controlling.AccountControllerEvent;
 import jd.controlling.AccountControllerListener;
 import jd.plugins.AccountInfo;
@@ -227,10 +229,15 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
                 return value.getName();
             }
 
-            /* Same tooltip as in the solver comparison table. */
+            /* Only the double click hint (no supported captcha types count), as it depends on what a double click does for this solver. */
             @Override
             protected String getTooltipText(final SolverService value) {
-                return SolverComparisonTableModel.getSolverTooltip(value);
+                if (value instanceof BrowserSolverService) {
+                    return _GUI.T.SolverOrderTable_tooltip_selectBrowser();
+                } else if (value.getBuyURL() != null) {
+                    return _GUI.T.SolverOrderTable_tooltip_buyPage();
+                }
+                return null;
             }
 
             /* Double click opens the page where an account for this solver can be bought. */
@@ -382,7 +389,8 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
                 } else {
                     rendererLabel.setText(value.getStatusText());
                     /* Ready solvers get a green check; solvers that need an action (button rows) never get one. */
-                    rendererLabel.setIcon(value.isReady() ? NewTheme.I().getIcon(IconKey.ICON_OK, 14) : null);
+                    /* Status texts that are warnings get a warning triangle. */
+                    rendererLabel.setIcon(value.isReady() ? NewTheme.I().getIcon(IconKey.ICON_OK, 14) : (value.isStatusTextWarning() ? warningIcon : null));
                     /* The renderer is reused for all rows, so the foreground has to be set (or reset) for every row. */
                     rendererLabel.setForeground(value.isStatusTextWarning() ? LAFOptions.getInstance().getColorForErrorForeground() : defaultStatusForeground);
                     rendererLabel.setVisible(true);

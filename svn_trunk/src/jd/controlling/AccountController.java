@@ -60,7 +60,6 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
-import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.plugins.controller.PluginClassLoader;
 import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChild;
@@ -437,31 +436,20 @@ public class AccountController implements AccountControllerListener, AccountProp
     }
 
     /*
-     * Captcha solver accounts for which the user clicked "Hide this session" in the low credits bubble. Deliberately kept in
-     * RAM only (no account property, not persisted): after a restart the user is warned again if the credits are still low. Weak keys, so
-     * removed accounts do not leak.
+     * Captcha solver accounts for which the user clicked "Hide this session" in the low credits bubble. Deliberately kept in RAM only (no
+     * account property, not persisted): after a restart the user is warned again if the credits are still low. Weak keys, so removed
+     * accounts do not leak.
      */
     private final Set<Account> lowCreditsSuppressedAccounts = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<Account, Boolean>()));
-    /*
-     * Captcha solver accounts whose credits were below the warning threshold at their last account check (RAM only, weak keys). Used by the
-     * account manager to display the status text as a warning.
-     */
-    private final Set<Account> lowBalanceAccounts           = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<Account, Boolean>()));
-
-    /** True if the credits of the given captcha solver account were below the user's warning threshold at its last account check. */
-    public boolean isLowBalance(final Account account) {
-        return lowBalanceAccounts.contains(account);
-    }
-
     /** Stops the low credits bubble for the given account until JDownloader is restarted. */
     public void suppressLowCreditsBubble(final Account account) {
         lowCreditsSuppressedAccounts.add(account);
     }
 
     /**
-     * Captcha solver specific part of the account check: default status text, zero balance error and low credits warning. If the credits
-     * are below the user's warning threshold, the status text of the account gets a hint and a bubble is shown after every account check,
-     * unless the user suppressed it for this account (see {@link #suppressLowCreditsBubble(Account)}).
+     * Captcha solver specific part of the account check: default status text, zero balance error and low balance warning. If the balance
+     * is below the user's warning threshold, a notification is shown after every account check, unless the user suppressed it for this
+     * account (see {@link #suppressLowCreditsBubble(Account)}).
      *
      * @param pluginSetStatus
      *            True if the plugin set a status text itself (it is kept then, otherwise a default "Balance: ..." status is set)
@@ -478,22 +466,19 @@ public class AccountController implements AccountControllerListener, AccountProp
         }
         if (ai.getAccountBalance() <= 0) {
             account.setError(AccountError.INVALID, -1, "Zero balance");
+            /**
+             * Balance is already zero so no need to check for low credits warning below. <br>
+             * The warning exists to warn the user before the balance goes to zero so we can assume that that warning has already happened.
+             */
+            return;
         }
         /* Low credits warning */
-        lowBalanceAccounts.remove(account);
-        final CaptchaSolverPluginConfig cfg = ((abstractPluginForCaptchaSolver) plugin).getDefaultConfig();
-        if (!cfg.isWarnOnLowBalance()) {
+        if (!account.isLowBalance()) {
             return;
         }
-        final double threshold = cfg.getLowBalanceWarningThreshold();
-        if (ai.getAccountBalance() >= threshold) {
-            return;
-        }
-        lowBalanceAccounts.add(account);
-        final String thresholdFormatted = AccountInfo.formatCaptchaSolverBalance(threshold, ai.getCurrency());
-        ai.setStatus(ai.getStatus() + " | ⚠ " + _GUI.T.CaptchaSolverAccount_status_lowCredits(thresholdFormatted));
+        /* The low balance hint in the status text is not stored in the AccountInfo, see Account#getLowBalanceStatusSuffix(). */
         if (!lowCreditsSuppressedAccounts.contains(account)) {
-            LowCaptchaCreditsBubbleSupport.getInstance().show(account, ai.getAccountBalanceFormatted(), thresholdFormatted, buildAfflink(plugin.getLazyP(), plugin, "captchasolver/lowcredits/bubble"));
+            LowCaptchaCreditsBubbleSupport.getInstance().show(account, ai.getAccountBalanceFormatted(), account.getLowBalanceThresholdFormatted(), buildAfflink(plugin.getLazyP(), plugin, "captchasolver/lowcredits/bubble"));
         }
     }
 

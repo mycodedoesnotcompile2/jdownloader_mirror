@@ -23,6 +23,13 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -40,14 +47,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-
-@HostPlugin(revision = "$Revision: 53563 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53573 $", interfaceVersion = 3, names = {}, urls = {})
 public class MegaloadOrg extends PluginForHost {
     /* API docs: "MEGALOAD Downloader API" (account/plan access to the Downloader API is required). */
     private static final String API_BASE                   = "https://megaload.org/API";
@@ -175,7 +175,10 @@ public class MegaloadOrg extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final Map<String, Object> entries = apiRequest(account, link, API_BASE + "/DesktopFileInfo.ashx?id=" + fid, null);
-        link.setProperty(PROPERTY_FILE_GUID, StringUtils.firstNotEmpty(StringUtils.valueOrEmpty((String) entries.get("fileId")).toLowerCase(Locale.ROOT), getFile_GUID(link)));
+        if (!link.hasProperty(PROPERTY_FILE_GUID)) {
+            /* Obtain long uuid from API. We need that later for downloading, especially if the added link only contained a short uuid. */
+            link.setProperty(PROPERTY_FILE_GUID, StringUtils.firstNotEmpty(StringUtils.valueOrEmpty((String) entries.get("fileId")).toLowerCase(Locale.ROOT), getFile_GUID(link)));
+        }
         /* name and size are not always present. */
         final String name = (String) entries.get("name");
         if (!StringUtils.isEmpty(name)) {
@@ -299,9 +302,9 @@ public class MegaloadOrg extends PluginForHost {
     }
 
     /**
-     * Makes sure a token is stored and returns the profile map. </br> validate=false: Re-use a stored token without any request (returns
-     * null) or login if there is none. </br> validate=true: Check the stored token via action=profile and login again if it is no longer
-     * valid.
+     * Makes sure a token is stored and returns the profile map. </br>
+     * validate=false: Re-use a stored token without any request (returns null) or login if there is none. </br>
+     * validate=true: Check the stored token via action=profile and login again if it is no longer valid.
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> login(final Account account, final boolean validate) throws Exception {
@@ -362,7 +365,6 @@ public class MegaloadOrg extends PluginForHost {
 
     private Browser sendApiRequest(final Account account, final String url, final String postJson) throws Exception {
         return sendApiRequest(getAccountToken(account), url, postJson);
-
     }
 
     private String getAccountToken(final Account account) {

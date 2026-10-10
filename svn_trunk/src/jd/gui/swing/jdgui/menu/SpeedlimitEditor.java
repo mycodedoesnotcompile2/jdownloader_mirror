@@ -48,6 +48,8 @@ public class SpeedlimitEditor extends MenuEditor implements DownloadWatchdogList
         setLayout(new MigLayout("ins " + getInsetsString() + ", hidemode 3", "6[grow,fill][][]", "[" + getComponentHeight() + "!]"));
         setOpaque(false);
         lbl = getLbl(_GUI.T.SpeedlimitEditor_SpeedlimitEditor_(), new AbstractIcon(IconKey.ICON_SPEED, 18));
+        /* explain that the global limit is split statically between all active connections */
+        setToolTipText(_GUI.T.SpeedlimitEditor_tooltip());
         /* regular controls, natively bound to the download speed limit config */
         speedSpinner = createSpinner(new ConfigIntSpinnerModel(org.jdownloader.settings.staticreferences.CFG_GENERAL.DOWNLOAD_SPEED_LIMIT));
         speedCheckbox = new ExtCheckBox(org.jdownloader.settings.staticreferences.CFG_GENERAL.DOWNLOAD_SPEED_LIMIT_ENABLED, lbl);

@@ -1,17 +1,22 @@
 package org.jdownloader.controlling.browser;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+
+import org.appwork.utils.os.CrossSystem;
 
 /**
  * Central access point for everything related to external (system) browsers.
  *
- * For now this manager only offers a best-effort "lazy" name lookup that turns a browser executable path (as configured e.g. in the captcha
- * browser solver commandline) into a nice human readable name.
- *
- * In the future this class is meant to also scan the system for installed browsers and return them.
+ * It offers a best-effort "lazy" name lookup that turns a browser executable path (as configured e.g. in the captcha browser solver
+ * commandline) into a nice human readable name, and a file system based scan for installed browsers.
  */
 public class ExternalBrowserManager {
     private static final ExternalBrowserManager INSTANCE = new ExternalBrowserManager();
@@ -147,11 +152,126 @@ public class ExternalBrowserManager {
     }
 
     /**
-     * Scans the system for installed browsers and returns them.
-     *
-     * Not implemented yet; currently always returns an empty list.
+     * A browser installation found on this system.
      */
-    public List<String> getInstalledBrowsers() {
-        return new ArrayList<String>();
+    public static final class InstalledBrowser {
+        private final String name;
+        private final String path;
+
+        /**
+         * @param name
+         *            human readable name
+         * @param path
+         *            absolute path of the executable, or null for the "OS default" dummy entry
+         */
+        public InstalledBrowser(final String name, final String path) {
+            this.name = name;
+            this.path = path;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        /** Absolute path of the executable, or null if this is the "OS default" dummy entry. */
+        public String getPath() {
+            return path;
+        }
+
+        @Override
+        public String toString() {
+            return name + " (" + path + ")";
+        }
+    }
+
+    /*
+     * Windows: {display name, path relative to one of the install roots}. Roots are %ProgramFiles%, %ProgramFiles(x86)%, %ProgramW6432%,
+     * %LocalAppData% and %LocalAppData%\Programs.
+     */
+    private static final String[][] WINDOWS_BROWSERS = new String[][] { { "Firefox", "Mozilla Firefox/firefox.exe" }, { "Firefox Developer Edition", "Firefox Developer Edition/firefox.exe" }, { "Firefox Nightly", "Firefox Nightly/firefox.exe" }, { "LibreWolf", "LibreWolf/librewolf.exe" }, { "Waterfox", "Waterfox/waterfox.exe" }, { "Pale Moon", "Moonchild Productions/Pale Moon/palemoon.exe" }, { "SeaMonkey", "SeaMonkey/seamonkey.exe" }, { "Google Chrome", "Google/Chrome/Application/chrome.exe" }, { "Google Chrome Beta", "Google/Chrome Beta/Application/chrome.exe" }, { "Google Chrome Dev", "Google/Chrome Dev/Application/chrome.exe" }, { "Google Chrome Canary", "Google/Chrome SxS/Application/chrome.exe" }, { "Chromium", "Chromium/Application/chrome.exe" }, { "Microsoft Edge", "Microsoft/Edge/Application/msedge.exe" }, { "Microsoft Edge Beta", "Microsoft/Edge Beta/Application/msedge.exe" }, { "Microsoft Edge Dev", "Microsoft/Edge Dev/Application/msedge.exe" }, { "Brave", "BraveSoftware/Brave-Browser/Application/brave.exe" }, { "Vivaldi", "Vivaldi/Application/vivaldi.exe" }, { "Opera", "Opera/opera.exe" }, { "Opera GX", "Opera GX/opera.exe" } };
+    /* Linux: {display name, executable name}. Searched in $PATH and a few well known directories. */
+    private static final String[][] LINUX_BROWSERS   = new String[][] { { "Firefox", "firefox" }, { "Firefox", "firefox-bin" }, { "Firefox ESR", "firefox-esr" }, { "Firefox", "org.mozilla.firefox" }, { "LibreWolf", "librewolf" }, { "LibreWolf", "io.gitlab.librewolf-community" }, { "Waterfox", "waterfox" }, { "Waterfox", "net.waterfox.waterfox" }, { "Pale Moon", "palemoon" }, { "SeaMonkey", "seamonkey" }, { "Google Chrome", "google-chrome" }, { "Google Chrome", "google-chrome-stable" }, { "Google Chrome", "com.google.Chrome" }, { "Google Chrome Beta", "google-chrome-beta" }, { "Google Chrome Dev", "google-chrome-unstable" }, { "Chromium", "chromium" }, { "Chromium", "chromium-browser" }, { "Chromium", "org.chromium.Chromium" }, { "Microsoft Edge", "microsoft-edge" }, { "Microsoft Edge", "microsoft-edge-stable" }, { "Microsoft Edge", "com.microsoft.Edge" }, { "Microsoft Edge Beta", "microsoft-edge-beta" }, { "Microsoft Edge Dev", "microsoft-edge-dev" }, { "Brave", "brave" }, { "Brave", "brave-browser" }, { "Brave", "com.brave.Browser" }, { "Vivaldi", "vivaldi" }, { "Vivaldi", "vivaldi-stable" }, { "Vivaldi", "com.vivaldi.Vivaldi" }, { "Opera", "opera" }, { "Opera", "com.opera.Opera" } };
+    /* macOS: {display name, path inside /Applications or ~/Applications}. */
+    private static final String[][] MAC_BROWSERS     = new String[][] { { "Firefox", "Firefox.app/Contents/MacOS/firefox" }, { "Firefox Developer Edition", "Firefox Developer Edition.app/Contents/MacOS/firefox" }, { "Firefox Nightly", "Firefox Nightly.app/Contents/MacOS/firefox" }, { "LibreWolf", "LibreWolf.app/Contents/MacOS/librewolf" }, { "Waterfox", "Waterfox.app/Contents/MacOS/waterfox" }, { "Google Chrome", "Google Chrome.app/Contents/MacOS/Google Chrome" }, { "Chromium", "Chromium.app/Contents/MacOS/Chromium" }, { "Microsoft Edge", "Microsoft Edge.app/Contents/MacOS/Microsoft Edge" }, { "Brave", "Brave Browser.app/Contents/MacOS/Brave Browser" }, { "Vivaldi", "Vivaldi.app/Contents/MacOS/Vivaldi" }, { "Opera", "Opera.app/Contents/MacOS/Opera" } };
+
+    /**
+     * Scans the system for installed browsers and returns them. The Windows registry is intentionally not used, only the file system is
+     * checked. If multiple installations of the same browser exist (different executables), all of them are returned.
+     *
+     * This does file system access and should not be called from the EDT.
+     *
+     * @return the installed browsers, never null.
+     */
+    public List<InstalledBrowser> getInstalledBrowsers() {
+        final List<InstalledBrowser> ret = new ArrayList<InstalledBrowser>();
+        /* Used to filter out the same executable found via different paths (symlinks, duplicate roots). */
+        final Set<String> dupes = new HashSet<String>();
+        if (CrossSystem.isWindows()) {
+            final List<File> roots = new ArrayList<File>();
+            final String[] envs = new String[] { "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "LocalAppData" };
+            for (final String env : envs) {
+                final String value = System.getenv(env);
+                if (value != null && value.trim().length() > 0) {
+                    roots.add(new File(value));
+                    if ("LocalAppData".equals(env)) {
+                        roots.add(new File(value, "Programs"));
+                    }
+                }
+            }
+            for (final String[] browser : WINDOWS_BROWSERS) {
+                for (final File root : roots) {
+                    addIfExecutable(ret, dupes, browser[0], new File(root, browser[1]));
+                }
+            }
+        } else if (CrossSystem.isMac()) {
+            final List<File> roots = new ArrayList<File>();
+            roots.add(new File("/Applications"));
+            roots.add(new File(System.getProperty("user.home"), "Applications"));
+            for (final String[] browser : MAC_BROWSERS) {
+                for (final File root : roots) {
+                    addIfExecutable(ret, dupes, browser[0], new File(root, browser[1]));
+                }
+            }
+        } else {
+            /* Linux and other unix like systems */
+            final List<File> dirs = new ArrayList<File>();
+            final String pathEnv = System.getenv("PATH");
+            if (pathEnv != null) {
+                for (final String dir : pathEnv.split(File.pathSeparator)) {
+                    if (dir.trim().length() > 0) {
+                        dirs.add(new File(dir));
+                    }
+                }
+            }
+            dirs.add(new File("/usr/bin"));
+            dirs.add(new File("/usr/local/bin"));
+            dirs.add(new File("/snap/bin"));
+            dirs.add(new File("/var/lib/flatpak/exports/bin"));
+            dirs.add(new File(System.getProperty("user.home"), ".local/share/flatpak/exports/bin"));
+            for (final String[] browser : LINUX_BROWSERS) {
+                for (final File dir : dirs) {
+                    addIfExecutable(ret, dupes, browser[0], new File(dir, browser[1]));
+                }
+            }
+        }
+        return ret;
+    }
+
+    private void addIfExecutable(final List<InstalledBrowser> list, final Set<String> dupes, final String name, final File file) {
+        if (!file.isFile()) {
+            return;
+        }
+        String key;
+        try {
+            key = file.getCanonicalPath();
+        } catch (final IOException e) {
+            key = file.getAbsolutePath();
+        }
+        if (CrossSystem.isWindows()) {
+            key = key.toLowerCase(Locale.ENGLISH);
+        }
+        if (dupes.add(key)) {
+            list.add(new InstalledBrowser(name, file.getAbsolutePath()));
+        }
     }
 }

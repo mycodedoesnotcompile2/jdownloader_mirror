@@ -12,8 +12,13 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
 import org.appwork.swing.exttable.ExtColumn;
+import org.appwork.utils.swing.dialog.Dialog;
+import org.appwork.utils.swing.dialog.DialogCanceledException;
+import org.appwork.utils.swing.dialog.DialogClosedException;
 import org.jdownloader.api.captcha.CaptchaAPIManualRemoteSolverService;
 import org.jdownloader.captcha.v2.SolverService;
+import org.jdownloader.captcha.v2.solver.service.BrowserSolverService;
+import org.jdownloader.controlling.browser.ExternalBrowserManager.InstalledBrowser;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
@@ -54,8 +59,38 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
 
     @Override
     protected boolean onDoubleClick(MouseEvent e, SolverService obj) {
+        if (obj instanceof BrowserSolverService) {
+            showSelectBrowserDialog((BrowserSolverService) obj);
+            return true;
+        }
         /* Config is shown inline below the table now; no separate properties dialog. */
         return false;
+    }
+
+    /** Lets the user choose the browser of the browser solver and stores the choice. */
+    public void showSelectBrowserDialog(final BrowserSolverService browserSolver) {
+        final SelectBrowserDialog dialog = new SelectBrowserDialog(browserSolver.getConfig().getBrowserCommandline());
+        try {
+            final InstalledBrowser selected = Dialog.getInstance().showDialog(dialog);
+            if (selected == null) {
+                return;
+            }
+            if (selected.getPath() == null) {
+                /* "OS Default" */
+                browserSolver.getConfig().setBrowserCommandline(null);
+            } else {
+                browserSolver.getConfig().setBrowserCommandline(new String[] { selected.getPath(), "%s" });
+            }
+            /* Check the (possibly new) browser path again on next access. */
+            browserSolver.resetBrowserPathCache();
+            /* Status text and ready state are computed live, so a redraw of the solver's row is enough. */
+            final int row = getModel().getRowforObject(browserSolver);
+            if (row >= 0) {
+                getModel().fireTableRowsUpdated(row, row);
+            }
+        } catch (DialogClosedException e1) {
+        } catch (DialogCanceledException e1) {
+        }
     }
 
     /**
@@ -64,8 +99,9 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
      * <li>MyJDownloader remote solver -> "Configure" (opens the My.JDownloader tab).</li>
      * <li>External (plugin based) solver -> "Open account manager" (and selects the solver's first account, if it has one) and, if the
      * solver has a buy page, "Buy credits".</li>
+     * <li>Browser solver -> "Select browser" (choose the browser used to open captcha pages, or the OS default).</li>
      * </ul>
-     * All other solver types (local JAC, dialog, browser) get no context menu actions.
+     * All other solver types (local JAC, dialog) get no context menu actions.
      */
     @Override
     protected JPopupMenu onContextMenu(final JPopupMenu popup, final SolverService contextObject, final List<SolverService> selection, final ExtColumn<SolverService> column, final MouseEvent mouseEvent) {
@@ -103,6 +139,17 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
                 });
                 popup.add(buyCredits);
             }
+            return popup;
+        } else if (contextObject instanceof BrowserSolverService) {
+            final BrowserSolverService browserSolver = (BrowserSolverService) contextObject;
+            final JMenuItem selectBrowser = new JMenuItem(_GUI.T.SolverOrderTable_context_selectBrowser(), browserSolver.getIcon(18));
+            selectBrowser.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(final ActionEvent e) {
+                    showSelectBrowserDialog(browserSolver);
+                }
+            });
+            popup.add(selectBrowser);
             return popup;
         }
         /* No context menu actions for any other solver type. */

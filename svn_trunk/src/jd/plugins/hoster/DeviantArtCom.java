@@ -60,7 +60,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 53129 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53574 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeviantArtCom extends PluginForHost {
     private final String               TYPE_DOWNLOADALLOWED_HTML                   = "class=\"text\">\\s*HTML download\\s*</span>";
     private final String               TYPE_DOWNLOADFORBIDDEN_HTML                 = "<div class=\"grf\\-indent\"";
@@ -307,9 +307,10 @@ public class DeviantArtCom extends PluginForHost {
                             }
                         }
                     }
-                    if (c != null) {
+                    /* Token is optional: It is missing e.g. for items blocked by the mature filter when not logged in. */
+                    final List<String> tokens = (List<String>) media.get("token");
+                    if (c != null && tokens != null && !tokens.isEmpty()) {
                         c = c.replaceFirst(",q_\\d+(,strp)?", "");
-                        final List<String> tokens = (List<String>) media.get("token");
                         final String token = tokens.get(0);
                         link.setProperty(PROPERTY_IMAGE_TOKEN, token);
                         displayedImageURL = baseUri + c.replaceFirst("<prettyName>", Matcher.quoteReplacement(prettyName));
@@ -342,6 +343,37 @@ public class DeviantArtCom extends PluginForHost {
         if (author != null) {
             link.setProperty(PROPERTY_USERNAME, author.get("username"));
         }
+    }
+
+    /**
+     * Returns false for URLs which are not the actual content image e.g. the DeviantArt logo which is sometimes given as "og:image" for
+     * items that are not publicly viewable.
+     */
+    private static boolean looksLikeValidImageURL(final String url) {
+        if (StringUtils.isEmpty(url) || !url.startsWith("http")) {
+            return false;
+        } else if (url.matches("(?i)^https?://st\\.deviantart\\.net/.*")) {
+            /* Static site assets such as https://st.deviantart.net/minish/main/logo/logo200x200.png */
+            return false;
+        } else if (url.contains("/logo/")) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Returns the value of the given image URL property or null if it is not set or invalid. Invalid values (e.g. the DeviantArt logo
+     * stored by older versions) are removed from the link.
+     */
+    private static String getValidImageURLProperty(final DownloadLink link, final String property) {
+        final String url = link.getStringProperty(property);
+        if (url == null) {
+            return null;
+        } else if (!looksLikeValidImageURL(url)) {
+            link.removeProperty(property);
+            return null;
+        }
+        return url;
     }
 
     private static String setTitleProperty(final DownloadLink link, String title) {
@@ -489,11 +521,19 @@ public class DeviantArtCom extends PluginForHost {
                 setTitleProperty(link, titleFromHTML);
             }
         }
+        /* Invalidate previously stored invalid image URL(s) */
+        getValidImageURLProperty(link, PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL);
+        getValidImageURLProperty(link, PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL_2);
         if (StringUtils.isEmpty(displayedImageURL) && isImage(link)) {
             displayedImageURL = HTMLSearch.searchMetaTag(br, "og:image");
             if (displayedImageURL != null) {
                 displayedImageURL = Encoding.htmlOnlyDecode(displayedImageURL);
-                link.setProperty(PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL, displayedImageURL);
+                if (looksLikeValidImageURL(displayedImageURL)) {
+                    link.setProperty(PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL, displayedImageURL);
+                } else {
+                    logger.info("Ignoring invalid og:image: " + displayedImageURL);
+                    displayedImageURL = null;
+                }
             }
         }
         final String officialDownloadFilesizeStr = br.getRegex(">\\s*Image size\\s*</div><div[^>]*>\\d+x\\d+px\\s*(\\d+[^>]+)</div>").getMatch(0);
@@ -1052,7 +1092,7 @@ public class DeviantArtCom extends PluginForHost {
         String dllink = null;
         final String officialDownloadurl = link.getStringProperty(PROPERTY_OFFICIAL_DOWNLOADURL);
         final String multiImageGalleryPreviewUrl = getMultiImageGalleryPreviewUrl(link);
-        final String imagePreviewUrl = link.getStringProperty(PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL);
+        final String imagePreviewUrl = getValidImageURLProperty(link, PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL);
         if (isVideo(link)) {
             /* officialDownloadurl can be given while account is not given -> Will lead to error 404 then! */
             dllink = link.getStringProperty(PROPERTY_VIDEO_DISPLAY_OR_PREVIEW_URL);
@@ -1106,7 +1146,7 @@ public class DeviantArtCom extends PluginForHost {
     }
 
     private static String getMultiImageGalleryPreviewUrl(final DownloadLink link) {
-        String url = link.getStringProperty(PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL_2);
+        String url = getValidImageURLProperty(link, PROPERTY_IMAGE_DISPLAY_OR_PREVIEW_URL_2);
         if (url == null) {
             return null;
         }

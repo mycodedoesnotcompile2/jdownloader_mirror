@@ -81,6 +81,10 @@ public class CaptchaTestChallengeFactory {
             }
             final Challenge<?> challenge;
             switch (type) {
+            case IMAGE_SINGLE_CLICK_CAPTCHA:
+                /* Exactly one click expected (max = 1 makes MultiClickCaptchaChallenge#isSingleClick() true). */
+                challenge = new MultiClickCaptchaChallenge(imageFile, "Click on the full trash can", plugin, 1, 1);
+                break;
             case IMAGE_MULTI_CLICK_CAPTCHA:
                 /* The test image has exactly "minClicks" targets -> max = min so the dialog closes automatically after the last click. */
                 challenge = new MultiClickCaptchaChallenge(imageFile, "Click all open circles.", plugin, parameters.getMinClicks(), parameters.getMinClicks());

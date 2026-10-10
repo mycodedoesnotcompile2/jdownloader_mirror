@@ -534,10 +534,12 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
             @Override
             public void configureRendererComponent(AccountEntry value, boolean isSelected, boolean hasFocus, int row, int column) {
                 super.configureRendererComponent(value, isSelected, hasFocus, row, column);
-                if (AccountController.getInstance().isLowBalance(value.getAccount())) {
+                final Account account = value.getAccount();
+                if (account.isValid() && !account.isTempDisabled() && account.isLowBalance()) {
                     /*
-                     * Captcha solver account with low credits: show its status text (which contains the low credits warning) in the theme's
-                     * error color.
+                     * Captcha solver account with low balance: show its status text (which contains the low balance warning) in the theme's
+                     * error color. Not for invalid/temp disabled accounts: Their whole row is already highlighted by the row highlighters of
+                     * the table (see PremiumAccountTable), so an error colored text would be red on red.
                      */
                     this.rendererField.setForeground(LAFOptions.getInstance().getColorForErrorForeground());
                 }
@@ -1014,6 +1016,10 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
                     ret = _GUI.T.PremiumAccountTableModel_getStringValue_temp_disabled2(ret);
                 }
                 /* Account is ok: show the plain status without a redundant "Account is ok:" prefix */
+            }
+            if (!value.isTempDisabled()) {
+                /* Captcha solver account with low balance: empty String if not applicable. */
+                ret += value.getLowBalanceStatusSuffix();
             }
             return ret;
         }

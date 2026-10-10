@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 import javax.swing.ButtonGroup;
+import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JLabel;
 import javax.swing.JRadioButton;
@@ -31,6 +32,7 @@ import org.jdownloader.captcha.v2.CaptchaSolverCaptchaTypesSettingsPanelBuilder;
 import org.jdownloader.captcha.v2.CaptchaSolverCaptchaTypesSettingsPanelBuilder.SolverServiceCaptchaTypeAccessor;
 import org.jdownloader.captcha.v2.CaptchaSolverLimitRule;
 import org.jdownloader.captcha.v2.SolverService;
+import org.jdownloader.captcha.v2.solver.service.BrowserSolverService;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
@@ -269,6 +271,18 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
                     /* Width tracking wrapper: long setting descriptions wrap instead of pushing the input fields out of the visible area. */
                     final WidthTrackingPanel configWrapper = new WidthTrackingPanel("ins 0", "[grow,fill]", "[]");
                     configWrapper.add(configComponent, "growx, wmin 10");
+                    if (solver instanceof BrowserSolverService) {
+                        /* The browser command line has no generic editor (hidden config entry), so offer the same dialog as the table does. */
+                        final BrowserSolverService browserSolver = (BrowserSolverService) solver;
+                        final JButton chooseBrowser = new JButton(_GUI.T.SolverOrderContainer_chooseBrowser(), new AbstractIcon(IconKey.ICON_BROWSE, 16));
+                        chooseBrowser.addActionListener(new ActionListener() {
+                            @Override
+                            public void actionPerformed(final ActionEvent e) {
+                                solverOrder.showSelectBrowserDialog(browserSolver);
+                            }
+                        });
+                        configWrapper.add(chooseBrowser, "newline, gaptop 5, growx 0, alignx left");
+                    }
                     configScrollPane.setViewportView(configWrapper);
                     configScrollPane.setVisible(true);
                     updateCustomLimits(solver);

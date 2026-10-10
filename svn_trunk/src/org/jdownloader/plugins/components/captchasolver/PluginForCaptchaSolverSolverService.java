@@ -139,21 +139,20 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
         /* Single account: keep the established "Ready | Balance: <localized amount>" layout. */
         final String statusText = _GUI.T.CaptchaSolverService_status_ready_balance(balanceText);
         if (isStatusTextWarning()) {
-            final String thresholdText = AccountInfo.formatCaptchaSolverBalance(getPluginConfig().getLowBalanceWarningThreshold(), currency);
-            return statusText + " | ⚠ " + _GUI.T.CaptchaSolverAccount_status_lowCredits(thresholdText);
+            return statusText + validAccounts.get(0).getLowBalanceStatusSuffix();
         }
         return statusText;
     }
 
     /**
      * True if the solver has exactly one usable account and its credits are below the user's warning threshold (see
-     * {@link AccountController#isLowBalance(Account)}). With several accounts the status text only shows the total balance, which says
+     * {@link Account#isLowBalance()}). With several accounts the status text only shows the total balance, which says
      * nothing about the single accounts, so no warning is shown then.
      */
     @Override
     public boolean isStatusTextWarning() {
         final List<Account> validAccounts = AccountController.getInstance().getValidAccounts(plugin.getHost());
-        return validAccounts != null && validAccounts.size() == 1 && AccountController.getInstance().isLowBalance(validAccounts.get(0));
+        return validAccounts != null && validAccounts.size() == 1 && validAccounts.get(0).isLowBalance();
     }
 
     @Override

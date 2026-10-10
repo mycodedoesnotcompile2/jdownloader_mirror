@@ -270,6 +270,10 @@ public class AccountListTableModel extends ExtTableModel<AccountEntry> implement
                     } else {
                         ret = _GUI.T.PremiumAccountTableModel_getStringValue_account_ok_2(ret);
                     }
+                    if (!value.getAccount().isTempDisabled()) {
+                        /* Captcha solver account with low balance: empty String if not applicable. */
+                        ret += value.getAccount().getLowBalanceStatusSuffix();
+                    }
                     return ret;
                 }
                 if (StringUtils.isNotEmpty(value.getAccount().getErrorString())) {

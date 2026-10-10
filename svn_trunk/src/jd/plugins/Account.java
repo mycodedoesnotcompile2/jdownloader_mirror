@@ -39,6 +39,8 @@ import org.jdownloader.DomainInfo;
 import org.jdownloader.controlling.UniqueAlltimeID;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.logging.LogController;
+import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
+import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
@@ -310,6 +312,56 @@ public class Account extends Property {
 
     public boolean isCaptchaSolverPlugin() {
         return isCaptchaSolverPlugin;
+    }
+
+    /**
+     * True if this is a captcha solver account with a known, positive balance below the user's low balance warning threshold (see
+     * {@link CaptchaSolverPluginConfig#getLowBalanceWarningThreshold()}) and the low balance warning is enabled. Evaluated live against the
+     * balance of the last account check and the current settings. A balance of 0 is not "low" but an error (see AccountController).
+     */
+    public boolean isLowBalance() {
+        final AccountInfo ai = getAccountInfo();
+        if (!isCaptchaSolverPlugin || ai == null || !(plugin instanceof abstractPluginForCaptchaSolver)) {
+            return false;
+        }
+        final double balance = ai.getAccountBalance();
+        if (balance <= 0) {
+            return false;
+        }
+        final CaptchaSolverPluginConfig cfg = ((abstractPluginForCaptchaSolver) plugin).getDefaultConfig();
+        if (!cfg.isWarnOnLowBalance()) {
+            /*
+             * User disabled low balance warning -> There is no such thing like a low balance because user defines the low balance
+             * threshold.
+             */
+            return false;
+        }
+        return balance < cfg.getLowBalanceWarningThreshold();
+    }
+
+    /**
+     * Returns the low balance threshold of this account formatted in the currency of its balance, or null if {@link #isLowBalance()} is
+     * false.
+     */
+    public String getLowBalanceThresholdFormatted() {
+        if (!isLowBalance()) {
+            return null;
+        }
+        final double threshold = ((abstractPluginForCaptchaSolver) plugin).getDefaultConfig().getLowBalanceWarningThreshold();
+        return AccountInfo.formatCaptchaSolverBalance(threshold, getAccountInfo().getCurrency());
+    }
+
+    /**
+     * Returns the hint which gets appended to the status text of this account while {@link #isLowBalance()} is true, otherwise an empty
+     * String. It is built when the status is displayed and not stored in the {@link AccountInfo}, so it disappears as soon as the low
+     * balance warning gets disabled or the balance is no longer low.
+     */
+    public String getLowBalanceStatusSuffix() {
+        final String thresholdFormatted = getLowBalanceThresholdFormatted();
+        if (thresholdFormatted == null) {
+            return "";
+        }
+        return " | ⚠ " + _GUI.T.CaptchaSolverAccount_status_lowCredits(thresholdFormatted);
     }
 
     /**

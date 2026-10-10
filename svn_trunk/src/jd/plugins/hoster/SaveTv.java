@@ -27,6 +27,22 @@ import java.util.Map;
 import java.util.Random;
 import java.util.regex.Pattern;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+import org.jdownloader.translate._JDT;
+
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -35,6 +51,7 @@ import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
+import jd.http.requests.DeleteRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -54,23 +71,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SyncSaveTvToolbarAction;
 import jd.utils.locale.JDL;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.os.CrossSystem;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.images.AbstractIcon;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-import org.jdownloader.translate._JDT;
-
-@HostPlugin(revision = "$Revision: 53400 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53572 $", interfaceVersion = 3, names = {}, urls = {})
 public class SaveTv extends PluginForHost {
     /* Static information */
     /* API functions developed for API version 3.0.0.1631 */
@@ -1143,7 +1144,8 @@ public class SaveTv extends PluginForHost {
                 }
                 /**
                  * 2021-02-11: Both serverside given filesizes are very vague. For downloads with ads we use the serverside given
-                 * information. </br> For ad-free downloads we'll calculate it on our own as that is more precise! </br>
+                 * information. </br>
+                 * For ad-free downloads we'll calculate it on our own as that is more precise! </br>
                  * duration_seconds_adsfree == 0 if adFree is unavailable while cutVideoSize == uncutVideoSize (which is of course not true,
                  * that's just what their backend does with that here).
                  */
@@ -1405,11 +1407,15 @@ public class SaveTv extends PluginForHost {
                 return;
             }
             /* Download finished successfully --> Handle optional telecastID cleanup. */
+            boolean deleted = false;
             if (cfg.getBooleanProperty(DELETE_TELECAST_ID_AFTER_DOWNLOAD, defaultDELETE_TELECAST_ID_AFTER_DOWNLOAD)) {
                 logger.info("Download finished --> User WANTS telecastID " + getTelecastId(link) + " deleted");
-                killTelecastID(link);
+                deleted = killTelecastID(link);
             }
-            markTelecastIdAsDownloaded(link);
+            if (!deleted) {
+                /* Marking makes no sense for a record which no longer exists. */
+                markTelecastIdAsDownloaded(link);
+            }
         } catch (final PluginException e) {
             if (e.getLinkStatus() == LinkStatus.ERROR_ALREADYEXISTS && cfg.getBooleanProperty(DELETE_TELECAST_ID_IF_FILE_ALREADY_EXISTS, defaultDELETE_TELECAST_ID_IF_FILE_ALREADY_EXISTS)) {
                 /*
@@ -1884,12 +1890,12 @@ public class SaveTv extends PluginForHost {
      * @param link
      *            DownloadLink: The DownloadLink whose telecastID will be deleted.
      */
-    private void killTelecastID(final DownloadLink link) throws Exception {
-        if (apiActive()) {
-            killTelecastIDAPI(link);
-        } else {
-            killTelecastIDWebsite(link);
+    private boolean killTelecastID(final DownloadLink link) {
+        if (!apiActive()) {
+            logger.warning("API is not available --> Cannot delete telecastID");
+            return false;
         }
+        return killTelecastIDAPI(link);
     }
 
     /**
@@ -1916,46 +1922,31 @@ public class SaveTv extends PluginForHost {
     }
 
     /**
-     * Deletes a desired telecastID from the users' account(!) <br />
+     * Deletes a desired telecastID from the users' account(!) via DELETE /v3/records/{telecastId}. <br />
+     * Uses a cloned Browser and does not go through the regular API error handling so that a failed delete can never trigger a re-login or
+     * alter the state of the main Browser instance. <br />
+     * The API returns HTTP 200 with a JSON object {telecastId, success, errors}. Only "success" tells whether the record was deleted.
      *
      * @param link
      *            DownloadLink: The DownloadLink whose telecastID will be deleted.
+     * @return true if the API confirmed the deletion.
      */
-    @Deprecated
-    private void killTelecastIDWebsite(final DownloadLink link) throws Exception {
+    private boolean killTelecastIDAPI(final DownloadLink link) {
         try {
-            final String deleteurl = "https://www." + link.getHost() + "/STV/M/obj/cRecordOrder/croDelete.cfm?TelecastID=" + getTelecastId(link);
-            this.br.getPage(deleteurl);
-            if (br.containsHTML("\"ok\"")) {
+            final Browser brc = this.br.cloneBrowser();
+            brc.getPage(new DeleteRequest(correctURLAPI("/records/" + getTelecastId(link))));
+            final int responsecode = brc.getHttpConnection().getResponseCode();
+            final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+            if (responsecode == 200 && ((Boolean) entries.get("success")).booleanValue()) {
                 logger.info("Successfully deleted telecastID");
-            } else {
-                logger.warning("Failed to delete telecastID");
+                return true;
             }
+            logger.warning("Failed to delete telecastID | Responsecode: " + responsecode + " | Errors: " + entries.get("errors"));
         } catch (final Throwable e) {
-            logger.info("Failed to delete telecastID");
+            logger.log(e);
+            logger.warning("Failed to delete telecastID");
         }
-    }
-
-    /**
-     * Deletes a desired telecastID from the users' account(!) <br />
-     *
-     * @param link
-     *            DownloadLink: The DownloadLink whose telecastID will be deleted.
-     */
-    private void killTelecastIDAPI(final DownloadLink link) throws Exception {
-        try {
-            api_GET(this.br, "/records/" + getTelecastId(link));
-            final long responsecode = br.getHttpConnection().getResponseCode();
-            if (responsecode == 422) {
-                logger.info("Failed to delete telecastID");
-            } else if (responsecode == 200) {
-                logger.info("Successfully deleted telecastID");
-            } else {
-                logger.info("Unknown status: Not sure whether telecastID has been deleted or not");
-            }
-        } catch (final Throwable e) {
-            logger.info("Failed to delete telecastID");
-        }
+        return false;
     }
 
     @Deprecated
@@ -2840,9 +2831,10 @@ public class SaveTv extends PluginForHost {
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_LABEL, "Erweiterte Einstellungen:\r\n<html><p style=\"color:#F62817\"><b>Warnung: Ändere die folgenden Einstellungen nur, wenn du weißt was du tust!\r\nMit einem Klick auf den gelben Pfeil rechts oben kannst du jederzeit zu den Standardeinstellungen zurück.</b></p></html>"));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_LABEL, "Soll die telecastID in bestimmten Situationen aus dem save.tv Archiv gelöscht werden?\r\n<html><p style=\"color:#F62817\"><b>Warnung:</b> Gelöschte telecastIDs können nicht wiederhergestellt werden!</p></html>"));
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), DELETE_TELECAST_ID_AFTER_DOWNLOAD, "Erfolgreich heruntergeladene telecastIDs aus dem save.tv Archiv löschen?").setDefaultValue(defaultDELETE_TELECAST_ID_AFTER_DOWNLOAD));
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), DELETE_TELECAST_ID_IF_FILE_ALREADY_EXISTS, "Falls Datei bereits auf der Festplatte existiert, telecastIDs aus dem save.tv Archiv löschen?").setDefaultValue(defaultDELETE_TELECAST_ID_IF_FILE_ALREADY_EXISTS));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_LABEL, "Lösche Aufnahmen aus dem Archiv, wenn:"));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), DELETE_TELECAST_ID_AFTER_DOWNLOAD, "Download erfolgreich abgeschlossen").setDefaultValue(defaultDELETE_TELECAST_ID_AFTER_DOWNLOAD));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), DELETE_TELECAST_ID_IF_FILE_ALREADY_EXISTS, "Datei bereits auf der Festplatte existiert").setDefaultValue(defaultDELETE_TELECAST_ID_IF_FILE_ALREADY_EXISTS));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_LABEL, "<html><p style=\"color:#F62817\"><b>Warnung:</b> Die Aufnahmen werden in deinem save.tv Account gelöscht!<br />Gelöschte Aufnahmen können nicht wiederhergestellt werden und sind unwiderruflich verloren!</p></html>"));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_TEXTFIELD, getPluginConfig(), CUSTOM_API_PARAMETERS_CRAWLER, "Crawler: eigene API Parameter definieren (alles außer 'limit,fields,nopagingheader,paging,offset') [urlEncoded]:\r\nBeispiel: 'tags=record:manual&fsk=6'\r\nWeitere Informationen siehe: api.save.tv/v3/docs/index#!/Records_|_get/Records_Get<html><p style=\"color:#F62817\"><b>Warnung:</b> Falsche Werte können den Crawler funktionsunfähig machen und andere Crawler-Einstellungen beeinflussen (ggf. Einstellungen zurücksetzen)!</p></html>").setDefaultValue(defaultCUSTOM_API_PARAMETERS_CRAWLER));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
@@ -2964,7 +2956,7 @@ public class SaveTv extends PluginForHost {
             String message = "Hallo lieber save.tv Nutzer/liebe save.tv Nutzerin\r\n";
             message += "Du bist gerade dabei, deine erste Save.tv Aufnahme mit JDownloader herunterzuladen.\r\n";
             message += "Das save.tv Plugin bietet folgende Features:\r\n";
-            message += "- Automatisierter Download von save.tv Links (telecast-IDs)\r\n";
+            message += "- Automatisierter Download von save.tv Links (Aufnahmen)\r\n";
             message += "- Laden des kompletten save.tv Videoarchivs über wenige Klicks\r\n";
             message += "--> Oder wahlweise nur alle Links der letzten X Tage\r\n";
             message += "- Einfügen aller Aufnahmen des Save.tv Videoarchivs über den Save.tv Button in der Toolbar oben\r\n";
@@ -3025,9 +3017,9 @@ public class SaveTv extends PluginForHost {
         panel.addStringPair(_GUI.T.lit_expire_date(), acc_expire);
         panel.addStringPair(_GUI.T.lit_price(), acc_price);
         panel.addStringPair("Sendungen im Archiv:", acc_count_archive_entries);
-        panel.addStringPair("Ladbare Sendungen im Archiv (telecast-IDs):", acc_count_telecast_ids);
+        panel.addStringPair("Ladbare Sendungen im Archiv (Aufnahmen):", acc_count_telecast_ids);
         panel.addStringPair("Datum des letzten erfolgreichen Crawlvorganges: ", user_lastcrawl_date);
-        panel.addStringPair("Zuletzt erfolgreich telecastIDs per Crawler hinzugefügt:", user_lastcrawl_newlinks_date);
+        panel.addStringPair("Zuletzt erfolgreich Aufnahmen per Crawler hinzugefügt:", user_lastcrawl_newlinks_date);
         panel.addHeader(_GUI.T.lit_download(), new AbstractIcon(IconKey.ICON_DOWNLOAD, 18));
         panel.addStringPair(_GUI.T.lit_max_simultanous_downloads(), "20");
         panel.addStringPair(_GUI.T.lit_max_chunks_per_link(), maxchunks);

@@ -1239,6 +1239,7 @@ SpeedLimiterToggleAction_tooltip=Globales Geschwindigkeitslimit ein-/ausschalten
 SpeedMeterPanel_createTooltipText_=Geschwindigkeitslimit: %s1/s
 SpeedMeterPanel_getString_limited=Geschwindigkeitslimit: %s1/s
 SpeedlimitEditor_SpeedlimitEditor_=Geschwindigkeitslimit
+SpeedlimitEditor_tooltip=Geschwindigkeitslimit\r\nDas globale Limit wird statisch durch die Anzahl der aktiven Verbindungen geteilt. Bandbreite, die langsame Hoster nicht nutzen, wird nicht an schnellere Downloads umverteilt.
 SpeedlimitEditor_format=%s1/s
 SpeedlimitToggleAction_SpeedlimitToggleAction=Geschwindigkeitsanzeige sichtbar
 SplitPackagesByHost_SplitPackagesByHost_object_=Pakete nach Hoster aufteilen

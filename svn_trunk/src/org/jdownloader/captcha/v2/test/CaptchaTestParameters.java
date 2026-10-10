@@ -112,6 +112,7 @@ public class CaptchaTestParameters {
     public static boolean usesImage(final CAPTCHA_TYPE type) {
         switch (type) {
         case IMAGE:
+        case IMAGE_SINGLE_CLICK_CAPTCHA:
         case IMAGE_MULTI_CLICK_CAPTCHA:
             return true;
         default:
@@ -150,6 +151,12 @@ public class CaptchaTestParameters {
             /* Test image next to this class in the project folder, its text is case-sensitive. */
             final CaptchaTestParameters ret = new CaptchaTestParameters(null, null, null, "KoYy2j");
             ret.setImageFile(getDefaultTestImage("test_image_captcha.png"));
+            return ret;
+        }
+        case IMAGE_SINGLE_CLICK_CAPTCHA: {
+            /* Test image: 3x3 grid of trash cans, the full one (center) has to be clicked. No expected result: the click position varies. */
+            final CaptchaTestParameters ret = new CaptchaTestParameters(null, null, null, null);
+            ret.setImageFile(getDefaultTestImage("test_single_click_captcha.jpg"));
             return ret;
         }
         case IMAGE_MULTI_CLICK_CAPTCHA: {

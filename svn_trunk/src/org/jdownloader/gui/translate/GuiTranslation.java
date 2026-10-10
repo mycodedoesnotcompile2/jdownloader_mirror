@@ -1277,6 +1277,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Speed Limit" })
     String SpeedlimitEditor_SpeedlimitEditor_();
 
+    @Default(lngs = { "en" }, values = { "Speed Limit\r\nThe global limit is split statically between all active connections. Bandwidth that slow hosts do not use is not redistributed to faster downloads." })
+    String SpeedlimitEditor_tooltip();
+
     @Default(lngs = { "en" }, values = { "%s1/s" })
     String SpeedlimitEditor_format(String formatBytes);
 
@@ -5372,6 +5375,12 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Ready" })
     String CaptchaSolverService_status_ready();
 
+    @Default(lngs = { "en" }, values = { "Not ready | Opening URLs is not supported by this system" })
+    String BrowserSolverService_status_notReady_openUrlsUnsupported();
+
+    @Default(lngs = { "en" }, values = { "Browser not found | %s1" })
+    String BrowserSolverService_status_browserNotFound(String path);
+
     @Default(lngs = { "en" }, values = { "Reset the settings of the selected captcha solver to default." })
     String SolverOrderContainer_reset_tooltip();
 
@@ -5479,6 +5488,42 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Open account manager" })
     String SolverOrderTable_context_openAccountManager();
+
+    @Default(lngs = { "en" }, values = { "Select browser" })
+    String SolverOrderTable_context_selectBrowser();
+
+    @Default(lngs = { "en" }, values = { "Choose browser..." })
+    String SolverOrderContainer_chooseBrowser();
+
+    @Default(lngs = { "en" }, values = { "Double click to select browser" })
+    String SolverOrderTable_tooltip_selectBrowser();
+
+    @Default(lngs = { "en" }, values = { "Double click opens buy credits page" })
+    String SolverOrderTable_tooltip_buyPage();
+
+    @Default(lngs = { "en" }, values = { "Select browser" })
+    String SelectBrowserDialog_title();
+
+    @Default(lngs = { "en" }, values = { "Save" })
+    String SelectBrowserDialog_save();
+
+    @Default(lngs = { "en" }, values = { "Searching for installed browsers..." })
+    String SelectBrowserDialog_searching();
+
+    @Default(lngs = { "en" }, values = { "OS Default" })
+    String SelectBrowserDialog_osDefault();
+
+    @Default(lngs = { "en" }, values = { "Path" })
+    String SelectBrowserDialog_column_path();
+
+    @Default(lngs = { "en" }, values = { "Browse..." })
+    String SelectBrowserDialog_browse();
+
+    @Default(lngs = { "en" }, values = { "Executable files" })
+    String SelectBrowserDialog_filter_executables();
+
+    @Default(lngs = { "en" }, values = { "Select browser executable" })
+    String SelectBrowserDialog_browse_title();
 
     @Default(lngs = { "en" }, values = { "Number of supported Captcha Types" })
     String SolverOrderTableModel_column_supportedCaptchaTypes();

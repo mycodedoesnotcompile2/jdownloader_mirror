@@ -73,6 +73,11 @@ public class CaptchaType {
             }
 
             @Override
+            public boolean hasTestChallenges() {
+                return true;
+            }
+
+            @Override
             public String getDomain() {
                 return null;
             }

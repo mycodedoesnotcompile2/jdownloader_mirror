@@ -1,13 +1,15 @@
 package org.jdownloader.captcha.v2.solver.service;
 
-import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.swing.Icon;
 
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.os.CrossSystem;
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
 import org.jdownloader.captcha.v2.solver.browser.BrowserCaptchaSolverConfigV3;
 import org.jdownloader.controlling.browser.ExternalBrowserManager;
 import org.jdownloader.gui.IconKey;
@@ -19,7 +21,7 @@ import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 public class BrowserSolverService extends AbstractSolverService {
     public static final String                  ID       = "browser";
-    private static final BrowserSolverService   INSTANCE  = new BrowserSolverService();
+    private static final BrowserSolverService   INSTANCE = new BrowserSolverService();
     private static BrowserCaptchaSolverConfigV3 config;
 
     public static BrowserSolverService getInstance() {
@@ -44,7 +46,7 @@ public class BrowserSolverService extends AbstractSolverService {
 
     @Override
     public Icon getIcon(int size) {
-        return NewTheme.I().getIcon(IconKey.ICON_OCR, size);
+        return NewTheme.I().getIcon(IconKey.ICON_BROWSE, size);
     }
 
     @Override
@@ -57,8 +59,78 @@ public class BrowserSolverService extends AbstractSolverService {
         return "Manual local captcha solving in your own browser. Requires our MyJDownloader browser extension. Does NOT require a MyJDownloader account!";
     }
 
+    /**
+     * Not ready if the system cannot open URLs (no OS default browser and no usable browser command line, see BrowserSolver#enqueue) or if
+     * the configured browser executable does not exist.
+     */
+    @Override
+    public boolean isReady() {
+        return isOpenBrowserSupported() && getMissingBrowserPath() == null;
+    }
+
+    /**
+     * Returns the executable path of the configured browser if it is an explicit path (contains a directory part) that does not exist,
+     * else null. A plain command name like "firefox" is resolved via PATH and therefore never reported.
+     */
+    private String getMissingBrowserPath() {
+        final String[] commandline = getConfig().getBrowserCommandline();
+        if (commandline == null) {
+            return null;
+        }
+        for (final String arg : commandline) {
+            if (arg != null && arg.trim().length() > 0) {
+                final String path = arg.trim();
+                if (path.indexOf('/') < 0 && path.indexOf('\\') < 0) {
+                    return null;
+                }
+                /* Avoid file system access on every call: the result is cached per path. */
+                final CheckedPath cached = checkedPath.get();
+                if (cached != null && cached.path.equals(path)) {
+                    return cached.missing ? path : null;
+                }
+                final boolean missing = !new File(path).exists();
+                checkedPath.set(new CheckedPath(path, missing));
+                return missing ? path : null;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Forgets the cached existence check of the configured browser path, so it is checked again on next access. Call this after a new
+     * browser path has been set.
+     */
+    public void resetBrowserPathCache() {
+        checkedPath.set(null);
+    }
+
+    private static final class CheckedPath {
+        private final String  path;
+        private final boolean missing;
+
+        private CheckedPath(final String path, final boolean missing) {
+            this.path = path;
+            this.missing = missing;
+        }
+    }
+
+    private final AtomicReference<CheckedPath> checkedPath = new AtomicReference<CheckedPath>();
+
+    /** The "Not ready" and "Browser not found" status texts are shown as a warning, see {@link #getStatusText()}. */
+    @Override
+    public boolean isStatusTextWarning() {
+        return !isReady();
+    }
+
     @Override
     public String getStatusText() {
+        if (!isOpenBrowserSupported()) {
+            return _GUI.T.BrowserSolverService_status_notReady_openUrlsUnsupported();
+        }
+        final String missingPath = getMissingBrowserPath();
+        if (missingPath != null) {
+            return _GUI.T.BrowserSolverService_status_browserNotFound(missingPath);
+        }
         final String[] commandline = getConfig().getBrowserCommandline();
         if (commandline != null && commandline.length > 0) {
             final String browserName = ExternalBrowserManager.getInstance().getLazyBrowserName(commandline);
