@@ -136,6 +136,9 @@ public class MenuManagerTree extends JTree {
                     popup.add(new AddSubMenuAction(managerFrame));
                     popup.add(new AddSpecialAction(managerFrame));
                     popup.add(new AddGenericItem(managerFrame, new SeparatorData()));
+                    popup.add(new DuplicateAction(managerFrame));
+                    popup.add(new MoveItemAction(managerFrame, true));
+                    popup.add(new MoveItemAction(managerFrame, false));
                     popup.add(new RemoveAction(managerFrame));
                     popup.show(MenuManagerTree.this, e.getPoint().x, e.getPoint().y);
                 }

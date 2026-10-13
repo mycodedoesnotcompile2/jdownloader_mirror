@@ -6,6 +6,8 @@ import java.util.List;
 import org.jdownloader.controlling.contextmenu.CustomizableTableContextAppAction;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.gui.views.SelectionInfo;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 import org.jdownloader.plugins.FinalLinkState;
 
 import jd.controlling.downloadcontroller.DownloadSession;
@@ -24,8 +26,12 @@ public class MarkDownloadFinishedAction extends CustomizableTableContextAppActio
         setName(NAME);
     }
 
-    public void actionPerformed(ActionEvent e) {
-        final List<DownloadLink> selection = getSelection().getChildren();
+    @Override
+    protected void onActionPerformed(final ActionEvent e, final SelectionType selectionType, final SelectionInfo<FilePackage, DownloadLink> selectionInfo) {
+        if (SelectionInfo.isEmpty(selectionInfo)) {
+            return;
+        }
+        final List<DownloadLink> selection = selectionInfo.getChildren();
         if (selection.size() == 0) {
             return;
         }

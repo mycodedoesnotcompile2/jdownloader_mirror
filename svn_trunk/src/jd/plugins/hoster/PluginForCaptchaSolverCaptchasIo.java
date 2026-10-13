@@ -42,7 +42,7 @@ import jd.plugins.PluginException;
  * Docs: https://api.captchas.io/document/#/methods <br>
  * Formerly known as captchasolutions.com
  */
-@HostPlugin(revision = "$Revision: 53529 $", interfaceVersion = 3, names = { "captchas.io" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53597 $", interfaceVersion = 3, names = { "captchas.io" }, urls = { "" })
 public class PluginForCaptchaSolverCaptchasIo extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -181,6 +181,9 @@ public class PluginForCaptchaSolverCaptchasIo extends abstractPluginForCaptchaSo
                 final ImageCaptchaChallenge<String> challenge = (ImageCaptchaChallenge<String>) captchachallenge;
                 query.appendEncoded("method", "base64");
                 query.appendEncoded("body", challenge.getBase64ImageFile());
+                if (Boolean.TRUE.equals(challenge.getCaseSensitive())) {
+                    query.appendEncoded("regsense", "1");
+                }
             } else {
                 throw new IllegalArgumentException("Unexpected captcha challenge type");
             }

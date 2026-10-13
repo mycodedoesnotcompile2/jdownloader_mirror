@@ -6,21 +6,22 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
-
-import org.appwork.exceptions.WTFException;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA.TYPE;
 
 import jd.http.Browser;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.hoster.GenericM3u8;
+
+import org.appwork.exceptions.WTFException;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA.TYPE;
 
 public class HlsContainer {
     public static interface MEDIAInterface {
@@ -224,6 +225,25 @@ public class HlsContainer {
                 bandwidth_highest = bandwidth_temp;
                 ret = list;
             }
+        }
+        return ret;
+    }
+
+    public Map<String, List<MEDIA>> splitMediaByLanguage() {
+        final Map<String, List<MEDIA>> ret = new LinkedHashMap<String, List<MEDIA>>();
+        ret.put(null, new ArrayList<MEDIA>());
+        final List<MEDIA> media = getMedia();
+        if (media == null) {
+            return ret;
+        }
+        for (final MEDIA mediaEntry : media) {
+            final String language = mediaEntry.getLanguage();
+            List<MEDIA> list = ret.get(language);
+            if (list == null) {
+                list = new ArrayList<HlsContainer.MEDIA>();
+                ret.put(language, list);
+            }
+            list.add(mediaEntry);
         }
         return ret;
     }
@@ -882,46 +902,47 @@ public class HlsContainer {
     }
 
     public void setPropertiesOnDownloadLink(final DownloadLink link) throws IOException {
-        final List<HlsContainer.MEDIA> media = getMedia();
-        final HlsContainer.MEDIA mediaList[];
-        if (media != null) {
-            mediaList = media.toArray(new HlsContainer.MEDIA[0]);
+        setPropertiesOnDownloadLink(link, getMedia());
+    }
+
+    public void setPropertiesOnDownloadLink(final DownloadLink link, final List<HlsContainer.MEDIA> mediaList) throws IOException {
+        if (mediaList != null) {
+            setPropertiesOnDownloadLink(link, mediaList.toArray(new HlsContainer.MEDIA[0]));
         } else {
-            mediaList = new HlsContainer.MEDIA[0];
+            setPropertiesOnDownloadLink(link, new HlsContainer.MEDIA[0]);
         }
-        setPropertiesOnDownloadLink(link, mediaList);
     }
 
     public void setPropertiesOnDownloadLink(final DownloadLink link, final HlsContainer.MEDIA... mediaList) throws IOException {
         oldVariant: {// old variant to store information
-            if (this.getWidth() > 0) {
-                link.setProperty(GenericM3u8.PROPERTY_WIDTH, this.getWidth());
-            }
-            if (this.getHeight() > 0) {
-                link.setProperty(GenericM3u8.PROPERTY_HEIGHT, this.getHeight());
-            }
-            if (this.getFramerate() > 0) {
-                link.setProperty(GenericM3u8.PROPERTY_FRAME_RATE, this.getFramerate());
-            }
-            if (this.getBandwidth() > 0) {
-                link.setProperty(GenericM3u8.PROPERTY_BANDWIDTH, this.getBandwidth());
-            }
-            if (this.getAverageBandwidth() > 0) {
-                link.setProperty(GenericM3u8.PROPERTY_BANDWIDTH_AVERAGE, this.getAverageBandwidth());
-            }
-            link.setProperty(GenericM3u8.PROPERTY_M3U8_NAME, this.getName());
-            link.setProperty(GenericM3u8.PROPERTY_M3U8_CODECS, this.getCodecs());
+        if (this.getWidth() > 0) {
+            link.setProperty(GenericM3u8.PROPERTY_WIDTH, this.getWidth());
         }
-        newVariant: {
-            // new variant to store the information
-            final HlsContainerStorable containerStorable = new HlsContainerStorable(this);
-            for (HlsContainer.MEDIA mediaEntry : mediaList) {
-                if (mediaEntry == null) {
-                    continue;
-                }
-                containerStorable.getMedia().add(new HlsContainerMediaStorable(mediaEntry));
-            }
-            containerStorable.writeTo(link);
+        if (this.getHeight() > 0) {
+            link.setProperty(GenericM3u8.PROPERTY_HEIGHT, this.getHeight());
         }
+        if (this.getFramerate() > 0) {
+            link.setProperty(GenericM3u8.PROPERTY_FRAME_RATE, this.getFramerate());
+        }
+        if (this.getBandwidth() > 0) {
+            link.setProperty(GenericM3u8.PROPERTY_BANDWIDTH, this.getBandwidth());
+        }
+        if (this.getAverageBandwidth() > 0) {
+            link.setProperty(GenericM3u8.PROPERTY_BANDWIDTH_AVERAGE, this.getAverageBandwidth());
+        }
+        link.setProperty(GenericM3u8.PROPERTY_M3U8_NAME, this.getName());
+        link.setProperty(GenericM3u8.PROPERTY_M3U8_CODECS, this.getCodecs());
+    }
+    newVariant: {
+        // new variant to store the information
+        final HlsContainerStorable containerStorable = new HlsContainerStorable(this);
+        for (HlsContainer.MEDIA mediaEntry : mediaList) {
+            if (mediaEntry == null) {
+                continue;
+            }
+            containerStorable.getMedia().add(new HlsContainerMediaStorable(mediaEntry));
+        }
+        containerStorable.writeTo(link);
+    }
     }
 }

@@ -50,7 +50,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.Bunkr;
 
-@DecrypterPlugin(revision = "$Revision: 52944 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53578 $", interfaceVersion = 3, names = {}, urls = {})
 public class BunkrAlbum extends PluginForDecrypt {
     public BunkrAlbum(PluginWrapper wrapper) {
         super(wrapper);
@@ -68,7 +68,7 @@ public class BunkrAlbum extends PluginForDecrypt {
          * Older domains: <br>
          * bunkr-albums.io down 2026-07-02
          */
-        ret.add(new String[] { MAIN_BUNKR_DOMAIN, "bunkrr.su", "bunkr.su", "bunkr.si", "bunkr.ru", "bunkr.is", "bunkr.la", "bunkrr.ru", "bunkr.sk", "bunkr.black", "bunkr.cat", "bunkr.media", "bunkr.ac", "bunkr.ws", "bunkr.red", "bunkr.site", "bunkr.black", "bunkrrr.org", "bunkr.fi", "bunkr.ci", "bunkr.ax", "bunkr.ac", "bunkr.se", "bunkr.es", "bunkr.ps", "bunkr.pk", "bunkr.ph", "bunkr.cr" });
+        ret.add(new String[] { MAIN_BUNKR_DOMAIN, "bunkrr.su", "bunkr.su", "bunkr.si", "bunkr.ru", "bunkr.is", "bunkr.la", "bunkrr.ru", "bunkr.sk", "bunkr.black", "bunkr.cat", "bunkr.media", "bunkr.ac", "bunkr.ws", "bunkr.red", "bunkr.site", "bunkr.black", "bunkrrr.org", "bunkr.fi", "bunkr.ci", "bunkr.ax", "bunkr.ac", "bunkr.se", "bunkr.es", "bunkr.ps", "bunkr.pk", "bunkr.ph", "bunkr.cr", "bunkr.cx" });
         return ret;
     }
 

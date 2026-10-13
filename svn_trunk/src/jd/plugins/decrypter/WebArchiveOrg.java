@@ -9,6 +9,7 @@ import java.util.regex.Pattern;
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
+import jd.http.Request;
 import jd.http.URLConnectionAdapter;
 import jd.http.requests.GetRequest;
 import jd.nutils.encoding.Encoding;
@@ -24,7 +25,9 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52752 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+
+@DecrypterPlugin(revision = "$Revision: 53586 $", interfaceVersion = 3, names = {}, urls = {})
 public class WebArchiveOrg extends PluginForDecrypt {
     private static final Pattern PATTERN_DIRECT = Pattern.compile("/web/(\\d+)(if|im|oe)_/(https?.+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern PATTERN_OTHER  = Pattern.compile("/web/(\\d+)/(https?.+)", Pattern.CASE_INSENSITIVE);
@@ -37,6 +40,7 @@ public class WebArchiveOrg extends PluginForDecrypt {
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, Request.getSuggestedUserAgent("153.0"));
         br.setFollowRedirects(true);
         return br;
     }
@@ -66,6 +70,19 @@ public class WebArchiveOrg extends PluginForDecrypt {
             ret.add("https?://" + buildHostsPatternPart(domains) + "/web/[0-9]+((if|im|oe)_|\\*)?/.+");
         }
         return ret.toArray(new String[0]);
+    }
+
+    @Override
+    protected DownloadLink createDownloadlink(String link) {
+        final DownloadLink ret = super.createDownloadlink(link);
+        if (link.startsWith("directhttp")) {
+            final List<String[]> customHeaders = new ArrayList<String[]>();
+            // default UA is blocked
+            customHeaders.add(new String[] { HTTPConstants.HEADER_REQUEST_USER_AGENT, Request.getSuggestedUserAgent("153.0") });
+            ret.setProperty(DirectHTTP.PROPERTY_REQUEST_TYPE, "GET");
+            ret.setProperty(DirectHTTP.PROPERTY_HEADERS, customHeaders);
+        }
+        return ret;
     }
 
     @Override

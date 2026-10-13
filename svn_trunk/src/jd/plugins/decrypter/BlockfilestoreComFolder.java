@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 
 import jd.PluginWrapper;
@@ -36,7 +35,7 @@ import jd.plugins.PluginForDecrypt;
 /**
  * @author raztoki
  */
-@DecrypterPlugin(revision = "$Revision: 48194 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53591 $", interfaceVersion = 2, names = {}, urls = {})
 public class BlockfilestoreComFolder extends PluginForDecrypt {
     public BlockfilestoreComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -72,7 +71,7 @@ public class BlockfilestoreComFolder extends PluginForDecrypt {
 
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, final ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.setFollowRedirects(true);
         final String parameter = param.toString();
         final String uid = new Regex(parameter, getSupportedLinks()).getMatch(0);
@@ -105,19 +104,20 @@ public class BlockfilestoreComFolder extends PluginForDecrypt {
             if ((Boolean) resource.get("isFolder") == Boolean.TRUE) {
                 final DownloadLink dl = this.createDownloadlink("https://www." + this.getHost() + "/folder/" + resource.get("id"));
                 dl.setRelativeDownloadFolderPath(path);
-                decryptedLinks.add(dl);
+                ret.add(dl);
             } else {
-                final DownloadLink dl = this.createDownloadlink("https://www." + this.getHost() + "/api/download?id=" + resource.get("id"));
-                dl.setFinalFileName(resource.get("name").toString());
-                dl.setVerifiedFileSize(((Number) resource.get("size")).longValue());
-                dl.setAvailable(true);
-                dl.setRelativeDownloadFolderPath(path);
-                decryptedLinks.add(dl);
+                final DownloadLink link = this.createDownloadlink("https://www." + this.getHost() + "/down/" + resource.get("id"));
+                link.setFinalFileName(resource.get("name").toString());
+                link.setVerifiedFileSize(((Number) resource.get("size")).longValue());
+                link.setAvailable(true);
+                link.setRelativeDownloadFolderPath(path);
+                ret.add(link);
             }
         }
-        return decryptedLinks;
+        return ret;
     }
 
+    @Override
     public boolean hasCaptcha(final CryptedLink link, final jd.plugins.Account acc) {
         return false;
     }

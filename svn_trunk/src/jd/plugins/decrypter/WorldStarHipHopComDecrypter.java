@@ -31,7 +31,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.WorldStarHipHopCom;
 
-@DecrypterPlugin(revision = "$Revision: 48552 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53588 $", interfaceVersion = 2, names = {}, urls = {})
 public class WorldStarHipHopComDecrypter extends PluginForDecrypt {
     public WorldStarHipHopComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -127,7 +127,7 @@ public class WorldStarHipHopComDecrypter extends PluginForDecrypt {
         }
         if (externID == null) {
             externID = br.getRegex("<iframe[^<>]*?src=\"([^\"]+)\"").getMatch(0);
-            if (!externID.contains("worldstarhiphop")) {
+            if (externID != null && !externID.contains("worldstarhiphop")) {
                 logger.info("External link found: " + externID);
                 ret.add(createDownloadlink(Encoding.htmlDecode(externID.trim())));
                 return ret;

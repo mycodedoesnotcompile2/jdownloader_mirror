@@ -41,7 +41,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 53502 $", interfaceVersion = 3, names = { "endcaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53584 $", interfaceVersion = 3, names = { "endcaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSolver {
     public PluginForCaptchaSolverEndcaptcha(PluginWrapper wrapper) {
         super(wrapper);
@@ -158,7 +158,7 @@ public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSo
             this.callAPI(r);
             final String captchaID = this.findCaptchaID();
             if (captchaID == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find captcha ID in API response");
             }
             job.setStatus(SolverStatus.SOLVING);
             /*

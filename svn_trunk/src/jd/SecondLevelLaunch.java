@@ -80,6 +80,7 @@ import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.appwork.utils.event.queue.QueueAction;
+import org.appwork.utils.images.IconIO;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.logging2.extmanager.Log;
@@ -92,6 +93,7 @@ import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.CrossSystem.OperatingSystem;
 import org.appwork.utils.os.Flatpak;
 import org.appwork.utils.os.Snap;
+import org.appwork.utils.os.hardware.Apple;
 import org.appwork.utils.os.hardware.HardwareType;
 import org.appwork.utils.os.hardware.HardwareTypeInterface;
 import org.appwork.utils.processes.ProcessBuilderFactory;
@@ -424,7 +426,15 @@ public class SecondLevelLaunch {
             LoggerFactory.getDefaultLogger().finer(key + "=" + pr.get(key));
         }
         LoggerFactory.getDefaultLogger().info("OS:" + CrossSystem.getOSFamily() + "|" + CrossSystem.getOS() + "|64bit:" + CrossSystem.is64BitOperatingSystem());
-        LoggerFactory.getDefaultLogger().info("CPU:" + CrossSystem.getARCHFamily() + "|64bit:" + CrossSystem.is64BitArch());
+        String cpuDetails = null;
+        if (CrossSystem.isMac()) {
+            try {
+                cpuDetails = Apple.getSoC().name();
+            } catch (final Throwable ignore) {
+                LoggerFactory.getDefaultLogger().log(ignore);
+            }
+        }
+        LoggerFactory.getDefaultLogger().info("CPU:" + CrossSystem.getARCHFamily() + "|64bit:" + CrossSystem.is64BitArch() + (cpuDetails != null ? cpuDetails : ""));
         LoggerFactory.getDefaultLogger().info("JVM:" + JVMVersion.get() + "|" + JVMVersion.getJVMVersion() + "|64bit:" + Application.is64BitJvm());
         try {
             final HardwareTypeInterface hardwareType = HardwareType.getHardware();
@@ -490,6 +500,11 @@ public class SecondLevelLaunch {
             LoggerFactory.getDefaultLogger().log(e);
         }
         LoggerFactory.getDefaultLogger().info("JDownloader2");
+        try {
+            IconIO.initSvgFactory();
+        } catch (final Throwable ignore) {
+            LoggerFactory.getDefaultLogger().log(ignore);
+        }
         SecondLevelLaunch.start(args);
     }
 

@@ -142,6 +142,15 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
             final ImageCaptchaChallenge challenge = (ImageCaptchaChallenge<String>) job.getChallenge();
             task.put("type", "ImageToTextTask");
             task.put("body", challenge.getBase64ImageFile());
+            final Boolean caseSensitive = challenge.getCaseSensitive();
+            if (caseSensitive != null) {
+                task.put("case", caseSensitive.booleanValue());
+            }
+            final Boolean numeric = challenge.getNumeric();
+            if (numeric != null) {
+                /* 0 = no requirements, 1 = digits only */
+                task.put("numeric", numeric.booleanValue() ? 1 : 0);
+            }
         } else {
             throw new IllegalArgumentException("Unexpected captcha challenge type");
         }
@@ -185,7 +194,7 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
             if (captchachallenge instanceof RecaptchaV2Challenge || captchachallenge instanceof HCaptchaChallenge || captchachallenge instanceof CloudflareTurnstileChallenge || captchachallenge instanceof CutCaptchaChallenge) {
                 resp = new TokenCaptchaResponse((Challenge<String>) captchachallenge, job.getSolver(), token);
             } else if (captchachallenge instanceof MultiClickCaptchaChallenge) {
-                // TODO: Test this
+                /* Coordinates task: https://2captcha.com/api-docs/coordinates */
                 final List<Map<String, Object>> clicklist = (List<Map<String, Object>>) solutionmap.get("coordinates");
                 final int[] x = new int[clicklist.size()];
                 final int[] y = new int[clicklist.size()];
@@ -195,7 +204,6 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
                     y[i] = ((Number) clicks.get("y")).intValue();
                     i++;
                 }
-                /* Coordinates task: https://2captcha.com/api-docs/coordinates */
                 final MultiClickedPoint mcp = new MultiClickedPoint(x, y);
                 resp = new AbstractResponse<MultiClickedPoint>((MultiClickCaptchaChallenge) captchachallenge, job.getSolver(), mcp);
             } else {

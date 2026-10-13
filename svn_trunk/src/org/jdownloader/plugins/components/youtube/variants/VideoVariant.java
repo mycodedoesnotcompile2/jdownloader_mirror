@@ -5,6 +5,8 @@ import java.util.Locale;
 
 import javax.swing.Icon;
 
+import jd.plugins.DownloadLink;
+
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
@@ -26,8 +28,6 @@ import org.jdownloader.plugins.components.youtube.itag.YoutubeITAG;
 import org.jdownloader.plugins.components.youtube.variants.generics.GenericVideoInfo;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.translate._JDT;
-
-import jd.plugins.DownloadLink;
 
 public class VideoVariant extends AbstractVariant<GenericVideoInfo> implements VideoInterface, AudioInterface {
     public VideoVariant(VariantBase base) {
@@ -288,6 +288,8 @@ public class VideoVariant extends AbstractVariant<GenericVideoInfo> implements V
 
     @Override
     public VideoResolution getVideoResolution() {
+        // Hint: returns the VideoResolution set for the ITAG, actual VideoResolution can be different due to aspect ratio and
+        // vertical/horizontal
         final YoutubeITAG itag = getiTagVideo();
         if (itag == null) {
             return null;

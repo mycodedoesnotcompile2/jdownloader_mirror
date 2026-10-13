@@ -16,6 +16,7 @@
 package org.jdownloader.captcha.v2.solver.browser;
 
 import java.awt.Cursor;
+import java.awt.Dimension;
 import java.awt.Dialog.ModalityType;
 import java.awt.Image;
 import java.awt.Point;
@@ -213,6 +214,20 @@ public class BrowserCaptchaDialog extends AbstractCaptchaDialog<String> {
         return offset;
     }
 
+    /**
+     * The dialog size is remembered (RememberLastDialogDimension). A size stored by an older version does not have room for all content
+     * (e.g. the external solver buttons) and would cut off the checkboxes at the top. Therefore the natural size of the content is the
+     * minimum size, which overrides a too small remembered size.
+     */
+    @Override
+    public void pack() {
+        final Dimension raw = getRawPreferredSize();
+        if (raw != null) {
+            getDialog().setMinimumSize(raw);
+        }
+        super.pack();
+    }
+
     @Override
     protected boolean isResizable() {
         return true;
@@ -220,7 +235,7 @@ public class BrowserCaptchaDialog extends AbstractCaptchaDialog<String> {
 
     @Override
     protected MigLayout getDialogLayout() {
-        return new MigLayout("ins 0,wrap 1", "[fill,grow]", "[grow,fill]10[]");
+        return new MigLayout("ins 0,wrap 1", "[fill,grow]", "[grow,fill]10[shrink 0]");
     }
 
     @Override
@@ -258,6 +273,7 @@ public class BrowserCaptchaDialog extends AbstractCaptchaDialog<String> {
     @Override
     public JComponent layoutDialogContent() {
         final JComponent ret = super.layoutDialogContent();
+        addExternalSolverPanel(ret);
         if (BrowserSolverService.getInstance().getConfig().isAutoOpenBrowserEnabled()) {
             final Thread openBrowseThread = new Thread("BrowserCaptcha:AutoOpen:" + challenge) {
                 {

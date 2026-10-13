@@ -22,10 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
@@ -39,7 +35,11 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.FilesterMeFolder;
 
-@HostPlugin(revision = "$Revision: 52934 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+
+@HostPlugin(revision = "$Revision: 53581 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilesterMe extends PluginForHost {
     public FilesterMe(PluginWrapper wrapper) {
         super(wrapper);
@@ -105,7 +105,7 @@ public class FilesterMe extends PluginForHost {
     }
 
     public int getMaxChunks(final DownloadLink link, final Account account) {
-        return 0;
+        return -4;
     }
 
     @Override

@@ -17,6 +17,7 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -36,7 +37,9 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SaintTo;
 
-@DecrypterPlugin(revision = "$Revision: 52231 $", interfaceVersion = 3, names = {}, urls = {})
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 53581 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { SaintTo.class })
 public class SaintToFolder extends PluginForDecrypt {
     public SaintToFolder(PluginWrapper wrapper) {
@@ -76,7 +79,7 @@ public class SaintToFolder extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+
         final String contenturl = param.getCryptedUrl();
         final String folderID = new Regex(contenturl, this.getSupportedLinks()).getMatch(0);
         br.getPage(contenturl);
@@ -87,69 +90,117 @@ public class SaintToFolder extends PluginForDecrypt {
         } else if (br.containsHTML(">\\s*No files in this album\\s*<")) {
             throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
         }
-        String title = br.getRegex("<title>([^<]+) - Saint Video Hosting</title>").getMatch(0);
-        final String[] htmls = br.getRegex("<tr class=\"file-list__file\">(.*?)</tr>").getColumn(0);
-        if (htmls != null && htmls.length > 0) {
-            /* Old website */
-            for (final String html : htmls) {
-                final String url = new Regex(html, "file_dwn\\('(https?://[^']+)'\\)").getMatch(0);
-                final String filename = new Regex(html, "class=\"filename\"[^>]*>([^<]+)</a>").getMatch(0);
-                final String filesizeBytesStr = new Regex(html, "class=\"fs\" data=\"(\\d+)\"").getMatch(0);
-                if (url == null || filename == null) {
+
+        ArrayList<DownloadLink> ret = parseVeryOld(br);
+        if (ret == null) {
+            ret = parseOld(br);
+            if (ret == null) {
+                ret = parseJSON(br);
+                if (ret == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                final DownloadLink file = createDownloadlink(url);
-                file.setName(Encoding.htmlDecode(filename).trim());
-                if (filesizeBytesStr != null) {
-                    file.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
-                } else {
-                    logger.warning("Failed to find filesize for item: " + url);
-                }
-                file.setAvailable(true);
-                ret.add(file);
-            }
-        } else {
-            /* New website */
-            title = br.getRegex("<h1[^>]*>([^<]+)</h1>").getMatch(0);
-            final String[] file_ids = br.getRegex("data-id=\"([a-zA-Z0-9-_]+)\"").getColumn(0);
-            if (file_ids == null || file_ids.length == 0) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            final String[] filenames = br.getRegex("data-name=\"([^\"]+)\"").getColumn(0);
-            final String[] filesizes = br.getRegex("data-size=\"(\\d+)\"").getColumn(0);
-            int i = 0;
-            for (final String file_id : file_ids) {
-                final String url = "https://" + br.getHost() + "/d/" + file_id;
-                final DownloadLink link = this.createDownloadlink(url);
-                if (filenames != null && filenames.length == file_ids.length) {
-                    final String filename = filenames[i];
-                    link.setName(filename);
-                } else if (i == 0) {
-                    /* Log only once */
-                    logger.warning("Failed to find filename information");
-                }
-                if (filesizes != null && filesizes.length == file_ids.length) {
-                    final String filesizeBytesStr = filesizes[i];
-                    link.setDownloadSize(Long.parseLong(filesizeBytesStr));
-                } else if (i == 0) {
-                    /* Log only once */
-                    logger.warning("Failed to find filesize information");
-                }
-                link.setAvailable(true);
-                ret.add(link);
-                i++;
             }
         }
+        String title = br.getRegex("<title>([^<]+) - Saint Video Hosting</title>").getMatch(0);
         if (title == null) {
-            /* Fallback */
-            logger.warning("Failed to find folder title");
-            title = folderID;
+            title = br.getRegex("<h1[^>]*>([^<]+)</h1>").getMatch(0);
+            if (title == null) {
+                /* Fallback */
+                logger.warning("Failed to find folder title");
+                title = folderID;
+            }
         }
         title = Encoding.htmlDecode(title).trim();
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(title);
         fp.setPackageKey(this.getHost() + "://folder/" + folderID);
         fp.addLinks(ret);
+        return ret;
+    }
+
+    private ArrayList<DownloadLink> parseVeryOld(Browser br) throws Exception {
+        final String[] htmls = br.getRegex("<tr class=\"file-list__file\">(.*?)</tr>").getColumn(0);
+        if (htmls == null || htmls.length == 0) {
+            return null;
+        }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        /* Old website */
+        for (final String html : htmls) {
+            final String url = new Regex(html, "file_dwn\\('(https?://[^']+)'\\)").getMatch(0);
+            final String filename = new Regex(html, "class=\"filename\"[^>]*>([^<]+)</a>").getMatch(0);
+            final String filesizeBytesStr = new Regex(html, "class=\"fs\" data=\"(\\d+)\"").getMatch(0);
+            if (url == null || filename == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final DownloadLink file = createDownloadlink(url);
+            file.setName(Encoding.htmlDecode(filename).trim());
+            if (filesizeBytesStr != null) {
+                file.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
+            } else {
+                logger.warning("Failed to find filesize for item: " + url);
+            }
+            file.setAvailable(true);
+            ret.add(file);
+        }
+        return ret;
+    }
+
+    private ArrayList<DownloadLink> parseJSON(Browser br) throws Exception {
+        final String json = br.getRegex("const[^>]*FILES[^>]*=[^>]*(\\[.*?\\])\\s*;").getMatch(0);
+        if (json == null) {
+            return null;
+        }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final List<Object> list = (List<Object>) JavaScriptEngineFactory.jsonToJavaObject(json);
+        for (Object entry : list) {
+            final Map<String, Object> map = (Map<String, Object>) entry;
+            final String file_id = map.get("id").toString();
+            final String url = "https://" + br.getHost() + "/d/" + file_id;
+            final DownloadLink link = this.createDownloadlink(url);
+            final String name = map.get("name").toString();
+            link.setFinalFileName(name);
+            final Object size = map.get("size");
+            if (size instanceof Number) {
+                link.setVerifiedFileSize(((Number) size).longValue());
+            } else if (size instanceof String) {
+                link.setVerifiedFileSize(Long.parseLong((String) size));
+            }
+            link.setAvailable(true);
+            ret.add(link);
+        }
+        return ret;
+    }
+
+    private ArrayList<DownloadLink> parseOld(Browser br) throws Exception {
+        final String[] file_ids = br.getRegex("data-id=\"([a-zA-Z0-9-_]+)\"").getColumn(0);
+        if (file_ids == null || file_ids.length == 0) {
+            return null;
+        }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final String[] filenames = br.getRegex("data-name=\"([^\"]+)\"").getColumn(0);
+        final String[] filesizes = br.getRegex("data-size=\"(\\d+)\"").getColumn(0);
+        int i = 0;
+        for (final String file_id : file_ids) {
+            final String url = "https://" + br.getHost() + "/d/" + file_id;
+            final DownloadLink link = this.createDownloadlink(url);
+            if (filenames != null && filenames.length == file_ids.length) {
+                final String filename = filenames[i];
+                link.setName(filename);
+            } else if (i == 0) {
+                /* Log only once */
+                logger.warning("Failed to find filename information");
+            }
+            if (filesizes != null && filesizes.length == file_ids.length) {
+                final String filesizeBytesStr = filesizes[i];
+                link.setDownloadSize(Long.parseLong(filesizeBytesStr));
+            } else if (i == 0) {
+                /* Log only once */
+                logger.warning("Failed to find filesize information");
+            }
+            link.setAvailable(true);
+            ret.add(link);
+            i++;
+        }
         return ret;
     }
 

@@ -21,6 +21,8 @@ public class CESSolverJob<T> {
     private volatile SolverStatus    status;
     private CESBubble                bubble;
     private volatile boolean         answered;
+    /** True once a final status (failed, aborted, answer rejected) was set, which hideBubble must not overwrite. */
+    private volatile boolean         finalStatusSet;
 
     public SolverJob<T> getJob() {
         return job;
@@ -28,8 +30,8 @@ public class CESSolverJob<T> {
 
     /**
      * The {@link ChallengeSolver} (e.g. a {@code PluginChallengeSolver}) that owns this job. Plugin solvers must attribute the
-     * {@link AbstractResponse} they build to this instance (not to themselves) so that {@code AbstractResponse#setValidation} can find a real
-     * {@link ChallengeSolver} and actually deliver setValid()/setInvalid()/setUnused() feedback.
+     * {@link AbstractResponse} they build to this instance (not to themselves) so that {@code AbstractResponse#setValidation} can find a
+     * real {@link ChallengeSolver} and actually deliver setValid()/setInvalid()/setUnused() feedback.
      */
     public ChallengeSolver<T> getSolver() {
         return solver;
@@ -54,6 +56,36 @@ public class CESSolverJob<T> {
 
     public void setStatus(SolverStatus solverStatus) {
         this.status = solverStatus;
+        if (solverStatus != null) {
+            job.logSolverStatus(solver, "UI status: " + solverStatus.getLabel());
+        }
+        if (bubble != null) {
+            bubble.update();
+        }
+    }
+
+    /**
+     * Sets the final status "failed" with the given reason (e.g. the error text of the solver service). It is not replaced by the generic
+     * "No Answer!" in {@link #hideBubble()}.
+     */
+    public void setFailed(final String reason) {
+        finalStatusSet = true;
+        setStatus(new SolverStatus(_GUI.T.CESSolverJob_status_failed(reason == null || reason.length() == 0 ? "-" : reason), NewTheme.I().getIcon(IconKey.ICON_BAD, 20)));
+    }
+
+    /** Sets the final status "timed out": the solver was stopped because it (or the whole job) ran into its timeout. */
+    public void setTimedOut() {
+        finalStatusSet = true;
+        setStatus(new SolverStatus(_GUI.T.CESSolverJob_status_timedOut(), NewTheme.I().getIcon(IconKey.ICON_WAIT, 20)));
+    }
+
+    /**
+     * Sets the final status "aborted": the solver did not fail but was stopped from outside (job solved/skipped, another solver chosen,
+     * timeout, ...). It is not replaced by the generic "No Answer!" in {@link #hideBubble()}.
+     */
+    public void setAborted() {
+        finalStatusSet = true;
+        setStatus(new SolverStatus(_GUI.T.CESSolverJob_status_aborted(), NewTheme.I().getIcon(IconKey.ICON_STOP, 20)));
     }
 
     public SolverStatus getStatus() {
@@ -70,15 +102,27 @@ public class CESSolverJob<T> {
     public void showBubble() throws InterruptedException {
         if (org.appwork.utils.Application.isHeadless()) {
             /* No GUI -> no bubble. */
-        } else if (hasManualSolver()) {
-            showBubble(CFG_CAPTCHA.CFG.getExternalCaptchaSolverChanceToAbortExternalCaptchaSolver());
-        } else if (CESBubbleSupport.getInstance().isEnabled()) {
+            return;
+        } else if (!CESBubbleSupport.getInstance().isEnabled()) {
+            /* Bubbles are disabled */
+            return;
+        } else if (job.isForcedStart(solver)) {
+            /*
+             * The user explicitly chose this solver in a captcha dialog ("use external solver") -> send the captcha right away, without the
+             * bubble that delays the upload and offers to abort it. The dialog solver may not be marked as done yet, so hasManualSolver()
+             * cannot be used to detect this.
+             */
+            getLogger().info("Bubble not shown: solver " + solver + " was chosen by the user -> not delaying the captcha upload");
+            return;
+        } else if (!hasManualSolver()) {
             /*
              * The bubble delays the upload to give the user a chance to solve the captcha manually or to abort the upload. Without a manual
              * solver that delay is pointless -> send the captcha right away.
              */
             getLogger().info("Bubble is enabled but not shown: no manual solver available for this challenge, not delaying the captcha upload to " + solver + " | Solvers: " + job.getSolverList());
+            return;
         }
+        showBubble(CFG_CAPTCHA.CFG.getExternalCaptchaSolverChanceToAbortExternalCaptchaSolver());
     }
 
     /**
@@ -115,6 +159,8 @@ public class CESSolverJob<T> {
             answered = true;
             setStatus(_GUI.T.DeathByCaptchaSolver_solveBasicCaptchaChallenge_answer(abrev(abstractResponse.getValue() + "")), NewTheme.I().getIcon(IconKey.ICON_OK, 20));
         } else {
+            /* Answer rejected by the job: keep this status instead of the generic "No Answer!" later. */
+            finalStatusSet = true;
             setStatus(_GUI.T.DeathByCaptchaSolver_solveBasicCaptchaChallenge_answer_bad(abrev(abstractResponse.getValue() + "")), NewTheme.I().getIcon(IconKey.ICON_BAD, 20));
         }
     }
@@ -127,7 +173,7 @@ public class CESSolverJob<T> {
     }
 
     public void hideBubble() {
-        if (!answered) {
+        if (!answered && !finalStatusSet) {
             setStatus(SolverStatus.UNSOLVED);
             if (bubble != null) {
                 bubble.update();

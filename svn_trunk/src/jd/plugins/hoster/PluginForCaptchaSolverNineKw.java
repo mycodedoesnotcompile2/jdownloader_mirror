@@ -45,7 +45,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 /**
  * Plugin for 9kw captcha solving service (https://9kw.eu/).
  */
-@HostPlugin(revision = "$Revision: 53561 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53597 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
 public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -323,7 +323,16 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
             upload_query.appendEncoded(challenge.isSingleClick() ? "mouse" : "multimouse", "1");
             imageFile = challenge.getImageFile();
         } else if (captchachallenge instanceof ImageCaptchaChallenge) {
-            imageFile = ((ImageCaptchaChallenge<?>) captchachallenge).getImageFile();
+            final ImageCaptchaChallenge<?> challenge = (ImageCaptchaChallenge<?>) captchachallenge;
+            imageFile = challenge.getImageFile();
+            if (Boolean.TRUE.equals(challenge.getCaseSensitive())) {
+                /* 0 = disabled (default), 1 = case sensitive */
+                upload_query.appendEncoded("case-sensitive", "1");
+            }
+            if (Boolean.TRUE.equals(challenge.getNumeric())) {
+                /* 0 = disabled (default), 1 = digits only (0-9) */
+                upload_query.appendEncoded("numeric", "1");
+            }
         } else {
             throw new IllegalArgumentException("Unexpected captcha challenge type");
         }

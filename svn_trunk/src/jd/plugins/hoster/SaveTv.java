@@ -29,12 +29,9 @@ import java.util.regex.Pattern;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.os.CrossSystem;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
@@ -71,14 +68,13 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SyncSaveTvToolbarAction;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 53572 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53583 $", interfaceVersion = 3, names = {}, urls = {})
 public class SaveTv extends PluginForHost {
     /* Static information */
     /* API functions developed for API version 3.0.0.1631 */
     // private static final String API_APP_NAME = "JDownloader";
     private static final String   API_PUBLIC_KEY                               = "2005d51304a04a6398bfbc1f3c2a1c8b";
     private static final String   API_SECRET_KEY                               = "3711128ae57644e9a6278adda57a85de457a257fc3ca4130ab5ac863940923be";
-    public static final String    HOST_STATIC                                  = "save.tv";
     /* Linktypes */
     public static final String    LINKTYPE_TELECAST_ID                         = "(?i).+/STV/M/obj/archive/VideoArchiveDetails\\.cfm\\?TelecastID=(\\d+)";
     /*
@@ -2525,7 +2521,7 @@ public class SaveTv extends PluginForHost {
                 result += String.format(Locale.ROOT, "E%02d", episodenumber);
             }
         } else {
-            result = getCustomStringForEmptyTags(plugin, HOST_STATIC);
+            result = getCustomStringForEmptyTags(plugin, "save.tv");
         }
         return result;
     }
@@ -2857,21 +2853,6 @@ public class SaveTv extends PluginForHost {
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_TEXTFIELD, getPluginConfig(), FORCE_ORIGINALFILENAME_MOVIES, JDL.L("plugins.hoster.savetv.forcefilenameforspecifiedmovies", "Original Dateinamen für folgende Filme erzwingen [Eingabe erfolgt in RegEx]:")).setDefaultValue(defaultFORCE_ORIGINALFILENAME_MOVIES).setEnabledCondidtion(origName, false));
     }
 
-    /** Number of seconds after which info dialogs (see showAutoCloseDialog) close themselves automatically. */
-    public static final int DIALOG_AUTO_CLOSE_SECONDS = 180;
-
-    /** Shows a purely informational dialog which closes itself automatically after DIALOG_AUTO_CLOSE_SECONDS. */
-    public static void showAutoCloseDialog(final String title, final String message) {
-        showAutoCloseDialog(title, message, DIALOG_AUTO_CLOSE_SECONDS);
-    }
-
-    /** Shows a purely informational dialog which closes itself automatically after the given number of seconds. */
-    public static void showAutoCloseDialog(final String title, final String message, final int timeoutSeconds) {
-        final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN | UIOManager.BUTTONS_HIDE_CANCEL, title, message);
-        dialog.setTimeout(timeoutSeconds * 1000);
-        UIOManager.I().show(ConfirmDialogInterface.class, dialog);
-    }
-
     public static String getMessageEnd() {
         String message = "";
         message += "\r\n\r\n";
@@ -2921,7 +2902,7 @@ public class SaveTv extends PluginForHost {
             message += "Links dieses Formats in JDownloader einfügen und herunterladen:\r\n";
             message += "https://www.save.tv/STV/M/obj/archive/VideoArchive.cfm";
             message += getMessageEnd();
-            showAutoCloseDialog("save.tv", message);
+            SyncSaveTvToolbarAction.showAutoCloseDialog("save.tv", message);
         } catch (Throwable e) {
             logger.log(e);
         }
@@ -2966,7 +2947,7 @@ public class SaveTv extends PluginForHost {
             message += "\r\n";
             message += "Diese Einstellungen sind verfügbar unter:\r\nEinstellungen -> Plugin Einstellungen -> save.tv";
             message += getMessageEnd();
-            showAutoCloseDialog("save.tv", message);
+            SyncSaveTvToolbarAction.showAutoCloseDialog("save.tv", message);
         } catch (Throwable e) {
             logger.log(e);
         }

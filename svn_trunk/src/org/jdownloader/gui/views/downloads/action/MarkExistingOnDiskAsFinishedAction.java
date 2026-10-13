@@ -19,6 +19,8 @@ import org.jdownloader.controlling.contextmenu.CustomizableTableContextAppAction
 import org.jdownloader.controlling.contextmenu.Customizer;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.gui.views.SelectionInfo;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.plugins.FinalLinkState;
 import org.jdownloader.plugins.config.Order;
@@ -115,8 +117,12 @@ public class MarkExistingOnDiskAsFinishedAction extends CustomizableTableContext
         });
     }
 
-    public void actionPerformed(ActionEvent e) {
-        final List<DownloadLink> selection = getSelection().getChildren();
+    @Override
+    protected void onActionPerformed(final ActionEvent e, final SelectionType selectionType, final SelectionInfo<FilePackage, DownloadLink> selectionInfo) {
+        if (SelectionInfo.isEmpty(selectionInfo)) {
+            return;
+        }
+        final List<DownloadLink> selection = selectionInfo.getChildren();
         if (selection.size() == 0) {
             return;
         }

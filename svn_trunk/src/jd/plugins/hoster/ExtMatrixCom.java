@@ -24,6 +24,7 @@ import java.util.Map;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -41,12 +42,15 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53575 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53587 $", interfaceVersion = 3, names = {}, urls = {})
 public class ExtMatrixCom extends PluginForHost {
     public ExtMatrixCom(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://" + getHost() + "/v2/premium");
     }
+
+    /* Cloudflare Turnstile sitekey used for the login captcha. */
+    private static final String TURNSTILE_SITEKEY = "0x4AAAAAAFJ5UTqieM77S3Qo";
 
     @Override
     public Browser createNewBrowserInstance() {
@@ -127,7 +131,7 @@ public class ExtMatrixCom extends PluginForHost {
             while (true) {
                 links.clear();
                 while (true) {
-                    /* TODO: Check how many links the API accepts at once. */
+                    /* TODO: 2026-10-09: Check how many links the API accepts at once, check if 100 is really fine. */
                     if (index == urls.length || links.size() == 100) {
                         break;
                     } else {
@@ -207,35 +211,69 @@ public class ExtMatrixCom extends PluginForHost {
         synchronized (account) {
             br.setCookiesExclusive(true);
             final Cookies cookies = account.loadCookies("");
-            if (cookies != null && !force) {
-                /* Trust stored session without further check. */
+            if (cookies != null) {
                 br.setCookies(getHost(), cookies);
-                return null;
+                if (!force) {
+                    /* Trust stored session without further check. */
+                    return null;
+                }
+                /* Check session and obtain account information via website. */
+                br.getPage("https://www." + getHost() + "/v2/account");
+                final String userBlock = br.getRegex("user:\\{(id:\\d+,name:\"[^\"]+\".*?)\\}").getMatch(0);
+                if (userBlock != null) {
+                    final Map<String, Object> user = new HashMap<String, Object>();
+                    user.put("name", new Regex(userBlock, "name:\"([^\"]+)\"").getMatch(0));
+                    user.put("isPremium", "true".equals(new Regex(userBlock, "isPremium:(true|false)").getMatch(0)));
+                    user.put("premiumEnd", Long.parseLong(new Regex(userBlock, "premiumEnd:(\\d+)").getMatch(0)));
+                    logger.info("Successfully logged in via cookies");
+                    return user;
+                }
+                logger.info("Cookie login failed");
+                br.clearCookies(getHost());
+                account.clearCookies("");
             }
             logger.info("Performing full login");
-            final Map<String, Object> postdata = new HashMap<String, Object>();
-            postdata.put("login", account.getUser());
-            postdata.put("password", account.getPass());
-            br.getHeaders().put("Content-Type", "application/json");
-            br.postPageRaw(getApiBase() + "/auth/login", JSonStorage.serializeToJson(postdata));
-            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            if (br.getHttpConnection().getResponseCode() == 401 || entries.containsKey("error")) {
-                final Map<String, Object> error = (Map<String, Object>) entries.get("error");
-                final String message = error != null ? (String) error.get("message") : null;
-                final Map<String, Object> details = error != null ? (Map<String, Object>) error.get("details") : null;
-                if (details != null && Boolean.TRUE.equals(details.get("captchaRequired"))) {
-                    /* TODO: Captcha handling is unknown. */
-                    throw new AccountInvalidException("Login captcha required");
-                }
-                if (!StringUtils.isEmpty(message)) {
+            Map<String, Object> entries = postLogin(account, null);
+            if (isCaptchaRequired(entries)) {
+                logger.info("Login captcha required");
+                final String cfTurnstileResponse = new CaptchaHelperHostPluginCloudflareTurnstile(this, br, TURNSTILE_SITEKEY).getToken();
+                entries = postLogin(account, cfTurnstileResponse);
+            }
+            final Map<String, Object> error = (Map<String, Object>) entries.get("error");
+            if (error != null) {
+                final String code = (String) error.get("code");
+                final String message = (String) error.get("message");
+                if ("captcha_required".equals(code)) {
+                    /* Captcha was required again even though we sent a token -> Token was wrong/expired. */
+                    throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+                } else if ("invalid_credentials".equals(code)) {
                     throw new AccountInvalidException(message);
                 } else {
-                    throw new AccountInvalidException();
+                    /* Unknown error code -> Do not blindly treat as invalid account. */
+                    throw new AccountInvalidException("Login failed: " + code + " | " + message);
                 }
             }
             account.saveCookies(br.getCookies(getHost()), "");
             return (Map<String, Object>) entries.get("user");
         }
+    }
+
+    private Map<String, Object> postLogin(final Account account, final String cfTurnstileResponse) throws Exception {
+        final Map<String, Object> postdata = new HashMap<String, Object>();
+        postdata.put("login", account.getUser());
+        postdata.put("password", account.getPass());
+        if (cfTurnstileResponse != null) {
+            postdata.put("captchaToken", cfTurnstileResponse);
+        }
+        br.getHeaders().put("Content-Type", "application/json");
+        br.postPageRaw(getApiBase() + "/auth/login", JSonStorage.serializeToJson(postdata));
+        return restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+    }
+
+    private boolean isCaptchaRequired(final Map<String, Object> entries) {
+        final Map<String, Object> error = (Map<String, Object>) entries.get("error");
+        /* Only the error code counts: "details.captchaRequired" can also be set for other errors e.g. "invalid_credentials". */
+        return error != null && "captcha_required".equals(error.get("code"));
     }
 
     @Override
@@ -269,6 +307,7 @@ public class ExtMatrixCom extends PluginForHost {
     }
 
     private void handleDownload(final DownloadLink link, final Account account) throws Exception {
+        /** 2026-10-12: I was unable to find any files that can be downloaded without premium account. */
         if (account == null || !AccountType.PREMIUM.equals(account.getType())) {
             /* Free (anonymous) downloads are not possible. */
             throw new AccountRequiredException();
@@ -293,14 +332,17 @@ public class ExtMatrixCom extends PluginForHost {
         br.getHeaders().put("Content-Type", "application/json");
         br.getHeaders().put("Origin", "https://www.extmatrix.com");
         br.getHeaders().put("Referer", getContentURL(link));
-        br.postPageRaw(getApiBase() + "/download/" + getFID(link) + "/link", "{}");
-        if (br.getHttpConnection().getResponseCode() == 401) {
+        final String fid = this.getFID(link);
+        br.getPage(getApiBase() + "/download/" + fid);
+        Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> viewer = (Map<String, Object>) entries.get("viewer");
+        if (br.getHttpConnection().getResponseCode() == 401 || (viewer != null && !Boolean.TRUE.equals(viewer.get("loggedIn")))) {
             /* Session expired -> Login again and retry once. */
             login(account, true);
             br.getHeaders().put("Content-Type", "application/json");
-            br.postPageRaw(getApiBase() + "/download/" + getFID(link) + "/link", "{}");
         }
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        br.postPageRaw(getApiBase() + "/download/" + fid + "/link", "{}");
+        entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final String url = (String) entries.get("url");
         if (StringUtils.isEmpty(url)) {
             final Map<String, Object> error = (Map<String, Object>) entries.get("error");
@@ -341,19 +383,20 @@ public class ExtMatrixCom extends PluginForHost {
 
     @Override
     public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        /* TODO: Update once download restrictions are known. */
-        return true;
+        if (account != null && AccountType.PREMIUM.equals(account.getType())) {
+            /* Free (anonymous) downloads are not possible. */
+            return true;
+        }
+        return false;
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        /* TODO: Update once download restrictions are known. */
         return 1;
     }
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        /* TODO: Update once download restrictions are known. */
         return Integer.MAX_VALUE;
     }
 }

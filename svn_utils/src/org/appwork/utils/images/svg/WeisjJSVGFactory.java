@@ -48,18 +48,12 @@ import org.appwork.utils.images.ScalableIcon;
  *
  */
 public class WeisjJSVGFactory implements SVGFactory {
-    private static Boolean SUPPORTED = null;
-
     @Override
     public boolean isSupported() {
         try {
-            if (SUPPORTED == null) {
-                SUPPORTED = JVMVersion.isMinimum(JVMVersion.JAVA_1_8) && Class.forName("com.github.weisj.jsvg.parser.SVGLoader") != null;
-            }
-            return SUPPORTED;
+            return JVMVersion.isMinimum(JVMVersion.JAVA_1_8) && Class.forName("com.github.weisj.jsvg.parser.SVGLoader") != null;
         } catch (ClassNotFoundException e) {
             org.appwork.loggingv3.LogV3.log(e);
-            SUPPORTED = false;
             return false;
         }
     }

@@ -1,18 +1,35 @@
 package org.jdownloader.controlling.contextmenu.gui;
 
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.Insets;
+import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
+import java.awt.event.ItemEvent;
+import java.awt.event.ItemListener;
 import java.awt.event.KeyListener;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.List;
 
+import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JComponent;
+import javax.swing.JComboBox;
 import javax.swing.JLabel;
+import javax.swing.JPopupMenu;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
 import javax.swing.KeyStroke;
+import javax.swing.Scrollable;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+import javax.swing.event.PopupMenuEvent;
+import javax.swing.event.PopupMenuListener;
 
 import jd.gui.swing.jdgui.JDGui;
 
@@ -32,6 +49,8 @@ import org.jdownloader.controlling.contextmenu.ActionContext;
 import org.jdownloader.controlling.contextmenu.ActionData;
 import org.jdownloader.controlling.contextmenu.CustomizableAppAction;
 import org.jdownloader.controlling.contextmenu.Customizer;
+import org.jdownloader.controlling.contextmenu.ReplacerTag;
+import org.jdownloader.controlling.contextmenu.ReplacerTagProvider;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.components.PseudoCombo;
@@ -255,6 +274,12 @@ public class CustomPanel extends MigPanel {
                 cb.setText(value);
                 add(new JLabel(getNameForCustomizer(gs)), "growx,spanx,wrap");
                 add(cb, "growx,spanx,wrap,pushx,growx");
+                if (actionClass instanceof ReplacerTagProvider) {
+                    final List<ReplacerTag> tags = ((ReplacerTagProvider) actionClass).getReplacerTags(gs.getKey());
+                    if (tags != null && tags.size() > 0) {
+                        add(createTagList(tags, cb), "growx,spanx,wrap,pushx,growx");
+                    }
+                }
             } else if (Clazz.isFixedPointNumber(gs.getType())) {
                 Number value = (Number) actionData.fetchSetup(gs.getKey());
                 if (value == null) {
@@ -288,6 +313,197 @@ public class CustomPanel extends MigPanel {
         } catch (Exception e) {
             logger.log(e);
         }
+    }
+
+    /**
+     * Creates a scrollable list with a header and one row per tag: a button that appends the tag to the given text field, a dropdown with
+     * the possible replaces of the tag, the description and the text that is used if there is no data.
+     */
+    private static JScrollPane createTagList(final List<ReplacerTag> tags, final ExtTextField target) {
+        final String columns = "[26!][150!][grow,fill][90!]";
+        /* The list always has the width of the visible area, so that the description column wraps instead of requiring a horizontal scrollbar */
+        final MigPanel list = new TagListPanel("ins 2 4 2 4", columns, "[]");
+        list.setOpaque(false);
+        /* Column header. Uses the same columns as the list, the header of a scroll pane is as wide as its viewport. */
+        final MigPanel header = new MigPanel("ins 2 4 2 4", columns, "[]");
+        header.setOpaque(false);
+        header.add(new JLabel(""));
+        header.add(createHeaderLabel("Tag"), "gapleft 4");
+        header.add(createHeaderLabel("Description"), "gapleft 8");
+        header.add(createHeaderLabel("<html>String for<br>missing data</html>"));
+        for (final ReplacerTag tag : tags) {
+            final List<String> replaces = tag.getReplaces();
+            final String[] labels = new String[replaces.size()];
+            for (int i = 0; i < labels.length; i++) {
+                labels[i] = "{" + replaces.get(i) + "}";
+            }
+            /* Tags with only one variant have no dropdown, so that it is obvious that there are no other variants */
+            final JComboBox<String> replaceBox;
+            final JComponent tagComponent;
+            if (replaces.size() > 1) {
+                /* The combo box itself is narrow, the popup is made as wide as the longest entry */
+                replaceBox = new JComboBox<String>(labels);
+                replaceBox.setEditable(false);
+                replaceBox.setToolTipText(labels[0]);
+                int widestLabel = 0;
+                for (final String label : labels) {
+                    widestLabel = Math.max(widestLabel, replaceBox.getFontMetrics(replaceBox.getFont()).stringWidth(label));
+                }
+                final int popupWidth = widestLabel + 40;
+                replaceBox.addPopupMenuListener(new PopupMenuListener() {
+                    @Override
+                    public void popupMenuWillBecomeVisible(final PopupMenuEvent e) {
+                        final Object popup = replaceBox.getUI().getAccessibleChild(replaceBox, 0);
+                        if (popup instanceof JPopupMenu && ((JPopupMenu) popup).getComponentCount() > 0 && ((JPopupMenu) popup).getComponent(0) instanceof JScrollPane) {
+                            final JScrollPane popupScroll = (JScrollPane) ((JPopupMenu) popup).getComponent(0);
+                            final Dimension size = new Dimension(Math.max(replaceBox.getWidth(), popupWidth), popupScroll.getPreferredSize().height);
+                            popupScroll.setPreferredSize(size);
+                            popupScroll.setMaximumSize(size);
+                            popupScroll.revalidate();
+                        }
+                    }
+
+                    @Override
+                    public void popupMenuWillBecomeInvisible(final PopupMenuEvent e) {
+                    }
+
+                    @Override
+                    public void popupMenuCanceled(final PopupMenuEvent e) {
+                    }
+                });
+                tagComponent = replaceBox;
+            } else {
+                replaceBox = null;
+                final JLabel tagLabel = new JLabel(labels[0]);
+                tagLabel.setToolTipText(labels[0]);
+                tagComponent = tagLabel;
+            }
+            final JTextField emptyField = new JTextField(tag.getEmptyCharacter(replaces.get(0)), 4);
+            /* Selecting another replace switches to its default, unless the user has entered an own text */
+            final String[] currentDefault = new String[] { tag.getEmptyCharacter(replaces.get(0)) };
+            final Runnable updateEmptyField = new Runnable() {
+                @Override
+                public void run() {
+                    final String replace = getSelectedReplace(replaceBox, replaces);
+                    final String newDefault = tag.getEmptyCharacter(replace);
+                    if (tag.isAlwaysAvailable(replace)) {
+                        /* There is never missing data: Nothing to set */
+                        emptyField.setText("");
+                        emptyField.setEnabled(false);
+                        emptyField.setToolTipText("This tag always has a value");
+                    } else {
+                        if (!emptyField.isEnabled() || currentDefault[0].equals(emptyField.getText())) {
+                            emptyField.setText(newDefault);
+                        }
+                        emptyField.setEnabled(true);
+                        emptyField.setToolTipText("Text that is used if there is no data for this tag");
+                    }
+                    currentDefault[0] = newDefault;
+                }
+            };
+            updateEmptyField.run();
+            if (replaceBox != null) {
+                replaceBox.addItemListener(new ItemListener() {
+                    @Override
+                    public void itemStateChanged(final ItemEvent e) {
+                        if (e.getStateChange() == ItemEvent.SELECTED) {
+                            replaceBox.setToolTipText(String.valueOf(replaceBox.getSelectedItem()));
+                            updateEmptyField.run();
+                        }
+                    }
+                });
+            }
+            final JButton add = new JButton(NewTheme.I().getIcon(IconKey.ICON_ADD, 14));
+            add.setMargin(new Insets(1, 3, 1, 3));
+            add.setFocusable(false);
+            add.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(final ActionEvent e) {
+                    final String newTag = tag.toTag(getSelectedReplace(replaceBox, replaces), emptyField.getText());
+                    final String text = target.getText();
+                    /* Plausibility check: do not add the tag if the pattern already ends with it */
+                    if (text == null || !text.endsWith(newTag)) {
+                        target.setText((text == null ? "" : text) + newTag);
+                    }
+                }
+            });
+            /* Wraps at the width of the column */
+            final JTextArea description = new JTextArea(tag.getDescription());
+            description.setEditable(false);
+            description.setFocusable(false);
+            description.setLineWrap(true);
+            description.setWrapStyleWord(true);
+            description.setOpaque(false);
+            description.setBorder(null);
+            description.setFont(new JLabel().getFont());
+            description.setForeground(new JLabel().getForeground());
+            list.add(add, "aligny center");
+            list.add(tagComponent, "gapleft 4,growx,aligny center");
+            list.add(description, "gapleft 8,aligny center,growx,wmin 50");
+            list.add(emptyField, "growx,aligny center,wrap");
+        }
+        final JScrollPane scroll = new JScrollPane(list);
+        scroll.setColumnHeaderView(header);
+        scroll.setBorder(null);
+        scroll.setOpaque(false);
+        scroll.getViewport().setOpaque(false);
+        scroll.getVerticalScrollBar().setUnitIncrement(16);
+        scroll.setPreferredSize(new Dimension(400, 200));
+        return scroll;
+    }
+
+    /**
+     * Panel that always has the width of the viewport of the scroll pane it is in.
+     */
+    private static class TagListPanel extends MigPanel implements Scrollable {
+        private static final long serialVersionUID = 1L;
+
+        private TagListPanel(final String layoutConstraints, final String columnConstraints, final String rowConstraints) {
+            super(layoutConstraints, columnConstraints, rowConstraints);
+        }
+
+        @Override
+        public Dimension getPreferredScrollableViewportSize() {
+            return getPreferredSize();
+        }
+
+        @Override
+        public int getScrollableUnitIncrement(final Rectangle visibleRect, final int orientation, final int direction) {
+            return 16;
+        }
+
+        @Override
+        public int getScrollableBlockIncrement(final Rectangle visibleRect, final int orientation, final int direction) {
+            return Math.max(16, visibleRect.height - 16);
+        }
+
+        @Override
+        public boolean getScrollableTracksViewportWidth() {
+            return true;
+        }
+
+        @Override
+        public boolean getScrollableTracksViewportHeight() {
+            return false;
+        }
+    }
+
+    /**
+     * @param replaceBox
+     *            The dropdown or null if the tag has only one replace
+     */
+    private static String getSelectedReplace(final JComboBox<String> replaceBox, final List<String> replaces) {
+        if (replaceBox == null) {
+            return replaces.get(0);
+        } else {
+            return replaces.get(Math.max(0, replaceBox.getSelectedIndex()));
+        }
+    }
+
+    private static JLabel createHeaderLabel(final String text) {
+        final JLabel label = new JLabel(text);
+        label.setFont(label.getFont().deriveFont(Font.BOLD));
+        return label;
     }
 
     public static String getNameForCustomizer(GetterSetter gs) {

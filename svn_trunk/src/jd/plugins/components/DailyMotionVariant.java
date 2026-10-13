@@ -53,6 +53,15 @@ public class DailyMotionVariant implements Storable, LinkVariant {
     }
 
     private String displayName;
+    private String language;
+
+    public String getLanguage() {
+        return language;
+    }
+
+    public void setLanguage(String language) {
+        this.language = language;
+    }
 
     public String getDisplayName() {
         return displayName;
@@ -62,20 +71,22 @@ public class DailyMotionVariant implements Storable, LinkVariant {
         this.displayName = displayName;
     }
 
-    public DailyMotionVariant(DailyMotionVariant variant, String convert, String qualityName, String name) {
-        this(variant.getLink(), variant.getVideoHeight(), convert, qualityName, name);
+    public DailyMotionVariant(DailyMotionVariant variant, String convert, String qualityName, String name, String language) {
+        this(variant.getLink(), variant.getVideoHeight(), convert, qualityName, name, language);
     }
 
-    public DailyMotionVariant(String directlink, int videoHeight, String convert, String qualityName, String name) {
+    public DailyMotionVariant(String directlink, int videoHeight, String convert, String qualityName, String name, final String language) {
         this.directlink = directlink;
         qName = qualityName;
         this.videoHeight = videoHeight;
         this.convertTo = convert;
         displayName = name;
+        this.language = language;
     }
 
     @Override
     public String _getUniqueId() {
+        final String displayName = getDisplayName();
         return convertTo == null ? displayName : (displayName + "->" + convertTo);
     }
 

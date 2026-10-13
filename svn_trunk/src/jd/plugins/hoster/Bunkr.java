@@ -41,7 +41,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BunkrAlbum;
 
-@HostPlugin(revision = "$Revision: 53209 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53578 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -513,7 +513,7 @@ public class Bunkr extends PluginForHost {
     }
 
     private String getDirecturlFromSingleFileAvailablecheck(final DownloadLink link, String singleFileURL, final boolean accessURL) throws PluginException, IOException {
-        final String lastDirectURL = getLastGrabbedDirectURL(link);
+        // final String lastDirectURL = getLastGrabbedDirectURL(link);
         setDirectURL(link, null);
         if (accessURL) {
             br.getPage(singleFileURL);
@@ -562,6 +562,8 @@ public class Bunkr extends PluginForHost {
             String safeFilenameFromHTML = safeFileInfoFromHTML.getMatch(0);
             // incomplete replacement, so we skip in this branch in this case
             // safeFilenameFromHTML = safeFilenameFromHTML.replaceFirst("<a href=\"/cdn-cgi/l/email-protection[^>]*>", "@");
+            /* 2026-10-12: Can contain chars like this: &#39; */
+            safeFilenameFromHTML = Encoding.htmlOnlyDecode(safeFilenameFromHTML);
             setFilename(link, safeFilenameFromHTML, false, true);
             final String filesizeBytesStr = safeFileInfoFromHTML.getMatch(1);
             /* Byte-precise file size */

@@ -16,13 +16,15 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
+
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
 
 import jd.PluginWrapper;
-import jd.http.Browser;
 import jd.parser.Regex;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -30,23 +32,16 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
-import jd.websocket.WebSocketClient;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.net.websocket.ReadWebSocketFrame;
-
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53591 $", interfaceVersion = 3, names = {}, urls = {})
 public class BlockfilestoreCom extends PluginForHost {
     public BlockfilestoreCom(PluginWrapper wrapper) {
         super(wrapper);
-        // this.enablePremium("");
     }
 
     @Override
     public String getAGBLink() {
-        return "https://www.blockfilestore.com/terms";
+        return getBaseURL() + "/terms";
     }
 
     private static List<String[]> getPluginDomains() {
@@ -63,17 +58,37 @@ public class BlockfilestoreCom extends PluginForHost {
     }
 
     public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    private static final Pattern PATTERN_API_DOWNLOAD = Pattern.compile("/api/download\\?id=([a-f0-9\\-]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_DOWN         = Pattern.compile("/down/([a-f0-9\\-]+)", Pattern.CASE_INSENSITIVE);
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
-        for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/api/download\\?id=([a-f0-9\\-]+)");
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(" + PATTERN_API_DOWNLOAD.pattern().substring(1) + "|" + PATTERN_DOWN.pattern().substring(1) + ")");
         }
         return ret.toArray(new String[0]);
     }
 
+    private String getBaseURL() {
+        return "https://www." + getHost();
+    }
+
     /* Connection stuff */
-    private static final boolean FREE_RESUME       = true;
-    private static final int     FREE_MAXCHUNKS    = 0;
-    private static final int     FREE_MAXDOWNLOADS = 20;
+    private static final boolean FREE_RESUME        = true;
+    private static final int     FREE_MAXCHUNKS     = 0;
+    private static final String  PROPERTY_DIRECTURL = "directurl";
+
+    @Override
+    public String getPluginContentURL(DownloadLink link) {
+        final String file_id = this.getFID(link);
+        if (file_id == null) {
+            return null;
+        }
+        return getBaseURL() + "/api/download?id=" + file_id;
+    }
 
     @Override
     public String getLinkID(final DownloadLink link) {
@@ -86,14 +101,39 @@ public class BlockfilestoreCom extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        final String url = link.getPluginPatternMatcher();
+        final String fid = new Regex(url, PATTERN_API_DOWNLOAD).getMatch(0);
+        if (fid != null) {
+            return fid;
+        }
+        return new Regex(url, PATTERN_DOWN).getMatch(0);
     }
 
     @Override
+    protected String getDefaultFileName(final DownloadLink link) {
+        return this.getFID(link);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        if (!link.isNameSet()) {
-            /* Fallback */
-            link.setName(this.getFID(link));
+        br.setFollowRedirects(true);
+        br.getPage(getBaseURL() + "/api/file/get-public-file?fileId=" + getFID(link));
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> result = (Map<String, Object>) entries.get("result");
+        if (result == null) {
+            /* No file data returned --> File offline */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        link.setFinalFileName(result.get("name").toString());
+        link.setProperty(PROPERTY_DIRECTURL, result.get("url").toString());
+        /* Size is optional: API may return null */
+        final Object sizeO = result.get("size");
+        if (sizeO != null) {
+            link.setVerifiedFileSize(((Number) sizeO).longValue());
         }
         return AvailableStatus.TRUE;
     }
@@ -105,35 +145,12 @@ public class BlockfilestoreCom extends PluginForHost {
     }
 
     private void handleDownload(final DownloadLink link, final boolean resumable, final int maxchunks) throws Exception, PluginException {
-        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+        /* 2026-10-12: Pre download wait and some http requests which the browser is doing can be skipped atm. */
+        final String directurl = link.getStringProperty(PROPERTY_DIRECTURL);
+        if (StringUtils.isEmpty(directurl)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final Browser brc = br.cloneBrowser();
-        brc.getHeaders().put("Content-Type", "text/plain;charset=UTF-8");
-        brc.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-        brc.postPage("https://www." + this.getHost() + "/bfshub/negotiate", "");
-        final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-        final String connectionId = entries.get("connectionId").toString();
-        // br.getHeaders().put("Origin", "https://www.blockfilestore.com");
-        // br.getHeaders().put("Sec-WebSocket-Extensions", "permessage-deflate; client_max_window_bits");
-        // br.getHeaders().put("Sec-WebSocket-Key", "");
-        // br.getHeaders().put("Sec-WebSocket-Version", "13");
-        final WebSocketClient wsc = new WebSocketClient(br, new URL("https://www." + this.getHost() + "/bfshub?id=" + connectionId));
-        String uidh = null;
-        try {
-            wsc.connect();
-            ReadWebSocketFrame frame = wsc.readNextFrame();// sid
-            frame = wsc.readNextFrame();// session
-            frame = wsc.readNextFrame();// subscription
-            frame = wsc.readNextFrame();// subscription
-            final String response = new String(frame.getPayload(), "UTF-8");
-            uidh = new Regex(response, "arguments\":\\[\"([a-f0-9\\-]+)\"\\]").getMatch(0);
-            // if (WebSocketFrameHeader.OP_CODE.UTF8_TEXT.equals(frame.getOpCode()) && frame.isFin())
-        } finally {
-            wsc.close();
-        }
-        br.getHeaders().put("uidh", uidh);
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, link.getPluginPatternMatcher(), resumable, maxchunks);
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, directurl, resumable, maxchunks);
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
             if (dl.getConnection().getResponseCode() == 403) {
@@ -154,14 +171,6 @@ public class BlockfilestoreCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
+        return Integer.MAX_VALUE;
     }
 }

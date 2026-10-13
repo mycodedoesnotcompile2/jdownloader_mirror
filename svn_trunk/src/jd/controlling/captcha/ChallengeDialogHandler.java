@@ -229,6 +229,15 @@ public abstract class ChallengeDialogHandler<D extends AbstractCaptchaDialog<Res
             } catch (Exception e) {
             }
         }
+        if (dialog.getExternalSolverToUse() != null) {
+            /* User chose to use an external solver now: no result and no skip, this solver just ends without an answer. */
+            if (captchaChallenge.getJob() != null && captchaChallenge.getJob().getLogger() != null) {
+                captchaChallenge.getJob().getLogger().info("Solver status: " + getClass().getSimpleName() + " -> SKIPPED (user chose external solver " + dialog.getExternalSolverToUse() + " in the dialog instead)");
+            }
+            resultException = null;
+            result = null;
+            return;
+        }
         setResultFrom(dialog);
         try {
             if (dialog.getCloseReason() != CloseReason.OK) {

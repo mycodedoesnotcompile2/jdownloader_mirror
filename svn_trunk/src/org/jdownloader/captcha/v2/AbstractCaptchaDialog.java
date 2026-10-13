@@ -1,5 +1,6 @@
 package org.jdownloader.captcha.v2;
 
+import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Dialog.ModalExclusionType;
 import java.awt.Dialog.ModalityType;
@@ -15,6 +16,9 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -29,28 +33,23 @@ import javax.sound.sampled.LineEvent;
 import javax.sound.sampled.LineEvent.Type;
 import javax.sound.sampled.LineListener;
 import javax.swing.BorderFactory;
+import javax.swing.DefaultListCellRenderer;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.KeyStroke;
-
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.gui.swing.dialog.DialogType;
-import jd.gui.swing.jdgui.JDGui;
-import jd.plugins.DownloadLink;
-import jd.plugins.Plugin;
-import jd.plugins.PluginForDecrypt;
-import jd.plugins.PluginForHost;
-import net.miginfocom.swing.MigLayout;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtButton;
 import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.swing.SwingUtils;
 import org.appwork.utils.swing.dialog.AbstractDialog;
 import org.appwork.utils.swing.dialog.DefaultButtonPanel;
@@ -81,6 +80,15 @@ import org.jdownloader.settings.SoundSettings;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.updatev2.gui.LAFOptions;
+
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.gui.swing.dialog.DialogType;
+import jd.gui.swing.jdgui.JDGui;
+import jd.plugins.DownloadLink;
+import jd.plugins.Plugin;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.PluginForHost;
+import net.miginfocom.swing.MigLayout;
 
 public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
     // private LocationStorage config;
@@ -234,11 +242,12 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
         return ModalityType.MODELESS;
     }
 
-    protected boolean      hideCaptchasForPackage = false;
-    protected final String explain;
-    protected boolean      hideAllCaptchas;
-    protected DomainInfo   hosterInfo;
-    protected JPanel       iconPanel;
+    protected volatile ChallengeSolver<?> externalSolverToUse;
+    protected boolean                     hideCaptchasForPackage = false;
+    protected final String                explain;
+    protected boolean                     hideAllCaptchas;
+    protected DomainInfo                  hosterInfo;
+    protected JPanel                      iconPanel;
 
     public boolean isHideAllCaptchas() {
         return hideAllCaptchas;
@@ -552,7 +561,7 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
         }
         case CRAWLER: {
             final CrawledLink link;
-            if (plugin == null || (link = ((PluginForDecrypt) plugin).getCurrentLink()) == null) {
+            if (plugin == null || (link = plugin.getCurrentLink()) == null) {
                 return null;
             }
             return link.getName();
@@ -591,7 +600,6 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
         } else {
             return null;
         }
-
         final JLabel header = new JLabel() {
             private boolean setting = false;
 
@@ -640,7 +648,6 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
         SwingUtils.setOpaque(panel, false);
         LAFOptions.applyBackground(lafOptions.getColorForPanelBackground(), field);
         getDialog().setModalExclusionType(ModalExclusionType.TOOLKIT_EXCLUDE);
-
         addBeforeImage(field);
         iconPanel = createCaptchaPanel();
         if (iconPanel != null) {
@@ -666,7 +673,6 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
             }
             if (CFG_CAPTCHA.CFG.isCancelDialogCountdownOnMouseClick()) {
                 iconPanel.addMouseListener(mouseListener = new MouseListener() {
-
                     @Override
                     public void mouseClicked(MouseEvent e) {
                         cancel();
@@ -709,6 +715,116 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
     }
 
     protected void addBeforeImage(MigPanel field) {
+    }
+
+    /**
+     * Returns the external solver the user chose to use right now instead of solving manually, or null. If set, the dialog was closed by
+     * the "use external solver now" button and must not be handled like a skip.
+     */
+    public ChallengeSolver<?> getExternalSolverToUse() {
+        return externalSolverToUse;
+    }
+
+    /**
+     * Adds a hint and one button per pending external solver to the given dialog content. Does nothing if there is no external solver that
+     * would be used after this dialog. Has to be called by the subclass after the rest of the content has been added.
+     */
+    protected void addExternalSolverPanel(final JComponent container) {
+        final SolverJob<?> job = challenge.getJob();
+        if (job == null) {
+            return;
+        }
+        final List<ChallengeSolver<?>> solvers = job.getPendingExternalSolvers();
+        if (solvers.size() == 0) {
+            return;
+        }
+        /*
+         * Same order in which the solvers are used: a solver that has to wait for another one (see JobRunnable#getWaitFor) comes after it.
+         * Ties are decided by the per-job tie-break order.
+         */
+        Collections.sort(solvers, new Comparator<ChallengeSolver<?>>() {
+            @Override
+            public int compare(final ChallengeSolver<?> a, final ChallengeSolver<?> b) {
+                final int aWaitsForB = JobRunnable.getWaitFor(a.getService(), b.getService(), job);
+                final int bWaitsForA = JobRunnable.getWaitFor(b.getService(), a.getService(), job);
+                if (aWaitsForB != bWaitsForA) {
+                    return aWaitsForB > bWaitsForA ? 1 : -1;
+                }
+                final int aOrder = job.getExternalTieBreakOrder(a.getService().getID());
+                final int bOrder = job.getExternalTieBreakOrder(b.getService().getID());
+                return aOrder < bOrder ? -1 : (aOrder == bOrder ? 0 : 1);
+            }
+        });
+        /*
+         * Only the wait until the captcha is sent to the first external solver is shown. It waits for all other solvers in parallel, so the
+         * longest wait counts.
+         */
+        final ChallengeSolver<?> first = solvers.get(0);
+        long wait = 0;
+        for (final ChallengeSolver<?> other : job.getSolverList()) {
+            if (other != first) {
+                wait = Math.max(wait, JobRunnable.getWaitFor(first.getService(), other.getService(), job));
+            }
+        }
+        final long remaining = Math.max(0, wait - (System.currentTimeMillis() - job.getCreated()));
+        final MigPanel externalPanel = new MigPanel("ins 5 0 0 0,wrap 1", "[grow,fill]", "[]");
+        SwingUtils.setOpaque(externalPanel, false);
+        /* Fixed html width: a plain label would make the whole dialog as wide as the text. */
+        externalPanel.add(new JLabel("<html><body style='width:320px'>" + _GUI.T.AbstractCaptchaDialog_externalSolverHint(TimeFormatter.formatMilliSeconds(remaining, 0), first.getService().getName()) + "</body></html>"), "wmin 0");
+        externalPanel.add(new JLabel(_GUI.T.AbstractCaptchaDialog_useExternalSolverQuestion()), "gaptop 5");
+        /* Dropdown + one button: the dialog does not grow with the number of configured external solvers. */
+        final MigPanel selectPanel = new MigPanel("ins 0", "[][]", "[]");
+        SwingUtils.setOpaque(selectPanel, false);
+        /* "Auto" entry (only if there is a choice) is selected by default and means: the solver that would be used first anyway. */
+        final Object auto = new Object();
+        final List<Object> items = new ArrayList<Object>();
+        if (solvers.size() > 1) {
+            items.add(auto);
+        }
+        items.addAll(solvers);
+        final JComboBox solverBox = new JComboBox(items.toArray());
+        solverBox.setRenderer(new DefaultListCellRenderer() {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public Component getListCellRendererComponent(final JList list, final Object value, final int index, final boolean isSelected, final boolean cellHasFocus) {
+                if (value == auto) {
+                    final JLabel autoLabel = (JLabel) super.getListCellRendererComponent(list, _GUI.T.AbstractCaptchaDialog_autoSolver(), index, isSelected, cellHasFocus);
+                    autoLabel.setIcon(NewTheme.I().getIcon(IconKey.ICON_OCR, 18));
+                    return autoLabel;
+                }
+                final SolverService service = ((ChallengeSolver<?>) value).getService();
+                final JLabel ret = (JLabel) super.getListCellRendererComponent(list, service.getName(), index, isSelected, cellHasFocus);
+                ret.setIcon(service.getIcon(18));
+                return ret;
+            }
+        });
+        solverBox.setMaximumRowCount(10);
+        final JButton button = new JButton(new AppAction() {
+            {
+                setName(_GUI.T.AbstractCaptchaDialog_useExternalSolver());
+            }
+
+            @Override
+            public void actionPerformed(final ActionEvent e) {
+                final Object selected = solverBox.getSelectedItem();
+                /* Auto = first solver of the list, i.e. the one that would be used first anyway. */
+                final ChallengeSolver<?> solver = selected == auto ? solvers.get(0) : (ChallengeSolver<?>) selected;
+                final SolverJob<?> job = challenge.getJob();
+                if (job.getLogger() != null) {
+                    job.getLogger().info("User chose external solver " + solver + " in " + AbstractCaptchaDialog.this.getClass().getSimpleName() + " -> close dialog and start it now");
+                }
+                /* Order is important: the solver must be released before this dialog's solver is stopped. */
+                externalSolverToUse = solver;
+                job.forceStart(solver);
+                setReturnmask(false);
+                dispose();
+            }
+        });
+        selectPanel.add(solverBox);
+        selectPanel.add(button);
+        externalPanel.add(selectPanel, "alignx left");
+        container.add(externalPanel, "growy 0");
     }
 
     protected HeaderScrollPane createHeaderScrollPane(MigPanel field) {

@@ -14,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import javax.swing.AbstractAction;
 import javax.swing.Icon;
+import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -26,6 +27,7 @@ import javax.swing.event.ListSelectionListener;
 import javax.swing.filechooser.FileFilter;
 import javax.swing.filechooser.FileSystemView;
 
+import org.appwork.swing.MigPanel;
 import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtDefaultRowSorter;
 import org.appwork.swing.exttable.ExtTableModel;
@@ -122,6 +124,31 @@ public class SelectBrowserDialog extends AbstractDialog<InstalledBrowser> {
             }
         });
         setLeftActions(createBrowseAction());
+    }
+
+    /**
+     * Puts the info button at the very left of the bottom bar, while all other buttons stay on the right (like before).
+     */
+    @Override
+    protected MigPanel createBottomPanel() {
+        final MigPanel bottom = new MigPanel("ins 0", "[]20[]20[grow,fill][]", "[]");
+        bottom.add(new JButton(createInfoAction()));
+        return bottom;
+    }
+
+    /** Icon-only button which opens the knowledgebase article about defining a custom browser for the browser captcha solver. */
+    private AbstractAction createInfoAction() {
+        return new AppAction() {
+            {
+                setIconKey(IconKey.ICON_INFO);
+                setTooltipText(_GUI.T.SelectBrowserDialog_info_tooltip());
+            }
+
+            @Override
+            public void actionPerformed(final ActionEvent e) {
+                CrossSystem.openURL("https://support.jdownloader.org/knowledgebase/article/define-custom-browser-solver-captcha-browser");
+            }
+        };
     }
 
     @Override

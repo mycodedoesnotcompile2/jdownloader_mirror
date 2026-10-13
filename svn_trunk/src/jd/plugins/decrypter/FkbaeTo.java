@@ -35,7 +35,7 @@ import jd.plugins.hoster.GenericM3u8;
 
 import org.appwork.utils.StringUtils;
 
-@DecrypterPlugin(revision = "$Revision: 52500 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53581 $", interfaceVersion = 3, names = {}, urls = {})
 public class FkbaeTo extends PluginForDecrypt {
     public FkbaeTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -115,21 +115,25 @@ public class FkbaeTo extends PluginForDecrypt {
             }
         }
         br.getPage(self_embed_url);
-        final String stream_url = br.getRegex("file:\\s*\"(https?://[^\"]+)").getMatch(0);
-        if (stream_url == null) {
+        String url = br.getRegex("file:\\s*\"(https?://[^\"]+)").getMatch(0);
+        if (url == null) {
+            url = br.getRegex("source\\s*src\\=\\s*\"(https?://[^\"]+)").getMatch(0);
+        }
+        if (url == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final DownloadLink video;
-        if (StringUtils.containsIgnoreCase(stream_url, ".m3u8")) {
+        if (StringUtils.containsIgnoreCase(url, ".m3u8")) {
             /* HLS video stream */
-            video = createDownloadlink(stream_url);
+            video = createDownloadlink(url);
+            video.setReferrerUrl(param.getCryptedUrl());
             if (title != null) {
                 video.setProperty(GenericM3u8.PRESET_NAME_PROPERTY, title);
             }
         } else {
             /* Progressive video stream */
-            video = createDownloadlink(DirectHTTP.createURLForThisPlugin(stream_url));
-            if (title != null && StringUtils.containsIgnoreCase(stream_url, ".mp4")) {
+            video = createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
+            if (title != null && StringUtils.containsIgnoreCase(url, ".mp4")) {
                 video.setFinalFileName(title + ".mp4");
             }
         }

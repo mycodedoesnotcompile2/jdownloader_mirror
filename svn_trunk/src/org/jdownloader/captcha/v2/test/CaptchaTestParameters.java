@@ -18,6 +18,16 @@ public class CaptchaTestParameters {
     private File   imageFile;
     private Double minScore;
     private int    minClicks = 1;
+    private String challengeDescription;
+
+    /** Only used by image captcha types: the description/explanation shown to the solver. */
+    public String getChallengeDescription() {
+        return challengeDescription;
+    }
+
+    public void setChallengeDescription(final String challengeDescription) {
+        this.challengeDescription = challengeDescription;
+    }
 
     public CaptchaTestParameters(final String siteKey, final String siteUrl, final String action, final String expectedResult) {
         this.siteKey = siteKey;
@@ -150,12 +160,14 @@ public class CaptchaTestParameters {
         case IMAGE: {
             /* Test image next to this class in the project folder, its text is case-sensitive. */
             final CaptchaTestParameters ret = new CaptchaTestParameters(null, null, null, "KoYy2j");
+            ret.setChallengeDescription("Test image captcha (case insensitive)");
             ret.setImageFile(getDefaultTestImage("test_image_captcha.png"));
             return ret;
         }
         case IMAGE_SINGLE_CLICK_CAPTCHA: {
             /* Test image: 3x3 grid of trash cans, the full one (center) has to be clicked. No expected result: the click position varies. */
             final CaptchaTestParameters ret = new CaptchaTestParameters(null, null, null, null);
+            ret.setChallengeDescription("Click on the full trash can");
             ret.setImageFile(getDefaultTestImage("test_single_click_captcha.jpg"));
             return ret;
         }
@@ -163,6 +175,7 @@ public class CaptchaTestParameters {
             /* Test image: 8 open circles have to be clicked. */
             final CaptchaTestParameters ret = new CaptchaTestParameters(null, null, null, null);
             ret.setMinClicks(8);
+            ret.setChallengeDescription("Click all open circles.");
             ret.setImageFile(getDefaultTestImage("test_multi_click_captcha.png"));
             return ret;
         }

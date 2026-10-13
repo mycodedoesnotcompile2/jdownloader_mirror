@@ -7,10 +7,16 @@ import java.awt.event.ActionEvent;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.swing.Box;
 import javax.swing.JComponent;
 import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
+import javax.swing.SwingUtilities;
+import javax.swing.event.TreeModelEvent;
+import javax.swing.event.TreeModelListener;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.filechooser.FileFilter;
@@ -73,9 +79,18 @@ public class MenuManagerDialog extends AbstractDialog<Object> implements TreeSel
         return ModalityType.MODELESS;
     }
 
+    private MoveItemAction moveToTopAction;
+    private MoveItemAction moveToBottomAction;
+
     protected MigPanel createBottomPanel() {
         MigPanel ret = new MigPanel("ins 0", "[]20[grow,fill][]", "[][]");
-        MigPanel topline = new MigPanel("ins 0", "[][][grow,fill][][][][]", "[]");
+        MigPanel topline = new MigPanel("ins 0", "[][][][][grow,fill][][][][]", "[]");
+        moveToTopAction = new MoveItemAction(this, true);
+        moveToBottomAction = new MoveItemAction(this, false);
+        ExtButton moveToTop = new ExtButton(moveToTopAction);
+        ExtButton moveToBottom = new ExtButton(moveToBottomAction);
+        moveToTop.setText(null);
+        moveToBottom.setText(null);
         topline.setOpaque(false);
         ExtButton addSubmenu = new ExtButton(new AddSubMenuAction(this)) {
             @Override
@@ -217,6 +232,8 @@ public class MenuManagerDialog extends AbstractDialog<Object> implements TreeSel
         remove.setText(null);
         topline.add(add, "height 24!");
         topline.add(addSubmenu, "height 24!");
+        topline.add(moveToTop, "height 24!");
+        topline.add(moveToBottom, "height 24!");
         topline.add(Box.createHorizontalBox());
         topline.add(remove, "height 24!");
         topline.add(reset, "height 24!");
@@ -305,15 +322,46 @@ public class MenuManagerDialog extends AbstractDialog<Object> implements TreeSel
     @Override
     public JComponent layoutDialogContent() {
         setMinimumSize(new Dimension(550, 400));
-        final MigPanel panel = new MigPanel("ins 2,wrap 2", "[grow,fill][fill]", "[grow,fill][]");
+        final MigPanel panel = new MigPanel("ins 2", "[grow,fill]", "[grow,fill]");
         panel.setOpaque(false);
         LAFOptions.getInstance().applyPanelBackground((JComponent) getDialog().getContentPane());
         LAFOptions.getInstance().applyPanelBackground(panel);
         model = new ManagerTreeModel();
+        model.addTreeModelListener(new TreeModelListener() {
+            /* The selection is restored after the model has fired its event, so the buttons are updated afterwards */
+            private void update() {
+                SwingUtilities.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        updateMoveActions();
+                    }
+                });
+            }
+
+            @Override
+            public void treeStructureChanged(final TreeModelEvent e) {
+                update();
+            }
+
+            @Override
+            public void treeNodesRemoved(final TreeModelEvent e) {
+                update();
+            }
+
+            @Override
+            public void treeNodesInserted(final TreeModelEvent e) {
+                update();
+            }
+
+            @Override
+            public void treeNodesChanged(final TreeModelEvent e) {
+                update();
+            }
+        });
         tree = new MenuManagerTree(this);
         tree.getSelectionModel().addTreeSelectionListener(this);
         LAFOptions.getInstance().applyPanelBackground(tree);
-        HeaderScrollPane sp = new HeaderScrollPane(tree) {
+        final HeaderScrollPane treeScrollPane = new HeaderScrollPane(tree) {
             @Override
             public Dimension getPreferredSize() {
                 Dimension pref = tree.getPreferredSize();
@@ -321,15 +369,23 @@ public class MenuManagerDialog extends AbstractDialog<Object> implements TreeSel
                 return pref;
             }
         };
-        sp.setColumnHeaderView(new TreeHeader());
-        panel.add(sp);
+        treeScrollPane.setColumnHeaderView(new TreeHeader());
+        treeScrollPane.setMinimumSize(new Dimension(150, 100));
         infoPanel = new InfoPanel(this);
         LAFOptions.getInstance().applyPanelBackground(infoPanel);
-        sp = new HeaderScrollPane(infoPanel);
-        sp.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
-        sp.setColumnHeaderView(new OptionsPaneHeader());
-        panel.add(sp);
-        LAFOptions.getInstance().applyPanelBackground(sp);
+        final HeaderScrollPane infoScrollPane = new HeaderScrollPane(infoPanel);
+        infoScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+        infoScrollPane.setColumnHeaderView(new OptionsPaneHeader());
+        infoScrollPane.setMinimumSize(new Dimension(250, 100));
+        LAFOptions.getInstance().applyPanelBackground(infoScrollPane);
+        /* The user can move the divider; additional width is distributed 40:60 between the action tree and the node settings */
+        final JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, treeScrollPane, infoScrollPane);
+        splitPane.setResizeWeight(0.4);
+        splitPane.setContinuousLayout(true);
+        splitPane.setBorder(null);
+        splitPane.setOpaque(false);
+        splitPane.setDividerLocation(300);
+        panel.add(splitPane);
         if (tree.getRowCount() > 0) {
             tree.setSelectionRow(0);
         }
@@ -352,6 +408,57 @@ public class MenuManagerDialog extends AbstractDialog<Object> implements TreeSel
     public void addMenuItem(MenuItemData action) {
         TreePath sel = model.addAction(tree.getSelectionPath(), action);
         tree.setSelectionPath(sel);
+    }
+
+    /**
+     * Duplicates the selected entries once. Each copy is inserted directly below its original and the copies are selected afterwards.
+     */
+    public void duplicateSelection() {
+        final TreePath[] selection = tree.getSelectionPaths();
+        if (selection == null) {
+            return;
+        }
+        final List<TreePath> copies = new ArrayList<TreePath>();
+        for (final TreePath path : selection) {
+            final TreePath copy = model.duplicate(path);
+            if (copy != null) {
+                copies.add(copy);
+            }
+        }
+        if (copies.size() > 0) {
+            tree.setSelectionPaths(copies.toArray(new TreePath[copies.size()]));
+        }
+    }
+
+    public boolean canMoveToTop() {
+        return tree != null && model.canMoveToEdge(tree.getSelectionPath(), true);
+    }
+
+    public boolean canMoveToBottom() {
+        return tree != null && model.canMoveToEdge(tree.getSelectionPath(), false);
+    }
+
+    /**
+     * Moves the selected entry to the very top or the very bottom of the whole menu.
+     */
+    public void moveSelectionToEdge(final boolean top) {
+        final TreePath moved = model.moveToEdge(tree.getSelectionPath(), top);
+        if (moved != null) {
+            tree.setSelectionPath(moved);
+        }
+        updateMoveActions();
+    }
+
+    /**
+     * Enables or disables the move buttons, depending on the position of the selected entry.
+     */
+    public void updateMoveActions() {
+        if (moveToTopAction != null) {
+            moveToTopAction.update();
+        }
+        if (moveToBottomAction != null) {
+            moveToBottomAction.update();
+        }
     }
 
     public void deleteSelection() {
@@ -381,6 +488,7 @@ public class MenuManagerDialog extends AbstractDialog<Object> implements TreeSel
 
     @Override
     public void valueChanged(TreeSelectionEvent e) {
+        updateMoveActions();
         TreePath sel = tree.getSelectionPath();
         if (sel == null) {
             infoPanel.updateInfo(null);

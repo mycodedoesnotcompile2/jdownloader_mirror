@@ -2,80 +2,65 @@ package org.jdownloader.gui.views.downloads.action;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
-import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
-import java.util.regex.Pattern;
+import java.util.Map;
 
 import javax.swing.TransferHandler;
 
-import jd.controlling.ClipboardMonitoring;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.linkcrawler.CrawledPackageView;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
-import jd.controlling.packagecontroller.AbstractPackageNode;
-import jd.gui.swing.jdgui.MainTabbedPane;
-import jd.parser.Regex;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import jd.plugins.FilePackageView;
-import jd.plugins.download.HashInfo;
-
-import org.appwork.utils.Files;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.os.CrossSystem;
 import org.jdownloader.controlling.contextmenu.ActionContext;
 import org.jdownloader.controlling.contextmenu.CustomizableTableContextAppAction;
 import org.jdownloader.controlling.contextmenu.Customizer;
-import org.jdownloader.extensions.extraction.Archive;
-import org.jdownloader.extensions.extraction.contextmenu.downloadlist.ArchiveValidator;
+import org.jdownloader.controlling.contextmenu.DelegatingReplacerTag;
+import org.jdownloader.controlling.contextmenu.ReplacerTag;
+import org.jdownloader.controlling.contextmenu.ReplacerTagDefinition;
+import org.jdownloader.controlling.contextmenu.ReplacerTagProvider;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.SelectionInfo.PackageView;
-import org.jdownloader.gui.views.components.packagetable.LinkTreeUtils;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTable;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionInfoCallback;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 import org.jdownloader.gui.views.components.packagetable.dragdrop.PackageControllerTableTransferHandler;
+import org.jdownloader.gui.views.downloads.action.replacer.DownloadReplacerTag;
 import org.jdownloader.gui.views.downloads.table.DownloadsTable;
 import org.jdownloader.gui.views.linkgrabber.LinkGrabberTable;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.UrlDisplayType;
 import org.jdownloader.translate._JDT;
 
-public class CopyGenericContextAction extends CustomizableTableContextAppAction implements ActionContext {
-    private static final String PATTERN_NAME                  = "{name}";                      // depends on type
-    private static final String PATTERN_PACKAGE_NAME          = "{packagename}";               // always package name
-    private static final String PATTERN_NAME_NOEXT            = "{name_noext}";
-    private static final String PATTERN_NEWLINE               = "{newline}";
-    private static final String PATTERN_TAB                   = "{tab}";
-    private static final String PATTERN_DOWNLOADLINK_PROPERTY = "{jd:prop:yourWishedProperty}";
-    private static final String PATTERN_COMMENT               = "{comment}";
-    private static final String PATTERN_AVAILABILITY          = "{availability}";
-    private static final String PATTERN_HASH                  = "{hash}";
-    private static final String PATTERN_FILESIZE_RAW          = "{filesize_raw}";
-    private static final String PATTERN_FILESIZE_B            = "{filesize}";
-    private static final String PATTERN_FILESIZE_KIB          = "{filesize_kib}";
-    private static final String PATTERN_FILESIZE_MIB          = "{filesize_mib}";
-    private static final String PATTERN_FILESIZE_GIB          = "{filesize_gib}";
-    private static final String PATTERN_URL                   = "{url}";
-    private static final String PATTERN_HOST                  = "{host}";
-    private static final String PATTERN_URL_CONTAINER         = "{url.container}";
-    private static final String PATTERN_URL_ORIGIN            = "{url.origin}";
-    private static final String PATTERN_URL_CONTENT           = "{url.content}";
-    private static final String PATTERN_URL_REFERRER          = "{url.referrer}";
-    private static final String PATTERN_ARCHIVE_PASSWORD      = "{archive.password}";
-    private static final String PATTERN_TYPE                  = "{type}";
-    private static final String PATTERN_EXTENSION             = "{ext}";
-    private static final String PATTERN_PATH                  = "{path}";
-    private static final String PATTERN_DATE                  = "{date_HH:mm}";
-    private static final String PATTERN_CREATED_DATE          = "{createdDate_HH:mm}";
-    private static final String PATTERN_FINISHED_DATE         = "{finishedDate_HH:mm}";
+import jd.controlling.ClipboardMonitoring;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
+import jd.controlling.packagecontroller.AbstractPackageNode;
+import jd.gui.swing.jdgui.MainTabbedPane;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+
+public class CopyGenericContextAction extends CustomizableTableContextAppAction implements ActionContext, ReplacerTagProvider {
+    /*
+     * The tags that are offered in the menu editor for the pattern of packages and for the pattern of links. The order is the order in the
+     * menu editor.
+     */
+    private static final List<ReplacerTag> PACKAGE_TAGS = new ArrayList<ReplacerTag>(Arrays.asList(DownloadReplacerTag.TYPE, DownloadReplacerTag.PACKAGE_NAME, DownloadReplacerTag.PATH, DownloadReplacerTag.COMMENT, DownloadReplacerTag.PACKAGE_SIZE, DownloadReplacerTag.PACKAGE_STATUS, DownloadReplacerTag.PACKAGE_ENABLED, DownloadReplacerTag.PACKAGE_PRIORITY, DownloadReplacerTag.DATE, DownloadReplacerTag.PACKAGE_DATE, DownloadReplacerTag.NEWLINE, DownloadReplacerTag.TAB));
+    private static final List<ReplacerTag> LINK_TAGS    = new ArrayList<ReplacerTag>(Arrays.asList(DownloadReplacerTag.TYPE, DownloadReplacerTag.FILE_NAME, DownloadReplacerTag.NAME_WITHOUT_EXTENSION, DownloadReplacerTag.EXTENSION, DownloadReplacerTag.PACKAGE_NAME, DownloadReplacerTag.PATH, DownloadReplacerTag.HOST, DownloadReplacerTag.COMMENT, DownloadReplacerTag.AVAILABILITY, DownloadReplacerTag.STATUS, DownloadReplacerTag.ENABLED, DownloadReplacerTag.PRIORITY, DownloadReplacerTag.HASH, DownloadReplacerTag.FILESIZE, DownloadReplacerTag.URL, DownloadReplacerTag.ARCHIVE_PASSWORD, DownloadReplacerTag.PROPERTY, DownloadReplacerTag.DATE, DownloadReplacerTag.MODIFIED_DATE, DownloadReplacerTag.PACKAGE_COMMENT, DownloadReplacerTag.PACKAGE_SIZE, DownloadReplacerTag.PACKAGE_STATUS, DownloadReplacerTag.PACKAGE_ENABLED, DownloadReplacerTag.PACKAGE_PRIORITY, DownloadReplacerTag.PACKAGE_DATE, DownloadReplacerTag.NEWLINE, DownloadReplacerTag.TAB));
+    /*
+     * The tags that are applied. In addition to the offered ones the legacy tags {name} and {filesize} (and {packagecomment}) work in the
+     * pattern of packages, {name} in the pattern of links. Tags that did not exist before (status, enabled, priority, modifiedDate) have no
+     * legacy variant for packages, packages use the tags of the package.
+     */
+    private static final List<ReplacerTag> PACKAGE_PATTERN_TAGS = new ArrayList<ReplacerTag>(PACKAGE_TAGS);
+    private static final List<ReplacerTag> LINK_PATTERN_TAGS    = new ArrayList<ReplacerTag>(LINK_TAGS);
+    static {
+        PACKAGE_PATTERN_TAGS.add(DownloadReplacerTag.NAME);
+        PACKAGE_PATTERN_TAGS.add(DownloadReplacerTag.FILESIZE);
+        PACKAGE_PATTERN_TAGS.add(DownloadReplacerTag.PACKAGE_COMMENT);
+        LINK_PATTERN_TAGS.add(DownloadReplacerTag.NAME);
+    }
 
     public CopyGenericContextAction() {
         super(true, true);
@@ -85,31 +70,26 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
     }
 
     public static String getTranslationForPatternPackages() {
-        final StringBuilder sb = new StringBuilder();
-        sb.append("<html>");
-        sb.append(_JDT.T.CopyGenericContextAction_getTranslationForPatternPackages_v3());
-        sb.append("<br><ul>");
-        for (final String pattern : new String[] { PATTERN_TYPE, PATTERN_PATH, PATTERN_COMMENT, PATTERN_FILESIZE_RAW, PATTERN_FILESIZE_B, PATTERN_FILESIZE_KIB, PATTERN_FILESIZE_MIB, PATTERN_FILESIZE_GIB, PATTERN_NEWLINE, PATTERN_TAB, PATTERN_NAME, PATTERN_PACKAGE_NAME, PATTERN_DATE, PATTERN_CREATED_DATE, PATTERN_FINISHED_DATE }) {
-            sb.append("<li>").append(pattern).append("</li>");
-        }
-        sb.append("</ul></html>");
-        return sb.toString();
+        return _JDT.T.CopyGenericContextAction_getTranslationForPatternPackages_v3();
     }
 
     public static String getTranslationForPatternLinks() {
-        final StringBuilder sb = new StringBuilder();
-        sb.append("<html>");
-        sb.append(_JDT.T.CopyGenericContextAction_getTranslationForPatternLinks_v3());
-        sb.append("<br><ul>");
-        for (final String pattern : new String[] { PATTERN_TYPE, PATTERN_PATH, PATTERN_COMMENT, PATTERN_AVAILABILITY, PATTERN_FILESIZE_RAW, PATTERN_FILESIZE_B, PATTERN_FILESIZE_KIB, PATTERN_FILESIZE_MIB, PATTERN_FILESIZE_GIB, PATTERN_NEWLINE, PATTERN_TAB, PATTERN_NAME, PATTERN_PACKAGE_NAME, PATTERN_HOST, PATTERN_NAME_NOEXT, PATTERN_EXTENSION, PATTERN_HASH, PATTERN_URL, PATTERN_URL_CONTAINER, PATTERN_URL_CONTENT, PATTERN_URL_ORIGIN, PATTERN_URL_REFERRER, PATTERN_ARCHIVE_PASSWORD, PATTERN_DOWNLOADLINK_PROPERTY, PATTERN_DATE, PATTERN_CREATED_DATE, PATTERN_FINISHED_DATE }) {
-            sb.append("<li>").append(pattern).append("</li>");
-        }
-        sb.append("</ul></html>");
-        return sb.toString();
+        return _JDT.T.CopyGenericContextAction_getTranslationForPatternLinks_v3();
     }
 
     public static String getTranslationForSmartSelection() {
         return _JDT.T.CopyGenericContextAction_getTranslationForSmartSelection();
+    }
+
+    @Override
+    public List<ReplacerTag> getReplacerTags(final String customizerKey) {
+        if ("patternPackages".equalsIgnoreCase(customizerKey)) {
+            return PACKAGE_TAGS;
+        } else if ("patternLinks".equalsIgnoreCase(customizerKey)) {
+            return LINK_TAGS;
+        } else {
+            return null;
+        }
     }
 
     private String patternPackages;
@@ -121,7 +101,23 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
 
     public void setPatternPackages(String copyPattern) {
         this.patternPackages = copyPattern;
-        setTooltipText(_GUI.T.CopyGenericContextAction_tt(getPatternPackages() + " - " + getPatternLinks()));
+        updateTooltip();
+    }
+
+    /**
+     * Builds the tooltip from the patterns that are actually set. Empty or missing patterns are left out.
+     */
+    private void updateTooltip() {
+        final StringBuilder sb = new StringBuilder();
+        for (final String pattern : new String[] { patternPackages, patternLinks }) {
+            if (StringUtils.isNotEmpty(pattern)) {
+                if (sb.length() > 0) {
+                    sb.append(" - ");
+                }
+                sb.append(pattern);
+            }
+        }
+        setTooltipText(_GUI.T.CopyGenericContextAction_tt(sb.toString()));
     }
 
     private String patternLinks;
@@ -133,7 +129,7 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
 
     public void setPatternLinks(String patternLinks) {
         this.patternLinks = patternLinks;
-        setTooltipText(_GUI.T.CopyGenericContextAction_tt(getPatternPackages() + " - " + getPatternLinks()));
+        updateTooltip();
     }
 
     private boolean smartSelection;
@@ -155,7 +151,7 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
     public void initContextDefaults() {
         super.initContextDefaults();
         patternPackages = "";
-        patternLinks = PATTERN_TYPE + ";" + PATTERN_NAME + ";" + PATTERN_URL;
+        patternLinks = "{type};{name};{url}";
         smartSelection = true;
     }
 
@@ -187,6 +183,8 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
 
     public <ParentType extends AbstractPackageNode<ChildrenType, ParentType>, ChildrenType extends AbstractPackageChildrenNode<ParentType>> String fromSelectionInfo(SelectionInfo<ParentType, ChildrenType> selectionInfo) {
         final StringBuilder sb = new StringBuilder();
+        /* Only needed if the link pattern contains the tag. Resolved once for the whole selection because it is expensive (file IO). */
+        final boolean archivePasswordNeeded = StringUtils.contains(getPatternLinks(), "{archive.password");
         if (isSmartSelection()) {
             int children = 0;
             for (final PackageView<ParentType, ChildrenType> pv : selectionInfo.getPackageViews()) {
@@ -197,19 +195,30 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
                 }
             }
             final boolean contentPermission = children == 1;
+            Map<AbstractNode, String> archivePasswords = null;
+            if (archivePasswordNeeded) {
+                final List<AbstractNode> links = new ArrayList<AbstractNode>();
+                for (final PackageView<ParentType, ChildrenType> pv : selectionInfo.getPackageViews()) {
+                    links.addAll(pv.getChildren());
+                }
+                archivePasswords = DownloadReplacerTag.resolveArchivePasswords(links);
+            }
+            final List<ReplacerTag> linkTags = createLinkTags(contentPermission, archivePasswords);
             for (final PackageView<ParentType, ChildrenType> pv : selectionInfo.getPackageViews()) {
                 final ParentType pkg = pv.getPackage();
-                add(sb, pkg, false);
+                add(sb, pkg, linkTags);
                 final List<ChildrenType> childs = pv.getChildren();
                 for (final ChildrenType c : childs) {
-                    add(sb, c, contentPermission);
+                    add(sb, c, linkTags);
                 }
             }
         } else {
             final List<AbstractNode> selection = selectionInfo.getRawSelection();
             final boolean contentPermission = selection.size() == 1 && selection.get(0) instanceof AbstractPackageChildrenNode;
+            final Map<AbstractNode, String> archivePasswords = archivePasswordNeeded ? DownloadReplacerTag.resolveArchivePasswords(selection) : null;
+            final List<ReplacerTag> linkTags = createLinkTags(contentPermission, archivePasswords);
             for (final AbstractNode pv : selection) {
-                add(sb, pv, contentPermission);
+                add(sb, pv, linkTags);
             }
         }
         return sb.toString();
@@ -224,252 +233,68 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
         }
     }
 
-    private final String getUrlByType(final UrlDisplayType dt, final AbstractNode node) {
-        final DownloadLink link;
-        if (node instanceof DownloadLink) {
-            link = (DownloadLink) node;
-        } else if (node instanceof CrawledLink) {
-            link = ((CrawledLink) node).getDownloadLink();
-        } else {
-            return null;
-        }
-        switch (dt) {
-        case CUSTOM:
-            return link.getCustomUrl();
-        case REFERRER:
-            return link.getReferrerUrl();
-        case CONTAINER:
-            return link.getContainerUrl();
-        case ORIGIN:
-            return link.getOriginUrl();
-        case CONTENT:
-            final String contentURL = link.getContentUrl();
-            if (contentURL != null) {
-                return contentURL;
-            } else {
-                return link.getPluginPatternMatcher();
-            }
-        default:
-            return null;
-        }
-    }
-
-    private final String formatFileSize(final long fileSize, SIZEUNIT sizeUnit) {
-        if (fileSize < 0) {
-            return "~";
-        } else {
-            return SIZEUNIT.formatValue(sizeUnit, fileSize);
-        }
-    }
-
-    private final String toUpperCase(final String input) {
-        if (input != null) {
-            return input.toUpperCase(Locale.ENGLISH);
-        } else {
-            return null;
-        }
-    }
-
-    private final String replaceDate(String line, final String key, final Long timeStamp) {
-        final Pattern pattern = Pattern.compile("(\\{" + key + "_(.*?)\\})");
-        while (true) {
-            final String timeFormat[] = new Regex(line, pattern).getRow(0);
-            if (timeFormat != null) {
-                if (timeStamp == null) {
-                    line = line.replace(timeFormat[0], "");
-                    continue;
-                }
-                try {
-                    final SimpleDateFormat dateFormat = new SimpleDateFormat(timeFormat[1], Locale.ENGLISH);
-                    line = line.replace(timeFormat[0], dateFormat.format(new Date(timeStamp.longValue())));
-                } catch (final Throwable e) {
-                    line = line.replace(timeFormat[0], "");
-                }
-            } else {
-                return line;
-            }
-        }
-    }
-
-    private final String replaceArchiveInfos(AbstractNode pv, String line) {
-        if (StringUtils.contains(line, PATTERN_ARCHIVE_PASSWORD)) {
-            final List<Archive> archives = ArchiveValidator.getArchivesFromPackageChildren(Arrays.asList(new AbstractNode[] { pv }), 1);
-            if (archives != null && archives.size() == 1) {
-                line = line.replace(PATTERN_ARCHIVE_PASSWORD, nulltoString(archives.get(0).getFinalPassword()));
-            } else {
-                line = line.replace(PATTERN_ARCHIVE_PASSWORD, nulltoString(null));
-            }
-        }
-        return line;
-    }
-
     public void add(StringBuilder sb, AbstractNode pv, final boolean contentPermission) {
-        String line = null;
-        if (pv instanceof FilePackage) {
-            line = getPatternPackages();
-            line = replaceDate(line, "date", System.currentTimeMillis());
-            final FilePackage pkg = (FilePackage) pv;
-            final long finishedDate = pkg.getFinishedDate();
-            line = replaceDate(line, "finishedDate", finishedDate == -1 ? null : finishedDate);
-            line = replaceDate(line, "createdDate", pkg.getCreated());
-            final FilePackageView fpv = new FilePackageView(pkg);
-            fpv.aggregate();
-            line = line.replace(PATTERN_TYPE, "Package");
-            line = line.replace(PATTERN_PATH, nulltoString(LinkTreeUtils.getDownloadDirectory(pkg)));
-            line = line.replace(PATTERN_COMMENT, nulltoString(pkg.getComment()));
-            final long fileSize = fpv.getSize();
-            line = line.replace(PATTERN_FILESIZE_RAW, nulltoString(Long.toString(fileSize)));
-            line = line.replace(PATTERN_FILESIZE_B, nulltoString(formatFileSize(fileSize, SIZEUNIT.B)));
-            line = line.replace(PATTERN_FILESIZE_KIB, nulltoString(formatFileSize(fileSize, SIZEUNIT.KiB)));
-            line = line.replace(PATTERN_FILESIZE_MIB, nulltoString(formatFileSize(fileSize, SIZEUNIT.MiB)));
-            line = line.replace(PATTERN_FILESIZE_GIB, nulltoString(formatFileSize(fileSize, SIZEUNIT.GiB)));
-            line = line.replace(PATTERN_NEWLINE, CrossSystem.getNewLine());
-            line = line.replace(PATTERN_TAB, "\t");
-            final String name = pkg.getName();
-            line = line.replace(PATTERN_NAME, nulltoString(name));
-            line = line.replace(PATTERN_PACKAGE_NAME, nulltoString(name));
-        } else if (pv instanceof DownloadLink) {
-            line = getPatternLinks();
-            line = replaceDate(line, "date", System.currentTimeMillis());
-            line = replaceArchiveInfos(pv, line);
-            final DownloadLink link = (DownloadLink) pv;
-            final long finishedDate = link.getFinishedDate();
-            line = replaceDate(line, "finishedDate", finishedDate == -1 ? null : finishedDate);
-            line = replaceDate(line, "createdDate", link.getCreated());
-            final FilePackage fp = link.getFilePackage();
-            line = line.replace(PATTERN_TYPE, "Link");
-            line = line.replace(PATTERN_HOST, nulltoString(link.getHost()));
-            line = line.replace(PATTERN_PATH, nulltoString(LinkTreeUtils.getDownloadDirectory(link)));
-            line = line.replace(PATTERN_COMMENT, nulltoString(link.getComment()));
-            final long fileSize = link.getView().getBytesTotalEstimated();
-            line = line.replace(PATTERN_FILESIZE_RAW, nulltoString(Long.toString(fileSize)));
-            line = line.replace(PATTERN_FILESIZE_B, nulltoString(formatFileSize(fileSize, SIZEUNIT.B)));
-            line = line.replace(PATTERN_FILESIZE_KIB, nulltoString(formatFileSize(fileSize, SIZEUNIT.KiB)));
-            line = line.replace(PATTERN_FILESIZE_MIB, nulltoString(formatFileSize(fileSize, SIZEUNIT.MiB)));
-            line = line.replace(PATTERN_FILESIZE_GIB, nulltoString(formatFileSize(fileSize, SIZEUNIT.GiB)));
-            line = line.replace(PATTERN_NEWLINE, CrossSystem.getNewLine());
-            line = line.replace(PATTERN_TAB, "\t");
-            line = replaceDownloadLinkProperties(link, line);
-            final String name = link.getView().getDisplayName();
-            line = line.replace(PATTERN_NAME, nulltoString(name));
-            line = line.replace(PATTERN_PACKAGE_NAME, nulltoString(fp.getName()));
-            line = line.replace(PATTERN_NAME_NOEXT, nulltoString(Files.getFileNameWithoutExtension(name)));
-            line = line.replace(PATTERN_EXTENSION, nulltoString(toUpperCase(Files.getExtension(name))));
-            final HashInfo hashInfo = link.getHashInfo();
-            for (final HashInfo.TYPE hashType : HashInfo.TYPE.values()) {
-                final String hashString;
-                if (hashInfo != null && hashInfo.getType() == hashType) {
-                    hashString = hashInfo.getHash();
-                } else {
-                    hashString = null;
-                }
-                line = line.replace("{" + hashType.name().replace("-", "").toLowerCase(Locale.ENGLISH) + "}", nulltoString(hashString));
+        add(sb, pv, createLinkTags(contentPermission, null));
+    }
+
+    /**
+     * The tags for the links of one copy action. Infos about the selection are not part of the links, so the tags that need them are
+     * replaced by tags that know them. Everything else is passed on to the tags of the enum.
+     *
+     * @param singleLink
+     *            true if the selection consists of exactly one link
+     * @param archivePasswords
+     *            The archive passwords of the selection, resolved up front, or null
+     */
+    private List<ReplacerTag> createLinkTags(final boolean singleLink, final Map<AbstractNode, String> archivePasswords) {
+        final List<ReplacerTag> ret = new ArrayList<ReplacerTag>(LINK_PATTERN_TAGS);
+        for (int i = 0; i < ret.size(); i++) {
+            if (ret.get(i) == DownloadReplacerTag.URL && singleLink) {
+                /* The content URL of a single link is not filtered */
+                ret.set(i, new DelegatingReplacerTag(DownloadReplacerTag.URL) {
+                    @Override
+                    public String apply(final String replace, final Object object) {
+                        if ("url.content".equals(replace) && object instanceof AbstractNode && (object instanceof DownloadLink || object instanceof CrawledLink)) {
+                            return DownloadReplacerTag.getContentUrlOfSingleLink((AbstractNode) object);
+                        }
+                        return super.apply(replace, object);
+                    }
+                });
+            } else if (ret.get(i) == DownloadReplacerTag.ARCHIVE_PASSWORD && archivePasswords != null) {
+                /* Passwords of all links have been resolved at once */
+                ret.set(i, new DelegatingReplacerTag(DownloadReplacerTag.ARCHIVE_PASSWORD) {
+                    @Override
+                    public String apply(final String replace, final Object object) {
+                        if (!"archive.password".equals(replace) || !(object instanceof DownloadLink || object instanceof CrawledLink)) {
+                            return super.apply(replace, object);
+                        }
+                        final String password = archivePasswords.get(object);
+                        return password != null ? password : "";
+                    }
+                });
             }
-            line = line.replace(PATTERN_AVAILABILITY, nulltoString(link.getAvailableStatus()));
-            line = line.replace(PATTERN_HASH, nulltoString(hashInfo != null ? hashInfo.getHash() : null));
-            line = line.replace(PATTERN_URL, nulltoString(link.getView().getDisplayUrl()));
-            line = line.replace(PATTERN_URL_CONTAINER, nulltoString(LinkTreeUtils.getUrlByType(UrlDisplayType.CONTAINER, link)));
-            if (contentPermission) {
-                line = line.replace(PATTERN_URL_CONTENT, nulltoString(getUrlByType(UrlDisplayType.CONTENT, link)));
-            } else {
-                line = line.replace(PATTERN_URL_CONTENT, nulltoString(LinkTreeUtils.getUrlByType(UrlDisplayType.CONTENT, link)));
-            }
-            line = line.replace(PATTERN_URL_ORIGIN, nulltoString(LinkTreeUtils.getUrlByType(UrlDisplayType.ORIGIN, link)));
-            line = line.replace(PATTERN_URL_REFERRER, nulltoString(LinkTreeUtils.getUrlByType(UrlDisplayType.REFERRER, link)));
-        } else if (pv instanceof CrawledLink) {
-            line = getPatternLinks();
-            line = replaceDate(line, "date", System.currentTimeMillis());
-            line = replaceArchiveInfos(pv, line);
-            final CrawledLink link = (CrawledLink) pv;
-            final long finishedDate = link.getFinishedDate();
-            line = replaceDate(line, "finishedDate", finishedDate == -1 ? null : finishedDate);
-            line = replaceDate(line, "createdDate", link.getCreated());
-            final CrawledPackage cp = link.getParentNode();
-            line = line.replace(PATTERN_TYPE, "Link");
-            line = line.replace(PATTERN_HOST, nulltoString(link.getHost()));
-            line = line.replace(PATTERN_COMMENT, nulltoString(link.getComment()));
-            line = line.replace(PATTERN_PATH, nulltoString(LinkTreeUtils.getDownloadDirectory(link)));
-            final long fileSize = link.getSize();
-            line = line.replace(PATTERN_FILESIZE_RAW, nulltoString(Long.toString(fileSize)));
-            line = line.replace(PATTERN_FILESIZE_B, nulltoString(formatFileSize(fileSize, SIZEUNIT.B)));
-            line = line.replace(PATTERN_FILESIZE_KIB, nulltoString(formatFileSize(fileSize, SIZEUNIT.KiB)));
-            line = line.replace(PATTERN_FILESIZE_MIB, nulltoString(formatFileSize(fileSize, SIZEUNIT.MiB)));
-            line = line.replace(PATTERN_FILESIZE_GIB, nulltoString(formatFileSize(fileSize, SIZEUNIT.GiB)));
-            line = line.replace(PATTERN_NEWLINE, CrossSystem.getNewLine());
-            line = line.replace(PATTERN_TAB, "\t");
-            line = replaceDownloadLinkProperties(link.getDownloadLink(), line);
-            final String name = link.getName();
-            line = line.replace(PATTERN_NAME, nulltoString(name));
-            line = line.replace(PATTERN_PACKAGE_NAME, nulltoString(cp.getName()));
-            line = line.replace(PATTERN_NAME_NOEXT, nulltoString(Files.getFileNameWithoutExtension(name)));
-            line = line.replace(PATTERN_EXTENSION, nulltoString(toUpperCase(Files.getExtension(name))));
-            final HashInfo hashInfo = link.getDownloadLink().getHashInfo();
-            for (final HashInfo.TYPE hashType : HashInfo.TYPE.values()) {
-                final String hashString;
-                if (hashInfo != null && hashInfo.getType() == hashType) {
-                    hashString = hashInfo.getHash();
-                } else {
-                    hashString = null;
-                }
-                line = line.replace("{" + hashType.name().replace("-", "").toLowerCase(Locale.ENGLISH) + "}", nulltoString(hashString));
-            }
-            line = line.replace(PATTERN_AVAILABILITY, nulltoString(link.getLinkState()));
-            line = line.replace(PATTERN_HASH, nulltoString(hashInfo != null ? hashInfo.getHash() : null));
-            line = line.replace(PATTERN_URL, nulltoString(link.getDownloadLink().getView().getDisplayUrl()));
-            line = line.replace(PATTERN_URL_CONTAINER, nulltoString(LinkTreeUtils.getUrlByType(UrlDisplayType.CONTAINER, link)));
-            if (contentPermission) {
-                line = line.replace(PATTERN_URL_CONTENT, nulltoString(getUrlByType(UrlDisplayType.CONTENT, link)));
-            } else {
-                line = line.replace(PATTERN_URL_CONTENT, nulltoString(LinkTreeUtils.getUrlByType(UrlDisplayType.CONTENT, link)));
-            }
-            line = line.replace(PATTERN_URL_ORIGIN, nulltoString(LinkTreeUtils.getUrlByType(UrlDisplayType.ORIGIN, link)));
-            line = line.replace(PATTERN_URL_REFERRER, nulltoString(LinkTreeUtils.getUrlByType(UrlDisplayType.REFERRER, link)));
-        } else if (pv instanceof CrawledPackage) {
-            line = getPatternPackages();
-            line = replaceDate(line, "date", System.currentTimeMillis());
-            final CrawledPackage pkg = (CrawledPackage) pv;
-            final long finishedDate = pkg.getFinishedDate();
-            line = replaceDate(line, "finishedDate", finishedDate == -1 ? null : finishedDate);
-            line = replaceDate(line, "createdDate", pkg.getCreated());
-            final CrawledPackageView fpv = new CrawledPackageView(pkg).aggregate();
-            line = line.replace(PATTERN_TYPE, "Package");
-            line = line.replace(PATTERN_COMMENT, nulltoString(pkg.getComment()));
-            line = line.replace(PATTERN_PATH, nulltoString(LinkTreeUtils.getDownloadDirectory(pkg)));
-            final long fileSize = fpv.getFileSize();
-            line = line.replace(PATTERN_FILESIZE_RAW, nulltoString(Long.toString(fileSize)));
-            line = line.replace(PATTERN_FILESIZE_B, nulltoString(formatFileSize(fileSize, SIZEUNIT.B)));
-            line = line.replace(PATTERN_FILESIZE_KIB, nulltoString(formatFileSize(fileSize, SIZEUNIT.KiB)));
-            line = line.replace(PATTERN_FILESIZE_MIB, nulltoString(formatFileSize(fileSize, SIZEUNIT.MiB)));
-            line = line.replace(PATTERN_FILESIZE_GIB, nulltoString(formatFileSize(fileSize, SIZEUNIT.GiB)));
-            line = line.replace(PATTERN_NEWLINE, CrossSystem.getNewLine());
-            line = line.replace(PATTERN_TAB, "\t");
-            final String name = pkg.getName();
-            line = line.replace(PATTERN_NAME, nulltoString(name));
-            line = line.replace(PATTERN_PACKAGE_NAME, nulltoString(name));
         }
+        return ret;
+    }
+
+    private void add(StringBuilder sb, AbstractNode pv, final List<ReplacerTag> linkTags) {
+        final List<ReplacerTag> tags;
+        final String pattern;
+        if (pv instanceof FilePackage || pv instanceof CrawledPackage) {
+            tags = PACKAGE_PATTERN_TAGS;
+            pattern = getPatternPackages();
+        } else if (pv instanceof DownloadLink || pv instanceof CrawledLink) {
+            tags = linkTags;
+            pattern = getPatternLinks();
+        } else {
+            return;
+        }
+        final String line = ReplacerTagDefinition.replace(tags, pattern, pv);
         if (StringUtils.isNotEmpty(line)) {
             if (sb.length() > 0) {
                 sb.append(CrossSystem.getNewLine());
             }
             sb.append(line);
         }
-    }
-
-    private final static Pattern PROPERTIES_TAG_PATTERN = Pattern.compile("(?i)(\\{jd:prop:([^\\}]+)\\})");
-
-    private final String replaceDownloadLinkProperties(final DownloadLink link, final String input) {
-        String line = input;
-        final String[][] propertiesToReplace = new Regex(input, PROPERTIES_TAG_PATTERN).getMatches();
-        for (final String[] propertyInfo : propertiesToReplace) {
-            final String completeStringToReplace = propertyInfo[0];
-            final String property = propertyInfo[1];
-            final String content = nulltoString(link.getProperty(property));
-            line = line.replace(completeStringToReplace, content);
-        }
-        return line;
-    }
-
-    private final String nulltoString(final Object comment) {
-        return StringUtils.valueOrEmpty(StringUtils.valueOfOrNull(comment));
     }
 }

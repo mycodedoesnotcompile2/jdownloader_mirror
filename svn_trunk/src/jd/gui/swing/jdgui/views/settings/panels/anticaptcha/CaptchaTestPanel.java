@@ -80,6 +80,8 @@ public class CaptchaTestPanel extends MigPanel {
     private static final int           PREVIEW_HEIGHT   = 200;
     private File                       imageFile;
     private final JButton              startButton;
+    private final JLabel               descriptionLabel;
+    private final JTextField           descriptionField;
     private final JLabel               actionLabel;
     private final JTextField           actionField;
     private final JLabel               minScoreLabel;
@@ -98,6 +100,8 @@ public class CaptchaTestPanel extends MigPanel {
     private final JButton              abortButton;
     private final JButton              retryButton;
     private Timer                      elapsedTimer;
+    /** Longest timeout of the active solvers in ms, or <= 0 if unknown/unlimited. */
+    private volatile long              maxTimeoutMillis;
     /* Snapshot of the form values of the currently running/last test, so that "Retry" is not affected by later form edits. */
     private CAPTCHA_TYPE               runType;
     private CaptchaRequestType         runSource;
@@ -176,6 +180,10 @@ public class CaptchaTestPanel extends MigPanel {
         imagePanel.add(imagePreview);
         add(imageLabel, "aligny top");
         add(imagePanel, "growx");
+        descriptionLabel = new JLabel("Challenge Description");
+        descriptionField = new JTextField();
+        add(descriptionLabel);
+        add(descriptionField, "growx");
         actionLabel = new JLabel("Action (reCAPTCHA v3)");
         add(actionLabel);
         add(actionField, "growx");
@@ -287,6 +295,9 @@ public class CaptchaTestPanel extends MigPanel {
         imageLabel.setVisible(usesImage);
         imagePanel.setVisible(usesImage);
         setImageFile(defaults.getImageFile());
+        descriptionLabel.setEnabled(usesImage);
+        descriptionField.setEnabled(usesImage);
+        descriptionField.setText(defaults.getChallengeDescription() == null ? "" : defaults.getChallengeDescription());
         actionField.setText(defaults.getAction() == null ? "" : defaults.getAction());
         expectedResultField.setText(defaults.getExpectedResult() == null ? "" : defaults.getExpectedResult());
         final boolean usesAction = CaptchaTestParameters.usesAction(type);
@@ -399,6 +410,7 @@ public class CaptchaTestPanel extends MigPanel {
         runSource = (CaptchaRequestType) sourceBox.getSelectedItem();
         runParameters = new CaptchaTestParameters(siteKeyField.getText().trim(), siteUrlField.getText().trim(), actionField.getText().trim(), expectedResultField.getText());
         runParameters.setImageFile(imageFile);
+        runParameters.setChallengeDescription(descriptionField.getText());
         runParameters.setMinClicks(((Number) minClicksSpinner.getValue()).intValue());
         if (CaptchaTestParameters.usesMinScore(runType) && minScoreCheckBox.isSelected()) {
             /* Round to one decimal: the spinner steps in 0.1 and floating point noise must not end up in the request. */
@@ -433,6 +445,7 @@ public class CaptchaTestPanel extends MigPanel {
         challenge = newChallenge;
         finishedJob = null;
         startTime = System.currentTimeMillis();
+        maxTimeoutMillis = 0;
         correctButton.setEnabled(false);
         incorrectButton.setEnabled(false);
         retryButton.setEnabled(false);
@@ -447,7 +460,13 @@ public class CaptchaTestPanel extends MigPanel {
     }
 
     private String formatElapsed() {
-        return "Elapsed: " + ((System.currentTimeMillis() - startTime) / 100) / 10d + "s";
+        final long elapsedMillis = System.currentTimeMillis() - startTime;
+        final StringBuilder sb = new StringBuilder("Elapsed: ").append(elapsedMillis / 100 / 10d).append("s");
+        final long maxMillis = maxTimeoutMillis;
+        if (maxMillis > 0) {
+            sb.append(" (").append(elapsedMillis * 100 / maxMillis).append("% of ").append(maxMillis / 1000L).append("s)");
+        }
+        return sb.toString();
     }
 
     /** Ticks the elapsed-time label and the "currently solving" status while waiting; stopped once solving finishes. */
@@ -485,9 +504,17 @@ public class CaptchaTestPanel extends MigPanel {
 
     private <X> void updateActiveSolversStatus(final SolverJob<X> job) {
         final StringBuilder sb = new StringBuilder();
+        /* Longest timeout of all active solvers; -1 as soon as one of them has no timeout (-> no percentage shown). */
+        long maxTimeout = 0;
         for (final ChallengeSolver<X> solver : job.getSolverList()) {
             if (job.isDone(solver)) {
                 continue;
+            }
+            final long solverTimeout = solver.getFinalTimeoutMillis();
+            if (solverTimeout <= 0) {
+                maxTimeout = -1;
+            } else if (maxTimeout >= 0) {
+                maxTimeout = Math.max(maxTimeout, solverTimeout);
             }
             if (sb.length() > 0) {
                 sb.append(", ");
@@ -495,6 +522,7 @@ public class CaptchaTestPanel extends MigPanel {
             sb.append(solver).append(" (timeout: ").append(formatTimeout(solver.getFinalTimeoutMillis())).append(")");
         }
         if (sb.length() > 0) {
+            maxTimeoutMillis = maxTimeout;
             statusLabel.setText("Solving with: " + sb);
         }
     }

@@ -24,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.regex.Matcher;
 
 import jd.PluginWrapper;
@@ -58,12 +59,13 @@ import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.components.hls.HlsContainer.CODEC;
 import org.jdownloader.plugins.components.hls.HlsContainer.CODEC_TYPE;
+import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA;
 import org.jdownloader.plugins.components.hls.HlsContainer.StreamCodec;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 //Decrypts embedded videos from dailymotion
-@DecrypterPlugin(revision = "$Revision: 53448 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
+@DecrypterPlugin(revision = "$Revision: 53581 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
 public class DailyMotionComDecrypter extends PluginForDecrypt {
     public DailyMotionComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -611,39 +613,47 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
             final List<HlsContainer> hlsqualities = HlsContainer.getHlsQualities(brc2);
             DownloadLink bestQuality = null;
             int highestHeight = -1;
-            final DailyMotionCom dailymotionHosterplugin = (DailyMotionCom) this.getNewPluginForHostInstance(this.getHost());
             for (final HlsContainer hlsquality : hlsqualities) {
-                final int height = hlsquality.getHeight();
-                // if (height <= 0) {
-                // continue;
-                // }
-                final StreamCodec codec = hlsquality.getCodecType(CODEC_TYPE.VIDEO);
-                if (codec != null && CODEC.AV1.equals(codec.getCodec())) {
-                    // skip av1 and only h264 for now
-                    continue;
-                }
-                final DownloadLink dl = createDownloadlink("https://dailymotion.com/video/" + videoID);
-                dl.setProperty(DailyMotionCom.PROPERTY_TYPE, DailyMotionCom.TYPE_VIDEO);
-                dl.setProperty(DailyMotionCom.PROPERTY_HLS_MASTER, hlsMaster);
-                dl.setProperty(DailyMotionCom.PROPERTY_DIRECTURL, hlsquality.getDownloadurl());
-                dl.setProperty(DailyMotionCom.PROPERTY_QUALITY_NAME, hlsquality.getResolution());
-                dl.setProperty(DailyMotionCom.PROPERTY_QUALITY_HEIGHT, height);
-                dl.setProperty(DailyMotionCom.PROPERTY_CONTENT_URL, contenturl);
-                dl.setProperty(DailyMotionCom.PROPERTY_TITLE, title);
-                dl.setProperty("plain_ext", ".mp4");
-                // dl.setDefaultPlugin(dailymotionHosterplugin);
-                dl.setProperty(DailyMotionCom.PROPERTY_VIDEO_ID, videoID);
-                hlsquality.setPropertiesOnDownloadLink(dl);
-                final String formattedFilename = DailyMotionCom.getFormattedFilename(this, dl);
-                dl.setName(formattedFilename);
-                dl.setAvailable(true);
-                dl.setContentUrl(contenturl);
-                if (bestQuality == null || height > highestHeight) {
-                    bestQuality = dl;
-                    highestHeight = height;
-                }
-                if (selectedQualities.contains(height)) {
-                    selectedFoundQualities.add(dl);
+                for (Entry<String, List<MEDIA>> lng : hlsquality.splitMediaByLanguage().entrySet()) {
+                    final int height = hlsquality.getHeight();
+                    // if (height <= 0) {
+                    // continue;
+                    // }
+                    final StreamCodec codec = hlsquality.getCodecType(CODEC_TYPE.VIDEO);
+                    if (codec != null && CODEC.AV1.equals(codec.getCodec())) {
+                        // skip av1 and only h264 for now
+                        continue;
+                    }
+                    final String anchor;
+                    if (lng.getKey() != null) {
+                        anchor = "#lng=" + lng.getKey();
+                    } else {
+                        anchor = "";
+                    }
+                    final DownloadLink dl = createDownloadlink("https://dailymotion.com/video/" + videoID + anchor);
+                    dl.setProperty(DailyMotionCom.PROPERTY_TYPE, DailyMotionCom.TYPE_VIDEO);
+                    dl.setProperty(DailyMotionCom.PROPERTY_HLS_MASTER, hlsMaster);
+                    dl.setProperty(DailyMotionCom.PROPERTY_DIRECTURL, hlsquality.getDownloadurl());
+                    dl.setProperty(DailyMotionCom.PROPERTY_QUALITY_NAME, hlsquality.getResolution());
+                    dl.setProperty(DailyMotionCom.PROPERTY_QUALITY_HEIGHT, height);
+                    dl.setProperty(DailyMotionCom.PROPERTY_CONTENT_URL, contenturl);
+                    dl.setProperty(DailyMotionCom.PROPERTY_TITLE, title);
+                    dl.setProperty("plain_ext", ".mp4");
+                    // dl.setDefaultPlugin(dailymotionHosterplugin);
+                    dl.setProperty(DailyMotionCom.PROPERTY_VIDEO_ID, videoID);
+                    dl.setProperty(DailyMotionCom.PROPERTY_VIDEO_LNG, lng.getKey());
+                    hlsquality.setPropertiesOnDownloadLink(dl, lng.getValue());
+                    String formattedFilename = DailyMotionCom.getFormattedFilename(this, dl);
+                    dl.setName(formattedFilename);
+                    dl.setAvailable(true);
+                    dl.setContentUrl(contenturl);
+                    if (bestQuality == null || height > highestHeight) {
+                        bestQuality = dl;
+                        highestHeight = height;
+                    }
+                    if (selectedQualities.contains(height)) {
+                        selectedFoundQualities.add(dl);
+                    }
                 }
             }
             if (best && bestQuality != null) {

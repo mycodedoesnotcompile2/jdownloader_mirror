@@ -13,6 +13,7 @@ import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 
 import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
 
 public class JobRunnable<T> implements Runnable {
     private SolverJob<T>                         job;
@@ -33,6 +34,8 @@ public class JobRunnable<T> implements Runnable {
         if (job.isDone(solver)) {
             return;
         }
+        /* Mark first: kill() interrupts the solver, which has to be able to tell a timeout from any other abort. */
+        job.setSolverTimedOut(solver);
         solver.kill(job);
         job.fireTimeoutEvent(solver);
     }
@@ -89,6 +92,10 @@ public class JobRunnable<T> implements Runnable {
                     if (s == solver) {
                         continue;
                     }
+                    if (job.isForcedStart(solver)) {
+                        /* Forced start (e.g. user clicked "use external solver now" in the captcha dialog) -> do not wait any longer. */
+                        break;
+                    }
                     int waitForThisSolver = getWaitFor(solver.getService(), s.getService(), job);
                     waitForThisSolver -= (System.currentTimeMillis() - startedWaiting);
                     if (waitForThisSolver <= 0) {
@@ -105,7 +112,7 @@ public class JobRunnable<T> implements Runnable {
                         if (waitForThisSolver > 1000) {
                             long t = System.currentTimeMillis();
                             job.getLogger().info(solver + " now waits up to " + TimeFormatter.formatMilliSeconds(waitForThisSolver, 0) + " for " + s);
-                            job.waitFor(waitForThisSolver, s);
+                            job.waitFor(solver, waitForThisSolver, s);
                             job.getLogger().info(solver + " actually waited " + TimeFormatter.formatMilliSeconds(System.currentTimeMillis() - t, 0) + " for " + s);
                         }
                         continue;
@@ -136,8 +143,10 @@ public class JobRunnable<T> implements Runnable {
                 switch (ChallengeResponseController.getInstance().reserveCaptchaSlot(solver)) {
                 case RESERVED:
                     try {
+                        job.setSolverSolving(solver);
                         job.getLogger().info("Solver Start: " + solver);
                         solver.solve(job);
+                        job.logSolverStatus(solver, "FINISHED (solve() returned normally)");
                     } finally {
                         ChallengeResponseController.getInstance().releaseCaptchaSlot(solver);
                     }
@@ -145,15 +154,30 @@ public class JobRunnable<T> implements Runnable {
                 case CUSTOM_LIMIT_REACHED:
                     /* The controller already logged which custom limit rule is used up. */
                     job.getLogger().info(solver + " has reached one of its custom limits -> Skipping this solver for this job.");
+                    job.logSolverStatus(solver, "NOT STARTED (custom limit reached)");
                     break;
                 case NO_FREE_SLOT:
                 default:
                     job.getLogger().info(solver + " gave up waiting for a free max-simultaneous-captchas slot -> Skipping this solver for this job.");
+                    job.logSolverStatus(solver, "NOT STARTED (no free captcha slot)");
                     break;
                 }
             } catch (SkipException e) {
+                if (SkipRequest.TIMEOUT.equals(e.getSkipRequest())) {
+                    job.logSolverStatus(solver, "TIMED OUT (solver ran into its timeout, e.g. dialog countdown expired)");
+                } else {
+                    job.logSolverStatus(solver, "SKIPPED (solver requested skip: " + e.getSkipRequest() + ")");
+                }
                 ChallengeResponseController.getInstance().setSkipRequest(e.getSkipRequest(), solver, job.getChallenge());
+            } catch (InterruptedException e) {
+                if (job.isSolverTimedOut(solver)) {
+                    job.logSolverStatus(solver, "TIMED OUT (solver or job timeout, solver was interrupted)");
+                } else {
+                    job.logSolverStatus(solver, "INTERRUPTED/CANCELED (" + e.getMessage() + ")");
+                }
+                getJob().getLogger().log(e);
             } catch (Throwable e) {
+                job.logSolverStatus(solver, "FAILED (" + e + ")");
                 getJob().getLogger().log(e);
             } finally {
                 if (timeout != null) {

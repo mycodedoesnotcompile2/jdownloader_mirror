@@ -555,6 +555,7 @@ public class ChallengeResponseController {
         case UNSUPPORTED_BY_SOLVER:
         case UNSUPPORTED_FOR_INTERNAL_SPECIAL_REASONS:
         case UNSUPPORTED_BROWSER_NO_URL_OPEN:
+        case UNSUPPORTED_BROWSER_NOT_FOUND:
             return true;
         default:
             return false;

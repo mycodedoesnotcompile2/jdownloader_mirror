@@ -234,6 +234,17 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
         }
     }
 
+    /** Returns the error text of the solver service/plugin if there is one, else a generic description of the exception. */
+    private static String getFailureReason(final Exception e) {
+        final String message = e.getMessage();
+        if (message != null && message.trim().length() > 0) {
+            return message.trim();
+        } else if (e instanceof PluginException) {
+            return LinkStatus.toString(((PluginException) e).getLinkStatus());
+        }
+        return e.getClass().getSimpleName();
+    }
+
     @Override
     public void solve(SolverJob<T> job) throws InterruptedException, SolverException, SkipException {
         final CESSolverJob<T> cesJob = new CESSolverJob<T>(job, this);
@@ -248,11 +259,29 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
                  * Captcha could not be solved (e.g. unsolvable captcha). This is a problem of the captcha itself and not of the account ->
                  * Only log it and do not set an account error.
                  */
+                job.logSolverStatus(this, "FAILED (captcha could not be solved: " + e.getMessage() + ")");
+                cesJob.setFailed(getFailureReason(e));
                 plugin.getLogger().log(e);
             } else {
+                job.logSolverStatus(this, "FAILED (account/plugin error: " + LinkStatus.toString(e.getLinkStatus()) + " " + e.getMessage() + ")");
+                cesJob.setFailed(getFailureReason(e));
                 plugin.handleAccountException(account, plugin.getLogger(), e);
             }
+        } catch (InterruptedException e) {
+            /* Not a failure: the solver was stopped from outside (job solved/skipped, other solver chosen, timeout). */
+            if (job.isSolverTimedOut(this)) {
+                job.logSolverStatus(this, "TIMED OUT (solver or job timeout, solver was interrupted)");
+                cesJob.setTimedOut();
+            } else {
+                job.logSolverStatus(this, "INTERRUPTED/CANCELED");
+                cesJob.setAborted();
+            }
+            plugin.getLogger().log(e);
         } catch (Exception e) {
+            job.logSolverStatus(this, "FAILED (" + e + ")");
+            cesJob.setFailed(getFailureReason(e));
+            /* E.g. SolverException with the error text of the solver service: Make sure it ends up in the plugin log. */
+            plugin.getLogger().log(e);
             // TODO
             e.printStackTrace();
         } finally {

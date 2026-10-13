@@ -37,6 +37,9 @@ public class SolverJob<T> {
     private final CopyOnWriteArraySet<ChallengeSolver<T>>        solverList;
     private LogSource                                            logger;
     private volatile SkipRequest                                 skipRequest;
+    private final CopyOnWriteArraySet<ChallengeSolver<?>>        solvingSet     = new CopyOnWriteArraySet<ChallengeSolver<?>>();
+    private final CopyOnWriteArraySet<ChallengeSolver<?>>        timedOutSet    = new CopyOnWriteArraySet<ChallengeSolver<?>>();
+    private final CopyOnWriteArraySet<ChallengeSolver<?>>        forcedStartSet = new CopyOnWriteArraySet<ChallengeSolver<?>>();
     private final AtomicInteger                                  LOCK        = new AtomicInteger();
     private final AtomicBoolean                                  alive       = new AtomicBoolean(true);
     private long                                                 created;
@@ -60,6 +63,14 @@ public class SolverJob<T> {
         config = JsonConfig.create(CaptchaSettings.class);
     }
 
+    /**
+     * Logs a status change of a solver within this job in a uniform format, so the life cycle of every solver (started, waiting, solving,
+     * skipped, failed, done, ...) can be followed in the job log.
+     */
+    public void logSolverStatus(final ChallengeSolver<?> solver, final String status) {
+        log("Solver status: " + solver + " [" + solver.getSolverType() + "] -> " + status);
+    }
+
     protected void log(String txt) {
         final LogSource lLogger = getLogger();
         if (lLogger != null) {
@@ -74,6 +85,9 @@ public class SolverJob<T> {
         }
         boolean kill = false;
         boolean isAlive;
+        if (abstractResponse.getSolver() instanceof ChallengeSolver) {
+            logSolverStatus((ChallengeSolver<?>) abstractResponse.getSolver(), "ANSWER received (job alive: " + alive.get() + ")");
+        }
         synchronized (LOCK) {
             isAlive = alive.get();
             if (isAlive) {
@@ -168,6 +182,7 @@ public class SolverJob<T> {
                     return;
                 }
             }
+            logSolverStatus(solver, "DONE (" + doneList.size() + "/" + solverList.size() + " solvers done)");
             final ChallengeSolverJobEventSender eventSender = getEventSender(false);
             if (eventSender != null) {
                 eventSender.fireEvent(new ChallengeSolverJobEvent(this, ChallengeSolverJobEvent.Type.SOLVER_DONE, solver));
@@ -201,6 +216,7 @@ public class SolverJob<T> {
                 throw new IllegalStateException("This Job does not contain this solver");
             }
         }
+        logSolverStatus(solver, "ACTIVE (waits for other solvers first, if configured)");
         final ChallengeSolverJobEventSender eventSender = getEventSender(false);
         if (eventSender != null) {
             eventSender.fireEvent(new ChallengeSolverJobEvent(this, ChallengeSolverJobEvent.Type.SOLVER_START, solver));
@@ -222,10 +238,15 @@ public class SolverJob<T> {
                 throw new IllegalStateException("This Job does not contain this solver");
             }
         }
+        logSolverStatus(solver, "TIMEOUT (solver took too long)");
         final ChallengeSolverJobEventSender eventSender = getEventSender(false);
         if (eventSender != null) {
             eventSender.fireEvent(new ChallengeSolverJobEvent(this, ChallengeSolverJobEvent.Type.SOLVER_TIMEOUT, solver));
         }
+    }
+
+    public long getCreated() {
+        return created;
     }
 
     public Challenge<T> getChallenge() {
@@ -307,7 +328,11 @@ public class SolverJob<T> {
             alive.set(false);
             for (ChallengeSolver<T> s : solverList) {
                 if (!doneList.contains(s)) {
-                    log("Kill " + s);
+                    if (SkipRequest.TIMEOUT.equals(skipRequest)) {
+                        logSolverStatus(s, "KILLED (job timed out)");
+                    } else {
+                        logSolverStatus(s, "KILLED (job is solved, skipped or aborted)");
+                    }
                     killList.add(s);
                 }
             }
@@ -317,7 +342,72 @@ public class SolverJob<T> {
         }
     }
 
+    /**
+     * Marks the given solver as actually working on this job (it passed all its wait times and got its captcha slot). Solvers that are only
+     * waiting for other solvers are not marked.
+     */
+    public void setSolverSolving(final ChallengeSolver<?> solver) {
+        if (solvingSet.add(solver)) {
+            logSolverStatus(solver, "SOLVING (wait times over, captcha slot reserved)");
+        }
+        _notifyAll();
+    }
+
+    /** Marks the solver as stopped because of its own timeout (see JobRunnable#fireTimeoutEvent). Call before the solver is killed. */
+    public void setSolverTimedOut(final ChallengeSolver<?> solver) {
+        timedOutSet.add(solver);
+    }
+
+    /**
+     * True if the solver ran into its own timeout or the whole job timed out (skip request TIMEOUT). Used to tell a timeout from other
+     * reasons why a solver was interrupted.
+     */
+    public boolean isSolverTimedOut(final ChallengeSolver<?> solver) {
+        return timedOutSet.contains(solver) || SkipRequest.TIMEOUT.equals(skipRequest);
+    }
+
+    public boolean isSolverSolving(final ChallengeSolver<?> solver) {
+        return solvingSet.contains(solver);
+    }
+
+    /**
+     * Makes the given solver skip all its remaining wait times for other solvers, so it starts working on this job right now. Wakes up the
+     * solver if it is currently waiting.
+     */
+    public void forceStart(final ChallengeSolver<?> solver) {
+        if (forcedStartSet.add(solver)) {
+            logSolverStatus(solver, "FORCE START requested (skips all remaining wait times)");
+        }
+        _notifyAll();
+    }
+
+    public boolean isForcedStart(final ChallengeSolver<?> solver) {
+        return forcedStartSet.contains(solver);
+    }
+
+    /**
+     * Returns all external solvers of this job which are neither done nor working on it yet, i.e. which would still be used later if the
+     * captcha is not solved by the currently running (manual) solvers.
+     */
+    public List<ChallengeSolver<?>> getPendingExternalSolvers() {
+        final List<ChallengeSolver<?>> ret = new ArrayList<ChallengeSolver<?>>();
+        for (final ChallengeSolver<T> solver : getSolverList()) {
+            if (solver.getSolverType() == ChallengeSolver.SolverType.EXTERNAL && !isDone(solver) && !isSolverSolving(solver)) {
+                ret.add(solver);
+            }
+        }
+        return ret;
+    }
+
     public void waitFor(int timeout, ChallengeSolver<?>... instances) throws InterruptedException {
+        waitFor(null, timeout, instances);
+    }
+
+    /**
+     * @param waiter
+     *            the solver that waits (may be null). If {@link #forceStart(ChallengeSolver)} is called for it, the wait ends immediately.
+     */
+    public void waitFor(final ChallengeSolver<?> waiter, int timeout, ChallengeSolver<?>... instances) throws InterruptedException {
         long endTime = -1;
         if (timeout > 0) {
             endTime = Time.systemIndependentCurrentJVMTimeMillis() + timeout;
@@ -327,6 +417,10 @@ public class SolverJob<T> {
         }
         try {
             while (!areDone(instances)) {
+                if (waiter != null && isForcedStart(waiter)) {
+                    log(waiter + " wait aborted by force start");
+                    return;
+                }
                 if (isSolved()) {
                     throw new InterruptedException(this + " is Solved");
                 } else if (Thread.interrupted()) {

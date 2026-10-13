@@ -25,6 +25,29 @@ public abstract class ImageCaptchaChallenge<T> extends Challenge<T> {
         this.plugin = plugin;
     }
 
+    /* null = not set */
+    private volatile Boolean caseSensitive = null;
+    /* null = not set */
+    private volatile Boolean numeric       = null;
+
+    /** @return true: Answer is case sensitive, false: Answer is not case sensitive, null: Not set. */
+    public Boolean getCaseSensitive() {
+        return caseSensitive;
+    }
+
+    public void setCaseSensitive(final Boolean caseSensitive) {
+        this.caseSensitive = caseSensitive;
+    }
+
+    /** @return true: Answer contains only digits, false: Answer may contain other characters, null: Not set. */
+    public Boolean getNumeric() {
+        return numeric;
+    }
+
+    public void setNumeric(final Boolean numeric) {
+        this.numeric = numeric;
+    }
+
     public Image getImage() throws IOException {
         final File imageFile = getImageFile();
         if (imageFile == null || !imageFile.isFile()) {

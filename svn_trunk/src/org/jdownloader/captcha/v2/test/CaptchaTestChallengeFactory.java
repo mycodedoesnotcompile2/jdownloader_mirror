@@ -80,18 +80,19 @@ public class CaptchaTestChallengeFactory {
                 return null;
             }
             final Challenge<?> challenge;
+            final String description = parameters.getChallengeDescription();
             switch (type) {
             case IMAGE_SINGLE_CLICK_CAPTCHA:
                 /* Exactly one click expected (max = 1 makes MultiClickCaptchaChallenge#isSingleClick() true). */
-                challenge = new MultiClickCaptchaChallenge(imageFile, "Click on the full trash can", plugin, 1, 1);
+                challenge = new MultiClickCaptchaChallenge(imageFile, description, plugin, 1, 1);
                 break;
             case IMAGE_MULTI_CLICK_CAPTCHA:
                 /* The test image has exactly "minClicks" targets -> max = min so the dialog closes automatically after the last click. */
-                challenge = new MultiClickCaptchaChallenge(imageFile, "Click all open circles.", plugin, parameters.getMinClicks(), parameters.getMinClicks());
+                challenge = new MultiClickCaptchaChallenge(imageFile, description, plugin, parameters.getMinClicks(), parameters.getMinClicks());
                 break;
             case IMAGE:
             default:
-                challenge = new BasicCaptchaChallenge("test", imageFile, "", "Test image captcha", plugin, 0);
+                challenge = new BasicCaptchaChallenge("test", imageFile, "", description, plugin, 0);
                 break;
             }
             challenge.setCaptchaRequestType(requestType);

@@ -2206,6 +2206,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Please send this log ID to your supporter!" })
     String LogAction_actionPerformed_givelogid_();
 
+    @Default(lngs = { "en" }, values = { "Copy Log-ID to clipboard and close" })
+    String LogAction_actionPerformed_copyandclose_();
+
     @Default(lngs = { "en" }, values = { "Checksum" })
     String checksumcolumnmd5();
 
@@ -2352,6 +2355,27 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Stop all Downloads" })
     String AbstractCaptchaDialog_createPopup_skip_and_stop_all_downloads();
+
+    @Default(lngs = { "en" }, values = { "If not solved here, this captcha will be sent to the external captcha solver %s2 in about %s1." })
+    String AbstractCaptchaDialog_externalSolverHint(String time, String solverName);
+
+    @Default(lngs = { "en" }, values = { "Use external captcha solver instead?" })
+    String AbstractCaptchaDialog_useExternalSolverQuestion();
+
+    @Default(lngs = { "en" }, values = { "Failed: %s1" })
+    String CESSolverJob_status_failed(String reason);
+
+    @Default(lngs = { "en" }, values = { "Timed out" })
+    String CESSolverJob_status_timedOut();
+
+    @Default(lngs = { "en" }, values = { "Aborted" })
+    String CESSolverJob_status_aborted();
+
+    @Default(lngs = { "en" }, values = { "Auto" })
+    String AbstractCaptchaDialog_autoSolver();
+
+    @Default(lngs = { "en" }, values = { "Use external solver" })
+    String AbstractCaptchaDialog_useExternalSolver();
 
     @Default(lngs = { "en" }, values = { "Skip all captchas for host '%s1'" })
     String AbstractCaptchaDialog_createPopup_skip_and_disable_all_downloads_from(String host);
@@ -5378,8 +5402,8 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Not ready | Opening URLs is not supported by this system" })
     String BrowserSolverService_status_notReady_openUrlsUnsupported();
 
-    @Default(lngs = { "en" }, values = { "Browser not found | %s1" })
-    String BrowserSolverService_status_browserNotFound(String path);
+    @Default(lngs = { "en" }, values = { "Custom browser not found, click to configure" })
+    String BrowserSolverService_status_customBrowserNotFound();
 
     @Default(lngs = { "en" }, values = { "Reset the settings of the selected captcha solver to default." })
     String SolverOrderContainer_reset_tooltip();
@@ -5518,6 +5542,9 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Browse..." })
     String SelectBrowserDialog_browse();
+
+    @Default(lngs = { "en" }, values = { "Open help article" })
+    String SelectBrowserDialog_info_tooltip();
 
     @Default(lngs = { "en" }, values = { "Executable files" })
     String SelectBrowserDialog_filter_executables();

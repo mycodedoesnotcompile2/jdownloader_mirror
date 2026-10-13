@@ -34,7 +34,7 @@ import jd.plugins.hoster.DailyMotionComV2;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 //Decrypts embedded videos from dailymotion
-@DecrypterPlugin(revision = "$Revision: 53401 $", interfaceVersion = 3, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
+@DecrypterPlugin(revision = "$Revision: 53581 $", interfaceVersion = 3, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
 public class DailyMotionComDecrypterV2 extends DailyMotionComDecrypter {
     public DailyMotionComDecrypterV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -47,7 +47,8 @@ public class DailyMotionComDecrypterV2 extends DailyMotionComDecrypter {
 
     private DailyMotionVariant getDailyMotionVariant(DownloadLink link) {
         final String name = link.getStringProperty(DailyMotionCom.PROPERTY_QUALITY_NAME);
-        return new DailyMotionVariant(DailyMotionCom.getDirectlink(link), DailyMotionCom.getQualityHeight(link), null, name, name);
+        final String lng = link.getStringProperty(DailyMotionCom.PROPERTY_VIDEO_LNG);
+        return new DailyMotionVariant(DailyMotionCom.getDirectlink(link), DailyMotionCom.getQualityHeight(link), null, name, name, lng);
     }
 
     @Override
@@ -100,9 +101,9 @@ public class DailyMotionComDecrypterV2 extends DailyMotionComDecrypter {
                     }
                 }
                 ArrayList<DailyMotionVariant> audioVariants = new ArrayList<DailyMotionVariant>();
-                audioVariants.add(new DailyMotionVariant(bestVi, "aac", "128kbits", "AAC Audio (~128kbit/s)"));
+                audioVariants.add(new DailyMotionVariant(bestVi, "aac", "128kbits", "AAC Audio (~128kbit/s)", null));
                 final DailyMotionVariant chosenVariant;
-                audioVariants.add(chosenVariant = new DailyMotionVariant(bestVi, "m4a", "128kbits", "M4A Audio (~128kbit/s)"));
+                audioVariants.add(chosenVariant = new DailyMotionVariant(bestVi, "m4a", "128kbits", "M4A Audio (~128kbit/s)", null));
                 audio.setVariants(audioVariants);
                 audio.setProperty("plain_ext", ".m4a");
                 audio.setVariantSupport(true);

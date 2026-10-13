@@ -62,7 +62,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA;
 import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA.TYPE;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 53400 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://dailymotion\\.com/video/\\w+" })
+@HostPlugin(revision = "$Revision: 53581 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://dailymotion\\.com/video/\\w+" })
 public class DailyMotionCom extends PluginForHost {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -81,7 +81,12 @@ public class DailyMotionCom extends PluginForHost {
     public String getLinkID(final DownloadLink link) {
         final String videoid = getVideoID(link);
         if (videoid != null) {
-            return "dailymotioncom" + videoid + "_" + getQualityHeight(link);
+            final String lng = link.getStringProperty(PROPERTY_VIDEO_LNG);
+            final String ret = "dailymotioncom" + videoid + "_" + getQualityHeight(link);
+            if (lng == null) {
+                return ret;
+            }
+            return ret + "_" + lng;
         } else {
             return super.getLinkID(link);
         }
@@ -112,6 +117,7 @@ public class DailyMotionCom extends PluginForHost {
     public static final String  PROPERTY_TITLE           = "plain_videoname";
     public static final String  PROPERTY_CONTENT_URL     = "mainlink";
     public static final String  PROPERTY_VIDEO_ID        = "plain_videoid";
+    public static final String  PROPERTY_VIDEO_LNG       = "video_lng";
     public static final String  PROPERTY_QUALITY_NAME    = "qualityname";
     public static final String  PROPERTY_QUALITY_HEIGHT  = "height";
     public static final String  PROPERTY_DATE_TIMESTAMP  = "plain_date";

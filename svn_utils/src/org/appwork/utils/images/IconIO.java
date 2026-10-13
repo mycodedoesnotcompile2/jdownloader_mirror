@@ -132,7 +132,7 @@ public class IconIO {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see javax.swing.Icon#getIconHeight()
          */
         @Override
@@ -142,7 +142,7 @@ public class IconIO {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see javax.swing.Icon#getIconWidth()
          */
         @Override
@@ -152,7 +152,7 @@ public class IconIO {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see org.appwork.swing.components.IdentifierInterface#toIdentifier()
          */
         @Override
@@ -174,7 +174,7 @@ public class IconIO {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see javax.swing.Icon#paintIcon(java.awt.Component, java.awt.Graphics, int, int)
          */
         @Override
@@ -713,17 +713,29 @@ public class IconIO {
             synchronized (SVG_FACTORY) {
                 factory = SVG_FACTORY.get();
                 if (factory == null) {
-                    factory = createSVGFactory();
-                    if (factory == null) {
-                        factory = new NoSVGSupportFactory();
-                    }
-                    SVG_FACTORY.set(factory);
+                    factory = initSvgFactory();
                 }
             }
         }
         if (!factory.isSupported()) {
             return null;
         } else {
+            return factory;
+        }
+    }
+
+    /**
+     * classpath(s) may have changed and now the svg factory may be available
+     *
+     * @return
+     */
+    public static SVGFactory initSvgFactory() {
+        synchronized (SVG_FACTORY) {
+            SVGFactory factory = createSVGFactory();
+            if (factory == null) {
+                factory = new NoSVGSupportFactory();
+            }
+            SVG_FACTORY.set(factory);
             return factory;
         }
     }

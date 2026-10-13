@@ -2134,6 +2134,12 @@ public class HLSDownloader extends DownloadInterface {
         }
         final List<File> requiredFiles = new ArrayList<File>();
         try {
+            try {
+                /* We are about to start downloading so we know that if there was a captcha, it has been solved successfully. */
+                downloadable.validateLastChallengeResponse();
+            } catch (final Throwable e) {
+                LogSource.exception(logger, e);
+            }
             downloadable.setDownloadInterface(this);
             DownloadPluginProgress downloadPluginProgress = null;
             downloadable.setConnectionHandler(this.getManagedConnetionHandler());

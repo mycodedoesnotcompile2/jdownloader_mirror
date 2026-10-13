@@ -1,18 +1,29 @@
 package jd.plugins.hoster;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.appwork.utils.DebugMode;
+import org.jdownloader.captcha.v2.AbstractResponse;
+import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
+import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
+import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolverTwoCaptchaAPIV2;
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigCapmonster;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
+import jd.http.requests.PostRequest;
+import jd.plugins.Account;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 53549 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53597 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
 public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -52,6 +63,59 @@ public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCapt
          */
         // types.add(CAPTCHA_TYPE.MT_CAPTCHA);
         return types;
+    }
+
+    @Override
+    public List<FeedbackType> getSupportedFeedbackTypes() {
+        /*
+         * Only negative feedback is supported by the API. There is no "report correct" and no "abort task" method. See
+         * sendCaptchaFeedback() for details.
+         */
+        final List<FeedbackType> types = new ArrayList<FeedbackType>();
+        types.add(FeedbackType.REPORT_INVALID_CAPTCHAS);
+        return types;
+    }
+
+    @Override
+    public boolean setInvalid(final AbstractResponse<?> response, final Account account) {
+        return sendCaptchaFeedback(response, account);
+    }
+
+    @Override
+    public boolean setValid(final AbstractResponse<?> response, final Account account) {
+        /* Not supported by the API. */
+        return false;
+    }
+
+    /**
+     * Docs: https://docs.capmonster.cloud/docs/api/bad-tokens/ <br>
+     * /reportIncorrectImageCaptcha: image captchas <br>
+     * /reportIncorrectTokenCaptcha: reCaptcha (2, 3, Enterprise), GeeTest, Turnstile <br>
+     * All other captcha types do not support feedback.
+     */
+    private final boolean sendCaptchaFeedback(final AbstractResponse<?> response, final Account account) {
+        final Challenge<?> challenge = response.getChallenge();
+        final String method;
+        if (challenge instanceof RecaptchaV2Challenge || challenge instanceof CloudflareTurnstileChallenge) {
+            method = "/reportIncorrectTokenCaptcha";
+        } else if (challenge instanceof ImageCaptchaChallenge || challenge instanceof MultiClickCaptchaChallenge) {
+            method = "/reportIncorrectImageCaptcha";
+        } else {
+            /* Not supported by the API. */
+            return false;
+        }
+        try {
+            final Map<String, Object> postdata = new HashMap<String, Object>();
+            postdata.put("clientKey", account.getPass());
+            postdata.put("taskId", Long.parseLong(response.getCaptchaSolverTaskID()));
+            final PostRequest req = br.createJSonPostRequest(this.getApiBase() + method, postdata);
+            br.getPage(req);
+            final Map<String, Object> entries = this.handleAPIErrors(br, account);
+            return "success".equalsIgnoreCase(entries.get("status").toString());
+        } catch (final Throwable e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 
     protected String getApiBase() {

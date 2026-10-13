@@ -8,6 +8,7 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.Point;
+import java.awt.BorderLayout;
 import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -22,6 +23,8 @@ import java.util.ArrayList;
 
 import javax.swing.JComponent;
 import javax.swing.JPanel;
+import javax.swing.Scrollable;
+import javax.swing.SwingConstants;
 import javax.swing.Timer;
 
 import org.appwork.utils.URLStream;
@@ -32,6 +35,8 @@ import org.jdownloader.DomainInfo;
 import org.jdownloader.captcha.v2.AbstractCaptchaDialog;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
+import org.appwork.swing.MigPanel;
+import org.jdownloader.gui.views.components.HeaderScrollPane;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
 import jd.captcha.utils.GifDecoder;
@@ -115,7 +120,7 @@ public abstract class AbstractImageCaptchaDialog<T> extends AbstractCaptchaDialo
     }
 
     protected MigLayout getDialogLayout() {
-        return new MigLayout("ins 0,wrap 1", "[fill,grow]", "[grow,fill]10[]");
+        return new MigLayout("ins 0,wrap 1", "[fill,grow]", "[grow,fill]10[shrink 0]");
     }
 
     @Override
@@ -160,6 +165,50 @@ public abstract class AbstractImageCaptchaDialog<T> extends AbstractCaptchaDialo
         return iconPanel;
     }
 
+    /**
+     * The captcha image panel scales the image to its own size (see createCaptchaPanel). That only works if the scroll pane gives it the
+     * size of the viewport instead of its preferred (= unscaled image) size. Therefore the content tracks the viewport size, so the image
+     * shrinks together with the dialog instead of overflowing it or getting scrollbars.
+     */
+    @Override
+    protected HeaderScrollPane createHeaderScrollPane(final MigPanel field) {
+        final class ViewportTrackingPanel extends JPanel implements Scrollable {
+            private static final long serialVersionUID = 1L;
+
+            ViewportTrackingPanel() {
+                super(new BorderLayout());
+                setOpaque(false);
+                add(field, BorderLayout.CENTER);
+            }
+
+            @Override
+            public Dimension getPreferredScrollableViewportSize() {
+                return getPreferredSize();
+            }
+
+            @Override
+            public int getScrollableUnitIncrement(final Rectangle visibleRect, final int orientation, final int direction) {
+                return 10;
+            }
+
+            @Override
+            public int getScrollableBlockIncrement(final Rectangle visibleRect, final int orientation, final int direction) {
+                return orientation == SwingConstants.VERTICAL ? visibleRect.height : visibleRect.width;
+            }
+
+            @Override
+            public boolean getScrollableTracksViewportWidth() {
+                return true;
+            }
+
+            @Override
+            public boolean getScrollableTracksViewportHeight() {
+                return true;
+            }
+        }
+        return new HeaderScrollPane(new ViewportTrackingPanel());
+    }
+
     protected void paintIconComponent(Graphics g, int width, int height, int xOsset, int yOffset, Image scaled) {
     }
 
@@ -197,6 +246,7 @@ public abstract class AbstractImageCaptchaDialog<T> extends AbstractCaptchaDialo
             }
             ret.add(inputComponent);
         }
+        addExternalSolverPanel(ret);
         return ret;
     }
 

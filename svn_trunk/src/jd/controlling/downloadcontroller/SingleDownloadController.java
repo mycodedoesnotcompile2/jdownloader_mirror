@@ -299,22 +299,24 @@ public class SingleDownloadController extends BrowserSettingsThread implements D
     }
 
     protected void invalidateLastChallengeResponse(LogSource logger, PluginForHost plugin) {
-        if (plugin != null) {
-            try {
-                plugin.invalidateLastChallengeResponse();
-            } catch (final Throwable ignore) {
-                logger.log(ignore);
-            }
+        if (plugin == null) {
+            return;
+        }
+        try {
+            plugin.invalidateLastChallengeResponse();
+        } catch (final Throwable ignore) {
+            logger.log(ignore);
         }
     }
 
     protected void validateLastChallengeResponse(LogSource logger, PluginForHost plugin) {
-        if (plugin != null) {
-            try {
-                plugin.validateLastChallengeResponse();
-            } catch (final Throwable ignore) {
-                logger.log(ignore);
-            }
+        if (plugin == null) {
+            return;
+        }
+        try {
+            plugin.validateLastChallengeResponse();
+        } catch (final Throwable ignore) {
+            logger.log(ignore);
         }
     }
 

@@ -12,13 +12,9 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
 import org.appwork.swing.exttable.ExtColumn;
-import org.appwork.utils.swing.dialog.Dialog;
-import org.appwork.utils.swing.dialog.DialogCanceledException;
-import org.appwork.utils.swing.dialog.DialogClosedException;
 import org.jdownloader.api.captcha.CaptchaAPIManualRemoteSolverService;
 import org.jdownloader.captcha.v2.SolverService;
 import org.jdownloader.captcha.v2.solver.service.BrowserSolverService;
-import org.jdownloader.controlling.browser.ExternalBrowserManager.InstalledBrowser;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
@@ -69,27 +65,12 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
 
     /** Lets the user choose the browser of the browser solver and stores the choice. */
     public void showSelectBrowserDialog(final BrowserSolverService browserSolver) {
-        final SelectBrowserDialog dialog = new SelectBrowserDialog(browserSolver.getConfig().getBrowserCommandline());
-        try {
-            final InstalledBrowser selected = Dialog.getInstance().showDialog(dialog);
-            if (selected == null) {
-                return;
-            }
-            if (selected.getPath() == null) {
-                /* "OS Default" */
-                browserSolver.getConfig().setBrowserCommandline(null);
-            } else {
-                browserSolver.getConfig().setBrowserCommandline(new String[] { selected.getPath(), "%s" });
-            }
-            /* Check the (possibly new) browser path again on next access. */
-            browserSolver.resetBrowserPathCache();
+        if (browserSolver.showSelectBrowserDialog()) {
             /* Status text and ready state are computed live, so a redraw of the solver's row is enough. */
             final int row = getModel().getRowforObject(browserSolver);
             if (row >= 0) {
                 getModel().fireTableRowsUpdated(row, row);
             }
-        } catch (DialogClosedException e1) {
-        } catch (DialogCanceledException e1) {
         }
     }
 

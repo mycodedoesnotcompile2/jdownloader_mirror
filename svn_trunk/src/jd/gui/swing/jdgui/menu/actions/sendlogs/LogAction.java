@@ -22,6 +22,7 @@ import java.util.List;
 import jd.controlling.ClipboardMonitoring;
 
 import org.appwork.uio.UIOManager;
+import org.appwork.utils.locale._AWU;
 import org.appwork.utils.logging2.LogSink.FLUSH;
 import org.appwork.utils.logging2.LogSourceProvider;
 import org.appwork.utils.logging2.sendlogs.AbstractLogAction;
@@ -68,7 +69,15 @@ public class LogAction extends AbstractLogAction {
         final String name = format(selection.get(0).getCreated()) + " <--> " + format(selection.get(selection.size() - 1).getLastModified());
         final String jdLog = "jdlog://" + id + "/";
         ClipboardMonitoring.getINSTANCE().setCurrentContent(jdLog);
-        Dialog.getInstance().showInputDialog(UIOManager.BUTTONS_HIDE_CANCEL, _GUI.T.LogAction_actionPerformed_givelogid_(), name + " " + jdLog);
+        final String message = _GUI.T.LogAction_actionPerformed_givelogid_();
+        /*
+         * Throws a DialogClosedException if the user closes the dialog via the X button. In that case nothing is copied.
+         */
+        final String text = Dialog.getInstance().showInputDialog(UIOManager.BUTTONS_HIDE_CANCEL, _AWU.T.DIALOG_INPUT_TITLE(), message, name + " " + jdLog, Dialog.getIconByText(message), _GUI.T.LogAction_actionPerformed_copyandclose_(), null);
+        /* Only reached if the user closed the dialog with the button: copy the text as shown in the dialog. */
+        if (text != null) {
+            ClipboardMonitoring.getINSTANCE().setCurrentContent(text);
+        }
     }
 
     @Override

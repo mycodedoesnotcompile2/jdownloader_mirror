@@ -281,6 +281,12 @@ public class SegmentDownloader extends DownloadInterface {
     @Override
     public boolean startDownload() throws Exception {
         try {
+            try {
+                /* We are about to start downloading so we know that if there was a captcha, it has been solved successfully. */
+                downloadable.validateLastChallengeResponse();
+            } catch (final Throwable e) {
+                LogSource.exception(logger, e);
+            }
             String fileOutput = downloadable.getFileOutput();
             String finalFileOutput = downloadable.getFinalFileOutput();
             outputCompleteFile = new File(fileOutput);

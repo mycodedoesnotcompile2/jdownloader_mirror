@@ -35,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.WorldStarHipHopComDecrypter;
 
-@HostPlugin(revision = "$Revision: 48043 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53588 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { WorldStarHipHopComDecrypter.class })
 public class WorldStarHipHopCom extends PluginForHost {
     private String dllink = null;
@@ -72,12 +72,12 @@ public class WorldStarHipHopCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://worldstarhiphop.com/videos/terms.php";
+        return "https://" + getHost() + "/videos/terms.php";
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -99,9 +99,9 @@ public class WorldStarHipHopCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String filename = null;
-        if (br.containsHTML("(?i)<title>\\s*Video: No Video\\s*</title>")) {
+        if (br.containsHTML("<title>\\s*Video: No Video\\s*</title>")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML(">This video isn\\'t here right now\\.\\.\\.")) {
+        } else if (br.containsHTML(">\\s*This video isn\\'t here right now\\.\\.\\.")) {
             link.setName(new Regex(link.getDownloadURL(), "([a-zA-Z0-9]+)$").getMatch(0));
             link.getLinkStatus().setStatusText("Video temporarily unavailable");
             return AvailableStatus.TRUE;
@@ -109,6 +109,9 @@ public class WorldStarHipHopCom extends PluginForHost {
         filename = br.getRegex("\"content-heading\">\\s*<h1>(.*?)</h1>").getMatch(0);
         if (filename == null) {
             filename = br.getRegex("<title>(.*?)( | Video )?</title>").getMatch(0);
+        }
+        if (filename == null) {
+            filename = new Regex(br.getURL(), "(?i)/videos/[^/]+/([^/]+)").getMatch(0);
         }
         if (br.containsHTML("videoplayer\\.vevo\\.com/embed/embedded\"")) {
             filename = Encoding.htmlDecode(filename).trim();
@@ -190,17 +193,5 @@ public class WorldStarHipHopCom extends PluginForHost {
             directurl = br.getRegex("\"(https?://hw\\-videos\\.worldstarhiphop\\.com/u/vid/.*?)\"").getMatch(0);
         }
         return directurl;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
     }
 }

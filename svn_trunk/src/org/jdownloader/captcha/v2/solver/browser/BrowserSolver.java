@@ -50,6 +50,9 @@ public class BrowserSolver extends ChallengeSolver<String> {
             return ChallengeVetoReason.UNSUPPORTED_FOR_INTERNAL_SPECIAL_REASONS;
         } else if (!BrowserSolverService.getInstance().isOpenBrowserSupported()) {
             return ChallengeVetoReason.UNSUPPORTED_BROWSER_NO_URL_OPEN;
+        } else if (BrowserSolverService.getInstance().isCustomBrowserMissing()) {
+            /* The user configured a custom browser which does not exist (anymore). Do not silently fall back to the OS default browser. */
+            return ChallengeVetoReason.UNSUPPORTED_BROWSER_NOT_FOUND;
         } else {
             return super.getChallengeVetoReason(c);
         }

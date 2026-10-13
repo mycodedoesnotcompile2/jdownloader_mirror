@@ -16,7 +16,7 @@ import jd.plugins.Account;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 53540 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53593 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
     /**
      * hCaptcha support is cached per account via account properties (not an instance field): abstractPluginForCaptchaSolver creates a fresh
@@ -52,7 +52,8 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
         types.add(CAPTCHA_TYPE.IMAGE);
         types.add(CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA);
         types.add(CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
-        // types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V3_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
