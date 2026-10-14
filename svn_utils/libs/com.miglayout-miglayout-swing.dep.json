@@ -5,7 +5,7 @@
   "history":[],
   "installed":{
     "changes":null,
-    "date":"2026-07-29T12:38:49.746+02:00",
+    "date":"2026-09-18T09:35:55.733+02:00",
     "dependencies":[{
       "groupId":"${project.groupId}",
       "artifactId":"miglayout-core",

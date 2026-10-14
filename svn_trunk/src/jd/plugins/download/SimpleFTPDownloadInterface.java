@@ -13,20 +13,6 @@ import java.util.Date;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import jd.controlling.downloadcontroller.DiskSpaceReservation;
-import jd.controlling.downloadcontroller.ExceptionRunnable;
-import jd.controlling.downloadcontroller.FileIsLockedException;
-import jd.controlling.downloadcontroller.ManagedThrottledConnectionHandler;
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.SimpleFTP;
-import jd.nutils.SimpleFTP.STATE;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.download.raf.HTTPDownloader;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.Application;
@@ -43,6 +29,20 @@ import org.jdownloader.plugins.SkipReason;
 import org.jdownloader.plugins.SkipReasonException;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.translate._JDT;
+
+import jd.controlling.downloadcontroller.DiskSpaceReservation;
+import jd.controlling.downloadcontroller.ExceptionRunnable;
+import jd.controlling.downloadcontroller.FileIsLockedException;
+import jd.controlling.downloadcontroller.ManagedThrottledConnectionHandler;
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.SimpleFTP;
+import jd.nutils.SimpleFTP.STATE;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.download.raf.HTTPDownloader;
 
 public class SimpleFTPDownloadInterface extends DownloadInterface {
     private final Downloadable                      downloadable;
@@ -239,12 +239,7 @@ public class SimpleFTPDownloadInterface extends DownloadInterface {
     @Override
     public boolean startDownload() throws Exception {
         try {
-            try {
-                /* We are about to start downloading so we know that if there was a captcha, it has been solved successfully. */
-                downloadable.validateLastChallengeResponse();
-            } catch (final Throwable e) {
-                LogSource.exception(logger, e);
-            }
+            downloadable.validateLastChallengeResponse();
             downloadable.setConnectionHandler(this.getManagedConnetionHandler());
             final DiskSpaceReservation reservation = downloadable.createDiskSpaceReservation();
             DownloadPluginProgress downloadPluginProgress = null;

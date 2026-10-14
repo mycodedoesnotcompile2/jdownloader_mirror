@@ -41,7 +41,7 @@ import jd.plugins.PluginException;
 /**
  * Captcha solver plugin for anti-captcha.com: https://anti-captcha.com/apidoc
  */
-@HostPlugin(revision = "$Revision: 53597 $", interfaceVersion = 3, names = { "anti-captcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53615 $", interfaceVersion = 3, names = { "anti-captcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverAntiCaptchaCom extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -78,6 +78,8 @@ public class PluginForCaptchaSolverAntiCaptchaCom extends abstractPluginForCaptc
          * disabled here until confirmed working. Re-enable once tested.
          */
         types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
+        /* 2026-10-13: Looks to be not working but API also doesn't return an error. */
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V3_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
@@ -137,8 +139,8 @@ public class PluginForCaptchaSolverAntiCaptchaCom extends abstractPluginForCaptc
                 task.put("type", "RecaptchaV3TaskProxyless");
                 task.put("isEnterprise", challenge.isEnterprise());
                 /*
-                 * minScore is required and only 0.3, 0.7 and 0.9 are allowed (selects the worker queue). Use the next allowed value that
-                 * is >= the requested score, default to 0.3.
+                 * minScore is required and only 0.3, 0.7 and 0.9 are allowed (selects the worker queue). Use the next allowed value that is
+                 * >= the requested score, default to 0.3.
                  */
                 final Double minScore = challenge.getMinScore();
                 if (minScore == null || minScore <= 0.3) {

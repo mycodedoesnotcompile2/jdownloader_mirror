@@ -7,6 +7,16 @@ import java.net.URI;
 import java.util.Date;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.appwork.exceptions.WTFException;
+import org.appwork.storage.config.JsonConfig;
+import org.appwork.utils.IO;
+import org.appwork.utils.logging2.LogSource;
+import org.jdownloader.plugins.DownloadPluginProgress;
+import org.jdownloader.plugins.SkipReason;
+import org.jdownloader.plugins.SkipReasonException;
+import org.jdownloader.settings.GeneralSettings;
+import org.jdownloader.translate._JDT;
+
 import jd.PluginWrapper;
 import jd.controlling.downloadcontroller.DiskSpaceReservation;
 import jd.controlling.downloadcontroller.ExceptionRunnable;
@@ -25,17 +35,7 @@ import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 import jd.plugins.download.raf.HTTPDownloader;
 
-import org.appwork.exceptions.WTFException;
-import org.appwork.storage.config.JsonConfig;
-import org.appwork.utils.IO;
-import org.appwork.utils.logging2.LogSource;
-import org.jdownloader.plugins.DownloadPluginProgress;
-import org.jdownloader.plugins.SkipReason;
-import org.jdownloader.plugins.SkipReasonException;
-import org.jdownloader.settings.GeneralSettings;
-import org.jdownloader.translate._JDT;
-
-@HostPlugin(revision = "$Revision: 51496 $", interfaceVersion = 2, names = { "filesystem" }, urls = { "filesystem:/.+" })
+@HostPlugin(revision = "$Revision: 53614 $", interfaceVersion = 2, names = { "filesystem" }, urls = { "filesystem:/.+" })
 public class FileSystem extends PluginForHost {
     public FileSystem(PluginWrapper wrapper) {
         super(wrapper);
@@ -152,12 +152,7 @@ public class FileSystem extends PluginForHost {
 
         public boolean startDownload() throws Exception {
             try {
-                try {
-                    /* We are about to start downloading so we know that if there was a captcha, it has been solved successfully. */
-                    downloadable.validateLastChallengeResponse();
-                } catch (final Throwable e) {
-                    LogSource.exception(downloadable.getLogger(), e);
-                }
+                downloadable.validateLastChallengeResponse();
                 downloadable.getLogger().finer("Start Download");
                 try {
                     DownloadPluginProgress downloadPluginProgress = null;

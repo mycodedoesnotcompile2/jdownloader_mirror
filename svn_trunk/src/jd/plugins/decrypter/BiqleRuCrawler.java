@@ -21,11 +21,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.BiqleRuConfig;
+import org.jdownloader.plugins.components.config.BiqleRuConfig.Quality;
+import org.jdownloader.plugins.components.config.BiqleRuConfig.QualitySelectionMode;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.parser.html.HTMLSearch;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -35,19 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.BiqleRuConfig;
-import org.jdownloader.plugins.components.config.BiqleRuConfig.Quality;
-import org.jdownloader.plugins.components.config.BiqleRuConfig.QualitySelectionMode;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 53443 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53605 $", interfaceVersion = 3, names = {}, urls = {})
 public class BiqleRuCrawler extends PluginForDecrypt {
     public BiqleRuCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -111,7 +110,7 @@ public class BiqleRuCrawler extends PluginForDecrypt {
             /* Try to use same "preferred quality selection mode" setting for vk.com as use has set for biqle.ru plugin. */
             try {
                 try {
-                    final QualitySelectionMode mode = PluginJsonConfig.get(BiqleRuConfig.class).getQualitySelectionMode();
+                    final QualitySelectionMode mode = get(getConfigInterface()).getQualitySelectionMode();
                     vkPlugin.setQualitySelectionMode(jd.plugins.hoster.VKontakteRuHoster.QualitySelectionMode.valueOf(mode.name()));
                 } catch (final Throwable e) {
                     logger.log(e);
@@ -139,7 +138,8 @@ public class BiqleRuCrawler extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if (br.containsHTML(">Попробуйте еще раз")) {
                 /**
-                 * "Try again" </br> https://biqle.ru/watch/-163698164_456239521
+                 * "Try again" </br>
+                 * https://biqle.ru/watch/-163698164_456239521
                  */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -310,7 +310,7 @@ public class BiqleRuCrawler extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         } else {
             final String userPreferredQuality = getUserPreferredqualityStr();
-            final QualitySelectionMode mode = PluginJsonConfig.get(BiqleRuConfig.class).getQualitySelectionMode();
+            final QualitySelectionMode mode = get(getConfigInterface()).getQualitySelectionMode();
             if (mode == QualitySelectionMode.BEST) {
                 ret.add(best);
             } else if (mode == QualitySelectionMode.SELECTED_ONLY) {
@@ -341,7 +341,10 @@ public class BiqleRuCrawler extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String title = Encoding.htmlOnlyDecode(br.getRegex("<title>\\s*(.*?)\\s*(—\\s*BIQLE.*?)?</title>").getMatch(0));
+        String title = HTMLSearch.searchMetaTagProperty(br.getRequest(), "og:title");
+        if (title == null || true) {
+            title = Encoding.htmlOnlyDecode(br.getRegex("<title[^>]*>\\s*(.*?)\\s*(—\\s*BIQLE.*?)?</title>").getMatch(0));
+        }
         FilePackage fp = null;
         if (title != null) {
             fp = FilePackage.getInstance();
@@ -366,7 +369,7 @@ public class BiqleRuCrawler extends PluginForDecrypt {
         if (br.getRequest().getHtmlCode().startsWith("{")) {
             json = br.getRequest().getHtmlCode();
         } else {
-            json = br.getRegex("window\\.playlist = (\\{.*?\\});\\s+").getMatch(0);
+            json = br.getRegex("window\\.playlist\\s*=\\s*(\\{.*?\\});\\s+").getMatch(0);
         }
         if (StringUtils.isEmpty(json)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -406,8 +409,9 @@ public class BiqleRuCrawler extends PluginForDecrypt {
         }
         if (qualityMap == null || qualityMap.isEmpty()) {
             /**
-             * 2023-01-18: Assume that content is offline. </br> Alternatively we could run through vk.com handling as their content is
-             * usually hosted on vk.com. </br> Offline items may only contain hls streams but those will be offline/broken too!
+             * 2023-01-18: Assume that content is offline. </br>
+             * Alternatively we could run through vk.com handling as their content is usually hosted on vk.com. </br>
+             * Offline items may only contain hls streams but those will be offline/broken too!
              */
             logger.info("Looks like content is offline | Skipped unsupported stream types: " + numberofSkippedUnsupportedStreamTypes);
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -420,7 +424,7 @@ public class BiqleRuCrawler extends PluginForDecrypt {
     }
 
     private String getUserPreferredqualityStr() {
-        final Quality quality = PluginJsonConfig.get(BiqleRuConfig.class).getPreferredQuality();
+        final Quality quality = get(getConfigInterface()).getPreferredQuality();
         switch (quality) {
         case Q1080:
             return "1080p";
@@ -439,7 +443,7 @@ public class BiqleRuCrawler extends PluginForDecrypt {
     }
 
     @Override
-    public Class<? extends PluginConfigInterface> getConfigInterface() {
+    public Class<BiqleRuConfig> getConfigInterface() {
         return BiqleRuConfig.class;
     }
 }

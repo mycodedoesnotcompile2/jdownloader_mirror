@@ -5,6 +5,15 @@ import java.io.File;
 import java.util.Date;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.appwork.exceptions.WTFException;
+import org.appwork.storage.config.JsonConfig;
+import org.appwork.utils.IO;
+import org.appwork.utils.logging2.LogSource;
+import org.jdownloader.plugins.DownloadPluginProgress;
+import org.jdownloader.plugins.SkipReason;
+import org.jdownloader.plugins.SkipReasonException;
+import org.jdownloader.settings.GeneralSettings;
+
 import jd.controlling.downloadcontroller.DiskSpaceReservation;
 import jd.controlling.downloadcontroller.ExceptionRunnable;
 import jd.controlling.downloadcontroller.FileIsLockedException;
@@ -20,15 +29,6 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 import jd.plugins.download.raf.HTTPDownloader;
-
-import org.appwork.exceptions.WTFException;
-import org.appwork.storage.config.JsonConfig;
-import org.appwork.utils.IO;
-import org.appwork.utils.logging2.LogSource;
-import org.jdownloader.plugins.DownloadPluginProgress;
-import org.jdownloader.plugins.SkipReason;
-import org.jdownloader.plugins.SkipReasonException;
-import org.jdownloader.settings.GeneralSettings;
 
 /** Simple download class which can write text content into a file. */
 public class TextDownloader extends DownloadInterface {
@@ -77,12 +77,7 @@ public class TextDownloader extends DownloadInterface {
 
     public boolean startDownload() throws Exception {
         try {
-            try {
-                /* We are about to start downloading so we know that if there was a captcha, it has been solved successfully. */
-                downloadable.validateLastChallengeResponse();
-            } catch (final Throwable e) {
-                LogSource.exception(downloadable.getLogger(), e);
-            }
+            downloadable.validateLastChallengeResponse();
             downloadable.getLogger().finer("Start Download");
             try {
                 final String textToWrite = this.textToWrite;
@@ -162,7 +157,6 @@ public class TextDownloader extends DownloadInterface {
             LogSource.exception(downloadable.getLogger(), ignore);
         }
         return true;
-
     }
 
     protected void cleanupDownladInterface() {

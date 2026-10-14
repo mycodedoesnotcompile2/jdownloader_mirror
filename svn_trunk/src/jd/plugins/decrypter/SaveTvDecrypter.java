@@ -28,9 +28,12 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.appwork.storage.TypeRef;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
@@ -53,7 +56,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SyncSaveTvToolbarAction;
 import jd.plugins.hoster.SaveTv;
 
-@DecrypterPlugin(revision = "$Revision: 53583 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(www\\.)?save\\.tv/STV/M/obj/archive/(?:Horizontal)?VideoArchive\\.cfm.*" })
+@DecrypterPlugin(revision = "$Revision: 53602 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(www\\.)?save\\.tv/STV/M/obj/archive/(?:Horizontal)?VideoArchive\\.cfm.*" })
 public class SaveTvDecrypter extends PluginForDecrypt {
     public SaveTvDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -134,6 +137,18 @@ public class SaveTvDecrypter extends PluginForDecrypt {
         }
         final String source = UrlQuery.parse(param.getCryptedUrl()).get("source");
         final boolean isFromJDToolbar = StringUtils.equalsIgnoreCase(source, "jdtoolbar");
+        if (isFromJDToolbar) {
+            /*
+             * This action does nothing else than SaveTvDecrypter with source=jdtoolbar --> It crawls all recordings from the users' save.tv
+             * video archive. The dialog below is purely informational (auto-closes/continues on its own) and can be disabled via
+             * SaveTv.SYNC_TOOLBAR_ENABLE_DIALOG.
+             */
+            final SubConfiguration cfg = getPluginConfig();
+            if (cfg.getBooleanProperty(SaveTv.SYNC_TOOLBAR_ENABLE_DIALOG, SaveTv.defaultSYNC_TOOLBAR_ENABLE_DIALOG)) {
+                final String message = "JDownloader durchsucht jetzt dein komplettes save.tv Videoarchiv nach Aufnahmen und fügt sie dem Linkgrabber hinzu.\r\n" + "Das kann etwas dauern - bitte habe etwas Geduld.\r\n" + "Die zugehörigen Crawler-Einstellungen findest du unter: Einstellungen -> Plugin Einstellungen -> save.tv\r\n" + "Dort kannst du diesen Dialog auch permanent abschalten.";
+                showAutoCloseDialog(SyncSaveTvToolbarAction.TOOLTIP, message, 60);
+            }
+        }
         /*
          * If the source URL was added via JDownloader toolbar, it shall be processed even if the user has deactivated the archive crawler.
          */
@@ -201,7 +216,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
                         String message = "Save.tv - Der Crawler wurde frühzeitig vom Benutzer beendet!\r\n";
                         message += "Es wurden bisher " + ret.size() + " von " + totalLinksNum + " Links (Aufnahmen) gefunden!";
                         message += getDialogEnd();
-                        SyncSaveTvToolbarAction.showAutoCloseDialog("save.tv Archiv-Crawler", message);
+                        showAutoCloseDialog("save.tv Archiv-Crawler", message);
                     } catch (Throwable e2) {
                         logger.log(e2);
                     }
@@ -214,7 +229,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
                     message += "Wir empfehlen, es zu einem späteren Zeitpunkt nochmals zu versuchen.\r\n";
                     message += "Es wurden nur " + ret.size() + " von " + totalLinksNum + " Links (Aufnahmen) gefunden!";
                     message += getDialogEnd();
-                    SyncSaveTvToolbarAction.showAutoCloseDialog("save.tv Archiv-Crawler", message);
+                    showAutoCloseDialog("save.tv Archiv-Crawler", message);
                 } catch (Throwable ebr) {
                     logger.log(ebr);
                 }
@@ -226,7 +241,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
                     message += "Wir empfehlen, es zu einem späteren Zeitpunkt nochmals zu versuchen und uns den Fehler ggf. zu melden.\r\n";
                     message += "Es wurden nur " + ret.size() + " von " + totalLinksNum + " Links (Aufnahmen) gefunden!";
                     message += getDialogEnd();
-                    SyncSaveTvToolbarAction.showAutoCloseDialog("save.tv Archiv-Crawler", message);
+                    showAutoCloseDialog("save.tv Archiv-Crawler", message);
                 } catch (Throwable ebr) {
                     logger.log(ebr);
                 }
@@ -593,6 +608,21 @@ public class SaveTvDecrypter extends PluginForDecrypt {
         }
     }
 
+    /** Number of seconds after which info dialogs (see showAutoCloseDialog) close themselves automatically. */
+    public static final int DIALOG_AUTO_CLOSE_SECONDS = 180;
+
+    /** Shows a purely informational dialog which closes itself automatically after DIALOG_AUTO_CLOSE_SECONDS. */
+    public static void showAutoCloseDialog(final String title, final String message) {
+        showAutoCloseDialog(title, message, DIALOG_AUTO_CLOSE_SECONDS);
+    }
+
+    /** Shows a purely informational dialog which closes itself automatically after the given number of seconds. */
+    public static void showAutoCloseDialog(final String title, final String message, final int timeoutSeconds) {
+        final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN | UIOManager.BUTTONS_HIDE_CANCEL, title, message);
+        dialog.setTimeout(timeoutSeconds * 1000);
+        UIOManager.I().show(ConfirmDialogInterface.class, dialog);
+    }
+
     /**
      * Performs save.tv API GET requests. <br />
      * TODO: Add error handling
@@ -618,7 +648,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
                 }
                 message += "\r\n" + getDialogAccountsInfo();
                 message += getDialogEnd();
-                SyncSaveTvToolbarAction.showAutoCloseDialog("save.tv Archiv-Crawler", message);
+                showAutoCloseDialog("save.tv Archiv-Crawler", message);
             } catch (final Throwable e) {
                 logger.log(e);
             }
@@ -631,7 +661,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
                 }
                 message += "\r\n" + getDialogAccountsInfo();
                 message += getDialogEnd();
-                SyncSaveTvToolbarAction.showAutoCloseDialog("save.tv Archiv-Crawler", message);
+                showAutoCloseDialog("save.tv Archiv-Crawler", message);
             } catch (final Throwable e) {
                 logger.log(e);
             }
@@ -643,7 +673,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
                 message += "\r\nVermutlich gab es in diesem Zeitraum keine neuen Aufnahmen!";
                 message += "\r\n" + getDialogAccountsInfo();
                 message += getDialogEnd();
-                SyncSaveTvToolbarAction.showAutoCloseDialog("save.tv Archiv-Crawler", message);
+                showAutoCloseDialog("save.tv Archiv-Crawler", message);
             } catch (final Throwable e) {
                 logger.log(e);
             }
@@ -654,7 +684,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
                 message += "\r\nEs wurden " + ret.size() + " Links gefunden!";
                 message += "\r\n" + getDialogAccountsInfo();
                 message += getDialogEnd();
-                SyncSaveTvToolbarAction.showAutoCloseDialog("save.tv Archiv-Crawler", message);
+                showAutoCloseDialog("save.tv Archiv-Crawler", message);
             } catch (final Throwable e) {
                 logger.log(e);
             }
@@ -664,7 +694,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
                 message += "\r\nEs wurden " + ret.size() + " von " + totalLinksNum + " Links gefunden!";
                 message += "\r\n" + getDialogAccountsInfo();
                 message += getDialogEnd();
-                SyncSaveTvToolbarAction.showAutoCloseDialog("save.tv Archiv-Crawler", message);
+                showAutoCloseDialog("save.tv Archiv-Crawler", message);
             } catch (final Throwable e) {
                 logger.log(e);
             }
@@ -674,7 +704,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
                 message += "\r\nEs wurden nur " + ret.size() + " von " + totalLinksNum + " Links (Aufnahmen) gefunden!";
                 message += "\r\n" + getDialogAccountsInfo();
                 message += getDialogEnd();
-                SyncSaveTvToolbarAction.showAutoCloseDialog("save.tv Archiv-Crawler", message);
+                showAutoCloseDialog("save.tv Archiv-Crawler", message);
             } catch (final Throwable e) {
                 logger.log(e);
             }
@@ -731,7 +761,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
             message += "\r\n";
             message += "Die Crawler Einstellungen findest du unter: Einstellungen -> Plugin Einstellungen -> save.tv";
             message += jd.plugins.hoster.SaveTv.getMessageEnd();
-            SyncSaveTvToolbarAction.showAutoCloseDialog("save.tv Archiv-Crawler", message);
+            showAutoCloseDialog("save.tv Archiv-Crawler", message);
         } catch (Throwable e) {
             logger.log(e);
         }

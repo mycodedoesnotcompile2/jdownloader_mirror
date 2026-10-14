@@ -70,7 +70,6 @@
 	<classpathentry kind="lib" path="ressourcen/libs/svnkit.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/antlr-runtime.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/laf/syntheticaPlain.jar"/>
-	<classpathentry kind="lib" path="/AppWorkUtils/libs/svgSalamander.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/image4j.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/Filters.jar" sourcepath="ressourcen/code-ressourcen/Filter_src.zip"/>
 	<classpathentry kind="lib" path="ressourcen/libs/js.jar" sourcepath="/tmp/.org.sf.feeling.decompiler1753856652823/source/rhino-1.7.7.2-sources-1753878266444.jar"/>

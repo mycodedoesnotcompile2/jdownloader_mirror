@@ -66,9 +66,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SyncSaveTvToolbarAction;
+import jd.plugins.decrypter.SaveTvDecrypter;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 53583 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53602 $", interfaceVersion = 3, names = {}, urls = {})
 public class SaveTv extends PluginForHost {
     /* Static information */
     /* API functions developed for API version 3.0.0.1631 */
@@ -2902,7 +2903,7 @@ public class SaveTv extends PluginForHost {
             message += "Links dieses Formats in JDownloader einfügen und herunterladen:\r\n";
             message += "https://www.save.tv/STV/M/obj/archive/VideoArchive.cfm";
             message += getMessageEnd();
-            SyncSaveTvToolbarAction.showAutoCloseDialog("save.tv", message);
+            SaveTvDecrypter.showAutoCloseDialog("save.tv", message);
         } catch (Throwable e) {
             logger.log(e);
         }
@@ -2947,7 +2948,7 @@ public class SaveTv extends PluginForHost {
             message += "\r\n";
             message += "Diese Einstellungen sind verfügbar unter:\r\nEinstellungen -> Plugin Einstellungen -> save.tv";
             message += getMessageEnd();
-            SyncSaveTvToolbarAction.showAutoCloseDialog("save.tv", message);
+            SaveTvDecrypter.showAutoCloseDialog("save.tv", message);
         } catch (Throwable e) {
             logger.log(e);
         }

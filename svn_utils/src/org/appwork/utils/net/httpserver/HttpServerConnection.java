@@ -558,7 +558,7 @@ public class HttpServerConnection implements HttpConnectionRunnable, RawHttpConn
      * @param res
      */
     protected void configure(HttpRequest request, HttpResponse response) {
-        DebugMode.breakIf(response == null, null);
+        DebugMode.breakIf(response == null, (Object) null);
         if (response == null) {
             // for example for EmptyRequestException, no HttpResponse instance available yet
             return;

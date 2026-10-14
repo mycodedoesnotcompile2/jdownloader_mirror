@@ -16,7 +16,7 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.List;
 
 import org.appwork.utils.StringUtils;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
@@ -34,7 +34,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49747 $", interfaceVersion = 3, names = { "biqle.ru" }, urls = { "biqledecrypted://.+" })
+@HostPlugin(revision = "$Revision: 53610 $", interfaceVersion = 3, names = { "biqle.ru" }, urls = { "biqledecrypted://.+" })
 public class BiqleRu extends PluginForHost {
     public BiqleRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -75,7 +75,7 @@ public class BiqleRu extends PluginForHost {
             brc.getHeaders().put(OPEN_RANGE_REQUEST);
             con = brc.openHeadConnection(dllink);
             if (!this.looksLikeDownloadableContent(con)) {
-                con.disconnect();
+                brc.followConnection(true);
                 dllink = getFreshDirecturl(link);
                 if (dllink == null) {
                     logger.info("Failed to refresh directurl");
@@ -107,7 +107,7 @@ public class BiqleRu extends PluginForHost {
         final String target_filename = link.getFinalFileName();
         try {
             final CryptedLink forDecrypter = new CryptedLink(link.getContainerUrl(), link);
-            final ArrayList<DownloadLink> ret = plg.decryptIt(forDecrypter, null);
+            final List<DownloadLink> ret = plg.decryptIt(forDecrypter, null);
             for (final DownloadLink dl : ret) {
                 correctDownloadLink(dl);
                 final String filenameTmp = dl.getFinalFileName();
@@ -142,17 +142,5 @@ public class BiqleRu extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

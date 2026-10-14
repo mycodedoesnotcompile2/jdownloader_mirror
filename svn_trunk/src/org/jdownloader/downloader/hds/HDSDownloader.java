@@ -13,6 +13,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.appwork.exceptions.WTFException;
+import org.appwork.utils.JDK8BufferHelper;
+import org.appwork.utils.Regex;
+import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.logging2.LogSource;
+import org.appwork.utils.net.throttledconnection.MeteredThrottledInputStream;
+import org.appwork.utils.speedmeter.AverageSpeedMeter;
+import org.jdownloader.plugins.DownloadPluginProgress;
+import org.jdownloader.plugins.SkipReason;
+import org.jdownloader.plugins.SkipReasonException;
+import org.jdownloader.translate._JDT;
+
 import jd.controlling.downloadcontroller.DiskSpaceReservation;
 import jd.controlling.downloadcontroller.ExceptionRunnable;
 import jd.controlling.downloadcontroller.FileIsLockedException;
@@ -26,18 +38,6 @@ import jd.plugins.PluginException;
 import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
-
-import org.appwork.exceptions.WTFException;
-import org.appwork.utils.JDK8BufferHelper;
-import org.appwork.utils.Regex;
-import org.appwork.utils.logging2.LogInterface;
-import org.appwork.utils.logging2.LogSource;
-import org.appwork.utils.net.throttledconnection.MeteredThrottledInputStream;
-import org.appwork.utils.speedmeter.AverageSpeedMeter;
-import org.jdownloader.plugins.DownloadPluginProgress;
-import org.jdownloader.plugins.SkipReason;
-import org.jdownloader.plugins.SkipReasonException;
-import org.jdownloader.translate._JDT;
 
 /*
  * Useful resources:
@@ -473,12 +473,7 @@ public class HDSDownloader extends DownloadInterface {
     @Override
     public boolean startDownload() throws Exception {
         try {
-            try {
-                /* We are about to start downloading so we know that if there was a captcha, it has been solved successfully. */
-                downloadable.validateLastChallengeResponse();
-            } catch (final Throwable e) {
-                LogSource.exception(logger, e);
-            }
+            downloadable.validateLastChallengeResponse();
             DownloadPluginProgress downloadPluginProgress = null;
             downloadable.setConnectionHandler(this.getManagedConnetionHandler());
             final DiskSpaceReservation reservation = downloadable.createDiskSpaceReservation();

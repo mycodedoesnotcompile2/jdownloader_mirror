@@ -31,7 +31,6 @@ import java.util.ArrayList;
 import javax.swing.JComponent;
 
 import org.appwork.swing.components.ExtTextField;
-import org.appwork.uio.UIOManager;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.jdownloader.DomainInfo;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
@@ -52,8 +51,7 @@ public class MultiClickCaptchaDialog extends AbstractImageCaptchaDialog<MultiCli
     // }
 
     public MultiClickCaptchaDialog(MultiClickCaptchaChallenge captchaChallenge, int flag, DialogType type, DomainInfo domainInfo, Image[] images, String explain) {
-        /* Single click captchas are confirmed by the click itself, see mouseReleased. */
-        super(captchaChallenge, flag | Dialog.STYLE_HIDE_ICON | (captchaChallenge.isSingleClick() ? UIOManager.BUTTONS_HIDE_OK : 0), _GUI.T.gui_captchaWindow_askForInput(domainInfo.getTld()), type, domainInfo, explain, images);
+        super(captchaChallenge, flag | Dialog.STYLE_HIDE_ICON,_GUI.T.gui_captchaWindow_askForInput(domainInfo.getTld()), type, domainInfo, explain, images);
         this.clickChallenge = captchaChallenge;
     }
 
@@ -62,6 +60,8 @@ public class MultiClickCaptchaDialog extends AbstractImageCaptchaDialog<MultiCli
         final JComponent ret = super.layoutDialogContent();
         iconPanel.setCursor(Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR));
         iconPanel.setToolTipText(getHelpText());
+        /* okButton exists now, so apply the initial state (0 clicks). */
+        updateOkButton();
         iconPanel.addMouseListener(new MouseListener() {
 
             @Override
@@ -129,6 +129,18 @@ public class MultiClickCaptchaDialog extends AbstractImageCaptchaDialog<MultiCli
             counter = clicks + " Klicks";
         }
         counterField.setText(counter + " - " + getHelpText());
+        updateOkButton();
+    }
+
+    /**
+     * Disables the OK button as long as the minimum amount of clicks has not been reached yet.
+     */
+    private void updateOkButton() {
+        if (okButton == null) {
+            return;
+        }
+        final int clicks = rp == null ? 0 : rp.size();
+        okButton.setEnabled(clicks >= clickChallenge.getMinClicks());
     }
 
     /**

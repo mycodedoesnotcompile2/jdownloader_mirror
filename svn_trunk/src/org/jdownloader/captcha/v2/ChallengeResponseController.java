@@ -3,6 +3,7 @@ package org.jdownloader.captcha.v2;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -443,6 +444,14 @@ public class ChallengeResponseController {
     }
 
     public <T> SolverJob<T> handle(final Challenge<T> c) throws InterruptedException, SkipException {
+        return handle(c, null);
+    }
+
+    /**
+     * Same as {@link #handle(Challenge)} but if onlyService is not null, only solvers of that service are used (e.g. for the captcha test
+     * panel). All other veto checks (disabled solver, unsupported/disabled captcha type, ...) still apply.
+     */
+    public <T> SolverJob<T> handle(final Challenge<T> c, final SolverService onlyService) throws InterruptedException, SkipException {
         if (c instanceof AbstractBrowserChallenge) {
             if (c instanceof RecaptchaV2Challenge) {
                 UpdateController.getInstance().addFeedback("rc");
@@ -459,7 +468,7 @@ public class ChallengeResponseController {
         }
         logger.info("Log to " + logger.getName());
         logger.info("Handle Challenge: " + c);
-        final List<ChallengeSolver<T>> solvers = createList(c);
+        final List<ChallengeSolver<T>> solvers = createList(c, onlyService);
         logger.info("Solver: " + solvers);
         if (solvers == null || solvers.size() == 0) {
             logger.info("No solver available!");
@@ -655,7 +664,7 @@ public class ChallengeResponseController {
     }
 
     @SuppressWarnings("unchecked")
-    private <T> List<ChallengeSolver<T>> createList(final Challenge<T> c) {
+    private <T> List<ChallengeSolver<T>> createList(final Challenge<T> c, final SolverService onlyService) {
         final List<ChallengeSolver<T>> ret = new ArrayList<ChallengeSolver<T>>();
         final HashSet<ChallengeVetoReason> vetoReasons = new HashSet<ChallengeVetoReason>();
         /* Process our own default/local solvers */
@@ -767,8 +776,16 @@ public class ChallengeResponseController {
                 logger.info("Existing solver accounts that cannot be used for this challenge: " + unavailableSolverDomains + "|vetoReasons=" + unavailableSolverDomainVetoReasons);
             }
         }
+        if (onlyService != null) {
+            /* Restricted to one solver service (test panel) -> remove all others. */
+            for (final Iterator<ChallengeSolver<T>> it = ret.iterator(); it.hasNext();) {
+                if (!onlyService.getID().equals(it.next().getService().getID())) {
+                    it.remove();
+                }
+            }
+        }
         int avoidedAutoSolversForLoginCaptcha = 0;
-        avoidAutoSolver: if (c.isAccountLogin() && CAPTCHA_SETTINGS.isAvoidAutoSolverForLoginCaptchas()) {
+        avoidAutoSolver: if (onlyService == null && c.isAccountLogin() && CAPTCHA_SETTINGS.isAvoidAutoSolverForLoginCaptchas()) {
             /*
              * Special handling for login captchas: Solve them locally if possible and wished in order to solve them faster since account
              * logins in JDownloader are supposed to happen fast.

@@ -18,8 +18,9 @@ import org.appwork.utils.Files;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.os.CrossSystem;
 import org.jdownloader.controlling.Priority;
-import org.jdownloader.controlling.contextmenu.ReplacerTag;
-import org.jdownloader.controlling.contextmenu.ReplacerTagDefinition;
+import org.jdownloader.controlling.contextmenu.Replacer;
+import org.jdownloader.controlling.contextmenu.Replacers;
+import org.jdownloader.controlling.contextmenu.Tag;
 import org.jdownloader.extensions.extraction.Archive;
 import org.jdownloader.extensions.extraction.ArchiveFile;
 import org.jdownloader.extensions.extraction.bindings.crawledlink.CrawledLinkArchiveFile;
@@ -43,13 +44,13 @@ import jd.plugins.FilePackageView;
 import jd.plugins.download.HashInfo;
 
 /**
- * All tags that can be used in patterns for links and packages of the download list and the linkgrabber. One place for the definition
- * (possible replaces, description, text for missing data) and the logic of each tag. Each constant decides itself with instanceof which
+ * All tags that can be used in patterns for links and packages of the download list and the linkgrabber. One place for the tags (examples
+ * and description) and the logic of each tag. Each constant decides itself with instanceof which
  * kinds of objects it can handle (DownloadLink, CrawledLink, FilePackage, CrawledPackage). To support more, extend the constant. To add a
  * tag, add a constant and put it into the lists of the actions that offer it.
  */
-public enum DownloadReplacerTag implements ReplacerTag {
-    TYPE(new ReplacerTagDefinition("type", "Always \"Package\" for packages and \"Link\" for links", "").setAlwaysAvailable(true)) {
+public enum DownloadReplacerTag implements Replacer {
+    TYPE("type", "Always \"Package\" for packages and \"Link\" for links") {
         @Override
         protected Object resolve(final String key, final AbstractNode node) {
             return isPackage(node) ? "Package" : "Link";
@@ -59,14 +60,14 @@ public enum DownloadReplacerTag implements ReplacerTag {
      * Legacy tag: The name of the object, whatever it is (file name of a link, name of a package). Not offered in the menu editor, use
      * {filename} or {packagename}.
      */
-    NAME(new ReplacerTagDefinition("name", "Name of the link or package", "")) {
+    NAME("name", "Name of the link or package") {
         @Override
         protected Object resolve(final String key, final AbstractNode node) {
             return getName(node);
         }
     },
     /** The file name. Packages have none. */
-    FILE_NAME(new ReplacerTagDefinition("filename", "File name, e.g. 'myvideofile.mp4'", "")) {
+    FILE_NAME("filename", "File name, e.g. 'myvideofile.mp4'") {
         @Override
         protected Object resolve(final String key, final AbstractNode node) {
             if (!isLink(node)) {
@@ -75,7 +76,7 @@ public enum DownloadReplacerTag implements ReplacerTag {
             return getName(node);
         }
     },
-    NAME_WITHOUT_EXTENSION(new ReplacerTagDefinition("name_noext", "File name without extension, e.g. 'myvideofile'", "")) {
+    NAME_WITHOUT_EXTENSION("name_noext", "File name without extension, e.g. 'myvideofile'") {
         @Override
         protected Object resolve(final String key, final AbstractNode node) {
             if (!isLink(node)) {
@@ -84,7 +85,7 @@ public enum DownloadReplacerTag implements ReplacerTag {
             return Files.getFileNameWithoutExtension(getName(node));
         }
     },
-    EXTENSION(new ReplacerTagDefinition("ext", "File extension in upper case, e.g. MP4", "")) {
+    EXTENSION("ext", "File extension in upper case, e.g. MP4") {
         @Override
         protected Object resolve(final String key, final AbstractNode node) {
             if (!isLink(node)) {
@@ -95,19 +96,19 @@ public enum DownloadReplacerTag implements ReplacerTag {
         }
     },
     /** The name of the package. For a link the package it is in. */
-    PACKAGE_NAME(new ReplacerTagDefinition("packagename", "Name of the package. For a link the name of the package it is in", "")) {
+    PACKAGE_NAME("packagename", "Name of the package. For a link the name of the package it is in") {
         @Override
         protected Object resolve(final String key, final AbstractNode node) {
             return getPackageName(node);
         }
     },
-    PATH(new ReplacerTagDefinition("path", "Download folder, e.g. C:\\Downloads\\My Package", "").setAlwaysAvailable(true)) {
+    PATH("path", "Download folder, e.g. C:\\Downloads\\My Package") {
         @Override
         protected Object resolve(final String key, final AbstractNode node) {
             return StringUtils.valueOfOrNull(LinkTreeUtils.getDownloadDirectory(node));
         }
     },
-    HOST(new ReplacerTagDefinition("host", "Host of the link, e.g. example.com", "")) {
+    HOST("host", "Host of the link, e.g. example.com") {
         @Override
         protected Object resolve(final String key, final AbstractNode node) {
             if (node instanceof DownloadLink) {
@@ -119,7 +120,7 @@ public enum DownloadReplacerTag implements ReplacerTag {
             }
         }
     },
-    COMMENT(new ReplacerTagDefinition("comment", "Comment", "")) {
+    COMMENT("comment", "Comment") {
         @Override
         protected Object resolve(final String key, final AbstractNode node) {
             if (node instanceof DownloadLink) {
@@ -135,7 +136,7 @@ public enum DownloadReplacerTag implements ReplacerTag {
             }
         }
     },
-    AVAILABILITY(new ReplacerTagDefinition("availability", "Online status, e.g. ONLINE, OFFLINE, UNKNOWN", "").setAlwaysAvailable(true)) {
+    AVAILABILITY("availability", "Online status, e.g. ONLINE, OFFLINE, UNKNOWN") {
         @Override
         protected Object resolve(final String key, final AbstractNode node) {
             if (node instanceof DownloadLink) {
@@ -148,7 +149,7 @@ public enum DownloadReplacerTag implements ReplacerTag {
         }
     },
     /** The same text that is shown in the status column. Crawled links (linkgrabber) use their availability state instead. */
-    STATUS(new ReplacerTagDefinition("status", "Text of the status column, e.g. Finished, Finished(mirror). In the linkgrabber the availability text", "")) {
+    STATUS("status", "Text of the status column, e.g. Finished, Finished(mirror). In the linkgrabber the availability text") {
         @Override
         protected Object resolve(final String key, final AbstractNode node) {
             if (!isLink(node)) {
@@ -157,7 +158,7 @@ public enum DownloadReplacerTag implements ReplacerTag {
             return getStatus(node);
         }
     },
-    ENABLED(new ReplacerTagDefinition("enabled", "true or false", "").setAlwaysAvailable(true)) {
+    ENABLED("enabled", "true or false") {
         @Override
         protected Object resolve(final String key, final AbstractNode node) {
             if (!isLink(node)) {
@@ -167,7 +168,7 @@ public enum DownloadReplacerTag implements ReplacerTag {
         }
     },
     /** The effective priority. Links with default priority inherit the priority of their package. */
-    PRIORITY(new ReplacerTagDefinition("priority", "LOWEST, LOWER, LOW, DEFAULT, HIGH, HIGHER or HIGHEST (links with default priority inherit the package priority)", "").setAlwaysAvailable(true)) {
+    PRIORITY("priority", "LOWEST, LOWER, LOW, DEFAULT, HIGH, HIGHER or HIGHEST (links with default priority inherit the package priority)") {
         @Override
         protected Object resolve(final String key, final AbstractNode node) {
             if (!isLink(node)) {
@@ -180,7 +181,7 @@ public enum DownloadReplacerTag implements ReplacerTag {
      * {hash} is the checksum of the link whatever its type is. {hash_md5} and the other type specific tags only have a value if the
      * checksum is of exactly that type.
      */
-    HASH(new ReplacerTagDefinition(HashTags.replaces(), "Checksum of the link. {hash} works for every type, {hash_<type>} only gives a value if the checksum is of exactly that type", "")) {
+    HASH(HashTags.replaces(), "Checksum of the link. {hash} works for every type, {hash_<type>} only gives a value if the checksum is of exactly that type") {
         @Override
         protected boolean isResponsibleFor(final String key) {
             return "hash".equals(key) || HashTags.TYPES.containsKey(key);
@@ -203,7 +204,7 @@ public enum DownloadReplacerTag implements ReplacerTag {
         }
     },
     /** The size of the link. For a package its total size. */
-    FILESIZE(new ReplacerTagDefinition(new String[] { "filesize", "filesize_kib", "filesize_mib", "filesize_gib", "filesize_raw" }, "Size in bytes, KiB, MiB or GiB (the largest fitting unit up to the selected one). filesize_raw is the plain number of bytes.", "~").setEmptyCharacter("filesize_raw", "-1")) {
+    FILESIZE(new String[] { "filesize", "filesize_kib", "filesize_mib", "filesize_gib", "filesize_raw" }, "Size in bytes, KiB, MiB or GiB (the largest fitting unit up to the selected one). filesize_raw is the plain number of bytes.") {
         @Override
         protected Object resolve(final String key, final AbstractNode node) {
             final long size = getSize(node);
@@ -214,7 +215,7 @@ public enum DownloadReplacerTag implements ReplacerTag {
         }
     },
     /** The total size of the package. For a link the package it is in. */
-    PACKAGE_SIZE(new ReplacerTagDefinition(new String[] { "packagesize", "packagesize_kib", "packagesize_mib", "packagesize_gib", "packagesize_raw" }, "Total size of the package (of the link), in bytes, KiB, MiB or GiB. packagesize_raw is the plain number of bytes.", "~").setEmptyCharacter("packagesize_raw", "-1")) {
+    PACKAGE_SIZE(new String[] { "packagesize", "packagesize_kib", "packagesize_mib", "packagesize_gib", "packagesize_raw" }, "Total size of the package (of the link), in bytes, KiB, MiB or GiB. packagesize_raw is the plain number of bytes.") {
         @Override
         protected Object resolve(final String key, final AbstractNode node) {
             final AbstractNode pkg = getPackage(node);
@@ -224,7 +225,7 @@ public enum DownloadReplacerTag implements ReplacerTag {
             return formatSize(getSize(pkg), key.substring("packagesize".length()));
         }
     },
-    URL(new ReplacerTagDefinition(new String[] { "url", "url.container", "url.content", "url.origin", "url.referrer" }, "Displayed URL, container URL, content URL, origin URL or referrer URL", "")) {
+    URL(new String[] { "url", "url.container", "url.content", "url.origin", "url.referrer" }, "Displayed URL, container URL, content URL, origin URL or referrer URL") {
         @Override
         protected Object resolve(final String key, final AbstractNode node) {
             if (!isLink(node)) {
@@ -250,7 +251,7 @@ public enum DownloadReplacerTag implements ReplacerTag {
         }
     },
     /** Looks up the archive of this one link. For many links use {@link DownloadReplacerTag#resolveArchivePasswords(List)}. */
-    ARCHIVE_PASSWORD(new ReplacerTagDefinition("archive.password", "Archive password", "")) {
+    ARCHIVE_PASSWORD("archive.password", "Archive password") {
         @Override
         protected Object resolve(final String key, final AbstractNode node) {
             if (!isLink(node)) {
@@ -264,7 +265,7 @@ public enum DownloadReplacerTag implements ReplacerTag {
             }
         }
     },
-    PROPERTY(new ReplacerTagDefinition("jd:prop:yourWishedProperty", "Any link property, replace 'yourWishedProperty' e.g. with 'videoId'", "")) {
+    PROPERTY("jd:prop:yourWishedProperty", "Any link property, replace 'yourWishedProperty' e.g. with 'videoId'") {
         @Override
         protected boolean isResponsibleFor(final String key) {
             return key.regionMatches(true, 0, PROPERTY_PREFIX, 0, PROPERTY_PREFIX.length());
@@ -284,7 +285,7 @@ public enum DownloadReplacerTag implements ReplacerTag {
         }
     },
     /** The text after the underscore is a SimpleDateFormat pattern, e.g. {createdDate_yyyy-MM-dd HH:mm:ss}. */
-    DATE(new ReplacerTagDefinition(new String[] { DateTags.NOW + DateTags.FORMAT, DateTags.CREATED + DateTags.FORMAT, DateTags.FINISHED + DateTags.FORMAT }, "Date and time: now, date added, date finished. The text after the underscore is a SimpleDateFormat pattern.", "").setAlwaysAvailable(DateTags.NOW + DateTags.FORMAT)) {
+    DATE(new String[] { DateTags.NOW + DateTags.FORMAT, DateTags.CREATED + DateTags.FORMAT, DateTags.FINISHED + DateTags.FORMAT }, "Date and time: now, date added, date finished. The text after the underscore is a SimpleDateFormat pattern.") {
         @Override
         protected boolean isResponsibleFor(final String key) {
             return key.startsWith(DateTags.NOW) || key.startsWith(DateTags.CREATED) || key.startsWith(DateTags.FINISHED);
@@ -296,7 +297,7 @@ public enum DownloadReplacerTag implements ReplacerTag {
         }
     },
     /** The modification time of the downloaded file. */
-    MODIFIED_DATE(new ReplacerTagDefinition(DateTags.MODIFIED + DateTags.FORMAT, "Modification time of the downloaded file on disk. Empty if the file does not exist or if 'GeneralSettings.useoriginallastmodified' is disabled. The text after the underscore is a SimpleDateFormat pattern.", "")) {
+    MODIFIED_DATE(DateTags.MODIFIED + DateTags.FORMAT, "Modification time of the downloaded file on disk. Empty if the file does not exist or if 'GeneralSettings.useoriginallastmodified' is disabled. The text after the underscore is a SimpleDateFormat pattern.") {
         @Override
         protected boolean isResponsibleFor(final String key) {
             return key.startsWith(DateTags.MODIFIED);
@@ -311,28 +312,28 @@ public enum DownloadReplacerTag implements ReplacerTag {
         }
     },
     /** The comment of the package. For a link the package it is in. */
-    PACKAGE_COMMENT(new ReplacerTagDefinition("packagecomment", "Comment of the package. For a link the comment of the package it is in", "")) {
+    PACKAGE_COMMENT("packagecomment", "Comment of the package. For a link the comment of the package it is in") {
         @Override
         protected Object resolve(final String key, final AbstractNode node) {
             final AbstractNode pkg = getPackage(node);
             return pkg != null ? COMMENT.resolve("comment", pkg) : null;
         }
     },
-    PACKAGE_STATUS(new ReplacerTagDefinition("packagestatus", "Status of the package. For a link the status of the package it is in", "")) {
+    PACKAGE_STATUS("packagestatus", "Status of the package. For a link the status of the package it is in") {
         @Override
         protected Object resolve(final String key, final AbstractNode node) {
             final AbstractNode pkg = getPackage(node);
             return pkg != null ? getStatus(pkg) : null;
         }
     },
-    PACKAGE_ENABLED(new ReplacerTagDefinition("packageenabled", "true or false: Whether the package is enabled. For a link the package it is in", "").setAlwaysAvailable(true)) {
+    PACKAGE_ENABLED("packageenabled", "true or false: Whether the package is enabled. For a link the package it is in") {
         @Override
         protected Object resolve(final String key, final AbstractNode node) {
             final AbstractNode pkg = getPackage(node);
             return pkg != null ? Boolean.toString(isEnabled(pkg)) : Boolean.toString(false);
         }
     },
-    PACKAGE_PRIORITY(new ReplacerTagDefinition("packagepriority", "Priority of the package. For a link the package it is in", "")) {
+    PACKAGE_PRIORITY("packagepriority", "Priority of the package. For a link the package it is in") {
         @Override
         protected Object resolve(final String key, final AbstractNode node) {
             final AbstractNode pkg = getPackage(node);
@@ -340,7 +341,7 @@ public enum DownloadReplacerTag implements ReplacerTag {
         }
     },
     /** The dates of the package. For a link the package it is in. The text after the underscore is a SimpleDateFormat pattern. */
-    PACKAGE_DATE(new ReplacerTagDefinition(new String[] { DateTags.PACKAGE_CREATED + DateTags.FORMAT, DateTags.PACKAGE_FINISHED + DateTags.FORMAT, DateTags.PACKAGE_MODIFIED + DateTags.FORMAT }, "Date and time of the package (of the link): date added, date finished, modification time. The text after the underscore is a SimpleDateFormat pattern.", "")) {
+    PACKAGE_DATE(new String[] { DateTags.PACKAGE_CREATED + DateTags.FORMAT, DateTags.PACKAGE_FINISHED + DateTags.FORMAT, DateTags.PACKAGE_MODIFIED + DateTags.FORMAT }, "Date and time of the package (of the link): date added, date finished, modification time. The text after the underscore is a SimpleDateFormat pattern.") {
         @Override
         protected boolean isResponsibleFor(final String key) {
             return key.startsWith(DateTags.PACKAGE_CREATED) || key.startsWith(DateTags.PACKAGE_FINISHED) || key.startsWith(DateTags.PACKAGE_MODIFIED);
@@ -357,13 +358,13 @@ public enum DownloadReplacerTag implements ReplacerTag {
             return formatDate(Character.toLowerCase(packageKey.charAt(0)) + packageKey.substring(1), pkg);
         }
     },
-    NEWLINE(new ReplacerTagDefinition("newline", "Line break", "").setAlwaysAvailable(true)) {
+    NEWLINE("newline", "Line break") {
         @Override
         protected Object resolve(final String key, final AbstractNode node) {
             return CrossSystem.getNewLine();
         }
     },
-    TAB(new ReplacerTagDefinition("tab", "Tab character", "").setAlwaysAvailable(true)) {
+    TAB("tab", "Tab character") {
         @Override
         protected Object resolve(final String key, final AbstractNode node) {
             return "\t";
@@ -422,59 +423,53 @@ public enum DownloadReplacerTag implements ReplacerTag {
         private static final String PACKAGE_MODIFIED = "packageModifiedDate_";
     }
 
-    private final ReplacerTagDefinition definition;
+    private final Tag tag;
 
-    private DownloadReplacerTag(final ReplacerTagDefinition definition) {
-        this.definition = definition;
+    private DownloadReplacerTag(final String key, final String description) {
+        this.tag = new Tag(key, description);
+    }
+
+    private DownloadReplacerTag(final String[] keys, final String description) {
+        this.tag = new Tag(keys, description);
     }
 
     @Override
-    public List<String> getReplaces() {
-        return definition.getReplaces();
-    }
-
-    @Override
-    public String getDescription() {
-        return definition.getDescription();
-    }
-
-    @Override
-    public String getEmptyCharacter(final String replace) {
-        return definition.getEmptyCharacter(replace);
-    }
-
-    @Override
-    public boolean isAlwaysAvailable(final String replace) {
-        return definition.isAlwaysAvailable(replace);
-    }
-
-    @Override
-    public String toTag(final String replace, final String emptyCharacterToUse) {
-        return definition.toTag(replace, emptyCharacterToUse);
+    public List<Tag> getTags() {
+        return Collections.singletonList(tag);
     }
 
     /**
-     * @return true if this tag handles the given tag. By default the tag has to be one of the replaces. Overridden by tags with a variable
+     * @return true if this tag handles the given key. By default the key has to be one of the examples. Overridden by tags with a variable
      *         part.
      */
     protected boolean isResponsibleFor(final String key) {
-        return definition.isResponsibleFor(key);
+        return tag.getKeys().contains(key);
     }
 
     @Override
-    public final String apply(final String replace, final Object object) {
-        if (!(object instanceof AbstractNode) || !isResponsibleFor(replace)) {
-            return null;
+    public final String replace(final String input, final Object object) {
+        if (input == null || !(object instanceof AbstractNode)) {
+            return input;
         }
-        final Object result = resolve(replace, (AbstractNode) object);
-        if (result == UNSUPPORTED) {
-            return null;
-        } else if (result == null) {
-            /* No data */
-            return "";
-        } else {
-            return result.toString();
-        }
+        final AbstractNode node = (AbstractNode) object;
+        return Replacers.replaceTags(input, new Replacers.TagResolver() {
+            @Override
+            public String resolve(final String key) {
+                if (!isResponsibleFor(key)) {
+                    return null;
+                }
+                final Object result = DownloadReplacerTag.this.resolve(key, node);
+                if (result == UNSUPPORTED) {
+                    /* This kind of link or package is not supported: The tag stays unchanged */
+                    return null;
+                } else if (result == null) {
+                    /* No data */
+                    return "";
+                } else {
+                    return result.toString();
+                }
+            }
+        });
     }
 
     /**

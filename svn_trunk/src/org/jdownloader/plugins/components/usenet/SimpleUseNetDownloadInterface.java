@@ -17,25 +17,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.CRC32;
 import java.util.zip.CheckedInputStream;
 
-import jd.controlling.downloadcontroller.DiskSpaceReservation;
-import jd.controlling.downloadcontroller.ExceptionRunnable;
-import jd.controlling.downloadcontroller.FileIsLockedException;
-import jd.controlling.downloadcontroller.ManagedThrottledConnectionHandler;
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.PluginProgress;
-import jd.plugins.download.DownloadInterface;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.Downloadable;
-import jd.plugins.download.HashInfo;
-import jd.plugins.download.HashInfo.TYPE;
-import jd.plugins.download.HashResult;
-import jd.plugins.download.SparseFile;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.Application;
 import org.appwork.utils.IO;
@@ -55,6 +36,25 @@ import org.jdownloader.plugins.HashCheckPluginProgress;
 import org.jdownloader.plugins.SkipReason;
 import org.jdownloader.plugins.SkipReasonException;
 import org.jdownloader.translate._JDT;
+
+import jd.controlling.downloadcontroller.DiskSpaceReservation;
+import jd.controlling.downloadcontroller.ExceptionRunnable;
+import jd.controlling.downloadcontroller.FileIsLockedException;
+import jd.controlling.downloadcontroller.ManagedThrottledConnectionHandler;
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.PluginProgress;
+import jd.plugins.download.DownloadInterface;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.Downloadable;
+import jd.plugins.download.HashInfo;
+import jd.plugins.download.HashInfo.TYPE;
+import jd.plugins.download.HashResult;
+import jd.plugins.download.SparseFile;
 
 public class SimpleUseNetDownloadInterface extends DownloadInterface {
     private final Downloadable                      downloadable;
@@ -360,12 +360,7 @@ public class SimpleUseNetDownloadInterface extends DownloadInterface {
     @Override
     public boolean startDownload() throws Exception {
         try {
-            try {
-                /* We are about to start downloading so we know that if there was a captcha, it has been solved successfully. */
-                downloadable.validateLastChallengeResponse();
-            } catch (final Throwable e) {
-                LogSource.exception(logger, e);
-            }
+            downloadable.validateLastChallengeResponse();
             downloadable.setConnectionHandler(this.getManagedConnetionHandler());
             final DiskSpaceReservation reservation = downloadable.createDiskSpaceReservation();
             DownloadPluginProgress downloadPluginProgress = null;

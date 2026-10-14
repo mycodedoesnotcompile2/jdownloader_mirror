@@ -5,8 +5,7 @@ import java.util.List;
 /**
  * A tag (or a group of related tags) that can be used in a pattern, e.g. <code>{hash_md5}</code>. An implementation contains everything
  * that belongs to the tag: the definition for the menu editor (possible replaces, description, text for missing data) and the logic that
- * creates the value. Use {@link ReplacerTagDefinition#replace(List, String, Object)} to apply a list of tags to a pattern.<br>
- * The user can override the text for missing data per tag by writing <code>{tag|text}</code>.
+ * creates the value. Use {@link ReplacerTagDefinition#replace(List, String, Object)} to apply a list of tags to a pattern.
  */
 public interface ReplacerTag {
     /**
@@ -30,7 +29,7 @@ public interface ReplacerTag {
     boolean isAlwaysAvailable(String replace);
 
     /**
-     * Builds the tag as it is written into the pattern. The text for missing data is only included if it differs from the default.
+     * Builds the tag as it is written into the pattern. E.g. "{hash_md5}".
      */
     String toTag(String replace, String emptyCharacterToUse);
 

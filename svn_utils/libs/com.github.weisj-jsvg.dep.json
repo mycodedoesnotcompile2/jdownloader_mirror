@@ -74,11 +74,29 @@
       "signatures":null,
       "version":"1.7.2",
       "vulnerabilities":[]
+    },
+    {
+      "changes":"2.0.0\t: ## Changes\r\n- Fix broken animations\r\n\r\n**Full Changelog**: https://github.com/weisJ/jsvg/compare/v1.7.1-rc1...v1.7.2-rc1",
+      "date":"2025-04-26T20:02:00.459+02:00",
+      "dependencies":null,
+      "description":"A lightweight Java2D SVG renderer",
+      "files":null,
+      "hashes":{"jsvg.jar":"81fc9ada579fc3f4924ec35f904c043de13ee8fba280322e638c7092006f1b52"},
+      "licenses":[{
+        "name":"MIT",
+        "url":"https://github.com/weisj/jsvg/blob/master/LICENSE",
+        "distribution":"repo"
+      }],
+      "minJRE":"JVM_1_8",
+      "name":"Jsvg",
+      "signatures":{"jsvg.jar":"-----BEGIN PGP SIGNATURE-----\nVersion: BCPG v@RELEASE_NAME@\n\niQEcBAABCgAGBQJoCPtxAAoJECVOnGTCZMF2xVsH/imHnRn/H+D8HLrolI+Xz6WT\njDsYYjDVIub5lPa62Vz340nF2mBP/jiH3zENYvVOWcoFVgj3lhCFtKa50Mkfpcf3\n3ZypVCyLt8uFLcIPfMhu0UojGqWV50v4te+WXlBq53yPwPaJCQukdX5lYDyhRlyL\n/+996bB6VrghVXX+L00YVUBaqwBkmbNHuZ6/MNxQhk99bxzyhUq8q/ZvIsNxJwnj\nYhVA2LNh3tAC2Ew4sxj5eWAB+xC8Z5c2eNNZcbnDkcFnVQuoscoKjguSZVwwzMz1\nhRPTXAph2x1iqghVUpz2Yfm+hdmdCGBcnnw+IpRtXgy8o2rJrcINkB5AYFDSjTA=\n=xsX4\n-----END PGP SIGNATURE-----\n"},
+      "version":"2.0.0",
+      "vulnerabilities":[]
     }
   ],
   "installed":{
-    "changes":"2.0.0\t: ## Changes\r\n- Fix broken animations\r\n\r\n**Full Changelog**: https://github.com/weisJ/jsvg/compare/v1.7.1-rc1...v1.7.2-rc1",
-    "date":"2025-04-26T20:02:00.459+02:00",
+    "changes":"2.1.0\t: ## New Modules\r\n\r\n- **`jsvg-javafx`** _(experimental)_: New module for rendering SVGs to a JavaFX `Canvas` via\r\n  `FXSVGCanvas`. This is an experimental addition and the API is subject to change in future\r\n  releases. (Contributed by @SonarSonic)\r\n- **Pluggable logging**: JSVG now ships a `LogManager` / `Logger` SPI. Applications can provide\r\n  a custom `LogManager` implementation through the Java `ServiceLoader` mechanism to integrate\r\n  JSVG log output into any logging framework of their choice.\r\n\t- **`jsvg-slf4j`**: New logging adapter module that routes JSVG internal log output through\r\n  [SLF4J](https://www.slf4j.org/). Simply include the module on the classpath to activate it\r\n  automatically via the Java `ServiceLoader` mechanism.\r\n\t- **`jsvg-systemlogger`**: New logging adapter module that routes JSVG internal log output through\r\n  the Java `System.Logger` API (introduced in Java 9).\r\n\r\n## Changes\r\n\r\n- Improved support for the `transform-origin` property allowing for the all keyword combinations to be specified.\r\n    - Percentage values are resolved relative to the element's reference box.\r\n- Fixed `text-anchor` handling for mixed content (text segments interleaved with `<textPath>`\r\n      elements).\r\n- Fixed incorrect `startOffset` positioning for text on paths \u2014 text now correctly starts at the specified offset along the path.\r\n- Fix dashPattern annotation in StrokeContext by @SonarSonic in https://github.com/weisJ/jsvg/pull/125\r\n- Fix dashPattern annotation in StrokeContext by @SonarSonic in https://github.com/weisJ/jsvg/pull/125\r\n- Fix incorrect x scaling in MeshPatch by @SonarSonic in https://github.com/weisJ/jsvg/pull/131\r\n- The `<mask>` element now supports the `mask-type` property.\r\n- Values in transforms can now be specified as comma or whitespace separated lists.\r\n- Added a `sizeForViewport` function on `SVGDocument` which returns the size of the SVG as if it were embedded in a viewport of that given size.\r\n\r\n**Full Changelog**: https://github.com/weisJ/jsvg/compare/v2.0.0-rc5...v2.1.0\r\n2.2.0\t: ## Changes\r\n\r\n* Support for `<feDiffuseLighting>` and its three light sources. (by @djberg96 in [#168](https://github.com/weisJ/jsvg/pull/168))\r\n* Support for `alignment-baseline`. (by @djberg96 in [#170](https://github.com/weisJ/jsvg/pull/170))\r\n* Added experimental support for custom fonts through `PlatformSupport#customFont(String)`. (Contributed by @alin-github in [#172](https://github.com/weisJ/jsvg/pull/172))\r\n* Fixed clipping of positioned `<use>` elements. [#166](https://github.com/weisJ/jsvg/issues/166)\r\n* Fixed root viewport handling and `non-scaling-stroke`, including use with filters. [#139](https://github.com/weisJ/jsvg/issues/139)\r\n* Fixed fractional coefficients and channel normalization in arithmetic `<feComposite>`. [#167](https://github.com/weisJ/jsvg/issues/167)\r\n* Fixed `<feDisplacementMap>` rendering at negative coordinates.\r\n* Test fixtures are no longer published as library variants.\r\n* Fixed viewbox handling regression in `render(component, graphics, viewBox)` [#169](https://github.com/weisJ/jsvg/issues/169).\r\n* fix: correct VALUE_IMAGE_ANTIALIAS to VALUE_IMAGE_ANTIALIASING in README by (@Jah-yee in [#175](https://github.com/weisJ/jsvg/pull/175))\r\n\r\n## Deprecations\r\n* `PlatformSupport.TargetSurface` and `PlatformSupporttargetSurface()` are now deprecated and planned for removal. They are no longer used internally.\r\n\r\n## New Contributors\r\n* @djberg96 made their first contribution in https://github.com/weisJ/jsvg/pull/168\r\n* @alin-github made their first contribution in https://github.com/weisJ/jsvg/pull/172\r\n* @Jah-yee made their first contribution in https://github.com/weisJ/jsvg/pull/175\r\n\r\n**Full Changelog**: https://github.com/weisJ/jsvg/compare/v2.1.0...v2.2.0",
+    "date":"2026-10-13T12:33:16.557+02:00",
     "dependencies":null,
     "description":"A lightweight Java2D SVG renderer",
     "files":[
@@ -125,7 +143,7 @@
       "jsvg.pom.sha512",
       "meta.json"
     ],
-    "hashes":{"jsvg.jar":"81fc9ada579fc3f4924ec35f904c043de13ee8fba280322e638c7092006f1b52"},
+    "hashes":{"jsvg.jar":"abc17a201f9cba7f690f1f68e9c0e9dacf225a8727922226b2b480c0d11c99e9"},
     "licenses":[{
       "name":"MIT",
       "url":"https://github.com/weisj/jsvg/blob/master/LICENSE",
@@ -133,8 +151,8 @@
     }],
     "minJRE":"JVM_1_8",
     "name":"Jsvg",
-    "signatures":{"jsvg.jar":"-----BEGIN PGP SIGNATURE-----\nVersion: BCPG v@RELEASE_NAME@\n\niQEcBAABCgAGBQJoCPtxAAoJECVOnGTCZMF2xVsH/imHnRn/H+D8HLrolI+Xz6WT\njDsYYjDVIub5lPa62Vz340nF2mBP/jiH3zENYvVOWcoFVgj3lhCFtKa50Mkfpcf3\n3ZypVCyLt8uFLcIPfMhu0UojGqWV50v4te+WXlBq53yPwPaJCQukdX5lYDyhRlyL\n/+996bB6VrghVXX+L00YVUBaqwBkmbNHuZ6/MNxQhk99bxzyhUq8q/ZvIsNxJwnj\nYhVA2LNh3tAC2Ew4sxj5eWAB+xC8Z5c2eNNZcbnDkcFnVQuoscoKjguSZVwwzMz1\nhRPTXAph2x1iqghVUpz2Yfm+hdmdCGBcnnw+IpRtXgy8o2rJrcINkB5AYFDSjTA=\n=xsX4\n-----END PGP SIGNATURE-----\n"},
-    "version":"2.0.0",
+    "signatures":{"jsvg.jar":"-----BEGIN PGP SIGNATURE-----\nVersion: BCPG v@RELEASE_NAME@\n\niQJPBAABCAA5FiEEBmwWfce6kZ8uFo36Lio67PE7JawFAmqjGjEbFIAAAAAABAAO\nbWFudTIsMi41KzEuMTIsMCwzAAoJEC4qOuzxOyWshi8P/3fAkOFRqrKIpht3VLDH\n7xDAYzBQ54xicPTnm+XI+UYetERq64x6CicOFNwUCU2gy5ZLLEhm3qKWxPUOFGnJ\nN29TktSIf1pZFFjUNNZPJ9yvY5aBmIH2YDVjj760Q7lkkuzVRIOOjdAYYgooXc5R\njSanH5C0QEw1yeENG3YgiFvkeIxpDm+s+pa5Uq8P//v3FrCmOrNXyDrhJwwwun2a\nFMr5W5hPQ7nAf4S6tTdxObi25Qh3xEIbIxDwTWHj0QIdDgw3ZyyC0mnA7iDW6hfn\nzpB3e8KSIllDOJe9k/xt0Zov4aaQSS2QnSOswhucK3BGR6fn3aml+claKowA9vWs\nbC9uW6mDcr/DWPHUmzWKfHTUDU9hMK94Bg0PnE8Og34IWOaf5AhM1wn177/jV4Vc\njymMgWeX9QTFECmNNWROJavgLuab+rM0ImtOM35BTpy0hud9YpL4wpT4QucTFYNS\n2mKBP73mR4qGDACWaloCxQjFQEwyYseLUiu2r3liQXFwe9q4dj3jp2FsgizV301D\nOXmBxMXky5HsghR/zRWIK/AEbW0D+6KLfOHK6o0DVqB6qRqKGLSESZrkK2n8C2us\nq9a8Pd0WdG5fpnxWh7YR9XIRgDUbGxPothDJpK4m9IzPZcym1uEMtg3SVsVl73F6\na1f0GCxGloVJkN2ng9bAF9eA\n=ZT+s\n-----END PGP SIGNATURE-----\n"},
+    "version":"2.2.0",
     "vulnerabilities":[]
   },
   "minJRE":"1.8",

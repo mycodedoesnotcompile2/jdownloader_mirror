@@ -92,7 +92,9 @@ public class CaptchaTestChallengeFactory {
                 break;
             case IMAGE:
             default:
-                challenge = new BasicCaptchaChallenge("test", imageFile, "", description, plugin, 0);
+                final BasicCaptchaChallenge imageChallenge = new BasicCaptchaChallenge("test", imageFile, "", description, plugin, 0);
+                imageChallenge.setCaseSensitive(parameters.getCaseSensitive());
+                challenge = imageChallenge;
                 break;
             }
             challenge.setCaptchaRequestType(requestType);

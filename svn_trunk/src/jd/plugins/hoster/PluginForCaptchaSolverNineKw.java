@@ -1,5 +1,9 @@
 package jd.plugins.hoster;
 
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -7,18 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import jd.PluginWrapper;
-import jd.http.requests.FormData;
-import jd.http.requests.PostFormDataRequest;
-import jd.parser.Regex;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
+import javax.imageio.ImageIO;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.TypeRef;
@@ -42,10 +35,23 @@ import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigNinekw
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
+import jd.PluginWrapper;
+import jd.http.requests.FormData;
+import jd.http.requests.PostFormDataRequest;
+import jd.parser.Regex;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
 /**
  * Plugin for 9kw captcha solving service (https://9kw.eu/).
  */
-@HostPlugin(revision = "$Revision: 53597 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53615 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
 public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -67,7 +73,17 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         types.add(CAPTCHA_TYPE.IMAGE);
         types.add(CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA);
         types.add(CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
+        /*
+         * All reCaptcha variants are "interactive" captchas on 9kw (variants "recaptchav2" and "recaptchav3", see "interactive" parameter
+         * in the API docs). The API has no separate Enterprise switch, so Enterprise captchas are sent like their normal counterparts.
+         */
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
+        /* 2026-10-13: v3 and v3 enterprise does not seem to work -> Always runs into timeout? */
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V3_ENTERPRISE);
+        /* 2026-10-13: hCaptcha is confirmed working. */
         types.add(CAPTCHA_TYPE.HCAPTCHA);
         // types.add(CAPTCHA_TYPE.GEETEST_V1);
         // types.add(CAPTCHA_TYPE.GEETEST_V4);
@@ -161,17 +177,18 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
     }
 
     /**
-     * @param imageFile
-     *            If given, the request is sent as multipart/form-data POST with this file as "file-upload-01" (the docs require POST for
+     * @param imageData
+     *            If given, the request is sent as multipart/form-data POST with this image as "file-upload-01" (the docs require POST for
      *            usercaptchaupload). Sending the image as base64 inside a GET url is too large and gets the connection reset.
      */
-    private Map<String, Object> callAPI(final UrlQuery query, final Account account, final File imageFile) throws IOException, PluginException {
+    private Map<String, Object> callAPI(final UrlQuery query, final Account account, final byte[] imageData) throws IOException, PluginException {
         query.appendEncoded("json", "1");
         query.appendEncoded("apikey", account.getPass());
         /* Potentially unneeded params */
         /**
          * 2026-03-17: Do not add jd=2 parameter as this will make API return non-json responses for some cases but we want json whenever
-         * possible. </br> Known effects when this parameter is sent: <br>
+         * possible. </br>
+         * Known effects when this parameter is sent: <br>
          * - Sometimes non-json responses <br>
          * - "captcha_id" field instead of "captchaid" <br>
          */
@@ -179,12 +196,12 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         query.appendEncoded("source", "jd2");
         query.appendEncoded("captchaSource", "jdPlugin");
         query.appendEncoded("version", "1.2");
-        if (imageFile != null) {
+        if (imageData != null) {
             final PostFormDataRequest request = br.createPostFormDataRequest(getBaseURL() + "/index.cgi");
             for (final Map.Entry<String, String> entry : query.toMap(true).entrySet()) {
                 request.addFormData(new FormData(entry.getKey(), entry.getValue()));
             }
-            request.addFormData(new FormData("file-upload-01", imageFile.getName(), imageFile));
+            request.addFormData(new FormData("file-upload-01", "captcha.png", "image/png", imageData));
             br.getPage(request);
         } else {
             br.getPage(getBaseURL() + "/index.cgi?" + query.toString());
@@ -284,6 +301,63 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         return 5000;
     }
 
+    /**
+     * 9kw rejects images whose width + height exceeds this value (error 0010 "Size is too big", e.g. 640+640=1280>800).
+     */
+    private static final int MAX_IMAGE_WIDTH_PLUS_HEIGHT = 800;
+
+    /**
+     * Result of {@link #prepareImage(File)}: the PNG bytes to upload and the factors the image was scaled with per axis (1.0 = unchanged).
+     */
+    private static class PreparedImage {
+        private final byte[] data;
+        private final double scaleX;
+        private final double scaleY;
+
+        private PreparedImage(final byte[] data, final double scaleX, final double scaleY) {
+            this.data = data;
+            this.scaleX = scaleX;
+            this.scaleY = scaleY;
+        }
+    }
+
+    /**
+     * Loads the image into RAM and downscales it (keeping the aspect ratio) so that width + height does not exceed the limit of the 9kw
+     * API. Images that are small enough are not scaled.
+     */
+    private PreparedImage prepareImage(final File imageFile) throws IOException {
+        final BufferedImage source = ImageIO.read(imageFile);
+        if (source == null) {
+            throw new IOException("Unsupported image format: " + imageFile);
+        }
+        final int width = source.getWidth();
+        final int height = source.getHeight();
+        BufferedImage target = source;
+        double scaleX = 1.0;
+        double scaleY = 1.0;
+        if (width + height > MAX_IMAGE_WIDTH_PLUS_HEIGHT) {
+            final double scale = (double) MAX_IMAGE_WIDTH_PLUS_HEIGHT / (width + height);
+            final int newWidth = Math.max(1, (int) Math.floor(width * scale));
+            final int newHeight = Math.max(1, (int) Math.floor(height * scale));
+            /* Use the real factors per axis (rounding to whole pixels) so click coordinates can be mapped back precisely. */
+            scaleX = (double) newWidth / width;
+            scaleY = (double) newHeight / height;
+            target = new BufferedImage(newWidth, newHeight, BufferedImage.TYPE_INT_RGB);
+            final Graphics2D g = target.createGraphics();
+            try {
+                g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+                g.drawImage(source, 0, 0, newWidth, newHeight, null);
+            } finally {
+                g.dispose();
+            }
+            logger.info("Downscaled image from " + width + "x" + height + " to " + newWidth + "x" + newHeight + " (9kw limit: width+height <= " + MAX_IMAGE_WIDTH_PLUS_HEIGHT + ")");
+        }
+        final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        ImageIO.write(target, "png", bos);
+        return new PreparedImage(bos.toByteArray(), scaleX, scaleY);
+    }
+
     @Override
     public void solve(CESSolverJob<?> job, Account account) throws Exception {
         job.setStatus(SolverStatus.UPLOADING);
@@ -292,6 +366,7 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         final Challenge<?> captchachallenge = job.getChallenge();
         /* Only set for image based challenges. Sent as file upload instead of base64. */
         File imageFile = null;
+        PreparedImage preparedImage = null;
         if (captchachallenge instanceof RecaptchaV2Challenge) {
             final RecaptchaV2Challenge challenge = (RecaptchaV2Challenge) captchachallenge;
             upload_query.appendEncoded("data-sitekey", challenge.getSiteKey());
@@ -301,7 +376,9 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
             upload_query.appendEncoded("pageurl", challenge.getSiteUrl(this));
             if (v3action != null) {
                 upload_query.appendEncoded("actionname", (String) v3action.get("action"));
-                upload_query.appendEncoded("min_score", "0.3");// minimal score
+                /* Minimal score: requested by the challenge or 0.3 by default. */
+                final Double minScore = challenge.getMinScore();
+                upload_query.appendEncoded("min_score", String.valueOf(minScore != null ? minScore : 0.3d));
             }
             upload_query.appendEncoded("interactive", "1");
             upload_query.appendEncoded("securetoken", challenge.getSecureToken());
@@ -353,7 +430,10 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         upload_query.appendEncoded("prio", cfg.getPrio() + "");
         upload_query.appendEncoded("selfsolve", cfg.isSelfsolve() + "");
         upload_query.appendEncoded("confirm", cfg.isConfirm() + "");
-        final Map<String, Object> uploadresp = this.callAPI(upload_query, account, imageFile);
+        if (imageFile != null) {
+            preparedImage = prepareImage(imageFile);
+        }
+        final Map<String, Object> uploadresp = this.callAPI(upload_query, account, preparedImage != null ? preparedImage.data : null);
         final String captcha_id = uploadresp.get("captchaid").toString();
         final UrlQuery polling_query = new UrlQuery();
         polling_query.appendEncoded("action", "usercaptchacorrectdata");
@@ -394,8 +474,9 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
                 final int[] y = new int[pairs.length];
                 for (int i = 0; i < pairs.length; i++) {
                     final String[] xy = pairs[i].split("x");
-                    x[i] = Integer.parseInt(xy[0]);
-                    y[i] = Integer.parseInt(xy[1]);
+                    /* Coordinates refer to the (possibly downscaled) uploaded image -> map them back to the original size. */
+                    x[i] = (int) Math.round(Integer.parseInt(xy[0]) / preparedImage.scaleX);
+                    y[i] = (int) Math.round(Integer.parseInt(xy[1]) / preparedImage.scaleY);
                 }
                 resp = new AbstractResponse<MultiClickedPoint>((MultiClickCaptchaChallenge) captchachallenge, job.getSolver(), new MultiClickedPoint(x, y));
             } else {

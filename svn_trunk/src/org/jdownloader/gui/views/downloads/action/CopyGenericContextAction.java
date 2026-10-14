@@ -4,6 +4,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -14,10 +15,10 @@ import org.appwork.utils.os.CrossSystem;
 import org.jdownloader.controlling.contextmenu.ActionContext;
 import org.jdownloader.controlling.contextmenu.CustomizableTableContextAppAction;
 import org.jdownloader.controlling.contextmenu.Customizer;
-import org.jdownloader.controlling.contextmenu.DelegatingReplacerTag;
-import org.jdownloader.controlling.contextmenu.ReplacerTag;
-import org.jdownloader.controlling.contextmenu.ReplacerTagDefinition;
-import org.jdownloader.controlling.contextmenu.ReplacerTagProvider;
+import org.jdownloader.controlling.contextmenu.Replacer;
+import org.jdownloader.controlling.contextmenu.ReplacerProvider;
+import org.jdownloader.controlling.contextmenu.Replacers;
+import org.jdownloader.controlling.contextmenu.Tag;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
@@ -41,20 +42,20 @@ import jd.gui.swing.jdgui.MainTabbedPane;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 
-public class CopyGenericContextAction extends CustomizableTableContextAppAction implements ActionContext, ReplacerTagProvider {
+public class CopyGenericContextAction extends CustomizableTableContextAppAction implements ActionContext, ReplacerProvider {
     /*
      * The tags that are offered in the menu editor for the pattern of packages and for the pattern of links. The order is the order in the
      * menu editor.
      */
-    private static final List<ReplacerTag> PACKAGE_TAGS = new ArrayList<ReplacerTag>(Arrays.asList(DownloadReplacerTag.TYPE, DownloadReplacerTag.PACKAGE_NAME, DownloadReplacerTag.PATH, DownloadReplacerTag.COMMENT, DownloadReplacerTag.PACKAGE_SIZE, DownloadReplacerTag.PACKAGE_STATUS, DownloadReplacerTag.PACKAGE_ENABLED, DownloadReplacerTag.PACKAGE_PRIORITY, DownloadReplacerTag.DATE, DownloadReplacerTag.PACKAGE_DATE, DownloadReplacerTag.NEWLINE, DownloadReplacerTag.TAB));
-    private static final List<ReplacerTag> LINK_TAGS    = new ArrayList<ReplacerTag>(Arrays.asList(DownloadReplacerTag.TYPE, DownloadReplacerTag.FILE_NAME, DownloadReplacerTag.NAME_WITHOUT_EXTENSION, DownloadReplacerTag.EXTENSION, DownloadReplacerTag.PACKAGE_NAME, DownloadReplacerTag.PATH, DownloadReplacerTag.HOST, DownloadReplacerTag.COMMENT, DownloadReplacerTag.AVAILABILITY, DownloadReplacerTag.STATUS, DownloadReplacerTag.ENABLED, DownloadReplacerTag.PRIORITY, DownloadReplacerTag.HASH, DownloadReplacerTag.FILESIZE, DownloadReplacerTag.URL, DownloadReplacerTag.ARCHIVE_PASSWORD, DownloadReplacerTag.PROPERTY, DownloadReplacerTag.DATE, DownloadReplacerTag.MODIFIED_DATE, DownloadReplacerTag.PACKAGE_COMMENT, DownloadReplacerTag.PACKAGE_SIZE, DownloadReplacerTag.PACKAGE_STATUS, DownloadReplacerTag.PACKAGE_ENABLED, DownloadReplacerTag.PACKAGE_PRIORITY, DownloadReplacerTag.PACKAGE_DATE, DownloadReplacerTag.NEWLINE, DownloadReplacerTag.TAB));
+    private static final List<Replacer> PACKAGE_TAGS = new ArrayList<Replacer>(Arrays.asList(DownloadReplacerTag.TYPE, DownloadReplacerTag.PACKAGE_NAME, DownloadReplacerTag.PATH, DownloadReplacerTag.COMMENT, DownloadReplacerTag.PACKAGE_SIZE, DownloadReplacerTag.PACKAGE_STATUS, DownloadReplacerTag.PACKAGE_ENABLED, DownloadReplacerTag.PACKAGE_PRIORITY, DownloadReplacerTag.DATE, DownloadReplacerTag.PACKAGE_DATE, DownloadReplacerTag.NEWLINE, DownloadReplacerTag.TAB));
+    private static final List<Replacer> LINK_TAGS    = new ArrayList<Replacer>(Arrays.asList(DownloadReplacerTag.TYPE, DownloadReplacerTag.FILE_NAME, DownloadReplacerTag.NAME_WITHOUT_EXTENSION, DownloadReplacerTag.EXTENSION, DownloadReplacerTag.PACKAGE_NAME, DownloadReplacerTag.PATH, DownloadReplacerTag.HOST, DownloadReplacerTag.COMMENT, DownloadReplacerTag.AVAILABILITY, DownloadReplacerTag.STATUS, DownloadReplacerTag.ENABLED, DownloadReplacerTag.PRIORITY, DownloadReplacerTag.HASH, DownloadReplacerTag.FILESIZE, DownloadReplacerTag.URL, DownloadReplacerTag.ARCHIVE_PASSWORD, DownloadReplacerTag.PROPERTY, DownloadReplacerTag.DATE, DownloadReplacerTag.MODIFIED_DATE, DownloadReplacerTag.PACKAGE_COMMENT, DownloadReplacerTag.PACKAGE_SIZE, DownloadReplacerTag.PACKAGE_STATUS, DownloadReplacerTag.PACKAGE_ENABLED, DownloadReplacerTag.PACKAGE_PRIORITY, DownloadReplacerTag.PACKAGE_DATE, DownloadReplacerTag.NEWLINE, DownloadReplacerTag.TAB));
     /*
      * The tags that are applied. In addition to the offered ones the legacy tags {name} and {filesize} (and {packagecomment}) work in the
      * pattern of packages, {name} in the pattern of links. Tags that did not exist before (status, enabled, priority, modifiedDate) have no
      * legacy variant for packages, packages use the tags of the package.
      */
-    private static final List<ReplacerTag> PACKAGE_PATTERN_TAGS = new ArrayList<ReplacerTag>(PACKAGE_TAGS);
-    private static final List<ReplacerTag> LINK_PATTERN_TAGS    = new ArrayList<ReplacerTag>(LINK_TAGS);
+    private static final List<Replacer> PACKAGE_PATTERN_TAGS = new ArrayList<Replacer>(PACKAGE_TAGS);
+    private static final List<Replacer> LINK_PATTERN_TAGS    = new ArrayList<Replacer>(LINK_TAGS);
     static {
         PACKAGE_PATTERN_TAGS.add(DownloadReplacerTag.NAME);
         PACKAGE_PATTERN_TAGS.add(DownloadReplacerTag.FILESIZE);
@@ -82,7 +83,7 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
     }
 
     @Override
-    public List<ReplacerTag> getReplacerTags(final String customizerKey) {
+    public List<Replacer> getReplacers(final String customizerKey) {
         if ("patternPackages".equalsIgnoreCase(customizerKey)) {
             return PACKAGE_TAGS;
         } else if ("patternLinks".equalsIgnoreCase(customizerKey)) {
@@ -203,7 +204,7 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
                 }
                 archivePasswords = DownloadReplacerTag.resolveArchivePasswords(links);
             }
-            final List<ReplacerTag> linkTags = createLinkTags(contentPermission, archivePasswords);
+            final List<Replacer> linkTags = createLinkReplacers(contentPermission, archivePasswords);
             for (final PackageView<ParentType, ChildrenType> pv : selectionInfo.getPackageViews()) {
                 final ParentType pkg = pv.getPackage();
                 add(sb, pkg, linkTags);
@@ -216,7 +217,7 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
             final List<AbstractNode> selection = selectionInfo.getRawSelection();
             final boolean contentPermission = selection.size() == 1 && selection.get(0) instanceof AbstractPackageChildrenNode;
             final Map<AbstractNode, String> archivePasswords = archivePasswordNeeded ? DownloadReplacerTag.resolveArchivePasswords(selection) : null;
-            final List<ReplacerTag> linkTags = createLinkTags(contentPermission, archivePasswords);
+            final List<Replacer> linkTags = createLinkReplacers(contentPermission, archivePasswords);
             for (final AbstractNode pv : selection) {
                 add(sb, pv, linkTags);
             }
@@ -234,51 +235,85 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
     }
 
     public void add(StringBuilder sb, AbstractNode pv, final boolean contentPermission) {
-        add(sb, pv, createLinkTags(contentPermission, null));
+        add(sb, pv, createLinkReplacers(contentPermission, null));
     }
 
     /**
-     * The tags for the links of one copy action. Infos about the selection are not part of the links, so the tags that need them are
-     * replaced by tags that know them. Everything else is passed on to the tags of the enum.
+     * Replaces a single tag by a value that depends on the selection. Infos about the selection are not part of the links, so the
+     * replacers of the enum cannot know them. It is applied before the replacers of the enum, which then do not see the tag anymore.
+     * Only links are handled, other objects and other tags stay unchanged.
+     */
+    private abstract static class SelectionReplacer implements Replacer {
+        private final String key;
+
+        private SelectionReplacer(final String key) {
+            this.key = key;
+        }
+
+        @Override
+        public List<Tag> getTags() {
+            /* The tag is offered by the replacer of the enum */
+            return Collections.emptyList();
+        }
+
+        @Override
+        public String replace(final String input, final Object object) {
+            if (input == null || !(object instanceof DownloadLink || object instanceof CrawledLink)) {
+                return input;
+            }
+            return Replacers.replaceTags(input, new Replacers.TagResolver() {
+                @Override
+                public String resolve(final String tag) {
+                    return key.equals(tag) ? getValue((AbstractNode) object) : null;
+                }
+            });
+        }
+
+        /**
+         * @return The value of the tag for this link. An empty string if there is no data.
+         */
+        protected abstract String getValue(AbstractNode link);
+    }
+
+    /**
+     * The replacers for the links of one copy action: The replacers for the infos about the selection, followed by the replacers of the
+     * enum.
      *
      * @param singleLink
      *            true if the selection consists of exactly one link
      * @param archivePasswords
      *            The archive passwords of the selection, resolved up front, or null
      */
-    private List<ReplacerTag> createLinkTags(final boolean singleLink, final Map<AbstractNode, String> archivePasswords) {
-        final List<ReplacerTag> ret = new ArrayList<ReplacerTag>(LINK_PATTERN_TAGS);
-        for (int i = 0; i < ret.size(); i++) {
-            if (ret.get(i) == DownloadReplacerTag.URL && singleLink) {
-                /* The content URL of a single link is not filtered */
-                ret.set(i, new DelegatingReplacerTag(DownloadReplacerTag.URL) {
-                    @Override
-                    public String apply(final String replace, final Object object) {
-                        if ("url.content".equals(replace) && object instanceof AbstractNode && (object instanceof DownloadLink || object instanceof CrawledLink)) {
-                            return DownloadReplacerTag.getContentUrlOfSingleLink((AbstractNode) object);
-                        }
-                        return super.apply(replace, object);
-                    }
-                });
-            } else if (ret.get(i) == DownloadReplacerTag.ARCHIVE_PASSWORD && archivePasswords != null) {
-                /* Passwords of all links have been resolved at once */
-                ret.set(i, new DelegatingReplacerTag(DownloadReplacerTag.ARCHIVE_PASSWORD) {
-                    @Override
-                    public String apply(final String replace, final Object object) {
-                        if (!"archive.password".equals(replace) || !(object instanceof DownloadLink || object instanceof CrawledLink)) {
-                            return super.apply(replace, object);
-                        }
-                        final String password = archivePasswords.get(object);
-                        return password != null ? password : "";
-                    }
-                });
-            }
+    private List<Replacer> createLinkReplacers(final boolean singleLink, final Map<AbstractNode, String> archivePasswords) {
+        final List<Replacer> ret = new ArrayList<Replacer>();
+        if (singleLink) {
+            /* The content URL of a single link is not filtered */
+            ret.add(new SelectionReplacer("url.content") {
+                @Override
+                protected String getValue(final AbstractNode link) {
+                    return DownloadReplacerTag.getContentUrlOfSingleLink(link);
+                }
+            });
         }
+        if (archivePasswords != null) {
+            /*
+             * Look up the password in the map that has been created once for the whole selection. An empty string means that there is no
+             * data (link is in no archive or in several).
+             */
+            ret.add(new SelectionReplacer("archive.password") {
+                @Override
+                protected String getValue(final AbstractNode link) {
+                    final String password = archivePasswords.get(link);
+                    return password != null ? password : "";
+                }
+            });
+        }
+        ret.addAll(LINK_PATTERN_TAGS);
         return ret;
     }
 
-    private void add(StringBuilder sb, AbstractNode pv, final List<ReplacerTag> linkTags) {
-        final List<ReplacerTag> tags;
+    private void add(StringBuilder sb, AbstractNode pv, final List<Replacer> linkTags) {
+        final List<Replacer> tags;
         final String pattern;
         if (pv instanceof FilePackage || pv instanceof CrawledPackage) {
             tags = PACKAGE_PATTERN_TAGS;
@@ -289,7 +324,7 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
         } else {
             return;
         }
-        final String line = ReplacerTagDefinition.replace(tags, pattern, pv);
+        final String line = Replacers.replace(tags, pattern, pv);
         if (StringUtils.isNotEmpty(line)) {
             if (sb.length() > 0) {
                 sb.append(CrossSystem.getNewLine());

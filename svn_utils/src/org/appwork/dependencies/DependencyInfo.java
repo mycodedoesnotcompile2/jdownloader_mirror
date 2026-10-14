@@ -4,6 +4,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -213,6 +214,20 @@ public class DependencyInfo {
     }
 
     private HashSet<RequiredBy> requiredBy = new HashSet<RequiredBy>();
+    /**
+     * Target workspace of the current MavenSync/DependencyUpdater run.
+     * The classpath workspace of this class is the tool's own checkout, not the workspace being updated.
+     */
+    private static File          requiredByWorkspaceRoot;
+
+    /**
+     * @return the previous root, so the caller can restore it
+     */
+    public static File setRequiredByWorkspaceRoot(final File workspaceRoot) {
+        final File previous = requiredByWorkspaceRoot;
+        requiredByWorkspaceRoot = workspaceRoot == null ? null : workspaceRoot.getAbsoluteFile();
+        return previous;
+    }
 
     public void setRequiredBy(final HashSet<RequiredBy> requiredBy) {
         this.requiredBy = requiredBy;
@@ -225,12 +240,57 @@ public class DependencyInfo {
     public boolean requiredBy(final File file, final String artefact, final String provider, final String version) {
         final RequiredBy req = new RequiredBy();
         req.setArtefact(artefact);
-        final File workspace = getWorkspaceRoot();
-        final String relative = Files.getRelativePath(workspace, file);
-        req.setFile(relative != null ? relative : file.getAbsolutePath());
+        req.setFile(toRequiredByPath(file));
         req.setProvider(provider);
         req.setVersion(version);
-        return this.requiredBy.add(req);
+        // Same artefact stored earlier with an absolute path (sync from another workspace) is the same reference.
+        final boolean replacedAbsolute = dropSameRequiredByWithAbsolutePath(req);
+        return this.requiredBy.add(req) || replacedAbsolute;
+    }
+
+    private boolean dropSameRequiredByWithAbsolutePath(final RequiredBy incoming) {
+        boolean removed = false;
+        final Iterator<RequiredBy> it = this.requiredBy.iterator();
+        while (it.hasNext()) {
+            final RequiredBy existing = it.next();
+            final String existingFile = existing.getFile();
+            if (existingFile == null || !new File(existingFile).isAbsolute()) {
+                continue;
+            }
+            if (!StringUtils.equals(existing.getArtefact(), incoming.getArtefact()) || !StringUtils.equals(existing.getProvider(), incoming.getProvider()) || !StringUtils.equals(existing.getVersion(), incoming.getVersion())) {
+                continue;
+            }
+            if (StringUtils.equals(toRequiredByPath(new File(existingFile)), incoming.getFile())) {
+                it.remove();
+                removed = true;
+            }
+        }
+        return removed;
+    }
+
+    private static String toRequiredByPath(final File file) {
+        final File explicit = requiredByWorkspaceRoot;
+        if (explicit != null) {
+            final String relative = Files.getRelativePath(explicit, file);
+            if (relative != null) {
+                return relative;
+            }
+        }
+        // Dep file lives in another Eclipse workspace than the running tool. Walk up to that workspace instead of storing an absolute path.
+        File cursor = file.getAbsoluteFile();
+        while (cursor != null) {
+            if (new File(cursor, ".metadata").isDirectory()) {
+                final String relative = Files.getRelativePath(cursor, file);
+                if (relative != null) {
+                    return relative;
+                }
+                break;
+            }
+            cursor = cursor.getParentFile();
+        }
+        final File workspace = getWorkspaceRoot();
+        final String relative = Files.getRelativePath(workspace, file);
+        return relative != null ? relative : file.getAbsolutePath();
     }
 
     private static File getWorkspaceRoot() {

@@ -12,6 +12,7 @@ import java.awt.event.ItemListener;
 import java.awt.event.KeyListener;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.swing.JButton;
@@ -49,8 +50,9 @@ import org.jdownloader.controlling.contextmenu.ActionContext;
 import org.jdownloader.controlling.contextmenu.ActionData;
 import org.jdownloader.controlling.contextmenu.CustomizableAppAction;
 import org.jdownloader.controlling.contextmenu.Customizer;
-import org.jdownloader.controlling.contextmenu.ReplacerTag;
-import org.jdownloader.controlling.contextmenu.ReplacerTagProvider;
+import org.jdownloader.controlling.contextmenu.Replacer;
+import org.jdownloader.controlling.contextmenu.ReplacerProvider;
+import org.jdownloader.controlling.contextmenu.Tag;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.components.PseudoCombo;
@@ -274,8 +276,8 @@ public class CustomPanel extends MigPanel {
                 cb.setText(value);
                 add(new JLabel(getNameForCustomizer(gs)), "growx,spanx,wrap");
                 add(cb, "growx,spanx,wrap,pushx,growx");
-                if (actionClass instanceof ReplacerTagProvider) {
-                    final List<ReplacerTag> tags = ((ReplacerTagProvider) actionClass).getReplacerTags(gs.getKey());
+                if (actionClass instanceof ReplacerProvider) {
+                    final List<Replacer> tags = ((ReplacerProvider) actionClass).getReplacers(gs.getKey());
                     if (tags != null && tags.size() > 0) {
                         add(createTagList(tags, cb), "growx,spanx,wrap,pushx,growx");
                     }
@@ -319,7 +321,7 @@ public class CustomPanel extends MigPanel {
      * Creates a scrollable list with a header and one row per tag: a button that appends the tag to the given text field, a dropdown with
      * the possible replaces of the tag, the description and the text that is used if there is no data.
      */
-    private static JScrollPane createTagList(final List<ReplacerTag> tags, final ExtTextField target) {
+    private static JScrollPane createTagList(final List<Replacer> replacers, final ExtTextField target) {
         final String columns = "[26!][150!][grow,fill][90!]";
         /* The list always has the width of the visible area, so that the description column wraps instead of requiring a horizontal scrollbar */
         final MigPanel list = new TagListPanel("ins 2 4 2 4", columns, "[]");
@@ -331,8 +333,12 @@ public class CustomPanel extends MigPanel {
         header.add(createHeaderLabel("Tag"), "gapleft 4");
         header.add(createHeaderLabel("Description"), "gapleft 8");
         header.add(createHeaderLabel("<html>String for<br>missing data</html>"));
-        for (final ReplacerTag tag : tags) {
-            final List<String> replaces = tag.getReplaces();
+        final List<Tag> tags = new ArrayList<Tag>();
+        for (final Replacer replacer : replacers) {
+            tags.addAll(replacer.getTags());
+        }
+        for (final Tag tag : tags) {
+            final List<String> replaces = tag.getKeys();
             final String[] labels = new String[replaces.size()];
             for (int i = 0; i < labels.length; i++) {
                 labels[i] = "{" + replaces.get(i) + "}";
@@ -378,37 +384,16 @@ public class CustomPanel extends MigPanel {
                 tagLabel.setToolTipText(labels[0]);
                 tagComponent = tagLabel;
             }
-            final JTextField emptyField = new JTextField(tag.getEmptyCharacter(replaces.get(0)), 4);
-            /* Selecting another replace switches to its default, unless the user has entered an own text */
-            final String[] currentDefault = new String[] { tag.getEmptyCharacter(replaces.get(0)) };
-            final Runnable updateEmptyField = new Runnable() {
-                @Override
-                public void run() {
-                    final String replace = getSelectedReplace(replaceBox, replaces);
-                    final String newDefault = tag.getEmptyCharacter(replace);
-                    if (tag.isAlwaysAvailable(replace)) {
-                        /* There is never missing data: Nothing to set */
-                        emptyField.setText("");
-                        emptyField.setEnabled(false);
-                        emptyField.setToolTipText("This tag always has a value");
-                    } else {
-                        if (!emptyField.isEnabled() || currentDefault[0].equals(emptyField.getText())) {
-                            emptyField.setText(newDefault);
-                        }
-                        emptyField.setEnabled(true);
-                        emptyField.setToolTipText("Text that is used if there is no data for this tag");
-                    }
-                    currentDefault[0] = newDefault;
-                }
-            };
-            updateEmptyField.run();
+            /* Not used yet: A missing value is always replaced by an empty string */
+            final JTextField emptyField = new JTextField("", 4);
+            emptyField.setEnabled(false);
+            emptyField.setToolTipText("A tag without data is replaced by an empty string");
             if (replaceBox != null) {
                 replaceBox.addItemListener(new ItemListener() {
                     @Override
                     public void itemStateChanged(final ItemEvent e) {
                         if (e.getStateChange() == ItemEvent.SELECTED) {
                             replaceBox.setToolTipText(String.valueOf(replaceBox.getSelectedItem()));
-                            updateEmptyField.run();
                         }
                     }
                 });
@@ -419,7 +404,7 @@ public class CustomPanel extends MigPanel {
             add.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(final ActionEvent e) {
-                    final String newTag = tag.toTag(getSelectedReplace(replaceBox, replaces), emptyField.getText());
+                    final String newTag = Tag.toPattern(getSelectedReplace(replaceBox, replaces));
                     final String text = target.getText();
                     /* Plausibility check: do not add the tag if the pattern already ends with it */
                     if (text == null || !text.endsWith(newTag)) {

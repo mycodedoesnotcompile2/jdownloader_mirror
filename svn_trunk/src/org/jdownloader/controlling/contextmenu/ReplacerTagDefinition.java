@@ -18,18 +18,18 @@ import org.appwork.utils.StringUtils;
  * {@link #replace(List, String, Object)}, which applies a list of tags to a pattern.
  */
 public class ReplacerTagDefinition {
-    /* {tag} or {tag|text that is used if there is no data} */
-    private static final Pattern TAG_PATTERN = Pattern.compile("\\{([^{}|]+)(?:\\|([^{}]*))?\\}");
+    /* {tag} */
+    private static final Pattern TAG_PATTERN = Pattern.compile("\\{([^{}]+)\\}");
 
     /**
      * Replaces all tags of the pattern in a single pass. The first replacer that handles a tag provides its value. If there is no data,
-     * the text after the pipe is used, or the default text of the tag. Tags that no replacer handles are left untouched. Because the
+     * the default text of the tag is used. Tags that no replacer handles are left untouched. Because the
      * pattern is only parsed once, tags contained in replaced values (e.g. in a file name) are not replaced again.
      *
      * @param tags
      *            The replacers
      * @param pattern
-     *            The pattern, e.g. "{name};{hash_md5|n/a}"
+     *            The pattern, e.g. "{name};{hash_md5}"
      * @param input
      *            The object the replacers get the data from
      * @return The pattern with all tags replaced or null if the pattern is null
@@ -51,8 +51,6 @@ public class ReplacerTagDefinition {
                 }
                 if (StringUtils.isNotEmpty(value)) {
                     replacement = value;
-                } else if (matcher.group(2) != null) {
-                    replacement = matcher.group(2);
                 } else {
                     replacement = tag.getEmptyCharacter(key);
                 }
@@ -151,14 +149,9 @@ public class ReplacerTagDefinition {
     }
 
     /**
-     * Builds the tag as it is written into the pattern. The text for missing data is only included if it differs from the default of the
-     * replace and if the replace can have missing data at all.
+     * Builds the tag as it is written into the pattern. A text for missing data cannot be set in the pattern, so it is ignored.
      */
     public String toTag(final String replace, final String emptyCharacterToUse) {
-        if (isAlwaysAvailable(replace) || emptyCharacterToUse == null || emptyCharacterToUse.equals(getEmptyCharacter(replace))) {
-            return "{" + replace + "}";
-        } else {
-            return "{" + replace + "|" + emptyCharacterToUse + "}";
-        }
+        return "{" + replace + "}";
     }
 }

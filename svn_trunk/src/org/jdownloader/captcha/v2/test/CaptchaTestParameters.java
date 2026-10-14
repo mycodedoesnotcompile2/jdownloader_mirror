@@ -11,14 +11,34 @@ import jd.plugins.CaptchaType.CAPTCHA_TYPE;
  * captcha settings). {@link #getDefaults(CAPTCHA_TYPE)} provides the pre-filled values for each captcha type.
  */
 public class CaptchaTestParameters {
-    private String siteKey;
-    private String siteUrl;
-    private String action;
-    private String expectedResult;
-    private File   imageFile;
-    private Double minScore;
-    private int    minClicks = 1;
-    private String challengeDescription;
+    private String  siteKey;
+    private String  siteUrl;
+    private String  action;
+    private String  expectedResult;
+    private File    imageFile;
+    private Double  minScore;
+    private int     minClicks = 1;
+    private String  challengeDescription;
+    private Boolean caseSensitive;
+
+    /** Only used by IMAGE: whether the answer is case sensitive, null = unset (not specified). */
+    public Boolean getCaseSensitive() {
+        return caseSensitive;
+    }
+
+    public void setCaseSensitive(final Boolean caseSensitive) {
+        this.caseSensitive = caseSensitive;
+    }
+
+    /** True if {@link #getCaseSensitive()} is relevant for the given captcha type. */
+    public static boolean usesCaseSensitive(final CAPTCHA_TYPE type) {
+        switch (type) {
+        case IMAGE:
+            return true;
+        default:
+            return false;
+        }
+    }
 
     /** Only used by image captcha types: the description/explanation shown to the solver. */
     public String getChallengeDescription() {
@@ -160,12 +180,15 @@ public class CaptchaTestParameters {
         case IMAGE: {
             /* Test image next to this class in the project folder, its text is case-sensitive. */
             final CaptchaTestParameters ret = new CaptchaTestParameters(null, null, null, "KoYy2j");
-            ret.setChallengeDescription("Test image captcha (case insensitive)");
+            ret.setChallengeDescription("Test image captcha (case sensitive)");
+            ret.setCaseSensitive(Boolean.TRUE);
             ret.setImageFile(getDefaultTestImage("test_image_captcha.png"));
             return ret;
         }
         case IMAGE_SINGLE_CLICK_CAPTCHA: {
-            /* Test image: 3x3 grid of trash cans, the full one (center) has to be clicked. No expected result: the click position varies. */
+            /*
+             * Test image: 3x3 grid of trash cans, the full one (center) has to be clicked. No expected result: the click position varies.
+             */
             final CaptchaTestParameters ret = new CaptchaTestParameters(null, null, null, null);
             ret.setChallengeDescription("Click on the full trash can");
             ret.setImageFile(getDefaultTestImage("test_single_click_captcha.jpg"));
@@ -206,11 +229,9 @@ public class CaptchaTestParameters {
             return new CaptchaTestParameters("6LfB5_IbAAAAAMCtsjEHEHKqcB9iQocwwxTiihJu", "https://2captcha.com/de/demo/recaptcha-v3", "demo_action", null);
         case RECAPTCHA_V3_ENTERPRISE:
             /*
-             * Taken from jd.plugins.hoster.FilerNet (its disabled fallback branch in doWebsiteApi(), key found in
-             * https://filer.net/assets/GetFileView-D0EkjwK_-1766004219124.js, 2025-11-20). isEnterprise()=true together with a non-null v3
-             * action makes the challenge effectively v3 too, which is why this maps to RECAPTCHA_V3_ENTERPRISE.
+             * Taken from https://2captcha.com/demo/recaptcha-v3-enterprise
              */
-            return new CaptchaTestParameters("6LfUvREsAAAAAHd79QK9HOfIAEVGqK4G4JxovEEn", "https://filer.net/", "download", null);
+            return new CaptchaTestParameters("6Lel38UnAAAAAMRwKj9qLH2Ws4Tf2uTDQCyfgR6b", "https://2captcha.com/demo/recaptcha-v3-enterprise", "demo_action", null);
         case HCAPTCHA:
             /*
              * 2026-09-22: Do not use the official hCaptcha test-key here because this will not return a result or at least our existing
