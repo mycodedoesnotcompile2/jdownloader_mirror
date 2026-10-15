@@ -17,26 +17,12 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Exceptions;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.gui.notify.gui.BubbleNotifyConfig.BubbleNotifyEnabledState;
-import org.jdownloader.gui.notify.gui.CFG_BUBBLE;
-import org.jdownloader.plugins.components.usenet.UsenetServer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -57,10 +43,25 @@ import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 52894 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.gui.notify.gui.BubbleNotifyConfig.BubbleNotifyEnabledState;
+import org.jdownloader.gui.notify.gui.CFG_BUBBLE;
+import org.jdownloader.plugins.components.usenet.UsenetServer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
+@HostPlugin(revision = "$Revision: 53625 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends UseNet {
     /* Docs: https://api-docs.torbox.app/ */
     public static final String           API_BASE                                                 = "https://api.torbox.app/v1/api";
+    private static final long            WEBDL_RETRY_DELAY                                        = TimeUnit.SECONDS.toMillis(30);
     private static MultiHosterManagement mhm                                                      = new MultiHosterManagement("torbox.app");
     public static final String           PROPERTY_IS_INFECTED                                     = "is_infected";
     public static final String           PROPERTY_DOWNLOAD_TYPE                                   = "download_type";
@@ -128,8 +129,8 @@ public class TorboxApp extends UseNet {
 
     public int getMaxChunks(final DownloadLink link, final Account account) {
         /**
-         * 2024-06-12: Max 16 total connections according to admin. </br>
-         * We'll be doing it this way right know, knowing that the user can easily try to exceed that limit with JDownloader.
+         * 2024-06-12: Max 16 total connections according to admin. </br> We'll be doing it this way right know, knowing that the user can
+         * easily try to exceed that limit with JDownloader.
          */
         return -16;
     }
@@ -200,89 +201,37 @@ public class TorboxApp extends UseNet {
         this.login(account, false);
         final String directlinkproperty = this.getPropertyKey("directlink");
         String storedDirecturl = link.getStringProperty(directlinkproperty);
+        final String accountProperty = getPropertyKey("webdl_account");
+        final String accountID = String.valueOf(account.getId().getID());
+        final String previousAccount = link.getStringProperty(accountProperty);
+        if (previousAccount != null && !StringUtils.equals(previousAccount, accountID)) {
+            resetDownloadlink(link);
+            storedDirecturl = null;
+        }
+        link.setProperty(accountProperty, accountID);
+        /* Adopt job identifiers from the previous local compatibility patch. */
+        if (previousAccount != null && StringUtils.equals(previousAccount, accountID) && link.getStringProperty(PROPERTY_MULTIHOST_FILE_ID) == null) {
+            final String legacyID = link.getStringProperty(getPropertyKey("webdl_id"));
+            final String legacyHash = link.getStringProperty(getPropertyKey("webdl_hash"));
+            if (legacyID != null && legacyHash != null) {
+                link.setProperty(PROPERTY_MULTIHOST_FILE_ID, legacyID);
+                link.setProperty(PROPERTY_MULTIHOST_HASH, legacyHash);
+            }
+        }
+
         final String dllink;
         find_direct_download_link: {
             if (storedDirecturl != null) {
-                logger.info("Trying to re-use stored directurl: " + storedDirecturl);
+                logger.info("Trying to re-use stored directurl");
                 dllink = storedDirecturl;
                 break find_direct_download_link;
-            }
-            String file_id = link.getStringProperty(PROPERTY_MULTIHOST_FILE_ID);
-            String hash = link.getStringProperty(PROPERTY_MULTIHOST_HASH);
-            webdownloadCheck: if (file_id != null && hash != null) {
-                /** Optional step: Checks server side download status */
-                logger.info("Checking webdownload status of internal file_id: " + file_id + " | hash: " + hash);
-                final UrlQuery query_checkcached = new UrlQuery();
-                query_checkcached.appendEncoded("bypass_cache", "false");
-                query_checkcached.appendEncoded("id", file_id);
-                final Request req_checkcached = br.createGetRequest(API_BASE + "/webdl/mylist?" + query_checkcached.toString());
-                final Map<String, Object> resp;
-                try {
-                    resp = (Map<String, Object>) this.callAPI(br, req_checkcached, account, link);
-                } catch (final PluginException pe) {
-                    /* Ugly but simple check for special case */
-                    if (StringUtils.containsIgnoreCase(pe.getMessage(), "Failed to retrieve web downloads list")) {
-                        /**
-                         * This can happen if: <br>
-                         * - Torbox server side deletes a web download for some reason - The user deletes a web download item and afterwards
-                         * it is re-tries in JDownloader with the now outdated cached web download file_id <br>
-                         * - Maybe also for very very old items in the download list where the web download item has been deleted server
-                         * side due to inactivitys
-                         */
-                        link.removeProperty(PROPERTY_MULTIHOST_FILE_ID);
-                        link.removeProperty(PROPERTY_MULTIHOST_HASH);
-                        throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Web download has been deleted, try again later", 1 * 60 * 1000l);
-                    }
-                    throw pe;
-                }
-                if (Boolean.TRUE.equals(resp.get("download_finished"))) {
-                    /* download_state should be "completed" in this case. */
-                    logger.info("Server side download is finished -> Download should work");
-                    break webdownloadCheck;
-                }
-                final Number eta_seconds = (Number) resp.get("eta");
-                String eta_str = "Undefined";
-                final int wait_seconds_min = 15;
-                int wait_seconds = wait_seconds_min;
-                if (eta_seconds != null) {
-                    eta_str = eta_seconds.intValue() + " Seconds";
-                    wait_seconds = Math.max(wait_seconds_min, eta_seconds.intValue());
-                }
-                final Number progress = (Number) resp.get("progress");
-                final String progress_percent_str = progress != null ? String.format("%.2f%%", progress.doubleValue() * 100) : "Unknown";
-                final String download_state = (String) resp.get("download_state");
-                // TODO: Implement other states to have nicer error messages
-                if (StringUtils.startsWithCaseInsensitive(download_state, "downloading")) {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Web download is in progress | Progress: " + progress_percent_str + " | ETA: " + eta_str, wait_seconds * 1000l);
-                } else if (StringUtils.startsWithCaseInsensitive(download_state, "failed")) {
-                    /* e.g. "download_state":"failed (Download 1Fichier)" */
-                    // TODO: Decide whether or not any retry is worth doing her; for now I just set a very long delay on such items, also
-                    // make use of this stored timestamp
-                    link.setProperty(PROPERTY_MULTIHOST_WEB_DOWNLOAD_FAILED_TIMESTAMP, System.currentTimeMillis());
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Web download failed | Progress: " + progress_percent_str, 3 * 60 * 60 * 1000l);
-                } else {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Web download is in unknown state: " + download_state + " | Progress: " + progress_percent_str + " | ETA: " + eta_str, wait_seconds * 1000l);
-                }
             }
             String passCode = link.getDownloadPassword();
             if (link.isPasswordProtected() && passCode == null) {
                 passCode = getUserInput("Password?", link);
             }
-            final UrlQuery query = new UrlQuery();
-            query.appendEncoded("link", link.getDefaultPlugin().buildExternalDownloadURL(link, this));
-            if (passCode != null) {
-                query.appendEncoded("password", passCode);
-            }
-            final Request req_createwebdownload = br.createPostRequest(API_BASE + "/webdl/createwebdownload", query);
-            final Map<String, Object> entries = (Map<String, Object>) this.callAPI(br, req_createwebdownload, account, link);
-            /**
-             * These two strings can be used to identify the unique item/link we just added.
-             */
-            file_id = entries.get("webdownload_id").toString();
-            hash = entries.get("hash").toString();
-            link.setProperty(PROPERTY_MULTIHOST_FILE_ID, file_id);
-            link.setProperty(PROPERTY_MULTIHOST_HASH, hash);
-            logger.info("Trying to init download for internal file_id: " + file_id + " | hash: " + hash);
+            final String file_id = resolveWebDownload(link, account, passCode);
+            logger.info("Requesting the ready TorBox web download");
             final UrlQuery query_requestdl = new UrlQuery();
             query_requestdl.appendEncoded("token", this.getApikey(account));
             query_requestdl.appendEncoded("web_id", file_id);
@@ -290,7 +239,7 @@ public class TorboxApp extends UseNet {
             final Request req_requestdl = br.createGetRequest(API_BASE + "/webdl/requestdl?" + query_requestdl.toString());
             dllink = this.callAPI(br, req_requestdl, account, link).toString();
             if (passCode != null && link.getDownloadPassword() == null) {
-                logger.info("User has entered correct download password: " + passCode);
+                logger.info("Storing download password for future retries");
                 /* Store password so we can re-use it next time */
                 link.setDownloadPassword(passCode);
             }
@@ -303,6 +252,8 @@ public class TorboxApp extends UseNet {
                 /* This code should never be reached */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "WTF");
             }
+        } catch (final InterruptedException ie) {
+            throw ie;
         } catch (final Exception e) {
             if (storedDirecturl != null) {
                 link.removeProperty(directlinkproperty);
@@ -318,9 +269,110 @@ public class TorboxApp extends UseNet {
         dl.startDownload();
     }
 
+    private String resolveWebDownload(final DownloadLink link, final Account account, final String passCode) throws IOException, PluginException, InterruptedException {
+        String fileID = link.getStringProperty(PROPERTY_MULTIHOST_FILE_ID);
+        if (fileID == null || link.getStringProperty(PROPERTY_MULTIHOST_HASH) == null) {
+            synchronized (account) {
+                final String sourceURL = link.getDefaultPlugin().buildExternalDownloadURL(link, this);
+                final Object response = callAPI(br, br.createGetRequest(API_BASE + "/webdl/mylist?bypass_cache=true"), account, link);
+                Map<String, Object> matching = null;
+                for (final Map<String, Object> item : webDownloadItems(response)) {
+                    if (sourceURL.equals(item.get("original_url")) && item.get("id") != null && item.get("hash") != null) {
+                        matching = item;
+                        if (Boolean.TRUE.equals(item.get("download_present"))) {
+                            break;
+                        }
+                    }
+                }
+                if (matching != null) {
+                    fileID = matching.get("id").toString();
+                    link.setProperty(PROPERTY_MULTIHOST_FILE_ID, fileID);
+                    link.setProperty(PROPERTY_MULTIHOST_HASH, matching.get("hash").toString());
+                    link.setProperty(getPropertyKey("webdl_created"), System.currentTimeMillis());
+                } else {
+                    final long delay = account.getLongProperty(getPropertyKey("webdl_next_create"), 0) - System.currentTimeMillis();
+                    if (delay > 0) {
+                        throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "TorBox: waiting for the web download creation interval", delay);
+                    }
+                    /* Shared reservation; failed create calls also consume API quota. */
+                    account.setProperty(getPropertyKey("webdl_next_create"), System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(65));
+                    final UrlQuery query = new UrlQuery();
+                    query.appendEncoded("link", sourceURL);
+                    if (passCode != null) {
+                        query.appendEncoded("password", passCode);
+                    }
+                    final Map<String, Object> created = (Map<String, Object>) callAPI(br, br.createPostRequest(API_BASE + "/webdl/createwebdownload", query), account, link);
+                    if (created == null || created.get("webdownload_id") == null || created.get("hash") == null) {
+                        throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "TorBox: missing remote download identifier", WEBDL_RETRY_DELAY);
+                    }
+                    fileID = created.get("webdownload_id").toString();
+                    link.setProperty(PROPERTY_MULTIHOST_FILE_ID, fileID);
+                    link.setProperty(PROPERTY_MULTIHOST_HASH, created.get("hash").toString());
+                    link.setProperty(getPropertyKey("webdl_created"), System.currentTimeMillis());
+                }
+            }
+        }
+        return waitForWebDownload(link, account, fileID);
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> webDownloadItems(final Object response) throws PluginException {
+        if (response == null) {
+            return Collections.emptyList();
+        } else if (response instanceof Map && ((Map<?, ?>) response).get("id") != null) {
+            return Collections.singletonList((Map<String, Object>) response);
+        } else if (response instanceof List) {
+            final List<Map<String, Object>> items = new ArrayList<Map<String, Object>>();
+            for (final Object item : (List<?>) response) {
+                items.add((Map<String, Object>) item);
+            }
+            return items;
+        } else {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+    }
+
+    private String waitForWebDownload(final DownloadLink link, final Account account, final String fileID) throws IOException, PluginException, InterruptedException {
+        final String hash = link.getStringProperty(PROPERTY_MULTIHOST_HASH);
+        final Object response = callAPI(br, br.createGetRequest(API_BASE + "/webdl/mylist?bypass_cache=true"), account, link);
+        for (final Map<String, Object> item : webDownloadItems(response)) {
+            if (fileID.equals(String.valueOf(item.get("id"))) || hash != null && hash.equals(item.get("hash"))) {
+                if (item.get("id") == null) {
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "TorBox: missing remote download identifier", WEBDL_RETRY_DELAY);
+                }
+                final String id = item.get("id").toString();
+                link.setProperty(PROPERTY_MULTIHOST_FILE_ID, id);
+                if (Boolean.TRUE.equals(item.get("download_present")) && (Boolean.TRUE.equals(item.get("cached")) || Boolean.TRUE.equals(item.get("download_finished")))) {
+                    return id;
+                }
+                final String state = String.valueOf(item.get("download_state"));
+                final Object error = item.get("error");
+                if (StringUtils.startsWithCaseInsensitive(state, "failed") || error != null && !StringUtils.isEmpty(error.toString())) {
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "TorBox web download failed: " + (error != null ? error : state), TimeUnit.HOURS.toMillis(3));
+                }
+                final Number progress = (Number) item.get("progress");
+                final Number eta = (Number) item.get("eta");
+                final String progressText = progress != null ? String.format("%.2f%%", progress.doubleValue() * 100) : "Unknown";
+                final long delay = eta != null ? Math.max(15, Math.min(60, eta.longValue())) * 1000l : WEBDL_RETRY_DELAY;
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "TorBox is preparing the download | State: " + state + " | Progress: " + progressText, delay);
+            }
+        }
+        final Object queued = callAPI(br, br.createGetRequest(API_BASE + "/queued/getqueued?type=webdl&bypass_cache=true"), account, link);
+        for (final Map<String, Object> item : webDownloadItems(queued)) {
+            if (hash != null && hash.equals(item.get("hash"))) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "TorBox is waiting for an available account slot", WEBDL_RETRY_DELAY);
+            }
+        }
+        if (System.currentTimeMillis() - link.getLongProperty(getPropertyKey("webdl_created"), 0) < TimeUnit.MINUTES.toMillis(1)) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Waiting for TorBox download registration", WEBDL_RETRY_DELAY);
+        }
+        resetDownloadlink(link);
+        throw new PluginException(LinkStatus.ERROR_RETRY, "TorBox job no longer exists");
+    }
+
     /**
-     * Fixed timestamps given by API so that we got milliseconds instead of nanoseconds. </br>
-     * 2024-11-12: Problems have been fixed server side so this workaround should not be needed anymore.
+     * Fixed timestamps given by API so that we got milliseconds instead of nanoseconds. </br> 2024-11-12: Problems have been fixed server
+     * side so this workaround should not be needed anymore.
      */
     private String fixDateString(final String dateStr) {
         /* 2024-07-10: They sometimes even return timestamps with 5 digits milli/nanosecs e.g.: 2024-07-05T13:57:33.76273+00:00 */
@@ -357,10 +409,10 @@ public class TorboxApp extends UseNet {
         final Object total_bytes_downloaded = user.get("total_bytes_downloaded");
         final Map<String, Object> user_settings = (Map<String, Object>) user.get("settings");
         /* Use shorter timeout than usually to make notification system work in a better way (see end of this function). */
-        account.setRefreshTimeout(5 * 60 * 1000l);
+        account.setRefreshTimeout(TimeUnit.MINUTES.toMillis(5));
         /**
-         * In GUI, used only needs to enter API key so we'll set the username for him here. </br>
-         * This is also important to be able to keep the user from adding the same account multiple times.
+         * In GUI, used only needs to enter API key so we'll set the username for him here. </br> This is also important to be able to keep
+         * the user from adding the same account multiple times.
          */
         account.setUser(user.get("email").toString());
         /* 0 = free, 1 = standard, 2 = pro */
@@ -369,10 +421,7 @@ public class TorboxApp extends UseNet {
         if (created_at != null) {
             ai.setCreateTime(parseTimeStamp(created_at));
         }
-        long premiumExpireTimestamp = -1;
-        if (premium_expires_at != null) {
-            premiumExpireTimestamp = parseTimeStamp(premium_expires_at);
-        }
+        final long premiumExpireTimestamp = parseTimeStamp(premium_expires_at);
         if (premiumExpireTimestamp > System.currentTimeMillis()) {
             account.setType(AccountType.PREMIUM);
             ai.setValidUntil(premiumExpireTimestamp, br);
@@ -388,7 +437,7 @@ public class TorboxApp extends UseNet {
         }
         final String totalBytesDownloadedText;
         if (total_bytes_downloaded instanceof Number) {
-            final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
+            final SIZEUNIT maxSizeUnit = CFG_GUI.MAX_SIZE_UNIT.getValue();
             totalBytesDownloadedText = SIZEUNIT.formatValue(maxSizeUnit, ((Number) total_bytes_downloaded).longValue());
         } else {
             totalBytesDownloadedText = "N/A";
@@ -469,7 +518,7 @@ public class TorboxApp extends UseNet {
                     final String reason = e.getMessage();
                     String msg = "Failed to obtain Usenet information from API";
                     if (reason != null) {
-                        msg += " | API error: " + msg;
+                        msg += " | API error: " + reason;
                     }
                     usenet.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
                     usenet.setStatusText(msg);
@@ -580,6 +629,14 @@ public class TorboxApp extends UseNet {
 
     /* API docs: https://api-docs.torbox.app/ */
     public Object callAPI(final Browser br, final Request req, final Account account, final DownloadLink link) throws IOException, PluginException, InterruptedException {
+        final String cooldownKey = getPropertyKey("api_wait_" + new java.net.URL(req.getUrl()).getPath());
+        final long wait = account.getLongProperty(cooldownKey, 0) - System.currentTimeMillis();
+        if (wait > 0) {
+            if (link != null) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "TorBox: waiting for API rate limit reset", wait);
+            }
+            throw new AccountUnavailableException("TorBox: waiting for API rate limit reset", wait);
+        }
         setLoginHeaders(req, account);
         br.getPage(req);
         return checkErrors(br, account, link);
@@ -604,9 +661,9 @@ public class TorboxApp extends UseNet {
         } catch (final JSonMapperException jme) {
             final String errortext = "Bad API response";
             if (link != null) {
-                mhm.handleErrorGeneric(account, link, errortext, 50, 5 * 60 * 1000l);
+                mhm.handleErrorGeneric(account, link, errortext, 50, TimeUnit.MINUTES.toMillis(5));
             } else {
-                throw Exceptions.addSuppressed(new AccountUnavailableException(errortext, 1 * 60 * 1000l), jme);
+                throw new AccountUnavailableException(jme, errortext, TimeUnit.MINUTES.toMillis(1));
             }
         }
         return null;
@@ -625,9 +682,11 @@ public class TorboxApp extends UseNet {
          * https://www.postman.com/wamy-dev/workspace/torbox/collection/29572726-4244cdaf-ece6-4b6d-a2ca-463a3af48f54
          */
         final String errorcode = (String) entries.get("error");
-        final String errormsg = entries.get("detail").toString();
+        final String detail = entries.get("detail") instanceof String ? (String) entries.get("detail") : "API request failed";
+        final String errormsg = "TorBox" + (errorcode != null ? " [" + errorcode + "]" : "") + ": " + detail;
         final HashSet<String> accountErrorsPermanent = new HashSet<String>();
         accountErrorsPermanent.add("BAD_TOKEN");
+        accountErrorsPermanent.add("AUTH_ERROR");
         final HashSet<String> accountErrorsTemporary = new HashSet<String>();
         accountErrorsTemporary.add("ACTIVE_LIMIT");
         final HashSet<String> downloadErrorsHostUnavailable = new HashSet<String>();
@@ -640,7 +699,7 @@ public class TorboxApp extends UseNet {
         downloadErrorsHostUnavailable.add("DOWNLOAD_LIMIT_REACHED");
         final HashSet<String> downloadErrorsFileUnavailable = new HashSet<String>();
         /* First check some special cases */
-        if (new Regex(errormsg, ".*This link is password protected.*").patternFind()) {
+        if (link != null && new Regex(errormsg, ".*This link is password protected.*").patternFind()) {
             link.setPasswordProtected(true);
             if (link.getDownloadPassword() != null) {
                 link.setDownloadPassword(null);
@@ -649,26 +708,49 @@ public class TorboxApp extends UseNet {
                 throw new PluginException(LinkStatus.ERROR_RETRY, "Link is password protected");
             }
         }
+        if (("RATE_LIMIT_EXCEEDED".equals(errorcode) || "60 per 1 hour".equals(detail))) {
+            long retryDelay = detail.contains("hour") ? TimeUnit.HOURS.toMillis(1) : TimeUnit.MINUTES.toMillis(1);
+            if (br.getHttpConnection() != null) {
+                final String retryAfter = br.getHttpConnection().getHeaderField("Retry-After");
+                if (retryAfter != null && retryAfter.matches("\\d{1,8}")) {
+                    retryDelay = Math.max(1000l, Long.parseLong(retryAfter) * 1000l);
+                }
+            }
+            if (br.getRequest() != null) {
+                try {
+                    final String path = new java.net.URL(br.getRequest().getUrl()).getPath();
+                    account.setProperty(getPropertyKey("api_wait_" + path), System.currentTimeMillis() + retryDelay);
+                } catch (final java.net.MalformedURLException ignored) {
+                }
+            }
+            if (link != null) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errormsg, retryDelay);
+            }
+            throw new AccountUnavailableException(errormsg, retryDelay);
+        }
+        if (link != null && ("ACTIVE_LIMIT".equals(errorcode) || "DOWNLOAD_LIMIT_REACHED".equals(errorcode) && StringUtils.containsIgnoreCase(detail, "active download limit") || "COOLDOWN_LIMIT".equals(errorcode) || "DOWNLOAD_SERVER_ERROR".equals(errorcode))) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errormsg, WEBDL_RETRY_DELAY);
+        }
+        if (link != null && ("DOWNLOAD_TOO_LARGE".equals(errorcode) || "PLAN_RESTRICTED_FEATURE".equals(errorcode))) {
+            throw new PluginException(LinkStatus.ERROR_FATAL, errormsg);
+        }
+        if (link != null && "LINK_OFFLINE".equals(errorcode)) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, errormsg);
+        }
         if (accountErrorsPermanent.contains(errorcode)) {
             /* This is the only error which allows us to remove the apikey and re-login. */
             throw new AccountInvalidException(errormsg);
         } else if (accountErrorsTemporary.contains(errorcode)) {
-            throw new AccountUnavailableException(errormsg, 5 * 60 * 1000);
+            throw new AccountUnavailableException(errormsg, TimeUnit.MINUTES.toMillis(5));
         } else if (downloadErrorsHostUnavailable.contains(errorcode)) {
-            mhm.putError(account, link, 5 * 60 * 1000l, errormsg);
+            mhm.putError(account, link, TimeUnit.MINUTES.toMillis(5), errormsg);
         } else if (downloadErrorsFileUnavailable.contains(errorcode)) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errormsg);
         }
-        if ("60 per 1 hour".equals(errormsg)) {
-            // {"detail":"60 per 1 hour"}
-            // https://api-docs.torbox.app/
-            // POST /webdl/createwebdownload is rate limited to 60/hour per API token.
-            throw new AccountUnavailableException("reached 60 api downloads per hour limit", TimeUnit.MINUTES.toMillis(15));
-        } else if (link != null) {
-            /* E.g. {"success":false,"detail":"Failed to request web download. Please try again later.","data":null} */
-            mhm.handleErrorGeneric(account, link, errormsg, 50, 1 * 60 * 1000l);
+        if (link != null) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errormsg, TimeUnit.MINUTES.toMillis(5));
         } else {
-            throw new AccountInvalidException(errormsg);
+            throw new AccountUnavailableException(errormsg, TimeUnit.MINUTES.toMillis(5));
         }
     }
 
@@ -731,6 +813,11 @@ public class TorboxApp extends UseNet {
     public void resetDownloadlink(final DownloadLink link) {
         link.removeProperty(PROPERTY_MULTIHOST_FILE_ID);
         link.removeProperty(PROPERTY_MULTIHOST_HASH);
+        link.removeProperty(getPropertyKey("webdl_id"));
+        link.removeProperty(getPropertyKey("webdl_hash"));
+        link.removeProperty(getPropertyKey("webdl_created"));
+        link.removeProperty(getPropertyKey("webdl_account"));
+        link.removeProperty(getPropertyKey("directlink"));
         super.resetDownloadlink(link);
     }
 }

@@ -9,12 +9,6 @@ import javax.swing.JLabel;
 import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
 
-import jd.gui.swing.jdgui.views.settings.components.Checkbox;
-import jd.gui.swing.jdgui.views.settings.components.Spinner;
-
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.views.settings.ConfigurationView;
-
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.exttable.ExtTableModel;
@@ -31,11 +25,15 @@ import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 import org.jdownloader.settings.staticreferences.CFG_SOUND;
 
-public class CaptchaConfigPanel extends AbstractConfigPanel {
-    private static final long serialVersionUID = 1L;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.views.settings.ConfigurationView;
+import jd.gui.swing.jdgui.views.settings.components.Checkbox;
+import jd.gui.swing.jdgui.views.settings.components.Spinner;
 
+public class CaptchaConfigPanel extends AbstractConfigPanel {
+    private static final long         serialVersionUID = 1L;
     // private CESSettingsPanel psp;
-    private SolverOrderTable  solverOrderTable;
+    private SolverOrderTable          solverOrderTable;
     private SolverComparisonContainer solverComparisonContainer;
     private Pair<Spinner>             skipBubbleTimeoutPair;
     private Pair<Checkbox>            useExternalSolverAccountsPair;
@@ -50,7 +48,6 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
         super();
         this.addHeader(getTitle(), new AbstractIcon(IconKey.ICON_OCR, 32));
         this.addDescriptionPlain(_GUI.T.AntiCaptchaConfigPanel_onShow_description());
-
         addPair(_GUI.T.AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_sounds(), null, new Checkbox(CFG_SOUND.CAPTCHA_SOUND_ENABLED));
         addPair(_GUI.T.AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_countdown_download(), null, new Checkbox(CFG_CAPTCHA.DIALOG_COUNTDOWN_FOR_DOWNLOADS_ENABLED));
         final Pair<Checkbox> useExternalSolverAccounts = this.useExternalSolverAccountsPair = addPair(_GUI.T.CaptchaConfigPanel_useExternalSolverAccounts(), null, new Checkbox(CFG_GENERAL.USE_AVAILABLE_CAPTCHA_SOLVER_ACCOUNTS));
@@ -66,7 +63,6 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
             }
         });
         updateSkipBubbleTimeoutEnabled();
-
         /* Tabbed area at the top: solver overview and captcha rules (similar to the Linkgrabber Filter panel). */
         final SolverOrderTable table = this.solverOrderTable = new SolverOrderTable();
         final SolverOrderContainer container = new SolverOrderContainer(table);
@@ -83,8 +79,12 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
         tabs.addTab("Captcha Rules", new CaptchaRulesContainer());
         this.solverComparisonContainer = new SolverComparisonContainer();
         tabs.addTab(_GUI.T.CaptchaSolverComparison_tab_title(), solverComparisonContainer);
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            tabs.addTab("Test & Debug", new JScrollPane(new CaptchaTestPanel()));
+        /* Always shown in the IDE; in the stable only via the (advanced settings only) setting "ShowCaptchaDebugPanel". */
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE || CFG_CAPTCHA.CFG.isShowCaptchaDebugPanel()) {
+            /* The panel is not Scrollable, so without an explicit unit increment one wheel step only scrolls a few pixels. */
+            final JScrollPane testScrollPane = new JScrollPane(new CaptchaTestPanel());
+            testScrollPane.getVerticalScrollBar().setUnitIncrement(20);
+            tabs.addTab("Test & Debug", testScrollPane);
         }
         add(tabs);
         // this.addHeader(_GUI.T.AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_solver(), new AbstractIcon(IconKey.ICON_share", 32));
@@ -165,11 +165,9 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
 
     @Override
     public void save() {
-
     }
 
     @Override
     public void updateContents() {
-
     }
 }

@@ -24,13 +24,16 @@ import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtPasswordField;
 import org.appwork.swing.components.ExtTextField;
 import org.appwork.swing.components.ExtTextHighlighter;
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
 import org.jdownloader.captcha.v2.SolverStatus;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.CaptchaResponse;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
@@ -43,7 +46,6 @@ import org.jdownloader.plugins.accounts.AccountBuilderInterface;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigImagetyperz;
 import org.jdownloader.plugins.controller.LazyPlugin;
-import org.seamless.util.io.IO;
 
 import jd.PluginWrapper;
 import jd.gui.swing.components.linkbutton.JLink;
@@ -60,7 +62,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 53499 $", interfaceVersion = 3, names = { "imagetyperz.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53620 $", interfaceVersion = 3, names = { "imagetyperz.com" }, urls = { "" })
 public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -99,14 +101,17 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
     @Override
     public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
         final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
-        /** TODO: Test and add more captcha types, see their API docs. They even claim to support hCaptcha. */
+        /**
+         * Their API also supports GeeTest, Capy, FunCaptcha, TikTok and "Task" captchas. Those are not added since the matching JD
+         * challenges do not provide the required parameters (e.g. GeeTest "challenge" and "gt").
+         */
         types.add(CAPTCHA_TYPE.IMAGE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
-        // types.add(CAPTCHA_TYPE.CLOUDFLARE_TURNSTILE);
-        // types.add(CAPTCHA_TYPE.HCAPTCHA);
+        types.add(CAPTCHA_TYPE.CLOUDFLARE_TURNSTILE);
+        types.add(CAPTCHA_TYPE.HCAPTCHA);
         // types.add(CAPTCHA_TYPE.GEETEST_V1);
         // types.add(CAPTCHA_TYPE.GEETEST_V4);
         return types;
@@ -187,104 +192,107 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
         return ai;
     }
 
+    /** Adds the authentication parameters (token or username & password) to the given query. */
+    private void addAuthentication(final UrlQuery query, final Account account) {
+        if (this.isLoginViaAuthtoken(account)) {
+            query.appendEncoded("token", account.getPass());
+        } else {
+            query.appendEncoded("username", account.getUser());
+            query.appendEncoded("password", account.getPass());
+        }
+    }
+
     @Override
     public void solve(CESSolverJob<?> job, Account account) throws Exception {
         final Challenge<?> c = job.getChallenge();
         job.setStatus(SolverStatus.UPLOADING);
+        final boolean tokenLogin = this.isLoginViaAuthtoken(account);
         /*
-         * Image captchas are solved synchronously (the upload response already contains the answer as "<id>|<solution>"), while reCAPTCHA
-         * uploads only return an id that has to be polled afterwards.
+         * Image captchas are solved synchronously (the upload response already contains the answer as "<id>|<solution>"), while all other
+         * captcha types only return an id that has to be polled afterwards.
          */
         boolean expectImmediateAnswer = false;
-        String uploadPath = null;
-        final UrlQuery uploadQuery = new UrlQuery();
-        uploadQuery.addAndReplace("action", "UPLOADCAPTCHA");
-        final UrlQuery pollingQuery = new UrlQuery();
-        String pollingPath = "/captchaapi/GetRecaptchaTextToken.ashx";
-        if (this.isLoginViaAuthtoken(account)) {
-            uploadQuery.addAndReplace("token", account.getPass());
-            pollingQuery.addAndReplace("token", account.getPass());
-            uploadPath = "/captchaapi/UploadRecaptchaToken.ashx";
-        } else {
-            uploadQuery.addAndReplace("username", account.getUser());
-            uploadQuery.addAndReplace("password", account.getPass());
-            pollingQuery.addAndReplace("username", account.getUser());
-            pollingQuery.addAndReplace("password", account.getPass());
-            uploadPath = "/captchaapi/UploadRecaptchaV1.ashx";
-        }
+        final String uploadPath;
         final String type;
+        final UrlQuery uploadQuery = new UrlQuery();
+        this.addAuthentication(uploadQuery, account);
+        uploadQuery.appendEncoded("action", "UPLOADCAPTCHA");
         if (c instanceof RecaptchaV2Challenge) {
-            type = "reCaptcha";
             final RecaptchaV2Challenge challenge = (RecaptchaV2Challenge) c;
-            if (challenge.isEnterprise()) {
-                uploadPath = "/captchaapi/UploadRecaptchaEnt.ashx";
-            } else {
-                /* For 'normal' reCaptcha captchas, API calls differ depending on login type */
-                if (this.isLoginViaAuthtoken(account)) {
-                    uploadPath = "/captchaapi/UploadRecaptchaToken.ashx";
-                } else {
-                    uploadPath = "/captchaapi/UploadRecaptchaV1.ashx";
-                }
-            }
-            uploadQuery.addAndReplace("pageurl", challenge.getSiteDomain());
-            uploadQuery.addAndReplace("googlekey", challenge.getSiteKey());
-            if (challenge.isEnterprise()) {
-                String enterprise_type = "v2";// default
-                if (challenge.isInvisible()) {
-                    enterprise_type = "v2";// invisible
-                    uploadQuery.addAndReplace("isinvisible", "1");
-                }
-                if (challenge.isV3()) {
-                    enterprise_type = "v3";// v3
-                }
-                if (challenge.getV3Action() != null) {
-                    final String action = (String) challenge.getV3Action().get("action");
-                    if (action != null) {
-                        enterprise_type = "v3";// v3
-                        uploadQuery.addAndReplace("captchaaction", action);
-                    }
-                }
-                uploadQuery.addAndReplace("enterprise_type", enterprise_type);
-            } else {
-                /* recaptchatype: 1 = normal, 2 = invisible, 3 = v3 (see imagetyperz-api/API-docs). */
-                if (challenge.isInvisible()) {
-                    uploadQuery.addAndReplace("recaptchatype", "2");
-                } else if (challenge.isV3()) {
-                    uploadQuery.addAndReplace("recaptchatype", "3");
-                } else {
-                    uploadQuery.addAndReplace("recaptchatype", "1");
-                }
+            type = "reCaptcha";
+            uploadQuery.appendEncoded("pageurl", challenge.getSiteUrl(this));
+            uploadQuery.appendEncoded("googlekey", challenge.getSiteKey());
+            final Map<String, Object> v3Action = challenge.getV3Action();
+            final String v3ActionName = v3Action != null ? (String) v3Action.get("action") : null;
+            final boolean isV3 = challenge.isV3() || v3ActionName != null;
+            if (v3ActionName != null) {
+                uploadQuery.appendEncoded("captchaaction", v3ActionName);
             }
             if (challenge.getMinScore() != null) {
-                uploadQuery.addAndReplace("score", Double.toString(challenge.getMinScore()));
+                uploadQuery.appendEncoded("score", Double.toString(challenge.getMinScore()));
             }
-            /* Set polling params */
-            if (this.isLoginViaAuthtoken(account)) {
-                pollingPath = "/captchaapi/GetRecaptchaTextToken.ashx";
+            if (StringUtils.isNotEmpty(challenge.getSecureToken())) {
+                uploadQuery.appendEncoded("data-s", challenge.getSecureToken());
+            }
+            if (challenge.isEnterprise()) {
+                uploadPath = "/captchaapi/UploadRecaptchaEnt.ashx";
+                uploadQuery.appendEncoded("enterprise_type", isV3 ? "v3" : "v2");
             } else {
-                pollingPath = "/captchaapi/GetRecaptchaText.ashx";
+                uploadPath = tokenLogin ? "/captchaapi/UploadRecaptchaToken.ashx" : "/captchaapi/UploadRecaptchaV1.ashx";
+                /* recaptchatype: 1 = normal, 2 = invisible, 3 = v3 */
+                if (isV3) {
+                    uploadQuery.appendEncoded("recaptchatype", "3");
+                } else if (challenge.isInvisible()) {
+                    uploadQuery.appendEncoded("recaptchatype", "2");
+                } else {
+                    uploadQuery.appendEncoded("recaptchatype", "1");
+                }
             }
+        } else if (c instanceof HCaptchaChallenge) {
+            final HCaptchaChallenge challenge = (HCaptchaChallenge) c;
+            type = "hCaptcha";
+            uploadPath = "/captchaapi/UploadHCaptchaUser.ashx";
+            uploadQuery.appendEncoded("captchatype", "11");
+            uploadQuery.appendEncoded("pageurl", challenge.getSiteUrl(this));
+            uploadQuery.appendEncoded("sitekey", challenge.getSiteKey());
+            if (AbstractHCaptcha.TYPE.INVISIBLE.name().equals(challenge.getType())) {
+                uploadQuery.appendEncoded("invisible", "1");
+            }
+        } else if (c instanceof CloudflareTurnstileChallenge) {
+            final CloudflareTurnstileChallenge challenge = (CloudflareTurnstileChallenge) c;
+            type = "Turnstile";
+            uploadPath = "/captchaapi/Uploadturnstile.ashx";
+            uploadQuery.appendEncoded("pageurl", challenge.getSiteUrl(this));
+            uploadQuery.appendEncoded("sitekey", challenge.getSiteKey());
         } else if (c instanceof ImageCaptchaChallenge) {
+            final ImageCaptchaChallenge<String> challenge = (ImageCaptchaChallenge<String>) c;
             type = "Image";
-            /* Image captchas are solved synchronously and the answer is returned directly in the upload response. */
             expectImmediateAnswer = true;
-            if (this.isLoginViaAuthtoken(account)) {
+            uploadQuery.appendEncoded("file", challenge.getBase64ImageFile());
+            if (tokenLogin) {
                 uploadPath = "/Forms/UploadFileAndGetTextNEWToken.ashx";
+                if (Boolean.TRUE.equals(challenge.getCaseSensitive())) {
+                    uploadQuery.appendEncoded("iscase", "true");
+                }
+                if (Boolean.TRUE.equals(challenge.getNumeric())) {
+                    /* 1 = digits only */
+                    uploadQuery.appendEncoded("alphanumeric", "1");
+                }
             } else {
-                uploadPath = "/Forms/UploadFileAndGetTextNew.ashx";
+                uploadPath = "/Forms/UploadFileAndGetTextNEW.ashx";
+                if (Boolean.TRUE.equals(challenge.getCaseSensitive())) {
+                    uploadQuery.appendEncoded("chkCase", "1");
+                }
             }
-            final ImageCaptchaChallenge challenge = (ImageCaptchaChallenge) c;
-            final byte[] data = IO.readBytes(challenge.getImageFile());
-            uploadQuery.addAndReplace("file", Base64.encodeToString(data, false));
         } else {
             throw new IllegalArgumentException("Unexpected captcha challenge type");
         }
         this.callAPI(br.createPostRequest(this.getApiBase() + uploadPath, uploadQuery));
+        final String responseText = br.getRequest().getHtmlCode().trim();
         String solution = null;
         final String captchaID;
         if (expectImmediateAnswer) {
             /* Image captcha: the response is "<captchaID>|<solution>", e.g. "123|polum". */
-            final String responseText = br.getRequest().getHtmlCode();
             final String[] idAndSolution = responseText.split("\\|", 2);
             if (idAndSolution.length != 2) {
                 throw new SolverException("Unexpected image captcha response: " + responseText);
@@ -292,54 +300,64 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
             captchaID = idAndSolution[0];
             solution = idAndSolution[1];
         } else {
-            captchaID = br.getRequest().getHtmlCode();
+            captchaID = responseText;
             if (!captchaID.matches("\\d+")) {
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA, "Invalid captcha_id format or invalid response");
             }
             job.setStatus(SolverStatus.SOLVING);
-            pollingQuery.addAndReplace("captchaID", captchaID);
+            /* Recommended way to get the result of any captcha type, see "Response JSON endpoint" in their API docs. */
+            final UrlQuery pollingQuery = new UrlQuery();
+            this.addAuthentication(pollingQuery, account);
+            pollingQuery.appendEncoded("captchaid", captchaID);
+            pollingQuery.appendEncoded("action", "GETTEXT");
+            final String pollingURL = this.getApiBase() + "/captchaapi/GetCaptchaResponseJson.ashx?" + pollingQuery.toString();
             while (true) {
                 waitDuringPolling(job.getChallenge(), account);
-                this.callAPI(br.createPostRequest(this.getApiBase() + pollingPath, pollingQuery));
-                if (!br.containsHTML("NOT_DECODED")) {
-                    solution = br.getRequest().getHtmlCode();
+                this.callAPI(br.createGetRequest(pollingURL));
+                final String pollResponse = br.getRequest().getHtmlCode().trim();
+                if (!pollResponse.startsWith("{") && !pollResponse.startsWith("[")) {
+                    /* Plain text response such as "ERROR: NOT_DECODED" (not solved yet) -> Continue */
+                    continue;
+                }
+                final Map<String, Object> entries;
+                if (pollResponse.startsWith("[")) {
+                    final List<Object> list = restoreFromString(pollResponse, TypeRef.LIST);
+                    entries = (Map<String, Object>) list.get(0);
+                } else {
+                    entries = restoreFromString(pollResponse, TypeRef.MAP);
+                }
+                if ("Solved".equalsIgnoreCase((String) entries.get("Status"))) {
+                    /* "respkey" is only populated for hCaptcha, the actual token is in "Response". */
+                    solution = (String) entries.get("Response");
                     break;
                 }
                 /* Not done yet -> Continue */
             }
         }
         job.getLogger().info("CAPTCHA(" + type + ") solved: " + solution);
-        AbstractResponse resp = null;
-        if (c instanceof RecaptchaV2Challenge) {
-            resp = new TokenCaptchaResponse((Challenge<String>) c, job.getSolver(), solution);
-        } else {
+        final AbstractResponse resp;
+        if (c instanceof ImageCaptchaChallenge) {
             resp = new CaptchaResponse((Challenge<String>) c, job.getSolver(), solution);
+        } else {
+            resp = new TokenCaptchaResponse((Challenge<String>) c, job.getSolver(), solution);
         }
         resp.setCaptchaSolverTaskID(captchaID);
         job.setAnswer(resp);
-        return;
     }
 
     @Override
     public boolean setInvalid(AbstractResponse<?> response, Account account) {
-        /* API docs: https://www.imagetyperz.com/Forms/NewAPI.aspx */
-        UrlQuery query = new UrlQuery(true);
-        query.addAndReplace("action", "SETBADIMAGE");
-        query.addAndReplace("imageid", response.getCaptchaSolverTaskID());
-        final String path;
-        if (this.isLoginViaAuthtoken(account)) {
-            query = query.append("token", account.getPass(), true);
-            path = "/Forms/SetBadImageToken.htm";
-        } else {
-            query.append("password", account.getPass(), true);
-            query.append("username", account.getUser(), true);
-            path = "/Forms/SetBadImage.ashx";
-        }
+        /* API docs: "Set captcha bad" */
+        final UrlQuery query = new UrlQuery();
+        this.addAuthentication(query, account);
+        query.appendEncoded("action", "SETBADIMAGE");
+        query.appendEncoded("imageid", response.getCaptchaSolverTaskID());
+        final String path = this.isLoginViaAuthtoken(account) ? "/Forms/SetBadImageToken.ashx" : "/Forms/SetBadImage.ashx";
         try {
-            final Request req = br.createPostRequest(this.getApiBase() + path, query);
-            this.callAPI(req);
-            return true;
-        } catch (Exception e) {
+            this.callAPI(br.createPostRequest(this.getApiBase() + path, query));
+            /* Success response is "SUCCESS" */
+            return "SUCCESS".equalsIgnoreCase(br.getRequest().getHtmlCode().trim());
+        } catch (final Exception e) {
             e.printStackTrace();
             return false;
         }
@@ -385,6 +403,13 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
         map.put("NOT_DECODED", "The captcha has not been solved yet.");
         map.put("INVALID_TOKEN", "No API token was provided, or the token is invalid.");
         map.put("INVALID_IMAGE_ID", "No image ID was provided, or the provided image ID is invalid.");
+        map.put("IMAGE_TIMED_OUT", "The captcha was not solved by the workers in time.");
+        map.put("INVALID_DOMAIN", "Wrong domain. Check the domain.");
+        map.put("INVALID_SITEKEY", "Wrong site key. Check the site key.");
+        map.put("AUTOMATED_QUERIES", "The proxy sent is blocked temporarily.");
+        map.put("NOT_INVISIBLE", "The captcha is not invisible.");
+        map.put("LIMIT_EXCEED", "The server is overloaded. Please try again later.");
+        map.put("INVALID_CAPTCHA_DATA", "Keys expired or the captcha could not be loaded on the worker side.");
         ERROR_MESSAGES = Collections.unmodifiableMap(map);
     }
 

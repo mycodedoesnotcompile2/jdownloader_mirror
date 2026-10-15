@@ -23,7 +23,6 @@ import javax.swing.JLabel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
-import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.Scrollable;
 import javax.swing.SpinnerNumberModel;
@@ -319,10 +318,23 @@ public class CustomPanel extends MigPanel {
 
     /**
      * Creates a scrollable list with a header and one row per tag: a button that appends the tag to the given text field, a dropdown with
-     * the possible replaces of the tag, the description and the text that is used if there is no data.
+     * the possible replaces of the tag and the description.
      */
     private static JScrollPane createTagList(final List<Replacer> replacers, final ExtTextField target) {
-        final String columns = "[26!][150!][grow,fill][90!]";
+        final List<Tag> tags = new ArrayList<Tag>();
+        for (final Replacer replacer : replacers) {
+            tags.addAll(replacer.getTags());
+        }
+        /* The tag column is as wide as the widest tag needs: The longest key of all tags, plus the arrow if there is a dropdown */
+        final JComboBox<String> measureBox = new JComboBox<String>();
+        int tagColumnWidth = 0;
+        for (final Tag tag : tags) {
+            for (final String key : tag.getKeys()) {
+                final int width = measureBox.getFontMetrics(measureBox.getFont()).stringWidth("{" + key + "}") + (tag.getKeys().size() > 1 ? 40 : 8);
+                tagColumnWidth = Math.max(tagColumnWidth, width);
+            }
+        }
+        final String columns = "[26!][" + tagColumnWidth + "!][grow,fill]";
         /* The list always has the width of the visible area, so that the description column wraps instead of requiring a horizontal scrollbar */
         final MigPanel list = new TagListPanel("ins 2 4 2 4", columns, "[]");
         list.setOpaque(false);
@@ -332,11 +344,6 @@ public class CustomPanel extends MigPanel {
         header.add(new JLabel(""));
         header.add(createHeaderLabel("Tag"), "gapleft 4");
         header.add(createHeaderLabel("Description"), "gapleft 8");
-        header.add(createHeaderLabel("<html>String for<br>missing data</html>"));
-        final List<Tag> tags = new ArrayList<Tag>();
-        for (final Replacer replacer : replacers) {
-            tags.addAll(replacer.getTags());
-        }
         for (final Tag tag : tags) {
             final List<String> replaces = tag.getKeys();
             final String[] labels = new String[replaces.size()];
@@ -384,10 +391,6 @@ public class CustomPanel extends MigPanel {
                 tagLabel.setToolTipText(labels[0]);
                 tagComponent = tagLabel;
             }
-            /* Not used yet: A missing value is always replaced by an empty string */
-            final JTextField emptyField = new JTextField("", 4);
-            emptyField.setEnabled(false);
-            emptyField.setToolTipText("A tag without data is replaced by an empty string");
             if (replaceBox != null) {
                 replaceBox.addItemListener(new ItemListener() {
                     @Override
@@ -424,8 +427,7 @@ public class CustomPanel extends MigPanel {
             description.setForeground(new JLabel().getForeground());
             list.add(add, "aligny center");
             list.add(tagComponent, "gapleft 4,growx,aligny center");
-            list.add(description, "gapleft 8,aligny center,growx,wmin 50");
-            list.add(emptyField, "growx,aligny center,wrap");
+            list.add(description, "gapleft 8,aligny center,growx,wmin 50,wrap");
         }
         final JScrollPane scroll = new JScrollPane(list);
         scroll.setColumnHeaderView(header);

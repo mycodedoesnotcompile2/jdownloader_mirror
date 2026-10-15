@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.appwork.storage.config.JsonConfig;
+import org.appwork.swing.exttable.columns.ExtProgressColumn;
 import org.appwork.utils.Files;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.os.CrossSystem;
@@ -201,6 +202,68 @@ public enum DownloadReplacerTag implements Replacer {
             } else {
                 return null;
             }
+        }
+    },
+    /** How long the download of the link took. */
+    DOWNLOAD_DURATION("link.download.duration", "How long the download of the link took in seconds. Empty if it has not been downloaded") {
+        @Override
+        protected Object resolve(final String key, final AbstractNode node) {
+            if (!isLink(node)) {
+                return UNSUPPORTED;
+            }
+            final DownloadLink downloadLink = getDownloadLink(node);
+            return downloadLink != null ? formatDuration(downloadLink.getView().getDownloadTime()) : null;
+        }
+    },
+    DOWNLOAD_PROGRESS_PERCENT("link.download.progress_percent", "Download progress of the link in percent, e.g. 45.67. Empty if the size is unknown") {
+        @Override
+        protected Object resolve(final String key, final AbstractNode node) {
+            if (!isLink(node)) {
+                return UNSUPPORTED;
+            }
+            final DownloadLink downloadLink = getDownloadLink(node);
+            return downloadLink != null ? formatPercent(downloadLink.getView().getBytesLoaded(), downloadLink.getView().getBytesTotal()) : null;
+        }
+    },
+    DOWNLOAD_PROGRESS_BYTES("link.download.progress_bytes", "Download progress of the link in bytes") {
+        @Override
+        protected Object resolve(final String key, final AbstractNode node) {
+            if (!isLink(node)) {
+                return UNSUPPORTED;
+            }
+            final DownloadLink downloadLink = getDownloadLink(node);
+            return downloadLink != null ? Long.toString(downloadLink.getView().getBytesLoaded()) : null;
+        }
+    },
+    /* The download tags of a package only have data for packages of the download list. For a link the package it is in. */
+    PACKAGE_DOWNLOAD_DURATION("package.download.duration", "Sum of the download times of the links of the package in seconds. For a link the package it is in. Empty if nothing has been downloaded") {
+        @Override
+        protected Object resolve(final String key, final AbstractNode node) {
+            final AbstractNode pkg = getPackage(node);
+            if (!(pkg instanceof FilePackage)) {
+                return null;
+            }
+            return formatDuration(((FilePackage) pkg).getDownloadTime());
+        }
+    },
+    PACKAGE_DOWNLOAD_PROGRESS_PERCENT("package.download.progress_percent", "Download progress of the package in percent, e.g. 45.67. For a link the package it is in. Empty if the size is unknown") {
+        @Override
+        protected Object resolve(final String key, final AbstractNode node) {
+            final AbstractNode pkg = getPackage(node);
+            if (!(pkg instanceof FilePackage)) {
+                return null;
+            }
+            return formatPercent(((FilePackage) pkg).getDownloadProgressPercent());
+        }
+    },
+    PACKAGE_DOWNLOAD_PROGRESS_BYTES("package.download.progress_bytes", "Download progress of the package in bytes. For a link the package it is in") {
+        @Override
+        protected Object resolve(final String key, final AbstractNode node) {
+            final AbstractNode pkg = getPackage(node);
+            if (!(pkg instanceof FilePackage)) {
+                return null;
+            }
+            return Long.toString(((FilePackage) pkg).getBytesLoaded());
         }
     },
     /** The size of the link. For a package its total size. */
@@ -478,6 +541,32 @@ public enum DownloadReplacerTag implements Replacer {
      * @return The value, null if there is no data or UNSUPPORTED if the tag cannot be used with this kind of link or package
      */
     protected abstract Object resolve(String key, AbstractNode node);
+
+    /**
+     * @param milliseconds
+     *            The download time in milliseconds
+     * @return The time in seconds or null if there is none
+     */
+    private static String formatDuration(final long milliseconds) {
+        return milliseconds > 0 ? Long.toString(milliseconds / 1000) : null;
+    }
+
+    /**
+     * @return The progress in percent with two decimals, e.g. 45.67, or null if the total size is unknown
+     */
+    private static String formatPercent(final long loaded, final long total) {
+        /* Same calculation as the progress column: Cut off after two decimals instead of rounding */
+        return total > 0 ? formatPercent(Math.min(100d, ExtProgressColumn.getPercentString(loaded, total))) : null;
+    }
+
+    /**
+     * @param percent
+     *            The progress in percent or a negative value if it is unknown
+     * @return The progress with two decimals, e.g. 45.67, or null if it is unknown
+     */
+    private static String formatPercent(final double percent) {
+        return percent >= 0 ? String.format(Locale.ENGLISH, "%.2f", percent) : null;
+    }
 
     /* Returned by getSize if the object is neither a link nor a package */
     private static final long UNKNOWN_TYPE = Long.MIN_VALUE;

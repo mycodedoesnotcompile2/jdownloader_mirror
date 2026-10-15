@@ -41,6 +41,13 @@ public interface CaptchaSettings extends ConfigInterface {
     public static final CaptchaSettings CFG = JsonConfig.create(CaptchaSettings.class);
 
     @AboutConfig
+    @DefaultBooleanValue(false)
+    @DescriptionForConfigEntry("Developer option: True to show the \"Test & Debug\" tab in the captcha settings, which allows to run test challenges through the captcha solvers. This tab is always shown if JDownloader runs from the IDE.")
+    boolean isShowCaptchaDebugPanel();
+
+    void setShowCaptchaDebugPanel(boolean b);
+
+    @AboutConfig
     @DefaultBooleanValue(true)
     @DescriptionForConfigEntry("Enable the notifications for external captcha solvers")
     boolean isRemoteCaptchaBubbleEnabled();

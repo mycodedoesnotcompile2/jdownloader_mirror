@@ -23,6 +23,7 @@ import java.util.regex.Pattern;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -32,7 +33,7 @@ import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 53606 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53637 $", interfaceVersion = 3, names = {}, urls = {})
 public class TerabytezOrg extends XFileSharingProBasic {
     public TerabytezOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -156,8 +157,14 @@ public class TerabytezOrg extends XFileSharingProBasic {
 
     @Override
     protected boolean supports_availablecheck_filename_abuse() {
-        /* 2026-10-13: Disabled server-side */
-        return false;
+        // now requires being logged in
+        return AccountController.getInstance().getValidAccount(this) != null;
+    }
+
+    @Override
+    protected boolean supports_availablecheck_alt() {
+        // now requires being logged in
+        return AccountController.getInstance().getValidAccount(this) != null;
     }
 
     @Override
@@ -188,7 +195,6 @@ public class TerabytezOrg extends XFileSharingProBasic {
         if (url_without_filename != null) {
             /**
              * 2025-08-12: Small workaround to allow "massLinkcheckerWebsite" to work, else it may fail with error "Filename don't match!".
-             * <br>
              * More details: https://board.jdownloader.org/showthread.php?p=550013#post550013
              */
             return url_without_filename;

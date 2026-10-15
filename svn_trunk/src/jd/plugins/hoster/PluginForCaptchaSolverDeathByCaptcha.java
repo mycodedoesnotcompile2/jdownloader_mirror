@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Currency;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -32,6 +33,7 @@ import org.appwork.utils.images.IconIO;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
 import org.jdownloader.captcha.v2.SolverStatus;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
@@ -66,7 +68,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 53549 $", interfaceVersion = 3, names = { "deathbycaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53619 $", interfaceVersion = 3, names = { "deathbycaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -105,14 +107,15 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
     public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
         final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
         types.add(CAPTCHA_TYPE.IMAGE);
-        types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
         /**
          *
-         * Enterprise supported via https://deathbycaptcha.com/api/newtokenrecaptcha#reCAPTCHAv2Enterprise
+         * Enterprise supported via https://deathbycaptcha.com/api/newtokenrecaptcha#reCAPTCHAv2Enterprise <br>
+         * 2026-10-14: v3, v2 invisible and v2 enterprise fail with HTTP/1.1 501 Not Implemented
          */
-        types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
-        types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
+        // types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
+        // types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
+        // types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
         types.add(CAPTCHA_TYPE.CLOUDFLARE_TURNSTILE);
         types.add(CAPTCHA_TYPE.CUTCAPTCHA);
         /* 2025-02-24: Not supported anymore, see isChallengeSupported and: https://deathbycaptcha.com/api#supported_captchas */
@@ -126,6 +129,14 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
         // types.add(CAPTCHA_TYPE.GEETEST_V1);
         // types.add(CAPTCHA_TYPE.GEETEST_V4);
         // types.add(CAPTCHA_TYPE.FRIENDLY_CAPTCHA);
+        return types;
+    }
+
+    @Override
+    public List<FeedbackType> getSupportedFeedbackTypes() {
+        /* API only offers reporting incorrectly solved captchas, see https://deathbycaptcha.com/api#api_details_report */
+        final List<FeedbackType> types = new ArrayList<FeedbackType>();
+        types.add(FeedbackType.REPORT_INVALID_CAPTCHAS);
         return types;
     }
 
@@ -232,15 +243,13 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
                     if (StringUtils.isEmpty(proxy)) {
                         throw new PluginException(LinkStatus.ERROR_CAPTCHA, "deathbycaptcha.com requires a proxy to solve reCAPTCHAv2 Enterprise challenges. Please configure one in the DeathByCaptcha settings.");
                     }
+                    if (v3action != null || rc_challenge.isV3()) {
+                        /* Docs only offer reCAPTCHA v2 Enterprise (type 25), which has no action/min_score parameters. */
+                        throw new PluginException(LinkStatus.ERROR_CAPTCHA, "deathbycaptcha.com does not support reCAPTCHA v3 Enterprise");
+                    }
                     token_param.put("proxy", proxy);
-                    token_param.put("proxytype", cfg.getEnterpriseRecaptchaProxyType());
-                    if (v3action != null) {
-                        token_param.put("action", v3action.get("action"));
-                    }
-                    final Double minScore = rc_challenge.getMinScore();
-                    if (minScore != null) {
-                        token_param.put("min_score", minScore);
-                    }
+                    /* Docs: proxytype is required whenever a proxy is given, e.g. "HTTP" (upper case). */
+                    token_param.put("proxytype", StringUtils.valueOrEmpty(cfg.getEnterpriseRecaptchaProxyType()).toUpperCase(Locale.ENGLISH));
                     r.addFormData(new FormData("token_enterprise_params", JSonStorage.serializeToJson(token_param)));
                 } else if (v3action != null) {
                     type = "RecaptchaV3";
@@ -290,8 +299,8 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
             } else {
                 throw new IllegalArgumentException("Unexpected captcha challenge type");
             }
-            br.getPage(r);
-            final Map<String, Object> uploadresp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            /* callAPI evaluates status/error and the HTTP response code (e.g. 403 = bad credentials/no credits, 400 = invalid params). */
+            final Map<String, Object> uploadresp = callAPI(r);
             final int captchaID = ((Number) uploadresp.get("captcha")).intValue();
             if (captchaID <= 0) {
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA, "Failed to upload captcha");
@@ -403,8 +412,8 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
         /*
          * Docs: https://deathbycaptcha.com/api#api_details -- the JSON body alone (status/error) does not distinguish an account problem
          * from a captcha problem, only the HTTP response code does: 403 = credentials rejected or insufficient credits (account,
-         * permanent), 400 = malformed request or invalid captcha image (captcha-level, not account), 503 = service overloaded
-         * (temporary), 500/other = internal server error (not the account's fault).
+         * permanent), 400 = malformed request or invalid captcha image (captcha-level, not account), 503 = service overloaded (temporary),
+         * 500/other = internal server error (not the account's fault).
          */
         final int responseCode = br.getHttpConnection().getResponseCode();
         if (responseCode == 403) {

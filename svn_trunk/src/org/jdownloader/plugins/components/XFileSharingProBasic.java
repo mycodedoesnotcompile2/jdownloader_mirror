@@ -93,7 +93,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 53613 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53638 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1224,11 +1224,13 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         premiumOnly: if (isPremiumOnlyURL(altbr)) {
             normalHandling = false;
             // dirty hack because loginWebsite doesn't have Browser parameter yet
+            boolean isLoggedIn = false;
             if (useAccountForLinkCheck(altbr, account, link)) {
                 final Browser brOld = this.br;
                 try {
                     this.br = altbr;
                     loginWebsite(link, account, false);
+                    isLoggedIn = true;
                 } catch (PluginException e) {
                     if (PluginEnvironment.DOWNLOAD.isCurrentPluginEnvironment()) {
                         throw e;
@@ -1238,7 +1240,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                     this.br = brOld;
                 }
             }
-            premiumDownloadWebsite: if (true) {
+            premiumDownloadWebsite: if (isLoggedIn) {
                 try {
                     final Browser tryNormalWebsite = altbr.cloneBrowser();
                     tryNormalWebsite.setFollowRedirects(false);
@@ -1253,14 +1255,12 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                             if (!canHandle(request.getUrl())) {
                                 // plugin cannot handle URL, abort this special handling
                                 break premiumDownloadWebsite;
-                            } else if (isDllinkFile(request.getUrl())) {
-                                // looks like direct download/auto-redirect is enabled, no way to fetch details from website
-                                break premiumDownloadWebsite;
-                            }
-                            if (request.getLocation() != null) {
+                            } else if (request.getLocation() != null) {
                                 // we have yet another redirect
-                                final Request redirect = tryNormalWebsite.createRedirectFollowingRequest(request);
-                                tryNormalWebsite.openRequestConnection(redirect);
+                                if (canHandle(redirectLocation)) {
+                                    final Request redirect = tryNormalWebsite.createRedirectFollowingRequest(request);
+                                    tryNormalWebsite.openRequestConnection(redirect);
+                                }
                                 continue followRequests;
                             }
                             tryNormalWebsite.setFollowRedirects(altbr.isFollowingRedirects());
@@ -1268,6 +1268,10 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                             altbr = tryNormalWebsite.cloneBrowser();
                             normalHandling = true;
                             break premiumOnly;
+                        } else if (isDllinkFile(redirectLocation)) {
+                            // looks like direct download/auto-redirect is enabled, no way to fetch details from website
+                            fileInfo[0] = StringUtils.nullOrNonEmpty(getFileNameFromURL(new URL(redirectLocation)));
+                            break premiumDownloadWebsite;
                         }
                         break premiumDownloadWebsite;
                     }
@@ -1279,13 +1283,13 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
              * Hosts whose urls are all premiumonly usually don't display any information about the URL at all - only maybe online/offline.
              * There are 2 alternative ways to get this information anyways!
              */
-            logger.info("PREMIUMONLY linkcheck: Trying alternative linkcheck");
             /* Find filename */
-            if (this.internal_supports_availablecheck_filename_abuse()) {
+            if (fileInfo[0] == null && this.internal_supports_availablecheck_filename_abuse()) {
                 fileInfo[0] = this.getFnameViaAbuseLink(altbr, link);
+                logger.info("PREMIUMONLY linkcheck: Trying alternative linkcheck, getFnameViaAbuseLink:" + fileInfo[0]);
             }
             /* Find filesize */
-            if (this.internal_supports_availablecheck_alt()) {
+            if (fileInfo[1] == null && this.internal_supports_availablecheck_alt()) {
                 getFilesizeViaAvailablecheckAlt(altbr, account, link);
             }
         }
@@ -4128,7 +4132,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         String fileName = getFileNameFromDispositionHeader(connection);
         if (StringUtils.isEmpty(fileName)) {
             fileName = Plugin.getFileNameFromURL(connection.getURL());
-            fileName = URLEncode.decodeURIComponent(fileName);
             /* Ignore typical meaningless names. */
             if (fileName != null && fileName.matches("(?i)video\\.(mp4|mkv)$")) {
                 fileName = null;

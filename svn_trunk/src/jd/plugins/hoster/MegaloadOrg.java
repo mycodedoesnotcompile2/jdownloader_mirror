@@ -23,13 +23,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -47,7 +40,15 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53573 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
+
+@HostPlugin(revision = "$Revision: 53623 $", interfaceVersion = 3, names = {}, urls = {})
 public class MegaloadOrg extends PluginForHost {
     /* API docs: "MEGALOAD Downloader API" (account/plan access to the Downloader API is required). */
     private static final String API_BASE                   = "https://megaload.org/API";
@@ -101,6 +102,7 @@ public class MegaloadOrg extends PluginForHost {
         final Browser br = super.createNewBrowserInstance();
         br.getHeaders().put("Accept", "application/json");
         br.getHeaders().put("User-Agent", API_USER_AGENT);
+        br.setIPVersion(IPVERSION.IPV4_IPV6);
         br.setFollowRedirects(true);
         return br;
     }
@@ -302,9 +304,9 @@ public class MegaloadOrg extends PluginForHost {
     }
 
     /**
-     * Makes sure a token is stored and returns the profile map. </br>
-     * validate=false: Re-use a stored token without any request (returns null) or login if there is none. </br>
-     * validate=true: Check the stored token via action=profile and login again if it is no longer valid.
+     * Makes sure a token is stored and returns the profile map. </br> validate=false: Re-use a stored token without any request (returns
+     * null) or login if there is none. </br> validate=true: Check the stored token via action=profile and login again if it is no longer
+     * valid.
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> login(final Account account, final boolean validate) throws Exception {

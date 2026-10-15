@@ -16,9 +16,6 @@ import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
 import org.jdownloader.captcha.v2.SolverStatus;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
-import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.CaptchaResponse;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
@@ -38,10 +35,9 @@ import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 53584 $", interfaceVersion = 3, names = { "endcaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53620 $", interfaceVersion = 3, names = { "endcaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSolver {
     public PluginForCaptchaSolverEndcaptcha(PluginWrapper wrapper) {
         super(wrapper);
@@ -76,7 +72,8 @@ public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSo
          * 2026-01-22: reCaptcha enterprise doesn't look to be supported according to their API docs
          */
         // types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
-        types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
+        /** 2026-10-14: Looks to be broken: API replies with "?" (plaintext questionmark) during polling (wtf!) */
+        // types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
         return types;
     }
 
@@ -128,14 +125,12 @@ public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSo
                     type = "RecaptchaV3";
                     r.addFormData(new FormData("type", "5"));
                     token_param.put("action", v3action.get("action"));
-                    final Double minScore = rc_challenge.getMinScore();
-                    if (minScore != null) {
-                        token_param.put("min_score", minScore);
-                    }
+                    token_param.put("min_score", getMinScoreOrDefault(rc_challenge));
                 } else {
                     if (rc_challenge.isV3()) {
                         type = "RecaptchaV3";
                         r.addFormData(new FormData("type", "5"));
+                        token_param.put("min_score", getMinScoreOrDefault(rc_challenge));
                     } else if (rc_challenge.isInvisible()) {
                         type = "RecaptchaV2 invisible";
                         r.addFormData(new FormData("type", "4"));
@@ -156,31 +151,37 @@ public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSo
                 throw new IllegalArgumentException("Unexpected captcha challenge type");
             }
             this.callAPI(r);
-            final String captchaID = this.findCaptchaID();
-            if (captchaID == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find captcha ID in API response");
-            }
-            job.setStatus(SolverStatus.SOLVING);
             /*
-             * The poll endpoint returns plain text (NOT JSON): "UNSOLVED_YET:/poll/<id>" while the captcha is still being solved, or the
-             * plain solution text once it is done. Completion is therefore detected by the absence of the "UNSOLVED_YET" marker.
+             * The upload endpoint either returns the solution right away (captcha was solved while waiting for the server response) or
+             * "UNSOLVED_YET:/poll/<id>". In the first case there is no captcha ID.
              */
-            while (true) {
-                waitDuringPolling(job.getChallenge(), account);
-                this.callAPI(br.createGetRequest(this.getApiBase() + "/poll/" + captchaID));
-                if (this.findCaptchaID() == null) {
-                    break;
+            String captchaID = this.findCaptchaID();
+            if (captchaID != null) {
+                job.setStatus(SolverStatus.SOLVING);
+                /*
+                 * The poll endpoint returns plain text (NOT JSON): "UNSOLVED_YET:/poll/<id>" while the captcha is still being solved, or
+                 * the plain solution text once it is done. Completion is therefore detected by the absence of the "UNSOLVED_YET" marker.
+                 * Polling interval is limited by getServerSideMinPollingIntervalMillis().
+                 */
+                while (true) {
+                    waitDuringPolling(job.getChallenge(), account);
+                    this.callAPI(br.createGetRequest(this.getApiBase() + "/poll/" + captchaID));
+                    if (this.findCaptchaID() == null) {
+                        break;
+                    }
                 }
             }
-            final String solution = br.getRequest().getHtmlCode();
+            final String solution = br.getRequest().getHtmlCode().trim();
             job.getLogger().info("CAPTCHA(" + type + ") solved: " + solution);
             final AbstractResponse resp;
-            if (challenge instanceof RecaptchaV2Challenge || challenge instanceof HCaptchaChallenge || challenge instanceof CloudflareTurnstileChallenge || challenge instanceof CutCaptchaChallenge) {
+            if (challenge instanceof RecaptchaV2Challenge) {
                 resp = new TokenCaptchaResponse((Challenge<String>) challenge, job.getSolver(), solution);
             } else {
                 resp = new CaptchaResponse((Challenge<String>) challenge, job.getSolver(), solution);
             }
-            resp.setCaptchaSolverTaskID(captchaID);
+            if (captchaID != null) {
+                resp.setCaptchaSolverTaskID(captchaID);
+            }
             job.setAnswer(resp);
             return;
         } catch (Exception e) {
@@ -193,22 +194,41 @@ public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSo
         return br.getRegex("UNSOLVED_YET:/poll/(\\d+)").getMatch(0);
     }
 
+    /** Docs: min_score is "usually 0.3". */
+    private Double getMinScoreOrDefault(final RecaptchaV2Challenge challenge) {
+        final Double minScore = challenge.getMinScore();
+        if (minScore != null) {
+            return minScore;
+        }
+        return 0.3d;
+    }
+
+    @Override
+    public long getServerSideMinPollingIntervalMillis() {
+        /* API docs: "Please don't poll for a CAPTCHA status more than once every 3 seconds." */
+        return 3000;
+    }
+
     @Override
     public boolean setInvalid(AbstractResponse<?> response, Account account) {
-        /* API docs: https://deathbycaptcha.com/api#api_details_report */
+        /*
+         * API docs: https://endcaptcha.com/api-specs (section 4). Refund only possible if the captcha was uploaded less than an hour ago.
+         */
+        final String captchaID = response.getCaptchaSolverTaskID();
+        if (captchaID == null) {
+            /* Captcha was solved directly during upload -> no captcha ID available to report it. */
+            return false;
+        }
         final UrlQuery query = new UrlQuery(true);
         query.append("username", account.getUser(), true);
         query.append("password", account.getPass(), true);
-        query.append("captcha_id", response.getCaptchaSolverTaskID(), true);
+        query.append("captcha_id", captchaID, true);
         try {
             final Request req = br.createPostRequest(this.getApiBase() + "/report", query);
             this.callAPI(req);
-            if (br.getRequest().getHtmlCode().equalsIgnoreCase("OK")) {
-                return true;
-            } else {
-                return false;
-            }
+            return br.getRequest().getHtmlCode().trim().equalsIgnoreCase("OK");
         } catch (Exception e) {
+            /* E.g. ERROR:ALREADY REPORTED, ERROR:INCORRECT CAPTCHA ID, ERROR:SOLVING, CANT REPORT */
             e.printStackTrace();
             return false;
         }
@@ -224,7 +244,8 @@ public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSo
         /* Check if error is related to login or captcha solving. Docs: https://endcaptcha.com/api-specs */
         if (this.getPluginEnvironment() == PluginEnvironment.ACCOUNT_CHECK) {
             throw new AccountInvalidException(error);
-        } else if (error.equalsIgnoreCase("NOT AUTHENTICATED") || error.equalsIgnoreCase("NOT ENOUGH BALANCE")) {
+        } else if (error.equalsIgnoreCase("NOT AUTHENTICATED") || error.equalsIgnoreCase("NOT ENOUGH BALANCE") || error.equalsIgnoreCase("INVALD CREDENTIALS") || error.equalsIgnoreCase("INVALID CREDENTIALS")) {
+            /* Note: "INVALD CREDENTIALS" (sic) is the spelling used in the API docs for /report. */
             throw new AccountInvalidException(error);
         }
         throw new SolverException(error);

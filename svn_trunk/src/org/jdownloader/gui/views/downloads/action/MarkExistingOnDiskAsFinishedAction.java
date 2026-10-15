@@ -8,7 +8,15 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import javax.swing.JProgressBar;
 
+import jd.controlling.downloadcontroller.DownloadSession;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.downloadcontroller.DownloadWatchDogJob;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
 import org.appwork.utils.locale._AWU;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogNoAnswerException;
@@ -26,26 +34,19 @@ import org.jdownloader.plugins.FinalLinkState;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.utils.FileIoCache;
 
-import jd.controlling.downloadcontroller.DownloadSession;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.DownloadWatchDogJob;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-
 /**
  * "Mark as finished if file exists on disk" context menu action.
  *
  * Walks all selected {@link DownloadLink}s and marks each one as finished whose expected output file already exists on disk. A
- * {@link FileIoCache} keeps the number of {@link File#exists()} calls to a minimum, which also covers the case where the same file
- * (same path) is referenced by two different packages. The whole scan runs inside a cancelable {@link ProgressDialog}.
+ * {@link FileIoCache} keeps the number of {@link File#exists()} calls to a minimum, which also covers the case where the same file (same
+ * path) is referenced by two different packages. The whole scan runs inside a cancelable {@link ProgressDialog}.
  *
- * When {@link #isFileSizeMustMatch()} is enabled, an existing file only counts when its size on disk matches the link's expected
- * download size. Links without a known size are not size-checked (existence alone is enough).
+ * When {@link #isFileSizeMustMatch()} is enabled, an existing file only counts when its size on disk matches the link's expected download
+ * size. Links without a known size are not size-checked (existence alone is enough).
  */
 public class MarkExistingOnDiskAsFinishedAction extends CustomizableTableContextAppAction<FilePackage, DownloadLink> implements ActionContext {
-    private static final long   serialVersionUID = 8087143123808363306L;
-    private final static String NAME             = _GUI.T.gui_table_contextmenu_markexistingondiskasfinished();
+    private static final long   serialVersionUID  = 8087143123808363306L;
+    private final static String NAME              = _GUI.T.gui_table_contextmenu_markexistingondiskasfinished();
     private boolean             fileSizeMustMatch = false;
 
     public MarkExistingOnDiskAsFinishedAction() {
@@ -67,14 +68,6 @@ public class MarkExistingOnDiskAsFinishedAction extends CustomizableTableContext
         this.fileSizeMustMatch = fileSizeMustMatch;
     }
 
-    private void setFinished(final DownloadLink downloadlink) {
-        downloadlink.setFinalLinkState(FinalLinkState.FINISHED);
-        final long knownSize = downloadlink.getKnownDownloadSize();
-        if (knownSize >= 0) {
-            downloadlink.setDownloadCurrent(knownSize);
-        }
-    }
-
     /**
      * Enqueues the state change through the {@link DownloadWatchDog}. If the link is currently being downloaded, the change is deferred
      * until the download controller detaches, otherwise it is applied right away. Mirrors {@link MarkDownloadFinishedAction}.
@@ -88,6 +81,14 @@ public class MarkExistingOnDiskAsFinishedAction extends CustomizableTableContext
 
             @Override
             public void interrupt() {
+            }
+
+            private void setFinished(final DownloadLink downloadlink) {
+                downloadlink.setFinalLinkState(FinalLinkState.FINISHED);
+                final long knownSize = downloadlink.getKnownDownloadSize();
+                if (knownSize >= 0) {
+                    downloadlink.setDownloadCurrent(knownSize);
+                }
             }
 
             @Override
@@ -122,26 +123,24 @@ public class MarkExistingOnDiskAsFinishedAction extends CustomizableTableContext
         if (SelectionInfo.isEmpty(selectionInfo)) {
             return;
         }
-        final List<DownloadLink> selection = selectionInfo.getChildren();
-        if (selection.size() == 0) {
-            return;
-        }
+
         /* Snapshot the setting at trigger time so a later change does not affect a running scan. */
         final boolean fileSizeMustMatch = isFileSizeMustMatch();
         new Thread("MarkExistingOnDiskAsFinishedAction") {
             public void run() {
+                final List<DownloadLink> selection = selectionInfo.getChildren();
                 /* Holds the text currently shown above the progress bar (e.g. "Working on: <filename>"). */
                 final AtomicReference<String> workingOn = new AtomicReference<String>();
                 final ProgressGetter getter = new ProgressGetter() {
-                    private final int    total             = selection.size();
-                    private volatile int current           = 0;
-                    private volatile int marked            = 0;
-                    private volatile int skipped           = 0;
-                    private volatile int errors            = 0;
+                    private final int        total              = selection.size();
+                    private volatile int     current            = 0;
+                    private volatile int     marked             = 0;
+                    private volatile int     skipped            = 0;
+                    private volatile int     errors             = 0;
                     /* Phase flag: true while scanning, false during the auto-close countdown that follows a completed scan. */
-                    private volatile boolean scanning      = true;
+                    private volatile boolean scanning           = true;
                     /* System time (ms) at which the dialog auto-closes; only meaningful once scanning == false. */
-                    private volatile long    closeDeadline = 0;
+                    private volatile long    closeDeadline      = 0;
                     private final long       AUTO_CLOSE_TIMEOUT = 30000;
 
                     @Override
@@ -204,10 +203,10 @@ public class MarkExistingOnDiskAsFinishedAction extends CustomizableTableContext
                          * deadline before flipping the phase flag so a concurrent reader never sees closeDeadline == 0.
                          */
                         workingOn.set(_GUI.T.MarkExistingOnDiskAsFinishedAction_working_done());
-                        closeDeadline = System.currentTimeMillis() + AUTO_CLOSE_TIMEOUT;
+                        closeDeadline = Time.systemIndependentCurrentJVMTimeMillis() + AUTO_CLOSE_TIMEOUT;
                         scanning = false;
                         while (!Thread.currentThread().isInterrupted()) {
-                            final long remaining = closeDeadline - System.currentTimeMillis();
+                            final long remaining = closeDeadline - Time.systemIndependentCurrentJVMTimeMillis();
                             if (remaining <= 0) {
                                 break;
                             }
@@ -227,7 +226,7 @@ public class MarkExistingOnDiskAsFinishedAction extends CustomizableTableContext
                         if (scanning) {
                             return _GUI.T.MarkExistingOnDiskAsFinishedAction_progress_status(current, total, marked, skipped, errors);
                         } else {
-                            final long remaining = closeDeadline - System.currentTimeMillis();
+                            final long remaining = closeDeadline - Time.systemIndependentCurrentJVMTimeMillis();
                             final int seconds = (int) Math.max(0, (remaining + 999) / 1000);
                             return _GUI.T.MarkExistingOnDiskAsFinishedAction_progress_status_done(marked, skipped, errors, seconds);
                         }
@@ -240,7 +239,7 @@ public class MarkExistingOnDiskAsFinishedAction extends CustomizableTableContext
                              * Countdown phase: drain the bar from the remaining time towards 0. Never return >= 100 here, otherwise the
                              * ProgressDialog would dispose itself immediately instead of waiting for the timeout / Close button.
                              */
-                            final long remaining = closeDeadline - System.currentTimeMillis();
+                            final long remaining = closeDeadline - Time.systemIndependentCurrentJVMTimeMillis();
                             if (remaining <= 0) {
                                 return 0;
                             }

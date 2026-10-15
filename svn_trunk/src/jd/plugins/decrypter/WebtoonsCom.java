@@ -20,12 +20,14 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.HashSet;
 
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DecrypterRetryException;
@@ -37,7 +39,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 48432 $", interfaceVersion = 3, names = { "webtoons.com" }, urls = { "https?://(?:www\\.)?webtoons\\.com/[a-z\\-]+/[^/]+/[^/]+/(?:[^/]+/viewer\\?title_no=\\d+\\&episode_no=\\d+|list\\?title_no=\\d+)" })
+@DecrypterPlugin(revision = "$Revision: 53626 $", interfaceVersion = 3, names = { "webtoons.com" }, urls = { "https?://(?:www\\.)?webtoons\\.com/[a-z\\-]+/[^/]+/[^/]+/(?:[^/]+/viewer\\?title_no=\\d+\\&episode_no=\\d+|list\\?title_no=\\d+)" })
 public class WebtoonsCom extends PluginForDecrypt {
     public WebtoonsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -66,13 +68,20 @@ public class WebtoonsCom extends PluginForDecrypt {
         final UrlQuery query = UrlQuery.parse(param.getCryptedUrl());
         final String titlenumber = query.get("title_no");
         final String episodenumber = query.get("episode_no");
-        String fpName = br.getRegex("\"og:title\"\\s*content=\"(.*?)\"").getMatch(0);
-        if (fpName == null) {
-            fpName = br.getRegex("<title>([^<>]+)</title>").getMatch(0);
+        final String ogtitle = br.getRegex("\"og:title\"\\s*content=\"(.*?)\"").getMatch(0);
+        if (StringUtils.containsIgnoreCase(ogtitle, "( locked)") || StringUtils.containsIgnoreCase(ogtitle, "(locked)")) {
+            throw new AccountRequiredException();
+        }
+        String title = ogtitle;
+        if (title == null) {
+            title = br.getRegex("<title>([^<>]+)</title>").getMatch(0);
         }
         final FilePackage fp = FilePackage.getInstance();
-        if (fpName != null) {
-            fp.setName(Encoding.htmlDecode(fpName).trim());
+        if (title != null) {
+            title = Encoding.htmlDecode(title).trim();
+            /* 2026-10-14: Double-decode needed */
+            title = Encoding.htmlOnlyDecode(title);
+            fp.setName(title);
         }
         String[] links;
         if (episodenumber != null) {
@@ -94,7 +103,7 @@ public class WebtoonsCom extends PluginForDecrypt {
                 dl.setAvailable(true);
                 dl.setFinalFileName(name);
                 if (fp != null) {
-                    fp.add(dl);
+                    dl._setFilePackage(fp);
                 }
                 ret.add(dl);
             }
@@ -102,13 +111,14 @@ public class WebtoonsCom extends PluginForDecrypt {
             /* Crawl all episodes of a series */
             int page = 1;
             final HashSet<String> dupes = new HashSet<String>();
+            int numberofLockedItems = 0;
             do {
                 logger.info("Crawling page: " + page);
                 /* Find urls of all episode of a title --> Re-Add these single episodes to the crawler. */
-                links = br.getRegex("<li[^>]*id=\"episode_\\d+\"[^>]+>[^<>]*?<a href=\"(https?://[^<>\"]+title_no=" + titlenumber + "\\&episode_no=\\d+)\"").getColumn(0);
-                if (links.length == 0) {
+                final String[][] episodes = br.getRegex("(?s)<li[^>]*id=\"episode_\\d+\"[^>]*>\\s*<a href=\"(https?://[^<>\"]+title_no=" + titlenumber + "\\&episode_no=\\d+)[^<>\"]*\"[^>]*>.*?<span class=\"subj\"><span>([^<]*)</span>").getMatches();
+                if (episodes.length == 0) {
                     /* Maybe we already found everything or there simply isn't anything. */
-                    if (ret.isEmpty()) {
+                    if (ret.isEmpty() && numberofLockedItems == 0) {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     } else {
                         /* This should be an extremely rare case */
@@ -116,11 +126,18 @@ public class WebtoonsCom extends PluginForDecrypt {
                         break;
                     }
                 }
-                logger.info("Crawled page " + page + " | Found items so far: " + ret.size());
+                logger.info("Crawled page " + page + " | Found items so far: " + ret.size() + " | Skipped premiumonly items: " + numberofLockedItems);
                 int numberofNewItems = 0;
-                for (final String singleLink : links) {
+                for (final String[] episode : episodes) {
+                    final String singleLink = episode[0];
+                    final String episodeTitle = Encoding.htmlDecode(episode[1]);
                     if (dupes.add(singleLink)) {
                         numberofNewItems++;
+                        if (StringUtils.containsIgnoreCase(episodeTitle, "locked)")) {
+                            /* Locked episode -> Skip and count */
+                            numberofLockedItems++;
+                            continue;
+                        }
                         final DownloadLink link = this.createDownloadlink(singleLink);
                         if (fp != null) {
                             fp.add(link);
@@ -152,7 +169,12 @@ public class WebtoonsCom extends PluginForDecrypt {
                     // continue;
                 }
             } while (!this.isAbort());
+            logger.info("Skipped locked episodes: " + numberofLockedItems);
             if (ret.isEmpty()) {
+                if (numberofLockedItems > 0) {
+                    /* Only locked episodes found */
+                    throw new AccountRequiredException();
+                }
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }

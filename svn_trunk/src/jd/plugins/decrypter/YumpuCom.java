@@ -16,16 +16,20 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
+import jd.http.Cookies;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
@@ -37,8 +41,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 50219 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53621 $", interfaceVersion = 3, names = {}, urls = {})
 public class YumpuCom extends PluginForDecrypt {
+    private static final String API_BASE = "https://api.yumpu.news/1.0";
+
     public YumpuCom(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -82,59 +88,60 @@ public class YumpuCom extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        /* The website sets a guest ("candyland") token cookie which is used as Bearer token for the API. */
+        final String authtoken = br.getCookie(br.getHost(), "yn_caT", Cookies.NOTDELETEDPATTERN);
+        if (StringUtils.isEmpty(authtoken)) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         String fid = new Regex(param.getCryptedUrl(), TYPE_NEW).getMatch(2);
         if (fid == null) {
             fid = new Regex(param.getCryptedUrl(), TYPE_OLD).getMatch(1);
         }
         final String url_name = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(1);
-        final String[] possibleQualityIdentifiersSorted = new String[] { "big", "large", "medium", "small" };
-        /* Old way */
-        br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-        br.getPage("https://www." + this.getHost() + "/en/document/json2/" + fid);
+        br.getHeaders().put("Authorization", "Bearer " + authtoken);
+        /* The guest token must be "connected" with a device fingerprint, otherwise the API answers with 403 "Not authenticated". */
+        final Map<String, Object> connect = new HashMap<String, Object>();
+        connect.put("fp_token", UUID.randomUUID().toString().replace("-", ""));
+        connect.put("country", "DE");
+        br.getHeaders().put("Content-Type", "application/json");
+        br.postPageRaw(API_BASE + "/auth/access/connect", JSonStorage.serializeToJson(connect));
+        br.getHeaders().remove("Content-Type");
+        br.getPage(API_BASE + "/documents/" + fid + "/details");
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final Object errorO = entries.get("error");
-        if (errorO != null) {
-            /* E.g. {"error":{"reason":"deleted","message":"Document deleted"}} */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        if (!Boolean.TRUE.equals(entries.get("success"))) {
+            /* E.g. {"success":false,"message":"Not authenticated","code":"403U0600"} */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, String.valueOf(entries.get("message")));
         }
-        final Map<String, Object> document = (Map<String, Object>) entries.get("document");
-        final List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) document.get("pages");
+        final Map<String, Object> document = (Map<String, Object>) entries.get("data");
+        final Map<String, Object> details = (Map<String, Object>) document.get("details");
         final String description = (String) document.get("description");
         String fpName = (String) document.get("title");
         if (StringUtils.isEmpty(fpName)) {
             /* Fallback */
             fpName = url_name;
         }
-        final String base_path = (String) document.get("base_path");
-        final Map<String, Object> images = (Map<String, Object>) document.get("images");
-        final String title = (String) images.get("title");
-        final Map<String, Object> dimensions = (Map<String, Object>) images.get("dimensions");
-        String best_resolution = null;
-        String best_resolution_label = null;
-        for (final String quality : possibleQualityIdentifiersSorted) {
-            best_resolution = (String) dimensions.get(quality);
-            if (best_resolution != null) {
-                best_resolution_label = quality;
-                break;
-            }
+        /* Issue titles can be just a date -> prepend name of the magazine. */
+        final Map<String, Object> group = (Map<String, Object>) document.get("group");
+        final String groupName = group != null ? (String) group.get("name") : null;
+        if (!StringUtils.isEmpty(groupName) && !fpName.contains(groupName)) {
+            fpName = groupName + " - " + fpName;
         }
-        if (StringUtils.isEmpty(base_path) || StringUtils.isEmpty(title) || StringUtils.isEmpty(best_resolution) || ressourcelist == null || ressourcelist.size() == 0) {
+        /* Only the "large" variant is delivered with signed URLs. */
+        final String base_path = (String) details.get("base_path");
+        final String directory = (String) ((Map<String, Object>) details.get("directories")).get("large");
+        final List<String> signedImages = (List<String>) ((Map<String, Object>) details.get("signed_images")).get("large");
+        if (signedImages.size() == 0) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final boolean setComment = !StringUtils.isEmpty(description) && !description.equalsIgnoreCase(fpName);
-        for (int i = 0; i < ressourcelist.size(); i++) {
-            /* 2019-05-21: 'quality' parameter = percentage of quality */
-            final Map<String, Object> ressource = ressourcelist.get(i);
-            final Map<String, Object> this_images = (Map<String, Object>) ressource.get("images");
-            final Map<String, Object> this_qss = (Map<String, Object>) ressource.get("qss");
-            final String this_image_best_resolution = this_images.get(best_resolution_label).toString();
-            final String this_image_best_resolution_aws_auth = this_qss.get(best_resolution_label).toString();
-            final String directurl = base_path + this_image_best_resolution + "?" + this_image_best_resolution_aws_auth;
-            final String filename = i + "_" + title;
+        final int padLength = String.valueOf(signedImages.size()).length();
+        for (int i = 0; i < signedImages.size(); i++) {
+            final String directurl = base_path + "/" + directory + "/" + signedImages.get(i);
+            final String filename = StringUtils.fillPre(Integer.toString(i + 1), "0", padLength) + "_" + fpName + ".jpg";
             final DownloadLink dl = createDownloadlink(DirectHTTP.createURLForThisPlugin(directurl));
             dl.setFinalFileName(filename);
             dl.setAvailable(true);
@@ -143,11 +150,9 @@ public class YumpuCom extends PluginForDecrypt {
             }
             ret.add(dl);
         }
-        if (fpName != null) {
-            final FilePackage fp = FilePackage.getInstance();
-            fp.setName(Encoding.htmlDecode(fpName.trim()));
-            fp.addLinks(ret);
-        }
+        final FilePackage fp = FilePackage.getInstance();
+        fp.setName(Encoding.htmlDecode(fpName.trim()));
+        fp.addLinks(ret);
         return ret;
     }
 }

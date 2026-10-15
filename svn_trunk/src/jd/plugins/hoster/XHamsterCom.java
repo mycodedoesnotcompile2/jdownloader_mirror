@@ -32,6 +32,27 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.plugins.components.config.XhamsterConfig;
+import org.jdownloader.plugins.components.config.XhamsterConfig.PreferredFormat;
+import org.jdownloader.plugins.components.config.XhamsterConfig.PremiumDownloadMode;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -57,28 +78,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.HexFormatter;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.plugins.components.config.XhamsterConfig;
-import org.jdownloader.plugins.components.config.XhamsterConfig.PreferredFormat;
-import org.jdownloader.plugins.components.config.XhamsterConfig.PremiumDownloadMode;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 53423 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53628 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -109,9 +109,11 @@ public class XHamsterCom extends PluginForHost {
             br.setCookie(domain, "translate-video-titles", "0");
         }
         /**
-         * 2022-07-22: Workaround for possible serverside bug: </br> In some countries, xhamster seems to redirect users to xhamster2.com.
-         * </br> If those users send an Accept-Language header of "de,en-gb;q=0.7,en;q=0.3" they can get stuck in a redirect-loop between
-         * deu.xhamster3.com and deu.xhamster3.com. </br> See initial report: https://board.jdownloader.org/showthread.php?t=91170
+         * 2022-07-22: Workaround for possible serverside bug: </br>
+         * In some countries, xhamster seems to redirect users to xhamster2.com. </br>
+         * If those users send an Accept-Language header of "de,en-gb;q=0.7,en;q=0.3" they can get stuck in a redirect-loop between
+         * deu.xhamster3.com and deu.xhamster3.com. </br>
+         * See initial report: https://board.jdownloader.org/showthread.php?t=91170
          */
         final String acceptLanguage = "en-gb;q=0.7,en;q=0.3";
         br.setAcceptLanguage(acceptLanguage);
@@ -1392,7 +1394,9 @@ public class XHamsterCom extends PluginForHost {
      */
     private Object[] parseAvailableQualities(final DownloadLink link, final Browser br, final int selectedQualityHeight, final Map<String, Object> hlsMap, final Map<Integer, Set<Object>> availableQualities) throws Exception {
         try {
-            final String jsonStr = br.getRegex(">\\s*window\\.initials\\s*=\\s*(\\{.*?\\})\\s*;\\s*</").getMatch(0);
+            String jsonStr = br.getRegex(">\\s*window\\.initials\\s*=\\s*(\\{.*?\\})\\s*;\\s*</").getMatch(0);
+            // jsonStr = new Regex(IO.readFileToString(new File("C:\\Users\\Daniel Wilhelm\\Desktop\\xhamster.txt")),
+            // ">\\s*window\\.initials\\s*=\\s*(\\{.*?\\})\\s*;\\s*</").getMatch(0);
             if (jsonStr == null) {
                 logger.warning("Failed to find json source");
                 return null;
@@ -1428,7 +1432,40 @@ public class XHamsterCom extends PluginForHost {
                 }
             }
             final class VideoSourcesParser {
-                public Object[] parse(final Integer selectedQualityHeight, final List<Map<String, Object>> video_sources, Map<String, Object> hostMap) throws Exception {
+                private String rewriteHost(final String sourcePath, final String qualityStr, String url, Map<String, Object> hostMap) throws IOException {
+                    final String host = new URL(url).getHost();
+                    final String subdomain = new Regex(host, "^(.*?)\\.").getMatch(0);
+                    final String domain = Browser.getHost(host, false);
+                    if (subdomain != null && subdomain.endsWith("-h")) {
+                        if (hostMap != null) {
+                            for (Entry<String, Object> entry : hostMap.entrySet()) {
+                                final Object hostMapping = entry.getValue();
+                                if (!(hostMapping instanceof String)) {
+                                    continue;
+                                }
+                                if (url.endsWith(".m3u8")) {
+                                    if (sourcePath.contains("h264") && entry.getKey().contains("hls") && entry.getKey().contains("h264")) {
+                                        return url.replaceFirst(host, (String) entry.getValue() + "." + domain);
+                                    }
+                                    if (sourcePath.contains("av1") && entry.getKey().contains("hls") && entry.getKey().contains("av1")) {
+                                        return url.replaceFirst(host, (String) entry.getValue() + "." + domain);
+                                    }
+                                } else {
+                                    if (sourcePath.contains("h264") && entry.getKey().contains("standard") && entry.getKey().contains("h264") && entry.getKey().contains(qualityStr)) {
+                                        return url.replaceFirst(host, (String) entry.getValue() + "." + domain);
+                                    }
+                                    if (sourcePath.contains("av1") && entry.getKey().contains("standard") && entry.getKey().contains("av1") && entry.getKey().contains(qualityStr)) {
+                                        return url.replaceFirst(host, (String) entry.getValue() + "." + domain);
+                                    }
+                                }
+                            }
+                        }
+                        return null;
+                    }
+                    return url;
+                }
+
+                public Object[] parse(final Integer selectedQualityHeight, final String sourcePath, final List<Map<String, Object>> video_sources, Map<String, Object> hostMap) throws Exception {
                     if (video_sources == null || video_sources.size() == 0) {
                         return null;
                     }
@@ -1436,6 +1473,11 @@ public class XHamsterCom extends PluginForHost {
                         final String qualityStr = (String) source.get("quality");
                         String url = (String) source.get("url");
                         url = decryptURL(br, url);
+                        url = rewriteHost(sourcePath, qualityStr, url, hostMap);
+                        if (url == null) {
+                            logger.info("hostmapping failed for:" + url + hostMap + " " + qualityStr);
+                            continue;
+                        }
                         source.put("url", url);
                         if (StringUtils.containsIgnoreCase(new URL(url).getPath(), ".m3u8")) {
                             /* HLS */
@@ -1460,23 +1502,6 @@ public class XHamsterCom extends PluginForHost {
                                 }
                             }
                         } else {
-                            final String host = new URL(url).getHost();
-                            blockVideo: if (("video-cf-h.xhcdn.com".equalsIgnoreCase(host) || "video-h.xhcdn.com".equalsIgnoreCase(host))) {
-                                if (hostMap != null) {
-                                    for (Entry<String, Object> entry : hostMap.entrySet()) {
-                                        final Object hostMapping = entry.getValue();
-                                        if (!(hostMapping instanceof String)) {
-                                            continue;
-                                        }
-                                        if (entry.getKey().contains("standard") && entry.getKey().contains("h264") && entry.getKey().contains(qualityStr) && "video-h.xhcdn.com".equalsIgnoreCase(host)) {
-                                            url = url.replaceFirst("video-h.xhcdn.com", (String) entry.getValue() + ".xhcdn.com");
-                                            break blockVideo;
-                                        }
-                                    }
-                                    logger.info("hostmapping failed:" + hostMap + " " + qualityStr);
-                                }
-                                continue;
-                            }
                             /* Progressive */
                             final String qualityStrNumber = qualityStr.replaceFirst("(?i)p", "");
                             if (!qualityStrNumber.matches("\\d+")) {
@@ -1518,7 +1543,7 @@ public class XHamsterCom extends PluginForHost {
                 }
             }
             for (String sourcePath : new String[] { "xplayerSettings2/sources/standard/mp4", "xplayerSettings/sources/standard/mp4", "xplayerSettings2/sources/standard/h264", "xplayerSettings/sources/standard/h264", "xplayerSettings2/sources/standard/av1", "xplayerSettings/sources/standard/av1" }) {
-                final Object[] selectedVideoSource = parser.parse(selectedQualityHeight, (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(json, sourcePath), hostMap);
+                final Object[] selectedVideoSource = parser.parse(selectedQualityHeight, sourcePath, (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(json, sourcePath), hostMap);
                 if (selectedVideoSource != null) {
                     return selectedVideoSource;
                 }
@@ -1694,7 +1719,6 @@ public class XHamsterCom extends PluginForHost {
             }
             dl = new jd.plugins.BrowserAdapter().openDownload(br, link, this.dllink, resume, 0);
             handleConnectionErrors(br, dl.getConnection());
-
             dl.startDownload();
         }
     }
@@ -2085,9 +2109,10 @@ public class XHamsterCom extends PluginForHost {
             logger.info("Fetching detailed premium account information");
             br.getPage(this.getPremiumAPIBase(account) + "/subscription/get");
             /**
-             * Returns "null" (without quotation mark) if cookies are valid but this is not a premium account. </br> Redirects to main page
-             * if cookies are invalid. </br> Return json if cookies are valid. </br> Can also return json along with http response code 400
-             * for valid cookies but user is non-premium.
+             * Returns "null" (without quotation mark) if cookies are valid but this is not a premium account. </br>
+             * Redirects to main page if cookies are invalid. </br>
+             * Return json if cookies are valid. </br>
+             * Can also return json along with http response code 400 for valid cookies but user is non-premium.
              */
             ai.setUnlimitedTraffic();
             /* Premium domain cookies are valid and we can expect json */

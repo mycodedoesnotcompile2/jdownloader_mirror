@@ -366,6 +366,16 @@ public abstract class ChallengeSolver<T> {
     }
 
     /**
+     * Max number of captchas that can be worked on at the same time when only this solver (= one account) is used, i.e. the smaller one of
+     * {@link #getFinalMaxCaptchaThreads()} and {@link #getFinalMaxCaptchaThreadsPerAccount()}, at least 1. <br>
+     * Do not use this for the limit enforcement in {@link ChallengeResponseController}: there the service-wide limit must not include the
+     * per-account limit, because a service with several accounts may use more captchas than a single account allows.
+     */
+    public final int getFinalMaxCaptchaThreadsSingleAccount() {
+        return Math.max(1, Math.min(getFinalMaxCaptchaThreads(), getFinalMaxCaptchaThreadsPerAccount()));
+    }
+
+    /**
      * Returns the custom limit rules (max captchas per time interval) that currently apply to this solver, i.e. only the enabled ones, and
      * only while the solver's custom limits are switched on. Default: null (no custom limits). The returned list is a snapshot and may be
      * freely iterated. It is evaluated by {@link ChallengeResponseController}: a solver with a used up rule is vetoed for new challenges (see

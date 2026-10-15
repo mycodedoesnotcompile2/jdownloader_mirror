@@ -1,14 +1,6 @@
 package org.jdownloader.gui.views.downloads.action;
 
 import java.awt.event.ActionEvent;
-import java.util.List;
-
-import org.jdownloader.controlling.contextmenu.CustomizableTableContextAppAction;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.gui.views.SelectionInfo;
-import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
-import org.jdownloader.plugins.FinalLinkState;
 
 import jd.controlling.downloadcontroller.DownloadSession;
 import jd.controlling.downloadcontroller.DownloadWatchDog;
@@ -16,6 +8,13 @@ import jd.controlling.downloadcontroller.DownloadWatchDogJob;
 import jd.controlling.downloadcontroller.SingleDownloadController;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
+
+import org.jdownloader.controlling.contextmenu.CustomizableTableContextAppAction;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.gui.views.SelectionInfo;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
+import org.jdownloader.plugins.FinalLinkState;
 
 public class MarkDownloadFinishedAction extends CustomizableTableContextAppAction<FilePackage, DownloadLink> {
     private static final long   serialVersionUID = 8087143123808363305L;
@@ -29,10 +28,6 @@ public class MarkDownloadFinishedAction extends CustomizableTableContextAppActio
     @Override
     protected void onActionPerformed(final ActionEvent e, final SelectionType selectionType, final SelectionInfo<FilePackage, DownloadLink> selectionInfo) {
         if (SelectionInfo.isEmpty(selectionInfo)) {
-            return;
-        }
-        final List<DownloadLink> selection = selectionInfo.getChildren();
-        if (selection.size() == 0) {
             return;
         }
         DownloadWatchDog.getInstance().enqueueJob(new DownloadWatchDogJob() {
@@ -55,7 +50,7 @@ public class MarkDownloadFinishedAction extends CustomizableTableContextAppActio
 
             @Override
             public void execute(DownloadSession currentSession) {
-                for (final DownloadLink link : selection) {
+                for (final DownloadLink link : selectionInfo.getChildren()) {
                     final DownloadWatchDogJob setFinishedJob = new DownloadWatchDogJob() {
                         @Override
                         public boolean isHighPriority() {

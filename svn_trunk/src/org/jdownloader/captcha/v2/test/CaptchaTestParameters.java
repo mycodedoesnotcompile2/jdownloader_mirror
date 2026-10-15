@@ -231,7 +231,9 @@ public class CaptchaTestParameters {
             /*
              * Taken from https://2captcha.com/demo/recaptcha-v3-enterprise
              */
-            return new CaptchaTestParameters("6Lel38UnAAAAAMRwKj9qLH2Ws4Tf2uTDQCyfgR6b", "https://2captcha.com/demo/recaptcha-v3-enterprise", "demo_action", null);
+            final CaptchaTestParameters v3Enterprise = new CaptchaTestParameters("6Lel38UnAAAAAMRwKj9qLH2Ws4Tf2uTDQCyfgR6b", "https://2captcha.com/demo/recaptcha-v3-enterprise", "demo_action", null);
+            v3Enterprise.setMinScore(0.5d);
+            return v3Enterprise;
         case HCAPTCHA:
             /*
              * 2026-09-22: Do not use the official hCaptcha test-key here because this will not return a result or at least our existing

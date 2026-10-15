@@ -16,6 +16,7 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -39,7 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.TorboxApp;
 
-@DecrypterPlugin(revision = "$Revision: 51030 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53625 $", interfaceVersion = 3, names = {}, urls = {})
 public class TorboxAppCrawler extends PluginForDecrypt {
     public TorboxAppCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -87,10 +88,6 @@ public class TorboxAppCrawler extends PluginForDecrypt {
             throw new AccountRequiredException();
         }
         final TorboxApp hosterplugin = (TorboxApp) this.getNewPluginForHostInstance(this.getHost());
-        br.getPage(param.getCryptedUrl());
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
         final UrlQuery query = UrlQuery.parse(param.getCryptedUrl());
         final String dl_id = query.get("id");
         final String dl_type = query.get("type");
@@ -110,6 +107,7 @@ public class TorboxAppCrawler extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported type: " + dl_type);
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final Map<String, FilePackage> packages = new HashMap<String, FilePackage>();
         final List<Map<String, Object>> files = (List<Map<String, Object>>) data.get("files");
         for (final Map<String, Object> file : files) {
             final String filename = file.get("short_name").toString();
@@ -134,9 +132,14 @@ public class TorboxAppCrawler extends PluginForDecrypt {
             }
             link.setAvailable(true);
             link.setRelativeDownloadFolderPath(path);
-            final FilePackage fp = FilePackage.getInstance();
-            fp.setName(path);
-            link._setFilePackage(fp);
+            FilePackage fp = packages.get(path);
+            if (fp == null) {
+                fp = FilePackage.getInstance();
+                fp.setName(path);
+                fp.setPackageKey("torbox://type/" + dl_type + "/download_id/" + dl_id + "/path/" + path);
+                packages.put(path, fp);
+            }
+            fp.add(link);
             ret.add(link);
         }
         return ret;

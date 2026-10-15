@@ -36,7 +36,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.BooruOrgCrawler;
 
-@HostPlugin(revision = "$Revision: 49846 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53626 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BooruOrgCrawler.class })
 public class BooruOrg extends PluginForHost {
     public BooruOrg(PluginWrapper wrapper) {
@@ -172,17 +172,5 @@ public class BooruOrg extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

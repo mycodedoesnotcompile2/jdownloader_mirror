@@ -60,7 +60,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 53574 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53624 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeviantArtCom extends PluginForHost {
     private final String               TYPE_DOWNLOADALLOWED_HTML                   = "class=\"text\">\\s*HTML download\\s*</span>";
     private final String               TYPE_DOWNLOADFORBIDDEN_HTML                 = "<div class=\"grf\\-indent\"";
@@ -606,12 +606,29 @@ public class DeviantArtCom extends PluginForHost {
                 /* Preview image download */
                 if (unlimitedImageSize != null && dllink != null && !dllink.matches("(?i).*/v1/.+")) {
                     link.setVerifiedFileSize(unlimitedImageSize.longValue());
-                } else if (officialDownloadsizeBytes != null) {
-                    link.setDownloadSize(officialDownloadsizeBytes.longValue());
-                } else if (officialDownloadFilesizeStr != null) {
-                    link.setDownloadSize(SizeFormatter.getSize(officialDownloadFilesizeStr.replace(",", "")));
                 } else {
-                    allowGrabFilesizeFromHeader = true;
+                    /*
+                     * Size of the preview is unknown. The original file size is not safe as the preview differs from the original (and the
+                     * user might not even be able to download the original).
+                     */
+                    final boolean useOriginalSize;
+                    switch (cfg.getFileSizeDisplayMode()) {
+                    case SAFE_FILE_SIZE_ELSE_UNKNOWN:
+                        useOriginalSize = false;
+                        break;
+                    case ORIGINAL_FILE_SIZE_RATHER_THAN_NONE:
+                    case AUTO:
+                    default:
+                        useOriginalSize = true;
+                        break;
+                    }
+                    if (useOriginalSize && officialDownloadsizeBytes != null) {
+                        link.setDownloadSize(officialDownloadsizeBytes.longValue());
+                    } else if (useOriginalSize && officialDownloadFilesizeStr != null) {
+                        link.setDownloadSize(SizeFormatter.getSize(officialDownloadFilesizeStr.replace(",", "")));
+                    } else {
+                        allowGrabFilesizeFromHeader = true;
+                    }
                 }
             }
         } else if (isDocument(link)) {

@@ -19,6 +19,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.config.XFSConfigVideoHotlinkCc;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -36,11 +40,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.config.XFSConfigVideoHotlinkCc;
-
-@HostPlugin(revision = "$Revision: 53542 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53628 $", interfaceVersion = 3, names = {}, urls = {})
 public class HotlinkCc extends XFileSharingProBasic {
     public HotlinkCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -339,8 +339,7 @@ public class HotlinkCc extends XFileSharingProBasic {
 
     @Override
     protected String getDllink(final DownloadLink link, final Account account, final Browser br, String src) {
-        /** 2021-01-26: Special */
-        String dllink = new Regex(src, "href=\"(https?://[^\"]+)\"[^>]*>\\s*Direct Download Link").getMatch(0);
+        String dllink = new Regex(src, "href=\"(https?://[^\"]+)\"[^>]*>\\s*(?:<i[^>]*>[^>]*/i>)?\\s*Direct Download Link").getMatch(0);
         if (dllink != null) {
             return dllink;
         } else {

@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.List;
 
 import org.appwork.storage.config.JsonConfig;
+import org.appwork.swing.exttable.columns.ExtProgressColumn;
 import org.appwork.utils.ModifyLock;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.logging2.extmanager.LoggerFactory;
@@ -628,6 +629,50 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
 
     public List<DownloadLink> getChildren() {
         return downloadLinkList;
+    }
+
+    /**
+     * @return The number of bytes that have been downloaded by all links of this package
+     */
+    public long getBytesLoaded() {
+        long loaded = 0;
+        final boolean readL = getModifyLock().readLock();
+        try {
+            for (final DownloadLink link : getChildren()) {
+                loaded += link.getView().getBytesLoaded();
+            }
+        } finally {
+            getModifyLock().readUnlock(readL);
+        }
+        return loaded;
+    }
+
+    /**
+     * @return The sum of the download times of all links of this package in milliseconds
+     */
+    public long getDownloadTime() {
+        long time = 0;
+        final boolean readL = getModifyLock().readLock();
+        try {
+            for (final DownloadLink link : getChildren()) {
+                time += link.getView().getDownloadTime();
+            }
+        } finally {
+            getModifyLock().readUnlock(readL);
+        }
+        return time;
+    }
+
+    /**
+     * @return The download progress of this package in percent (0 to 100) or -1 if the total size is unknown
+     */
+    public double getDownloadProgressPercent() {
+        final long total = new FilePackageView(this).aggregate().getSize();
+        if (total <= 0) {
+            return -1;
+        }
+        /* Same calculation as the progress column: Cut off after two decimals instead of rounding */
+        return Math.min(100d, ExtProgressColumn.getPercentString(getBytesLoaded(), total));
     }
 
     public PackageController<FilePackage, DownloadLink> getControlledBy() {

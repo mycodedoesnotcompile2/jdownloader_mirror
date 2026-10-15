@@ -9,16 +9,22 @@ import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.HierarchyEvent;
 import java.awt.event.HierarchyListener;
-import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 
 import javax.imageio.ImageIO;
 import javax.swing.Box;
@@ -26,11 +32,13 @@ import javax.swing.DefaultListCellRenderer;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.RowSorter;
+import javax.swing.SortOrder;
 import javax.swing.JComboBox;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
-import javax.swing.JMenuItem;
 import javax.swing.JList;
+import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
 import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
@@ -43,10 +51,13 @@ import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingConstants;
 import javax.swing.Timer;
 import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.RowSorterEvent;
+import javax.swing.event.RowSorterListener;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableCellRenderer;
+import javax.swing.table.TableRowSorter;
 
 import org.appwork.swing.MigPanel;
 import org.appwork.utils.StringUtils;
@@ -67,8 +78,12 @@ import org.jdownloader.captcha.v2.test.CaptchaTestParameters;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.logging.LogController;
+import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSolverService;
+import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 
+import jd.controlling.AccountController;
 import jd.controlling.captcha.SkipException;
+import jd.plugins.Account;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 /**
@@ -76,108 +91,120 @@ import jd.plugins.CaptchaType.CAPTCHA_TYPE;
  * the captcha type to test, edit the site URL/site key (pre-filled with the known test values, see {@link CaptchaTestParameters}) and run
  * real throwaway test {@link Challenge}s (see {@link CaptchaTestChallengeFactory}) through the normal solving pipeline
  * ({@link ChallengeResponseController#handle(Challenge)}) on a background thread. <br>
- * Every test (a single test is just a table with one row, a multi test runs all selected captcha types of one solver one after another)
- * is shown as a row of the result table. Clicking a row shows its details below the table: progress, status, elapsed time, result and the
- * feedback/abort/retry buttons. If an expected result is given, the solver's answer is compared against it and the matching feedback
- * button is disabled (a correct answer cannot be reported as incorrect and vice versa).
+ * Every test (a single test is just a table with one row, a multi test runs all selected captcha types of one solver one after another) is
+ * shown as a row of the result table. Clicking a row shows its details below the table: progress, status, elapsed time, result and the
+ * feedback/abort/retry buttons. If an expected result is given, the solver's answer is compared against it and the matching feedback button
+ * is disabled (a correct answer cannot be reported as incorrect and vice versa).
  */
 public class CaptchaTestPanel extends MigPanel {
-    private static final long           serialVersionUID  = 1L;
-    private static final Color          COLOR_ORANGE      = new Color(230, 126, 0);
-    private final JComboBox             sourceBox;
-    private final JComboBox             typeBox;
-    private final JLabel                siteUrlLabel;
-    private final JTextField            siteUrlField;
-    private final JLabel                siteKeyLabel;
-    private final JTextField            siteKeyField;
-    private final JLabel                imageLabel;
-    private final MigPanel              imagePanel;
-    private final JLabel                imagePreview;
-    private final JLabel                imageResolutionLabel;
+    private static final long               serialVersionUID   = 1L;
+    private static final Color              COLOR_ORANGE       = new Color(230, 126, 0);
+    private final JComboBox                 sourceBox;
+    private final JComboBox                 typeBox;
+    private final JLabel                    siteUrlLabel;
+    private final JTextField                siteUrlField;
+    private final JLabel                    siteKeyLabel;
+    private final JTextField                siteKeyField;
+    private final JLabel                    imageLabel;
+    private final MigPanel                  imagePanel;
+    private final JLabel                    imagePreview;
+    private final JLabel                    imageResolutionLabel;
     /* Original captcha image of the preview, the clicked positions of the result and whether it is shown in full size. */
-    private BufferedImage               previewSource;
-    private final List<Point>           resultMarkers     = new ArrayList<Point>();
-    private boolean                     previewExpanded   = false;
+    private BufferedImage                   previewSource;
+    private final List<Point>               resultMarkers      = new ArrayList<Point>();
+    private boolean                         previewExpanded    = false;
     /* All captcha images are scaled into a box of this size unless they are expanded by a click. */
-    private static final int            PREVIEW_WIDTH     = 320;
-    private static final int            PREVIEW_HEIGHT    = 200;
-    private File                        imageFile;
-    private final JButton               startButton;
-    private final JLabel                descriptionLabel;
-    private final JTextField            descriptionField;
-    private final JLabel                caseSensitiveLabel;
-    private final JComboBox             caseSensitiveBox;
-    private final JLabel                actionLabel;
-    private final JTextField            actionField;
-    private final JLabel                minScoreLabel;
-    private final JCheckBox             minScoreCheckBox;
-    private final JSpinner              minScoreSpinner;
-    private final JLabel                minClicksLabel;
-    private final JSpinner              minClicksSpinner;
-    private final JTextField            expectedResultField;
-    private final JComboBox             solverBox;
-    private final JButton               typesButton;
-    private final JPopupMenu            typesPopup;
+    /* Upper limit of the max simultaneous tests spinner, the limit of the solver itself may be lower. */
+    private static final int                MAX_PARALLEL_TESTS = 20;
+    private static final int                PREVIEW_WIDTH      = 320;
+    private static final int                PREVIEW_HEIGHT     = 200;
+    private File                            imageFile;
+    private final JButton                   startButton;
+    private final JLabel                    descriptionLabel;
+    private final JTextField                descriptionField;
+    private final JLabel                    caseSensitiveLabel;
+    private final JComboBox                 caseSensitiveBox;
+    private final JLabel                    actionLabel;
+    private final JTextField                actionField;
+    private final JLabel                    minScoreLabel;
+    private final JCheckBox                 minScoreCheckBox;
+    private final JSpinner                  minScoreSpinner;
+    private final JLabel                    minClicksLabel;
+    private final JSpinner                  minClicksSpinner;
+    private final JTextField                expectedResultField;
+    private final JComboBox                 solverBox;
+    /* Red warning, shown if there is no solver that could be selected. */
+    private final JLabel                noSolverWarning = new JLabel();
+    /* Red warning, shown if captcha types are selectable but the user deselected all of them. */
+    private final JLabel                noTypeWarning   = new JLabel();
+    private final JButton                   typesButton;
+    private final JPopupMenu                typesPopup;
     /* First entry of the popup: selects/deselects all captcha types. */
-    private final JCheckBox             selectAllBox      = new JCheckBox("Select/Deselect all");
-    private final List<JCheckBox>       typeCheckBoxes    = new ArrayList<JCheckBox>();
-    private final List<CAPTCHA_TYPE>    typeCheckBoxTypes = new ArrayList<CAPTCHA_TYPE>();
-    private final JButton               multiStartButton;
-    private final JButton               multiCancelButton;
+    private final JCheckBox                 selectAllBox       = new JCheckBox("Select/Deselect all");
+    private final List<JCheckBox>           typeCheckBoxes     = new ArrayList<JCheckBox>();
+    private final List<CAPTCHA_TYPE>        typeCheckBoxTypes  = new ArrayList<CAPTCHA_TYPE>();
+    private final JButton                   multiStartButton;
+    private final JButton                   multiCancelButton;
     /* Result table: one row per test. */
-    private final RunTableModel         runModel          = new RunTableModel();
-    private final JLabel                batchLabel        = new JLabel();
-    private volatile List<TestRun>      batchRuns         = new ArrayList<TestRun>();
-    private volatile long               batchStartTime;
-    private final JTable                runTable;
-    private final JScrollPane           runScroll;
+    private final RunTableModel             runModel           = new RunTableModel();
+    /* Overall progress of the batch (finished tests) and, while at least one test is still running, an animated activity bar. */
+    private final JProgressBar                batchBar           = new JProgressBar(0, 1);
+    private final JProgressBar                activityBar        = new JProgressBar();
+    private volatile List<TestRun>          batchRuns          = new ArrayList<TestRun>();
+    private volatile long                   batchStartTime;
+    private final JTable                    runTable;
+    private final JScrollPane               runScroll;
     /* Details of the test selected in the table. */
-    private final MigPanel              runPanel;
-    private final JProgressBar          progress;
-    private final JLabel                statusLabel;
-    private final JLabel                elapsedLabel;
-    private final JTextArea             resultArea;
-    private final JButton               correctButton;
-    private final JButton               incorrectButton;
-    private final JButton               abortButton;
-    private final JButton               retryButton;
-    private Timer                       refreshTimer;
-    private final Color                 defaultButtonForeground;
-    private volatile TestRun            selectedRun;
+    private final MigPanel                  runPanel;
+    private final JProgressBar              progress;
+    private final JLabel                    statusLabel;
+    private final JLabel                    elapsedLabel;
+    private final JTextArea                 resultArea;
+    private final JButton                   correctButton;
+    private final JButton                   incorrectButton;
+    private final JButton                   abortButton;
+    private final JButton                   retryButton;
+    private Timer                           refreshTimer;
+    private final Color                     defaultButtonForeground;
+    private TableRowSorter<RunTableModel> runSorter;
+    /* True while the sort order is changed by the panel itself (not by a click of the user on a column header). */
+    private boolean                     internalSortChange = false;
+    private volatile TestRun                selectedRun;
     /* The tests of the current/last batch are executed one after another by this thread. */
-    private volatile Thread             batchThread;
-    private volatile boolean            batchRunning      = false;
-    private volatile boolean            batchCancelled    = false;
+    private final JSpinner                  parallelSpinner;
+    private final JLabel                    parallelInfoLabel  = new JLabel();
+    private volatile boolean                batchRunning       = false;
+    private volatile boolean                batchCancelled     = false;
     /*
      * Reads the timeout of a test as soon as its job exists (before the periodic refresh could), so that even very fast tests have a
      * progress percentage.
      */
-    private final ChallengeResponseListener jobListener = new ChallengeResponseListener() {
-        @Override
-        public void onNewJob(final SolverJob<?> job) {
-            for (final TestRun run : runModel.getRuns()) {
-                if (run.challenge != null && run.challenge == job.getChallenge()) {
-                    run.maxTimeoutMillis = getMaxTimeoutMillis(job);
-                }
-            }
-        }
+    private final ChallengeResponseListener jobListener        = new ChallengeResponseListener() {
+                                                                   @Override
+                                                                   public void onNewJob(final SolverJob<?> job) {
+                                                                       for (final TestRun run : runModel.getRuns()) {
+                                                                           if (run.challenge != null && run.challenge == job.getChallenge()) {
+                                                                               run.maxTimeoutMillis = getMaxTimeoutMillis(job);
+                                                                           }
+                                                                       }
+                                                                   }
 
-        @Override
-        public void onNewJobAnswer(final SolverJob<?> job, final AbstractResponse<?> response) {
-        }
+                                                                   @Override
+                                                                   public void onNewJobAnswer(final SolverJob<?> job, final AbstractResponse<?> response) {
+                                                                   }
 
-        @Override
-        public void onJobDone(final SolverJob<?> job) {
-        }
+                                                                   @Override
+                                                                   public void onJobDone(final SolverJob<?> job) {
+                                                                   }
 
-        @Override
-        public void onJobSolverEnd(final ChallengeSolver<?> solver, final SolverJob<?> job) {
-        }
+                                                                   @Override
+                                                                   public void onJobSolverEnd(final ChallengeSolver<?> solver, final SolverJob<?> job) {
+                                                                   }
 
-        @Override
-        public void onJobSolverStart(final ChallengeSolver<?> solver, final SolverJob<?> job) {
-        }
-    };
+                                                                   @Override
+                                                                   public void onJobSolverStart(final ChallengeSolver<?> solver, final SolverJob<?> job) {
+                                                                   }
+                                                               };
 
     public CaptchaTestPanel() {
         super("ins 10, wrap 2", "[][grow,fill]", "[]");
@@ -322,6 +349,10 @@ public class CaptchaTestPanel extends MigPanel {
                 final SolverService service = (SolverService) value;
                 final boolean ready = service == null || isSelectable(service);
                 final Component comp = super.getListCellRendererComponent(list, service == null ? "" : service.getName(), index, isSelected && ready, cellHasFocus);
+                if (service != null && comp instanceof JLabel) {
+                    /* Same solver icon as in the other solver lists (see SolverOrderTableModel). */
+                    ((JLabel) comp).setIcon(service.getIcon(18));
+                }
                 if (!ready) {
                     comp.setEnabled(false);
                     comp.setForeground(Color.GRAY);
@@ -367,11 +398,28 @@ public class CaptchaTestPanel extends MigPanel {
                 rebuildTypeList();
             }
         });
-        add(new JLabel("<html>Choose solver to test. You can only choose solvers with status \"Ready\", they must be activated in the \"Solver overview\" tab and if it is a paid solver, an active and enabled account must be present.</html>"), "span 2, growx, wmin 0");
+        add(new JLabel("<html>Choose solver to test. You can only choose solvers with status \"Ready\", they must be enabled in the \"Solver overview\" tab and if it is a paid solver, an active and enabled account must be present.</html>"), "span 2, growx, wmin 0");
+        noSolverWarning.setIcon(NewTheme.I().getIcon(IconKey.ICON_WARNING_RED, 18));
+        noSolverWarning.setText("!! All Solvers are disabled or not properly configured !!");
+        noSolverWarning.setForeground(Color.RED);
+        noSolverWarning.setVisible(false);
+        add(noSolverWarning, "span 2, growx, wmin 0");
         add(new JLabel("Multi test: Solver"));
         add(solverBox, "growx");
         add(new JLabel("Multi test: Captcha types"));
         add(typesButton, "growx");
+        noTypeWarning.setIcon(NewTheme.I().getIcon(IconKey.ICON_WARNING_RED, 18));
+        noTypeWarning.setText("No captcha type selected: select at least one captcha type to test");
+        noTypeWarning.setForeground(Color.RED);
+        noTypeWarning.setVisible(false);
+        add(noTypeWarning, "skip 1, growx, wmin 0");
+        /* Max simultaneous tests: up to MAX_PARALLEL_TESTS, but never more than the selected solver accepts at the same time. */
+        parallelSpinner = new JSpinner(new SpinnerNumberModel(1, 1, MAX_PARALLEL_TESTS, 1));
+        final MigPanel parallelPanel = new MigPanel("ins 0", "[][grow,fill]", "[]");
+        parallelPanel.add(parallelSpinner);
+        parallelPanel.add(parallelInfoLabel);
+        add(new JLabel("Multi test: Max simultaneous tests"));
+        add(parallelPanel, "growx");
         final MigPanel multiButtons = new MigPanel("ins 0", "[][]", "[]");
         multiButtons.add(multiStartButton);
         multiButtons.add(multiCancelButton);
@@ -384,6 +432,50 @@ public class CaptchaTestPanel extends MigPanel {
         runTable.getColumnModel().getColumn(1).setPreferredWidth(100);
         runTable.getColumnModel().getColumn(2).setPreferredWidth(80);
         runTable.getColumnModel().getColumn(3).setPreferredWidth(400);
+        /*
+         * All columns are sortable. Default order: passed, failed, running, pending. The table is sorted again after every change of a test
+         * (e.g. when a test finishes), so the order always follows the current state.
+         */
+        final TableRowSorter<RunTableModel> sorter = new TableRowSorter<RunTableModel>(runModel);
+        sorter.setSortsOnUpdates(true);
+        sorter.setComparator(0, new Comparator<CAPTCHA_TYPE>() {
+            @Override
+            public int compare(final CAPTCHA_TYPE o1, final CAPTCHA_TYPE o2) {
+                return o1.getDisplayName().compareToIgnoreCase(o2.getDisplayName());
+            }
+        });
+        sorter.setComparator(1, new Comparator<RunState>() {
+            @Override
+            public int compare(final RunState o1, final RunState o2) {
+                return o1.getSortRank() - o2.getSortRank();
+            }
+        });
+        sorter.setComparator(2, new Comparator<TestRun>() {
+            @Override
+            public int compare(final TestRun o1, final TestRun o2) {
+                final long d1 = getSortDuration(o1);
+                final long d2 = getSortDuration(o2);
+                return d1 < d2 ? -1 : (d1 == d2 ? 0 : 1);
+            }
+        });
+        sorter.setComparator(3, new Comparator<String>() {
+            @Override
+            public int compare(final String o1, final String o2) {
+                return o1.compareToIgnoreCase(o2);
+            }
+        });
+        runSorter = sorter;
+        runTable.setRowSorter(sorter);
+        /* Sorting by the user (click on a column header) switches the automatic sorting off until the next test is started. */
+        sorter.addRowSorterListener(new RowSorterListener() {
+            @Override
+            public void sorterChanged(final RowSorterEvent e) {
+                if (e.getType() == RowSorterEvent.Type.SORT_ORDER_CHANGED && !internalSortChange) {
+                    sorter.setSortsOnUpdates(false);
+                }
+            }
+        });
+        enableAutoSort();
         runTable.setDefaultRenderer(CAPTCHA_TYPE.class, new TableCellRenderer() {
             private final JLabel label = new JLabel();
 
@@ -425,7 +517,14 @@ public class CaptchaTestPanel extends MigPanel {
                 final int percent = getProgressPercent(run);
                 bar.setValue(Math.max(percent, 0));
                 bar.setStringPainted(duration >= 0);
-                bar.setString(duration < 0 ? "" : (percent >= 0 ? percent + "% (" : "(") + (duration / 100 / 10d) + "s)");
+                /* Example: "10.3s (34% of 30.00s)", or only "10.3s" if the timeout is unknown. */
+                if (duration < 0) {
+                    bar.setString("");
+                } else if (percent >= 0) {
+                    bar.setString((duration / 100 / 10d) + "s (" + percent + "% of " + String.format(java.util.Locale.ENGLISH, "%.2f", run.maxTimeoutMillis / 1000d) + "s)");
+                } else {
+                    bar.setString((duration / 100 / 10d) + "s");
+                }
                 return bar;
             }
         });
@@ -436,7 +535,7 @@ public class CaptchaTestPanel extends MigPanel {
 
             @Override
             public Component getTableCellRendererComponent(final JTable table, final Object value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
-                final TestRun run = runModel.getRun(row);
+                final TestRun run = runModel.getRun(table.convertRowIndexToModel(row));
                 if (isCancellable(run)) {
                     return button;
                 }
@@ -454,8 +553,8 @@ public class CaptchaTestPanel extends MigPanel {
                     return;
                 }
                 final int row = runTable.rowAtPoint(e.getPoint());
-                if (row >= 0 && runTable.columnAtPoint(e.getPoint()) == 3) {
-                    final TestRun run = runModel.getRun(row);
+                if (row >= 0 && runTable.convertColumnIndexToModel(runTable.columnAtPoint(e.getPoint())) == 3) {
+                    final TestRun run = runModel.getRun(runTable.convertRowIndexToModel(row));
                     if (isCancellable(run)) {
                         abortRun(run, false);
                     }
@@ -477,17 +576,25 @@ public class CaptchaTestPanel extends MigPanel {
             public void valueChanged(final ListSelectionEvent e) {
                 if (!e.getValueIsAdjusting()) {
                     final int row = runTable.getSelectedRow();
-                    selectedRun = row < 0 ? null : runModel.getRun(row);
+                    selectedRun = row < 0 ? null : runModel.getRun(runTable.convertRowIndexToModel(row));
                     syncMarkers();
                     refreshDetails();
                 }
             }
         });
         runScroll = new JScrollPane(runTable);
-        runScroll.setPreferredSize(new Dimension(400, 150));
+        /* Always shown at full size (all rows), so it never scrolls itself; the mouse wheel scrolls the surrounding panel instead. */
+        runScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
+        runScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        SolverOrderContainer.passMouseWheelToParent(runScroll);
         runScroll.setVisible(false);
-        batchLabel.setVisible(false);
-        add(batchLabel, "span 2");
+        batchBar.setStringPainted(true);
+        batchBar.setVisible(false);
+        activityBar.setIndeterminate(true);
+        activityBar.setPreferredSize(new Dimension(100, 6));
+        activityBar.setVisible(false);
+        add(batchBar, "span 2, growx");
+        add(activityBar, "span 2, growx, gaptop 2");
         add(runScroll, "span 2, growx");
         /* Details of the selected test (the former test dialog): hidden until a test is selected. */
         runPanel = new MigPanel("ins 0, wrap 1", "[grow,fill]", "[][][][grow,fill][][]");
@@ -553,6 +660,7 @@ public class CaptchaTestPanel extends MigPanel {
         add(runPanel, "span 2, growx, pushy, aligny top");
         rebuildTypeList();
         applyDefaults();
+        updateNoSolverWarning();
         /* Solvers can be (de)activated in the other tabs meanwhile -> check the selection whenever this panel is shown again. */
         addHierarchyListener(new HierarchyListener() {
             @Override
@@ -571,6 +679,7 @@ public class CaptchaTestPanel extends MigPanel {
      * @return true if the selection is usable
      */
     private boolean refreshSolverSelection() {
+        updateNoSolverWarning();
         if (batchRunning) {
             return true;
         }
@@ -591,6 +700,18 @@ public class CaptchaTestPanel extends MigPanel {
         rebuildTypeList();
         solverBox.repaint();
         return replacement != null;
+    }
+
+    /** Shows the warning if not a single solver can be selected. */
+    private void updateNoSolverWarning() {
+        boolean anySelectable = false;
+        for (int i = 0; i < solverBox.getItemCount(); i++) {
+            if (isSelectable((SolverService) solverBox.getItemAt(i))) {
+                anySelectable = true;
+                break;
+            }
+        }
+        noSolverWarning.setVisible(!anySelectable);
     }
 
     /** Fills the site URL/site key/action/expected result fields with the pre-filled test values of the selected captcha type. */
@@ -622,9 +743,12 @@ public class CaptchaTestPanel extends MigPanel {
         actionField.setEnabled(usesAction);
         final boolean usesMinScore = CaptchaTestParameters.usesMinScore(type);
         minScoreLabel.setEnabled(usesMinScore);
-        minScoreCheckBox.setSelected(false);
+        /* Default: no min score is requested, unless the captcha type has a default min score. */
+        final Double defaultMinScore = defaults.getMinScore();
+        minScoreCheckBox.setSelected(usesMinScore && defaultMinScore != null);
         minScoreCheckBox.setEnabled(usesMinScore);
-        minScoreSpinner.setEnabled(false);
+        minScoreSpinner.setValue(defaultMinScore != null ? defaultMinScore : Double.valueOf(0.5d));
+        minScoreSpinner.setEnabled(usesMinScore && defaultMinScore != null);
         final boolean usesMinClicks = CaptchaTestParameters.usesMinClicks(type);
         minClicksLabel.setEnabled(usesMinClicks);
         minClicksSpinner.setEnabled(usesMinClicks);
@@ -762,6 +886,52 @@ public class CaptchaTestPanel extends MigPanel {
         return parameters;
     }
 
+    /**
+     * Max number of captchas the given solver accepts at the same time, as enforced by the controller: the solver's
+     * {@link ChallengeSolver#getFinalMaxCaptchaThreadsSingleAccount()} (user limit and server-side limit of one account). Never more than
+     * MAX_PARALLEL_TESTS.
+     */
+    private static int getSolverParallelLimit(final SolverService service) {
+        int limit = MAX_PARALLEL_TESTS;
+        if (service == null) {
+            return limit;
+        }
+        /* Local solvers exist once. */
+        for (final ChallengeSolver<?> solver : ChallengeResponseController.getInstance().listSolvers()) {
+            if (service.getID().equals(solver.getService().getID())) {
+                limit = Math.min(limit, getSolverLimit(solver));
+            }
+        }
+        if (service instanceof PluginForCaptchaSolverSolverService) {
+            /* External solvers are created per account (the controller uses one account per solver service). */
+            final List<Account> accounts = AccountController.getInstance().getValidAccounts(service.getID());
+            if (accounts != null && !accounts.isEmpty()) {
+                final Account account = accounts.get(0);
+                try {
+                    limit = Math.min(limit, getSolverLimit(((abstractPluginForCaptchaSolver) account.getPlugin()).getPluginChallengeSolver(null, account)));
+                } catch (final Throwable e) {
+                    LogController.CL().log(e);
+                }
+            }
+        }
+        return limit;
+    }
+
+    private static int getSolverLimit(final ChallengeSolver<?> solver) {
+        return solver.getFinalMaxCaptchaThreadsSingleAccount();
+    }
+
+    /** Applies the limit of the selected solver to the max simultaneous tests spinner. */
+    private void updateParallelLimit() {
+        final int limit = getSolverParallelLimit((SolverService) solverBox.getSelectedItem());
+        final SpinnerNumberModel model = (SpinnerNumberModel) parallelSpinner.getModel();
+        model.setMaximum(Integer.valueOf(limit));
+        if (((Number) model.getValue()).intValue() > limit) {
+            model.setValue(Integer.valueOf(limit));
+        }
+        parallelInfoLabel.setText(limit < MAX_PARALLEL_TESTS ? "(limited to " + limit + " by the selected solver)" : "(max " + MAX_PARALLEL_TESTS + ")");
+    }
+
     /** A solver can only be tested if it is ready and activated in the "Solver overview" tab. */
     private static boolean isSelectable(final SolverService service) {
         return service.isReady() && service.getConfigV3().isEnabled();
@@ -772,6 +942,7 @@ public class CaptchaTestPanel extends MigPanel {
         typesPopup.removeAll();
         typeCheckBoxes.clear();
         typeCheckBoxTypes.clear();
+        updateParallelLimit();
         typesPopup.add(selectAllBox);
         typesPopup.addSeparator();
         final SolverService service = (SolverService) solverBox.getSelectedItem();
@@ -779,7 +950,19 @@ public class CaptchaTestPanel extends MigPanel {
         if (supported != null) {
             for (final CAPTCHA_TYPE type : CAPTCHA_TYPE.values()) {
                 if (type.hasTestChallenges() && supported.contains(type)) {
-                    final JCheckBox box = new JCheckBox(type.getDisplayName(), true);
+                    /* The check box itself has no text: the captcha type icon and name are a separate label (click toggles the check box). */
+                    final JCheckBox box = new JCheckBox("", true);
+                    final JLabel typeLabel = new JLabel(type.getDisplayName(), type.getIcon(), SwingConstants.LEADING);
+                    typeLabel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                    typeLabel.addMouseListener(new MouseAdapter() {
+                        @Override
+                        public void mouseClicked(final MouseEvent e) {
+                            box.doClick();
+                        }
+                    });
+                    final MigPanel typeRow = new MigPanel("ins 0", "[][grow,fill]", "[]");
+                    typeRow.add(box);
+                    typeRow.add(typeLabel);
                     box.addActionListener(new ActionListener() {
                         @Override
                         public void actionPerformed(final ActionEvent e) {
@@ -788,7 +971,7 @@ public class CaptchaTestPanel extends MigPanel {
                     });
                     typeCheckBoxes.add(box);
                     typeCheckBoxTypes.add(type);
-                    typesPopup.add(box);
+                    typesPopup.add(typeRow);
                 }
             }
         }
@@ -804,6 +987,7 @@ public class CaptchaTestPanel extends MigPanel {
         }
         typesButton.setText(selected + " of " + typeCheckBoxes.size() + " captcha types selected");
         multiStartButton.setEnabled(selected > 0 && !batchRunning);
+        noTypeWarning.setVisible(!typeCheckBoxes.isEmpty() && selected == 0);
         /* Checked only if every type is selected. */
         selectAllBox.setSelected(selected > 0 && selected == typeCheckBoxes.size());
         selectAllBox.setEnabled(!typeCheckBoxes.isEmpty());
@@ -818,8 +1002,8 @@ public class CaptchaTestPanel extends MigPanel {
 
     /**
      * Runs all selected captcha types of the selected solver one after another. The captcha type selected in the form uses the form values
-     * (which are the defaults unless the user changed them), all other types use their default test values. The captcha source always
-     * comes from the form.
+     * (which are the defaults unless the user changed them), all other types use their default test values. The captcha source always comes
+     * from the form.
      */
     private void startMultiTest() {
         final SolverService service = (SolverService) solverBox.getSelectedItem();
@@ -851,10 +1035,13 @@ public class CaptchaTestPanel extends MigPanel {
      */
     private void startBatch(final List<TestRun> runs, final boolean replaceTable) {
         if (replaceTable) {
+            /* A new test starts: the automatic sorting is active again. */
+            enableAutoSort();
             runModel.setRuns(runs);
         } else {
             runModel.fireRunsChanged();
         }
+        updateRunScrollHeight();
         runScroll.setVisible(true);
         batchCancelled = false;
         batchRunning = true;
@@ -864,21 +1051,42 @@ public class CaptchaTestPanel extends MigPanel {
         setBatchRunningState(true);
         startRefreshTimer();
         ChallengeResponseController.getInstance().getEventSender().addListener(jobListener);
+        /* Single tests and retries run alone; a multi test runs as many tests at the same time as chosen (and allowed by the solver). */
+        final int parallel = Math.max(1, Math.min(runs.size(), Math.min(((Number) parallelSpinner.getValue()).intValue(), getSolverParallelLimit(runs.get(0).service))));
         final Thread thread = new Thread("CaptchaTestPanelBatch") {
             @Override
             public void run() {
+                final ExecutorService pool = Executors.newFixedThreadPool(parallel, new ThreadFactory() {
+                    @Override
+                    public Thread newThread(final Runnable r) {
+                        final Thread t = new Thread(r, "CaptchaTestPanelTest");
+                        t.setDaemon(true);
+                        return t;
+                    }
+                });
                 try {
                     for (final TestRun run : runs) {
-                        if (run.state == RunState.FAILED && run.aborted) {
-                            /* Aborted while it was still waiting for its turn. */
-                            continue;
-                        }
-                        if (batchCancelled) {
-                            finishRun(run, RunState.FAILED, "Cancelled", null);
-                            continue;
-                        }
-                        executeRun(run);
+                        pool.execute(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (run.state == RunState.FAILED && run.aborted) {
+                                    /* Aborted while it was still waiting for its turn. */
+                                    return;
+                                }
+                                if (batchCancelled) {
+                                    finishRun(run, RunState.FAILED, "Cancelled", null);
+                                    return;
+                                }
+                                executeRun(run);
+                            }
+                        });
                     }
+                    pool.shutdown();
+                    while (!pool.awaitTermination(1, TimeUnit.HOURS)) {
+                        /* Wait until all tests are done (each one has its own solver timeout). */
+                    }
+                } catch (final InterruptedException e) {
+                    pool.shutdownNow();
                 } finally {
                     batchRunning = false;
                     ChallengeResponseController.getInstance().getEventSender().removeListener(jobListener);
@@ -896,7 +1104,6 @@ public class CaptchaTestPanel extends MigPanel {
             }
         };
         thread.setDaemon(true);
-        batchThread = thread;
         if (replaceTable) {
             runTable.setRowSelectionInterval(0, 0);
         }
@@ -918,8 +1125,9 @@ public class CaptchaTestPanel extends MigPanel {
 
     /** Builds a fresh challenge from the snapshot of the test and runs it through the solving pipeline. Runs on the batch thread. */
     private void executeRun(final TestRun run) {
-        /* Clear an interrupt flag that was meant for the previous test. */
+        /* Clear an interrupt flag that was meant for the previous test of this pool thread. */
         Thread.interrupted();
+        run.thread = Thread.currentThread();
         @SuppressWarnings("unchecked")
         final Challenge<Object> newChallenge = (Challenge<Object>) CaptchaTestChallengeFactory.newChallenge(run.type, run.source, run.parameters);
         if (newChallenge == null) {
@@ -985,6 +1193,7 @@ public class CaptchaTestPanel extends MigPanel {
             LogController.CL().log(e);
             finishRun(run, RunState.FAILED, batchCancelled ? "Cancelled" : "Failed: " + e.getMessage(), null);
         } finally {
+            run.thread = null;
             run.challenge = null;
         }
     }
@@ -1051,21 +1260,61 @@ public class CaptchaTestPanel extends MigPanel {
         return (int) Math.min(100, duration * 100 / timeout);
     }
 
+    /**
+     * Sizes the result table so that the header and all rows are visible (see SolverOrderContainer#tableFullHeight for the extra pixels,
+     * without them the last row is partly cut and a scrollbar would be needed).
+     */
+    private void updateRunScrollHeight() {
+        final int headerHeight = runTable.getTableHeader() != null ? runTable.getTableHeader().getPreferredSize().height : 0;
+        final int height = headerHeight + runTable.getPreferredSize().height + 10;
+        runScroll.setPreferredSize(new Dimension(runTable.getPreferredSize().width, height));
+        runScroll.revalidate();
+        revalidate();
+    }
+
     /** Progress line above the table of a multi test: "Running test 1/X" while running, the total time when done. */
     private void updateBatchLabel() {
         final List<TestRun> runs = batchRuns;
-        batchLabel.setVisible(runModel.getRowCount() > 1);
-        if (batchRunning) {
-            int started = 0;
-            for (final TestRun run : runs) {
-                if (run.state != RunState.PENDING) {
-                    started++;
-                }
+        final boolean visible = runModel.getRowCount() > 1;
+        batchBar.setVisible(visible);
+        /* The animation shows that at least one test is still running. */
+        activityBar.setVisible(visible && batchRunning);
+        int started = 0;
+        int finished = 0;
+        for (final TestRun run : runs) {
+            switch (run.state) {
+            case PENDING:
+                break;
+            case RUNNING:
+                started++;
+                break;
+            case PASSED:
+            case PASSED_UNEXPECTED_ANSWER:
+            case FAILED:
+            default:
+                started++;
+                finished++;
+                break;
             }
-            batchLabel.setText("Running test " + Math.max(1, Math.min(started, runs.size())) + "/" + runs.size());
+        }
+        batchBar.setMaximum(Math.max(1, runs.size()));
+        batchBar.setValue(finished);
+        final long elapsed = System.currentTimeMillis() - batchStartTime;
+        if (batchRunning) {
+            batchBar.setString("Finished tests " + finished + "/" + runs.size() + " | Time: " + (elapsed / 100 / 10d) + "s");
         } else {
-            final long elapsed = System.currentTimeMillis() - batchStartTime;
-            batchLabel.setText((batchCancelled ? "Tests cancelled" : "Tests completed") + " | Time: " + (elapsed / 100 / 10d) + "s");
+            batchBar.setString((batchCancelled ? "Tests cancelled" : "Tests completed") + " | Time: " + (elapsed / 100 / 10d) + "s");
+        }
+    }
+
+    /** Automatic sorting: passed, failed, running, pending, applied again after every change of a test. */
+    private void enableAutoSort() {
+        internalSortChange = true;
+        try {
+            runSorter.setSortsOnUpdates(true);
+            runSorter.setSortKeys(Collections.singletonList(new RowSorter.SortKey(1, SortOrder.ASCENDING)));
+        } finally {
+            internalSortChange = false;
         }
     }
 
@@ -1084,9 +1333,9 @@ public class CaptchaTestPanel extends MigPanel {
             return;
         }
         runTable.setRowSelectionInterval(row, row);
-        final TestRun run = runModel.getRun(row);
+        final TestRun run = runModel.getRun(runTable.convertRowIndexToModel(row));
         final JPopupMenu menu = new JPopupMenu();
-        final JMenuItem cancel = new JMenuItem("Cancel");
+        final JMenuItem cancel = new JMenuItem("Cancel", NewTheme.I().getIcon(IconKey.ICON_FALSE, 16));
         cancel.setEnabled(isCancellable(run));
         cancel.addActionListener(new ActionListener() {
             @Override
@@ -1174,6 +1423,24 @@ public class CaptchaTestPanel extends MigPanel {
         return sb.toString();
     }
 
+    /**
+     * Sort key of the duration column: the duration of finished tests only. Running tests (their duration changes all the time) and
+     * pending tests have a fixed key and are sorted behind the finished ones, so the order does not change live.
+     */
+    private static long getSortDuration(final TestRun run) {
+        switch (run.state) {
+        case PASSED:
+        case PASSED_UNEXPECTED_ANSWER:
+        case FAILED:
+            return Math.max(0, getDurationMillis(run));
+        case RUNNING:
+            return Long.MAX_VALUE - 1;
+        case PENDING:
+        default:
+            return Long.MAX_VALUE;
+        }
+    }
+
     /** Duration of a test: until its end, or until now while it is running. */
     private static long getDurationMillis(final TestRun run) {
         final long start = run.startTime;
@@ -1199,7 +1466,9 @@ public class CaptchaTestPanel extends MigPanel {
         return maxTimeout;
     }
 
-    /** Shows which solver(s) are still working on the challenge and their {@link ChallengeSolver#getFinalTimeoutMillis()}, while waiting. */
+    /**
+     * Shows which solver(s) are still working on the challenge and their {@link ChallengeSolver#getFinalTimeoutMillis()}, while waiting.
+     */
     private void updateActiveSolversStatus(final TestRun run) {
         final Challenge<Object> current = run.challenge;
         if (run.finishedJob != null || current == null) {
@@ -1279,7 +1548,7 @@ public class CaptchaTestPanel extends MigPanel {
         switch (run.state) {
         case RUNNING:
             killLiveJob(run);
-            final Thread thread = batchThread;
+            final Thread thread = run.thread;
             if (thread != null && thread.isAlive()) {
                 thread.interrupt();
             }
@@ -1307,6 +1576,23 @@ public class CaptchaTestPanel extends MigPanel {
         PASSED,
         PASSED_UNEXPECTED_ANSWER,
         FAILED;
+
+        /** Default table order: passed, failed, running, pending. */
+        int getSortRank() {
+            switch (this) {
+            case PASSED:
+            case PASSED_UNEXPECTED_ANSWER:
+                return 0;
+            case FAILED:
+                return 1;
+            case RUNNING:
+                return 2;
+            case PENDING:
+            default:
+                return 3;
+            }
+        }
+
         String getText() {
             switch (this) {
             case RUNNING:
@@ -1372,6 +1658,8 @@ public class CaptchaTestPanel extends MigPanel {
         private volatile boolean            aborted;
         private volatile long               maxTimeoutMillis;
         private volatile Challenge<Object>  challenge;
+        /* Pool thread that currently executes this test. */
+        private volatile Thread             thread;
         private volatile SolverJob<Object>  finishedJob;
         private final List<Point>           markers = new ArrayList<Point>();
 
@@ -1407,7 +1695,7 @@ public class CaptchaTestPanel extends MigPanel {
     private static class RunTableModel extends AbstractTableModel {
         private static final long   serialVersionUID = 1L;
         private final List<TestRun> runs             = new ArrayList<TestRun>();
-        private final String[]      columns          = { "Captcha type", "Passed", "Progress", "Answer" };
+        private final String[]      columns          = { "Captcha type", "Passed", "Duration", "Answer" };
 
         void setRuns(final List<TestRun> newRuns) {
             runs.clear();

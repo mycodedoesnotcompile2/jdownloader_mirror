@@ -21,11 +21,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -42,7 +37,12 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53587 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
+
+@HostPlugin(revision = "$Revision: 53623 $", interfaceVersion = 3, names = {}, urls = {})
 public class ExtMatrixCom extends PluginForHost {
     public ExtMatrixCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -84,7 +84,8 @@ public class ExtMatrixCom extends PluginForHost {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
             /* Only new links are supported: /v2/files/<fid>/<name>.html or just /v2/files/<fid>/<something> (e.g. "/0") */
-            ret.add("https?://(?:[A-Za-z0-9]+\\.)?" + buildHostsPatternPart(domains) + "/v2/files/([A-Za-z0-9]+)(?:/([^/\\?#]+?)(?:\\.html)?)?");
+            /* old /files/ are redirected to /v2/ */
+            ret.add("https?://(?:[A-Za-z0-9]+\\.)?" + buildHostsPatternPart(domains) + "/(?:v2/)?files/([A-Za-z0-9]+)(?:/([^/]*?)(?:\\.html|\\?|$))?");
         }
         return ret.toArray(new String[0]);
     }
@@ -162,7 +163,7 @@ public class ExtMatrixCom extends PluginForHost {
                     final String fid = getFID(link);
                     Map<String, Object> match = null;
                     for (final Map<String, Object> item : items) {
-                        if (StringUtils.equals(fid, (String) item.get("fileId"))) {
+                        if (fid.equals(item.get("fileId"))) {
                             match = item;
                             break;
                         }

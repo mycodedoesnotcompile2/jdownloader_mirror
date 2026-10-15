@@ -29,6 +29,10 @@ public interface DeviantArtComConfig extends PluginConfigInterface {
             return "Image download mode";
         }
 
+        public String getFileSizeDisplayMode_label() {
+            return "File size display mode";
+        }
+
         public String getArtCrawlMode_label() {
             return "Crawl mode for '/art/' links";
         }
@@ -102,4 +106,34 @@ public interface DeviantArtComConfig extends PluginConfigInterface {
     ImageDownloadMode getImageDownloadMode();
 
     void setImageDownloadMode(final ImageDownloadMode mode);
+
+    public static enum FileSizeDisplayMode implements LabelInterface {
+        AUTO {
+            @Override
+            public String getLabel() {
+                return "Auto";
+            }
+        },
+        ORIGINAL_FILE_SIZE_RATHER_THAN_NONE {
+            @Override
+            public String getLabel() {
+                return "Display original file size rather than none";
+            }
+        },
+        SAFE_FILE_SIZE_ELSE_UNKNOWN {
+            @Override
+            public String getLabel() {
+                return "Display safe file size, otherwise unknown";
+            }
+        };
+    }
+
+    @AboutConfig
+    @DefaultEnumValue("AUTO")
+    @Order(40)
+    @DescriptionForConfigEntry("Controls what to display if the file that will be downloaded (e.g. preview image) differs from the original file and its exact size is not known.")
+    @DefaultOnNull
+    FileSizeDisplayMode getFileSizeDisplayMode();
+
+    void setFileSizeDisplayMode(final FileSizeDisplayMode mode);
 }
