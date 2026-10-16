@@ -2,6 +2,8 @@ package org.jdownloader.captcha.v2;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.WeakHashMap;
@@ -33,16 +35,40 @@ public abstract class ChallengeSolver<T> {
         }
 
         @Override
-        public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        public Set<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
             /* Placeholder solver that never receives challenges. */
-            return new ArrayList<CAPTCHA_TYPE>();
+            return EnumSet.noneOf(CAPTCHA_TYPE.class);
         }
+
     };
 
-    public enum FeedbackType {
-        REPORT_INVALID_CAPTCHAS,
-        REPORT_VALID_CAPTCHAS,
-        ABORT_CAPTCHAS
+    public enum FeedbackType implements LabelInterface {
+        REPORT_INVALID_CAPTCHAS {
+            @Override
+            public String getLabel() {
+                return _GUI.T.FeedbackType_REPORT_INVALID_CAPTCHAS();
+            }
+        },
+        REPORT_VALID_CAPTCHAS {
+            @Override
+            public String getLabel() {
+                return _GUI.T.FeedbackType_REPORT_VALID_CAPTCHAS();
+            }
+        },
+        /* Solver delivered an answer but JDownloader did not use it, see setUnused. */
+        REPORT_UNUSED_CAPTCHAS {
+            @Override
+            public String getLabel() {
+                return _GUI.T.FeedbackType_REPORT_UNUSED_CAPTCHAS();
+            }
+        },
+        /* Challenge without answer can be aborted on the server side, see abstractPluginForCaptchaSolver#abortCaptcha. */
+        ABORT_CAPTCHAS {
+            @Override
+            public String getLabel() {
+                return _GUI.T.FeedbackType_ABORT_CAPTCHAS();
+            }
+        }
     }
 
     public enum SolverType implements LabelInterface {
@@ -105,9 +131,14 @@ public abstract class ChallengeSolver<T> {
     protected ChallengeSolver() {
     }
 
-    public List<FeedbackType> getSupportedFeedbackTypes() {
-        // TODO: Make this abstract
-        return null;
+    /**
+     * Returns the captcha feedback types this solver supports (see {@link #setValid(AbstractResponse)},
+     * {@link #setInvalid(AbstractResponse)} and {@link #setUnused(AbstractResponse)}). Default: none, because the default implementations of
+     * those methods do nothing (e.g. the BrowserSolver and the manual dialog solvers cannot receive any feedback). Solvers that really
+     * handle feedback have to override this method. Null or an empty set means that no feedback is supported.
+     */
+    public Set<FeedbackType> getSupportedFeedbackTypes() {
+        return EnumSet.noneOf(FeedbackType.class);
     }
 
     /**
@@ -119,9 +150,9 @@ public abstract class ChallengeSolver<T> {
      * Important: If a solver supports all reCaptcha captcha types, return RECAPTCHA_V2, RECAPTCHA_V2_ENTERPRISE AND RECAPTCHA_V2_INVISIBLE
      * !
      *
-     * @return List of supported captcha types
+     * @return Set of supported captcha types
      */
-    public abstract List<CAPTCHA_TYPE> getSupportedCaptchaTypes();
+    public abstract Set<CAPTCHA_TYPE> getSupportedCaptchaTypes();
 
     /* Returns type of solver e.g. browser solver, local image solver or external solver. Defined by the solver's service. */
     public SolverType getSolverType() {
@@ -132,19 +163,58 @@ public abstract class ChallengeSolver<T> {
      * Return list of user disabled captcha types if any are disabled. <br>
      * Returns null or empty list of user has not disabled any captcha types.
      */
-    public List<CAPTCHA_TYPE> getUserDisabledCaptchaTypes() {
+    public Set<CAPTCHA_TYPE> getUserDisabledCaptchaTypes() {
         return null;
     }
 
-    public boolean setInvalid(AbstractResponse<?> response) {
+    /** True if this solver supports the given captcha feedback type, see {@link #getSupportedFeedbackTypes()}. */
+    private boolean isFeedbackSupported(final FeedbackType type) {
+        final Set<FeedbackType> types = getSupportedFeedbackTypes();
+        return types != null && types.contains(type);
+    }
+
+    /**
+     * Reports to the solver that its answer was not correct. Only calls {@link #onInvalid(AbstractResponse)} if the solver declares
+     * {@link FeedbackType#REPORT_INVALID_CAPTCHAS}.
+     *
+     * @return true if the feedback was delivered
+     */
+    public final boolean setInvalid(final AbstractResponse<?> response) {
+        return isFeedbackSupported(FeedbackType.REPORT_INVALID_CAPTCHAS) && onInvalid(response);
+    }
+
+    /**
+     * Tells the solver that its answer was not used. Only calls {@link #onUnused(AbstractResponse)} if the solver declares
+     * {@link FeedbackType#REPORT_UNUSED_CAPTCHAS}.
+     *
+     * @return true if the feedback was delivered
+     */
+    public final boolean setUnused(final AbstractResponse<?> response) {
+        return isFeedbackSupported(FeedbackType.REPORT_UNUSED_CAPTCHAS) && onUnused(response);
+    }
+
+    /**
+     * Reports to the solver that its answer was correct. Only calls {@link #onValid(AbstractResponse)} if the solver declares
+     * {@link FeedbackType#REPORT_VALID_CAPTCHAS}.
+     *
+     * @return true if the feedback was delivered
+     */
+    public final boolean setValid(final AbstractResponse<?> response) {
+        return isFeedbackSupported(FeedbackType.REPORT_VALID_CAPTCHAS) && onValid(response);
+    }
+
+    /** Override to handle "incorrect" feedback. Only called if the solver supports {@link FeedbackType#REPORT_INVALID_CAPTCHAS}. */
+    protected boolean onInvalid(final AbstractResponse<?> response) {
         return false;
     }
 
-    public boolean setUnused(AbstractResponse<?> response) {
+    /** Override to handle "unused" feedback. Only called if the solver supports {@link FeedbackType#REPORT_UNUSED_CAPTCHAS}. */
+    protected boolean onUnused(final AbstractResponse<?> response) {
         return false;
     }
 
-    public boolean setValid(AbstractResponse<?> response) {
+    /** Override to handle "correct" feedback. Only called if the solver supports {@link FeedbackType#REPORT_VALID_CAPTCHAS}. */
+    protected boolean onValid(final AbstractResponse<?> response) {
         return false;
     }
 
@@ -272,14 +342,14 @@ public abstract class ChallengeSolver<T> {
         if (!this.isEnabled()) {
             return ChallengeVetoReason.SOLVER_DISABLED;
         }
-        final List<CAPTCHA_TYPE> supported_types = this.getSupportedCaptchaTypes();
+        final Set<CAPTCHA_TYPE> supported_types = this.getSupportedCaptchaTypes();
         final CAPTCHA_TYPE ctype = CAPTCHA_TYPE.getCaptchaTypeForChallenge(c);
         if (ctype != null) {
             if (supported_types == null || supported_types.isEmpty()) {
                 /* Solver does not declare any supported captcha type (bug in solver implementation) -> Cannot solve any captcha. */
                 return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
             }
-            final List<CAPTCHA_TYPE> disabled_types = this.getUserDisabledCaptchaTypes();
+            final Set<CAPTCHA_TYPE> disabled_types = this.getUserDisabledCaptchaTypes();
             if (disabled_types != null && supported_types.contains(ctype) && disabled_types.contains(ctype)) {
                 /* Captcha type is supported by plugin but user has disabled this captcha type for this account. */
                 return ChallengeVetoReason.CAPTCHA_TYPE_DISABLED_BY_USER;

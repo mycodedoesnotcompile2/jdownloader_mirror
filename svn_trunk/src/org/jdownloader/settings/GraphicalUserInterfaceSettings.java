@@ -880,12 +880,6 @@ public interface GraphicalUserInterfaceSettings extends ConfigInterface {
 
     void setTaskBarFlashEnabled(boolean b);
 
-    @DefaultBooleanValue(false)
-    @AboutConfig
-    boolean isCaptchaDebugModeEnabled();
-
-    void setCaptchaDebugModeEnabled(boolean b);
-
     public static enum StartButtonAction {
         @EnumLabel("Add all Linkgrabber links and start Downloads.")
         ADD_ALL_LINKS_AND_START_DOWNLOADS,
@@ -1456,13 +1450,6 @@ public interface GraphicalUserInterfaceSettings extends ConfigInterface {
     String getDateTimeFormatDownloadListFinishedDateColumn();
 
     void setDateTimeFormatDownloadListFinishedDateColumn(String df);
-
-    @AboutConfig
-    @RequiresRestart("Restart is Required")
-    @DefaultBooleanValue(true)
-    boolean isSpecialDealOboomDialogVisibleOnStartup();
-
-    void setSpecialDealOboomDialogVisibleOnStartup(boolean b);
 
     @RequiresRestart("Restart is Required")
     @AboutConfig

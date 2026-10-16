@@ -1,5 +1,7 @@
 package jd.plugins;
 
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -594,8 +596,8 @@ public class CaptchaType {
     public static final boolean HIDE_CAPTCHA_TYPES_NOT_SUPPORTED_BY_JD = true;
 
     /** Returns captcha types that should be displayed in GUI. */
-    public static List<CAPTCHA_TYPE> getProcessableCaptchaTypes() {
-        final List<CAPTCHA_TYPE> ctypes = new ArrayList<CAPTCHA_TYPE>();
+    public static Set<CAPTCHA_TYPE> getProcessableCaptchaTypes() {
+        final Set<CAPTCHA_TYPE> ctypes = EnumSet.noneOf(CAPTCHA_TYPE.class);
         for (final CAPTCHA_TYPE ctype : CAPTCHA_TYPE.values()) {
             if (HIDE_CAPTCHA_TYPES_NOT_SUPPORTED_BY_JD && !ctype.isJDownloaderSupported()) {
                 continue;

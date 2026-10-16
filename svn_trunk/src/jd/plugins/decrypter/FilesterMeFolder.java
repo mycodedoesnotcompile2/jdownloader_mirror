@@ -21,14 +21,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.encoding.Base64;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
+import jd.parser.html.HTMLSearch;
 import jd.plugins.Account;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -42,7 +41,9 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FilesterMe;
 
-@DecrypterPlugin(revision = "$Revision: 52902 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.encoding.Base64;
+
+@DecrypterPlugin(revision = "$Revision: 53642 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { FilesterMe.class })
 public class FilesterMeFolder extends PluginForDecrypt {
     public FilesterMeFolder(PluginWrapper wrapper) {
@@ -114,6 +115,12 @@ public class FilesterMeFolder extends PluginForDecrypt {
             folder_access_token = br.getCookie(br.getHost(), "folder_access_token");
         }
         String title = br.getRegex("class=\"folder-title\"[^>]*>\\s*([^<]+)\\s*</h1>").getMatch(0);
+        if (title == null) {
+            title = br.getRegex(">\\s*([^<]*)\\s*</h\\d+>\\s*<div[^>]*>\\s*<span[^>]*>\\s*Created").getMatch(0);
+            if (title == null) {
+                title = HTMLSearch.searchMetaTagProperty(br.getRequest(), "og:title");
+            }
+        }
         String folder_title;
         if (title != null) {
             folder_title = Encoding.htmlDecode(title).trim();
@@ -228,7 +235,7 @@ public class FilesterMeFolder extends PluginForDecrypt {
     }
 
     public static Form findPasswordForm(final Browser br) {
-        return br.getFormByRegex(">\\s*Access\\s*Folder\\s*<");
+        return br.getFormByRegex(">\\s*(Access\\s*Folder|Folder\\s*password)\\s*<");
     }
 
     @Override

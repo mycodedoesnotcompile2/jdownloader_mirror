@@ -1,5 +1,7 @@
 package org.jdownloader.plugins.components.captchasolver;
 
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -66,6 +68,14 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
         this.enablePremium(getBuyPremiumUrl());
     }
 
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put("User-Agent", "JDownloader " + this.getVersion());
+        br.setFollowRedirects(true);
+        return br;
+    }
+
     /**
      * Returns the features supported by this plugin.
      *
@@ -83,25 +93,28 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      *
      *
      *
-     * @return List of supported captcha types
+     * @return Set of supported captcha types
      */
-    public abstract List<CAPTCHA_TYPE> getSupportedCaptchaTypes();
+    public abstract Set<CAPTCHA_TYPE> getSupportedCaptchaTypes();
 
     /**
      * Returns list of captcha types supported by this account. <br>
      * Most solvers support all captcha types for all account types, only some (e.g. captchas.io) may support some captcha types only for
      * specific / more expensive account types.
      */
-    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes(final Account account) {
+    public Set<CAPTCHA_TYPE> getSupportedCaptchaTypes(final Account account) {
         return getSupportedCaptchaTypes();
     }
 
     /**
-     * This can be used so that a plugin can provide this information in advance so that e.g. users can lookup this info in a comparison
-     * table aka "Does this solver allow for response-feedback"?
+     * Returns the captcha feedback types this solver supports: e.g. reporting valid/invalid captchas. Default: none. Plugins whose service
+     * offers captcha feedback have to override this together with {@link #setValid}, {@link #setInvalid} and/or {@link #abortCaptcha}. Null
+     * or an empty set means that the solver does not offer any captcha feedback. <br>
+     * Also used so that users can lookup this info in advance, e.g. in a comparison table aka "Does this solver allow for
+     * response-feedback"?
      */
-    public List<FeedbackType> getSupportedFeedbackTypes() {
-        return null;
+    public Set<FeedbackType> getSupportedFeedbackTypes() {
+        return EnumSet.noneOf(FeedbackType.class);
     }
 
     public abstract String getBuyPremiumUrl();
@@ -124,7 +137,9 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      *            The captcha response to report as invalid
      * @return true if the report was successfully sent, false otherwise
      */
-    public abstract boolean setInvalid(final AbstractResponse<?> response, final Account account) throws Exception;
+    public boolean setInvalid(final AbstractResponse<?> response, final Account account) throws Exception {
+        return false;
+    }
 
     /**
      * Reports a captcha as valid.
@@ -137,16 +152,40 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
         return false;
     }
 
+    /**
+     * Reports a captcha response as unused: the solver DID deliver an answer, but JDownloader did not use it, e.g. because the answer
+     * arrived after the job was already solved/skipped/timed out, or because another solver's differing answer was used instead. <br>
+     * Not to be confused with {@link #abortCaptcha(String, Account)}, which is for challenges that have NO answer (yet).
+     *
+     * @param response
+     *            The captcha response that was not used
+     * @return true if the report was successfully sent, false otherwise
+     */
     public boolean setUnused(final AbstractResponse<?> response, final Account account) throws Exception {
         return false;
     }
 
-    public List<CAPTCHA_TYPE> getUserDisabledCaptchaTypes(final Account account) {
+    /**
+     * Aborts a captcha task on the server side of the solver service because JDownloader no longer waits for its answer: JDownloader ran
+     * into its own timeout, the user skipped/aborted the captcha, or another solver solved it first. At that point there is no answer
+     * from this solver. The service should stop working on the task and ideally not charge for it. Only called if the plugin declares {@link FeedbackType#ABORT_CAPTCHAS} in
+     * {@link #getSupportedFeedbackTypes()}. Plugins that declare it must override this.
+     *
+     * @param response
+     *            Placeholder response without a value: it only carries the task ID the solver service assigned to the captcha, see
+     *            {@link AbstractResponse#getCaptchaSolverTaskID()}.
+     * @return true if the task was aborted successfully, false otherwise
+     */
+    public boolean abortCaptcha(final AbstractResponse<?> response, final Account account) throws Exception {
+        return false;
+    }
+
+    public Set<CAPTCHA_TYPE> getUserDisabledCaptchaTypes(final Account account) {
         final AccountInfo ai = account.getAccountInfo();
         if (ai == null) {
             return null;
         }
-        final List<CAPTCHA_TYPE> disabled_captcha_types = new ArrayList<CAPTCHA_TYPE>();
+        final Set<CAPTCHA_TYPE> disabled_captcha_types = EnumSet.noneOf(CAPTCHA_TYPE.class);
         final AccountCaptchaTypeAccessor ata = new AccountCaptchaTypeAccessor(account);
         for (final CAPTCHA_TYPE ctype : CAPTCHA_TYPE.values()) {
             if (!ata.isEnabled(ctype)) {

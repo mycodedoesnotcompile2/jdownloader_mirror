@@ -5600,6 +5600,18 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "The list of supported captcha types is self-declared: a solver may support more captcha types than listed here." })
     String CaptchaSolverComparison_disclaimer();
 
+    @Default(lngs = { "en" }, values = { "Feedback: report correct captchas" })
+    String FeedbackType_REPORT_VALID_CAPTCHAS();
+
+    @Default(lngs = { "en" }, values = { "Feedback: report incorrect captchas" })
+    String FeedbackType_REPORT_INVALID_CAPTCHAS();
+
+    @Default(lngs = { "en" }, values = { "Feedback: report unused captchas" })
+    String FeedbackType_REPORT_UNUSED_CAPTCHAS();
+
+    @Default(lngs = { "en" }, values = { "Feedback: abort unsolved captchas" })
+    String FeedbackType_ABORT_CAPTCHAS();
+
     @Default(lngs = { "en" }, values = { "Downloads" })
     String CaptchaRequestType_HOSTER();
 

@@ -1,5 +1,6 @@
 package org.jdownloader.captcha.v2;
 
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -124,17 +125,17 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
     }
 
     @Override
-    public List<FeedbackType> getSupportedFeedbackTypes() {
+    public Set<FeedbackType> getSupportedFeedbackTypes() {
         return plugin.getSupportedFeedbackTypes();
     }
 
     @Override
-    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+    public Set<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
         return plugin.getSupportedCaptchaTypes(account);
     }
 
     @Override
-    public List<CAPTCHA_TYPE> getUserDisabledCaptchaTypes() {
+    public Set<CAPTCHA_TYPE> getUserDisabledCaptchaTypes() {
         return this.plugin.getUserDisabledCaptchaTypes(account);
     }
 
@@ -154,8 +155,8 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
         if (veto != null) {
             return veto;
         }
-        final List<CAPTCHA_TYPE> all_supported_captcha_types = this.plugin.getSupportedCaptchaTypes();
-        final List<CAPTCHA_TYPE> account_supported_captcha_types = this.plugin.getSupportedCaptchaTypes(this.account);
+        final Set<CAPTCHA_TYPE> all_supported_captcha_types = this.plugin.getSupportedCaptchaTypes();
+        final Set<CAPTCHA_TYPE> account_supported_captcha_types = this.plugin.getSupportedCaptchaTypes(this.account);
         final CAPTCHA_TYPE ctype = CAPTCHA_TYPE.getCaptchaTypeForChallenge(c);
         if (ctype != null && all_supported_captcha_types != null && account_supported_captcha_types != null && all_supported_captcha_types.contains(ctype) && !account_supported_captcha_types.contains(ctype)) {
             return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER_ACCOUNT;
@@ -174,13 +175,9 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
         return null;
     }
 
+    /* The feedback type is already checked by ChallengeSolver#setValid. */
     @Override
-    public boolean setValid(AbstractResponse<?> response) {
-        final List<FeedbackType> feedbacktypes = this.getSupportedFeedbackTypes();
-        if (feedbacktypes != null && !feedbacktypes.contains(FeedbackType.REPORT_VALID_CAPTCHAS)) {
-            /* Feedback type is not supported by plugin. */
-            return false;
-        }
+    protected boolean onValid(final AbstractResponse<?> response) {
         if (!plugin.isEnableCaptchaFeedback(account)) {
             /* Feedback is disabled by user */
             return false;
@@ -194,13 +191,9 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
         }
     }
 
+    /* The feedback type is already checked by ChallengeSolver#setInvalid. */
     @Override
-    public boolean setInvalid(AbstractResponse<?> response) {
-        final List<FeedbackType> feedbacktypes = this.getSupportedFeedbackTypes();
-        if (feedbacktypes != null && !feedbacktypes.contains(FeedbackType.REPORT_INVALID_CAPTCHAS)) {
-            /* Feedback type is not supported by plugin. */
-            return false;
-        }
+    protected boolean onInvalid(final AbstractResponse<?> response) {
         if (!plugin.isEnableCaptchaFeedback(account)) {
             /* Feedback is disabled by user */
             return false;
@@ -214,13 +207,9 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
         }
     }
 
+    /* The feedback type is already checked by ChallengeSolver#setUnused. */
     @Override
-    public boolean setUnused(AbstractResponse<?> response) {
-        final List<FeedbackType> feedbacktypes = this.getSupportedFeedbackTypes();
-        if (feedbacktypes != null && !feedbacktypes.contains(FeedbackType.ABORT_CAPTCHAS)) {
-            /* Feedback type is not supported by plugin. */
-            return false;
-        }
+    protected boolean onUnused(final AbstractResponse<?> response) {
         if (!plugin.isEnableCaptchaFeedback(account)) {
             /* Feedback is disabled by user */
             return false;
@@ -231,6 +220,42 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
             // TODO: Handle plugin/account related exceptions
             e.printStackTrace();
             return false;
+        }
+    }
+
+    /**
+     * Aborts the captcha task on the server side of the solver service if JDownloader no longer waits for its answer, so the service stops
+     * working on it and (ideally) does not charge for it: the solver or the whole job ran into a timeout, or the job ended without this
+     * solver's answer (skipped/aborted by the user, solved by another solver). Does nothing if the plugin does not support
+     * {@link FeedbackType#ABORT_CAPTCHAS}, the user disabled captcha feedback, no task was submitted or this solver already delivered an
+     * answer (that one gets {@link #setUnused(AbstractResponse)}/valid/invalid feedback instead).
+     */
+    private void abortServerSideIfNotNeeded(final SolverJob<T> job, final CESSolverJob<T> cesJob) {
+        final String taskID = cesJob.getCaptchaSolverTaskID();
+        if (taskID == null || cesJob.isAnswerDelivered()) {
+            return;
+        }
+        final boolean timedOut = job.isSolverTimedOut(this);
+        if (!timedOut && job.isAlive()) {
+            /* Job still wants an answer: the solver just ended on its own (e.g. unsolved), the task is finished on the server side. */
+            return;
+        }
+        final Set<FeedbackType> feedbacktypes = this.getSupportedFeedbackTypes();
+        if (feedbacktypes == null || !feedbacktypes.contains(FeedbackType.ABORT_CAPTCHAS) || !plugin.isEnableCaptchaFeedback(account)) {
+            return;
+        }
+        /* Clear a pending interrupt (kill interrupts the solver thread), otherwise the abort request would fail immediately. */
+        Thread.interrupted();
+        final String reason = timedOut ? "timeout" : "job no longer needs an answer";
+        try {
+            /* No answer exists, so build a value-less response that carries the task ID. */
+            final AbstractResponse<T> placeholder = new AbstractResponse<T>(job.getChallenge(), this, null);
+            placeholder.setCaptchaSolverTaskID(taskID);
+            final boolean aborted = plugin.abortCaptcha(placeholder, account);
+            job.logSolverStatus(this, "Server side abort of task " + taskID + " (" + reason + "): " + (aborted ? "success" : "failed"));
+        } catch (final Exception e) {
+            job.logSolverStatus(this, "Server side abort of task " + taskID + " (" + reason + ") failed: " + e);
+            plugin.getLogger().log(e);
         }
     }
 
@@ -285,6 +310,7 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
             // TODO
             e.printStackTrace();
         } finally {
+            abortServerSideIfNotNeeded(job, cesJob);
             cesJob.hideBubble();
             // TODO: Check if it's fine to nullify here
             plugin.setCurrentCaptchaChallenge(null);

@@ -39,6 +39,8 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
     private Pair<Checkbox>            useExternalSolverAccountsPair;
     private CaptchaSettingsTabbedPane tabs;
     private JScrollPane               solversScrollPane;
+    private CaptchaTestPanel          testPanel;
+    private JScrollPane               testScrollPane;
 
     public String getTitle() {
         return _GUI.T.AntiCaptchaConfigPanel_getTitle();
@@ -46,6 +48,7 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
 
     public CaptchaConfigPanel() {
         super();
+        debugTabShown = false;
         this.addHeader(getTitle(), new AbstractIcon(IconKey.ICON_OCR, 32));
         this.addDescriptionPlain(_GUI.T.AntiCaptchaConfigPanel_onShow_description());
         addPair(_GUI.T.AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_sounds(), null, new Checkbox(CFG_SOUND.CAPTCHA_SOUND_ENABLED));
@@ -80,11 +83,13 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
         this.solverComparisonContainer = new SolverComparisonContainer();
         tabs.addTab(_GUI.T.CaptchaSolverComparison_tab_title(), solverComparisonContainer);
         /* Always shown in the IDE; in the stable only via the (advanced settings only) setting "ShowCaptchaDebugPanel". */
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE || CFG_CAPTCHA.CFG.isShowCaptchaDebugPanel()) {
+        if (isDebugPanelAvailable()) {
             /* The panel is not Scrollable, so without an explicit unit increment one wheel step only scrolls a few pixels. */
-            final JScrollPane testScrollPane = new JScrollPane(new CaptchaTestPanel());
+            final CaptchaTestPanel testPanel = this.testPanel = new CaptchaTestPanel();
+            final JScrollPane testScrollPane = this.testScrollPane = new JScrollPane(testPanel);
             testScrollPane.getVerticalScrollBar().setUnitIncrement(20);
             tabs.addTab("Test & Debug", testScrollPane);
+            debugTabShown = true;
         }
         add(tabs);
         // this.addHeader(_GUI.T.AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_solver(), new AbstractIcon(IconKey.ICON_share", 32));
@@ -99,6 +104,48 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
      */
     private void updateSkipBubbleTimeoutEnabled() {
         skipBubbleTimeoutPair.setEnabled(CESBubbleSupport.getInstance().isEnabled() && useExternalSolverAccountsPair.getComponent().isSelected());
+    }
+
+    /**
+     * True if the "Test & Debug" tab is available: always in the IDE, otherwise only if the (advanced settings only) setting
+     * "ShowCaptchaDebugPanel" is enabled.
+     */
+    private static volatile boolean debugTabShown = false;
+
+    /**
+     * True if the "Test & Debug" tab really exists in the (already built) captcha settings. The tab is created together with the panel, so
+     * this can differ from {@link #isDebugPanelAvailable()} if the setting was changed afterwards.
+     */
+    public static boolean isDebugTabShown() {
+        return debugTabShown;
+    }
+
+    public static boolean isDebugPanelAvailable() {
+        return DebugMode.TRUE_IN_IDE_ELSE_FALSE || CFG_CAPTCHA.CFG.isShowCaptchaDebugPanel();
+    }
+
+    /** Opens the captcha settings, shows the "Test & Debug" tab and preselects the given solver for the multi test. */
+    public static void showTestAndDebug(final SolverService solver) {
+        JsonConfig.create(GraphicalUserInterfaceSettings.class).setConfigViewVisible(true);
+        JDGui.getInstance().setContent(ConfigurationView.getInstance(), true);
+        ConfigurationView.getInstance().setSelectedSubPanel(CaptchaConfigPanel.class);
+        final CaptchaConfigPanel captchaConfigPanel = ConfigurationView.getInstance().getSubPanel(CaptchaConfigPanel.class);
+        if (captchaConfigPanel != null) {
+            captchaConfigPanel.selectTestAndDebug(solver);
+        }
+    }
+
+    private void selectTestAndDebug(final SolverService solver) {
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                if (testScrollPane == null) {
+                    return;
+                }
+                tabs.setSelectedComponent(testScrollPane);
+                testPanel.selectMultiTestSolver(solver);
+            }
+        });
     }
 
     /**

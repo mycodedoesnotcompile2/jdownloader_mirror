@@ -1,8 +1,10 @@
 package org.jdownloader.captcha.v2.solver.browser;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.EnumSet;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 
+import org.appwork.utils.Time;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
@@ -28,14 +30,44 @@ public class BrowserSolver extends ChallengeSolver<String> {
         return INSTANCE;
     }
 
+    /**
+     * If a skip request arrives within this many milliseconds after the auto clicker released the mouse button, we assume the auto clicker
+     * missed the captcha and hit one of our own skip buttons by accident.
+     */
+    private static final long                    AUTO_CLICK_SKIP_PROTECTION_MS = 50;
     protected final BrowserCaptchaSolverConfigV3 config;
-    private volatile BrowserDialogHandler         handler;
+    private volatile BrowserDialogHandler        handler;
+    /* Timestamp of the last auto click (mouse release), -1 if there was never one */
+    private final AtomicLong                     lastAutoClickTimestamp        = new AtomicLong(-1);
 
     private BrowserSolver() {
         super(BrowserSolverService.getInstance(), 1);
         config = BrowserSolverService.getInstance().getConfig();
         threadPool.allowCoreThreadTimeOut(true);
         AdvancedConfigManager.getInstance().register(BrowserSolverService.getInstance().getConfig());
+    }
+
+    /** Call right after the auto clicker released the mouse button. */
+    public void markAutoClick() {
+        lastAutoClickTimestamp.set(Time.systemIndependentCurrentJVMTimeMillis());
+    }
+
+    /**
+     * Returns the milliseconds since the last auto click or -1 if there was never one. <br>
+     * Part of workaround for auto click clicking wrong position, see: https://svn.jdownloader.org/issues/88375
+     */
+    public long getMillisSinceAutoClick() {
+        final long last = lastAutoClickTimestamp.get();
+        if (last < 0) {
+            return -1;
+        }
+        return Time.systemIndependentCurrentJVMTimeMillis() - last;
+    }
+
+    /** Returns true if the auto clicker clicked just now, so a click on one of our own buttons was most likely a misclick. */
+    public boolean hasRecentlyClicked() {
+        final long passed = getMillisSinceAutoClick();
+        return passed >= 0 && passed <= AUTO_CLICK_SKIP_PROTECTION_MS;
     }
 
     @Override
@@ -59,14 +91,8 @@ public class BrowserSolver extends ChallengeSolver<String> {
     }
 
     @Override
-    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
-        final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
-        types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
-        types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
-        types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
-        types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
-        types.add(CAPTCHA_TYPE.HCAPTCHA);
-        return types;
+    public Set<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        return EnumSet.of(CAPTCHA_TYPE.RECAPTCHA_V3, CAPTCHA_TYPE.RECAPTCHA_V2, CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE, CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE, CAPTCHA_TYPE.HCAPTCHA);
     }
 
     public static boolean isSpecialReCaptchaEnterpriseChallenge(final Challenge<?> c) {

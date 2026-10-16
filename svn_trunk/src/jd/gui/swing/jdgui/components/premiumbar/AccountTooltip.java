@@ -4,6 +4,7 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Point;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -146,7 +147,7 @@ public class AccountTooltip extends PanelToolTip {
                     continue;
                 }
                 final abstractPluginForCaptchaSolver captchaplugin = (abstractPluginForCaptchaSolver) plg;
-                final List<CAPTCHA_TYPE> supported_captcha_types = captchaplugin.getSupportedCaptchaTypes(account);
+                final Set<CAPTCHA_TYPE> supported_captcha_types = captchaplugin.getSupportedCaptchaTypes(account);
                 if (supported_captcha_types == null) {
                     continue;
                 }

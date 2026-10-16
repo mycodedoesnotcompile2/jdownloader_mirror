@@ -2,6 +2,8 @@ package org.jdownloader.captcha.v2.solver.jac;
 
 import java.awt.Image;
 import java.io.IOException;
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -79,11 +81,15 @@ public class JACSolver extends ChallengeSolver<String> {
      * JAC can only solve plain image captchas (see {@link #solve(SolverJob)}: only {@link BasicCaptchaChallenge} is handled), NOT the click
      * captcha types.
      */
+    /** JAC learns from the feedback: valid captchas raise and invalid captchas lower the trust of the used method. */
     @Override
-    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
-        final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
-        types.add(CAPTCHA_TYPE.IMAGE);
-        return types;
+    public Set<FeedbackType> getSupportedFeedbackTypes() {
+        return EnumSet.of(FeedbackType.REPORT_VALID_CAPTCHAS, FeedbackType.REPORT_INVALID_CAPTCHAS);
+    }
+
+    @Override
+    public Set<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        return EnumSet.of(CAPTCHA_TYPE.IMAGE);
     }
 
     /**
@@ -167,7 +173,7 @@ public class JACSolver extends ChallengeSolver<String> {
     }
 
     @Override
-    public boolean setValid(AbstractResponse<?> response) {
+    protected boolean onValid(final AbstractResponse<?> response) {
         if (response.getSolver() != this) {
             return false;
         }
@@ -191,7 +197,7 @@ public class JACSolver extends ChallengeSolver<String> {
     }
 
     @Override
-    public boolean setInvalid(AbstractResponse<?> response) {
+    protected boolean onInvalid(final AbstractResponse<?> response) {
         if (!(response instanceof JACCaptchaResponse)) {
             return false;
         }

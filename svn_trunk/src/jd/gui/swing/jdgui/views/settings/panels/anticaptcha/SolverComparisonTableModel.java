@@ -112,12 +112,12 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
 
     /** Returns the number of captcha types the solver supports. Used as default sort criterion. */
     private static int getSupportedCount(final SolverService solver) {
-        final List<CAPTCHA_TYPE> supportedTypes = solver.getSupportedCaptchaTypes();
+        final Set<CAPTCHA_TYPE> supportedTypes = solver.getSupportedCaptchaTypes();
         return supportedTypes == null ? 0 : supportedTypes.size();
     }
 
     private static boolean isSupported(final SolverService solver, final CAPTCHA_TYPE type) {
-        final List<CAPTCHA_TYPE> supportedTypes = solver.getSupportedCaptchaTypes();
+        final Set<CAPTCHA_TYPE> supportedTypes = solver.getSupportedCaptchaTypes();
         return supportedTypes != null && supportedTypes.contains(type);
     }
 

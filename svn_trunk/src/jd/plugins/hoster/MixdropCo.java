@@ -45,7 +45,7 @@ import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHos
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.components.antiDDoSForHost;
 
-@HostPlugin(revision = "$Revision: 53556 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53645 $", interfaceVersion = 3, names = {}, urls = {})
 public class MixdropCo extends antiDDoSForHost {
     public MixdropCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -68,7 +68,7 @@ public class MixdropCo extends antiDDoSForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "mixdrop.ag", "mixdrop.co", "mixdrop.to", "mixdrop.top", "mixdrop.club", "mixdrop.sx", "mixdrop.bz", "mixdroop.bz", "mixdrop.vc", "mdy48tn97.com", "mdbekjwqa.pw", "mdfx9dc8n.net", "mdzsmutpcvykb.net", "mixdrop.ms", "mixdrop.is", "mixdrop.si", "mixdrop.ps", "mixdrop.my", "mixdrop.sn", "mixdrop.cfd", "mixdrop.cv", "mixdrop23.net", "mxdrop.to", "m1xdrop.net", "m1xdrop.com", "m1xdrop.bz", "m1xdrop.click", "mixdrp.click", "miixdrop.net", "miiixdrop.net", "miiiixdrop.net", "miixdrop.com", "miixdrop.top", "mixdrop.vip", "mxdrop.sx", "mxdrop.top" });
+        ret.add(new String[] { "mixdrop.ag", "mixdrop.co", "mixdrop.to", "mixdrop.top", "mixdrop.club", "mixdrop.sx", "mixdrop.bz", "mixdroop.bz", "mixdrop.vc", "mdy48tn97.com", "mdbekjwqa.pw", "mdfx9dc8n.net", "mdzsmutpcvykb.net", "mixdrop.ms", "mixdrop.is", "mixdrop.si", "mixdrop.ps", "mixdrop.my", "mixdrop.sn", "mixdrop.cfd", "mixdrop.cv", "mixdrop23.net", "mxdrop.to", "m1xdrop.net", "m1xdrop.com", "m1xdrop.bz", "m1xdrop.click", "mixdrp.click", "miixdrop.net", "miiixdrop.net", "miiiixdrop.net", "miixdrop.com", "miixdrop.top", "mixdrop.vip", "mxdrop.sx", "mxdrop.top", "mxdrop.click" });
         return ret;
     }
 

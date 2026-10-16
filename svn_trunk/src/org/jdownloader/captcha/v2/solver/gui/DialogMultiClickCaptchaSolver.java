@@ -1,5 +1,7 @@
 package org.jdownloader.captcha.v2.solver.gui;
 
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -35,11 +37,8 @@ public class DialogMultiClickCaptchaSolver extends AbstractDialogSolver<MultiCli
     }
 
     @Override
-    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
-        final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
-        types.add(CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA);
-        types.add(CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
-        return types;
+    public Set<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        return EnumSet.of(CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA, CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
     }
 
     @Override

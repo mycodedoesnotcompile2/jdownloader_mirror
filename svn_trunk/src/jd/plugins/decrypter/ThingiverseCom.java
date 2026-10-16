@@ -6,6 +6,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -22,14 +29,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 53387 $", interfaceVersion = 2, names = { "thingiverse.com" }, urls = { "https?://(www\\.)?thingiverse\\.com/(thing:\\d+|make:\\d+|[^/]+/(about|designs|collections(/[^/]+)?|makes|likes|things)|groups/[^/]+(/(things|about))?)" })
+@DecrypterPlugin(revision = "$Revision: 53650 $", interfaceVersion = 2, names = { "thingiverse.com" }, urls = { "https?://(www\\.)?thingiverse\\.com/(thing:\\d+|make:\\d+|[^/]+/(about|designs|collections(/[^/]+)?|makes|likes|things)|groups/[^/]+(/(things|about))?)" })
 public class ThingiverseCom extends PluginForDecrypt {
     public ThingiverseCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -71,6 +71,7 @@ public class ThingiverseCom extends PluginForDecrypt {
             final Request request = br.createGetRequest(API_BASE + "/copies/" + contentID);
             request.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + authtoken);
             request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.thingiverse.com/");
+            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, param.getCryptedUrl());
             br.getPage(request);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -103,9 +104,12 @@ public class ThingiverseCom extends PluginForDecrypt {
         if (authtoken == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        /* "/files" would return a list without name/zip_data, so use the thing endpoint. */
         final Request request = br.createGetRequest(API_BASE + "/things/" + thingID);
         request.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + authtoken);
         request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.thingiverse.com/");
+        /* Without a Referer the API responds with 403 "You are using an invalid token". */
+        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, "https://www.thingiverse.com/thing:" + thingID);
         br.getPage(request);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -143,15 +147,87 @@ public class ThingiverseCom extends PluginForDecrypt {
         if (ret != null) {
             return ret;
         }
-        final Browser brc = br.cloneBrowser();
-        brc.getPage("https://www.thingiverse.com/_next/static/chunks/8894.de789bbe5b3daaa5.js");
-        ret = brc.getRegex("\"\".concat\\(\"([a-fA-F0-9]{32})\"\\)").getMatch(0);
+        try {
+            ret = findAuthTokenDynamically(br);
+        } catch (final Exception e) {
+            /* Dynamic lookup failed --> Use fallback below. */
+            logger.log(e);
+        }
+        if (ret == null) {
+            /* Ultimate fallback: Last known chunk URL. */
+            logger.warning("Auto token search failed --> Using fallback chunk URL");
+            final Browser brc = br.cloneBrowser();
+            brc.getPage("https://www.thingiverse.com/_next/static/chunks/4024.5c01d92b9d3589f3.js");
+            ret = brc.getRegex(TOKEN_REGEX).getMatch(0);
+        }
         if (StringUtils.isEmpty(ret)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        } else {
-            AUTH_TOKEN.set(ret);
-            return ret;
         }
+        AUTH_TOKEN.set(ret);
+        return ret;
+    }
+
+    private static final String TOKEN_REGEX = "\"\".concat\\(\"([a-fA-F0-9]{32})\"\\)";
+
+    /** Returns null if the token could not be found. */
+    private String findAuthTokenDynamically(final Browser br) throws Exception {
+        final Browser brc = br.cloneBrowser();
+        final String chunkBase = "https://www.thingiverse.com/_next/static/chunks/";
+        brc.getPage("https://www.thingiverse.com/");
+        /* The token lives in a lazily loaded chunk whose file name contains a hash that changes with every deployment. */
+        final List<String> chunkURLs = new ArrayList<String>();
+        final String webpackURL = brc.getRegex("(/_next/static/chunks/webpack-[a-f0-9]+\\.js)").getMatch(0);
+        if (webpackURL != null) {
+            /* Chunks that are referenced directly inside the HTML. */
+            final String[] htmlChunks = brc.getRegex("(/_next/static/chunks/[^\"'\\\\]+?\\.js)").getColumn(0);
+            if (htmlChunks != null) {
+                for (final String htmlChunk : htmlChunks) {
+                    final String url = brc.getURL(htmlChunk).toExternalForm();
+                    if (!chunkURLs.contains(url)) {
+                        chunkURLs.add(url);
+                    }
+                }
+            }
+            /* Lazy chunks: the webpack runtime contains a chunkID -> hash map. Chunks seen containing the token so far are tried first. */
+            brc.getPage(webpackURL);
+            final String[][] chunkMap = brc.getRegex("(\\d{1,5}):\"([a-f0-9]{16})\"").getMatches();
+            final String[] preferredIDs = new String[] { "4024", "6331" };
+            final List<String> lazyChunks = new ArrayList<String>();
+            for (final String[] entry : chunkMap) {
+                final String url = chunkBase + entry[0] + "." + entry[1] + ".js";
+                if (StringUtils.containsIgnoreCase(url, "/" + preferredIDs[0] + ".") || StringUtils.containsIgnoreCase(url, "/" + preferredIDs[1] + ".")) {
+                    lazyChunks.add(0, url);
+                } else {
+                    lazyChunks.add(url);
+                }
+            }
+            for (final String url : lazyChunks) {
+                if (!chunkURLs.contains(url)) {
+                    chunkURLs.add(url);
+                }
+            }
+        }
+        logger.info("Auto token search: Found " + chunkURLs.size() + " chunk candidates");
+        int index = 0;
+        for (final String chunkURL : chunkURLs) {
+            index++;
+            final Browser brChunk = br.cloneBrowser();
+            brChunk.setAllowedResponseCodes(new int[] { 404 });
+            brChunk.getPage(chunkURL);
+            final int responseCode = brChunk.getHttpConnection().getResponseCode();
+            if (responseCode != 200) {
+                logger.info("Auto token search: Chunk " + index + "/" + chunkURLs.size() + " skipped due to response code " + responseCode + ": " + chunkURL);
+                continue;
+            }
+            final String token = brChunk.getRegex(TOKEN_REGEX).getMatch(0);
+            if (token != null) {
+                logger.info("Auto token search: Token found in chunk " + index + "/" + chunkURLs.size() + ": " + chunkURL);
+                return token;
+            }
+            logger.info("Auto token search: Chunk " + index + "/" + chunkURLs.size() + " has no token: " + chunkURL);
+        }
+        logger.info("Auto token search: Token not found in any chunk");
+        return null;
     }
 
     private String[] getAPISearchLinks(Browser br) throws Exception {

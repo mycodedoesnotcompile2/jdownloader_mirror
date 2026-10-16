@@ -1,5 +1,7 @@
 package jd.plugins.hoster;
 
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.Currency;
 import java.util.HashMap;
@@ -9,7 +11,6 @@ import java.util.Map;
 
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.ReflectionUtils;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
@@ -18,8 +19,6 @@ import org.jdownloader.captcha.v2.SolverStatus;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
-import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
-import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.CaptchaResponse;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
@@ -46,7 +45,7 @@ import jd.plugins.PluginException;
  * The API is similar to the one of anti-captcha.com/2captcha.com (createTask/getTaskResult) but has its own task types and feedback
  * methods.
  */
-@HostPlugin(revision = "$Revision: 53603 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53649 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
 public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -63,21 +62,20 @@ public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCapt
     }
 
     @Override
-    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
-        final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
+    public Set<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        final Set<CAPTCHA_TYPE> types = EnumSet.noneOf(CAPTCHA_TYPE.class);
         types.add(CAPTCHA_TYPE.IMAGE);
-        /*
+        /**
          * 2026-10-13: Click captchas are solved via ComplexImageTask module "shein" (the only coordinate module, see
          * https://docs.capmonster.cloud/docs/captchas/compleximage/coordinate/shein/). capmonster.cloud has no generic "click on the image"
          * task, so this only works for captchas that module was trained for. Images are limited to 50 KB (ERROR_TOO_BIG_CAPTCHA_FILESIZE)
-         * and must be sent as base64 (no URL/upload).
+         * and must be sent as base64 (no URL/upload). <br>
+         * 2026-10-15: Disabled all click captcha challenges since they only support very specific click captchas called "Shein".
          */
-        types.add(CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA);
-        types.add(CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
+        // types.add(CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA);
+        // types.add(CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
         /* 2026-10-07: Works according to them but failed for me. */
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            types.add(CAPTCHA_TYPE.HCAPTCHA);
-        }
+        types.add(CAPTCHA_TYPE.HCAPTCHA);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
@@ -86,22 +84,20 @@ public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCapt
         types.add(CAPTCHA_TYPE.CLOUDFLARE_TURNSTILE);
         /*
          * 2026-09-24: capmonster.cloud's API does offer MtCaptchaTaskProxyless, but solve() has no request handling for it yet, so it is
-         * NOT declared here. Declaring it without a matching solve() branch would make solve() throw for such a challenge. Re-add
-         * together with the corresponding solve() handling.
+         * NOT declared here. Declaring it without a matching solve() branch would make solve() throw for such a challenge. Re-add together
+         * with the corresponding solve() handling.
          */
         // types.add(CAPTCHA_TYPE.MT_CAPTCHA);
         return types;
     }
 
     @Override
-    public List<FeedbackType> getSupportedFeedbackTypes() {
+    public Set<FeedbackType> getSupportedFeedbackTypes() {
         /*
          * Only negative feedback is supported by the API. There is no "report correct" and no "abort task" method. See
          * sendCaptchaFeedback() for details.
          */
-        final List<FeedbackType> types = new ArrayList<FeedbackType>();
-        types.add(FeedbackType.REPORT_INVALID_CAPTCHAS);
-        return types;
+        return EnumSet.of(FeedbackType.REPORT_INVALID_CAPTCHAS);
     }
 
     @Override
@@ -164,17 +160,6 @@ public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCapt
             task.put("type", "TurnstileTaskProxyless");
             task.put("websiteURL", challenge.getSiteUrl(this));
             task.put("websiteKey", challenge.getSiteKey());
-        } else if (captchachallenge instanceof MultiClickCaptchaChallenge) {
-            /* https://docs.capmonster.cloud/docs/captchas/compleximage/coordinate/shein/ (exactly one image, base64) */
-            final MultiClickCaptchaChallenge challenge = (MultiClickCaptchaChallenge) captchachallenge;
-            task.put("type", "ComplexImageTask");
-            task.put("class", "recognition");
-            final List<String> images = new ArrayList<String>();
-            images.add(challenge.getBase64ImageFile());
-            task.put("imagesBase64", images);
-            final Map<String, Object> metadata = new HashMap<String, Object>();
-            metadata.put("Task", "shein");
-            task.put("metadata", metadata);
         } else if (captchachallenge instanceof ImageCaptchaChallenge) {
             final ImageCaptchaChallenge<?> challenge = (ImageCaptchaChallenge<?>) captchachallenge;
             /* https://docs.capmonster.cloud/docs/captchas/ImageToText/image-to-text/ */
@@ -220,22 +205,7 @@ public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCapt
             }
             final Map<String, Object> solutionmap = (Map<String, Object>) entries.get("solution");
             final AbstractResponse<?> resp;
-            if (captchachallenge instanceof MultiClickCaptchaChallenge) {
-                /*
-                 * Format: "answer":[{"X":69.0,"Y":201.954889},...] -> coordinates in the order they have to be clicked, see
-                 * "metadata":{"AnswerType":"Coordinate"}
-                 */
-                final List<Map<String, Object>> clicklist = (List<Map<String, Object>>) solutionmap.get("answer");
-                final int[] x = new int[clicklist.size()];
-                final int[] y = new int[clicklist.size()];
-                int i = 0;
-                for (final Map<String, Object> click : clicklist) {
-                    x[i] = (int) Math.round(((Number) click.get("X")).doubleValue());
-                    y[i] = (int) Math.round(((Number) click.get("Y")).doubleValue());
-                    i++;
-                }
-                resp = new AbstractResponse<MultiClickedPoint>((MultiClickCaptchaChallenge) captchachallenge, job.getSolver(), new MultiClickedPoint(x, y));
-            } else if (captchachallenge instanceof ImageCaptchaChallenge) {
+            if (captchachallenge instanceof ImageCaptchaChallenge) {
                 /* ImageToTextTask: {"solution":{"text":"answer"},"status":"ready",...} */
                 resp = new CaptchaResponse((Challenge<String>) captchachallenge, job.getSolver(), solutionmap.get("text").toString());
             } else {
@@ -361,6 +331,15 @@ public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCapt
     @Override
     public Class<? extends CaptchaSolverPluginConfigCapmonster> getConfigInterface() {
         return CaptchaSolverPluginConfigCapmonster.class;
+    }
+
+    @Override
+    public long getServerSideMinPollingIntervalMillis() {
+        /*
+         * Docs: https://docs.capmonster.cloud/docs/api/api-errors/ -> getTaskResult must not be called more often than once every 2
+         * seconds. Otherwise the API returns ERROR_TOO_MUCH_REQUESTS and blocks the API key for 10 minutes.
+         */
+        return 2 * 1000L;
     }
 
     @Override

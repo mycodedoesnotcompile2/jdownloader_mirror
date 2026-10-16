@@ -2,6 +2,8 @@ package jd.plugins.hoster;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.Currency;
 import java.util.HashMap;
@@ -26,7 +28,6 @@ import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptcha
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfigEndcaptcha;
 
 import jd.PluginWrapper;
-import jd.http.Browser;
 import jd.http.Request;
 import jd.http.requests.FormData;
 import jd.http.requests.PostFormDataRequest;
@@ -37,17 +38,10 @@ import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 53620 $", interfaceVersion = 3, names = { "endcaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53649 $", interfaceVersion = 3, names = { "endcaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSolver {
     public PluginForCaptchaSolverEndcaptcha(PluginWrapper wrapper) {
         super(wrapper);
-    }
-
-    @Override
-    public Browser createNewBrowserInstance() {
-        final Browser br = super.createNewBrowserInstance();
-        br.setFollowRedirects(true);
-        return br;
     }
 
     @Override
@@ -56,15 +50,13 @@ public class PluginForCaptchaSolverEndcaptcha extends abstractPluginForCaptchaSo
     }
 
     @Override
-    public List<FeedbackType> getSupportedFeedbackTypes() {
-        final List<FeedbackType> types = new ArrayList<FeedbackType>();
-        types.add(FeedbackType.REPORT_INVALID_CAPTCHAS);
-        return types;
+    public Set<FeedbackType> getSupportedFeedbackTypes() {
+        return EnumSet.of(FeedbackType.REPORT_INVALID_CAPTCHAS);
     }
 
     @Override
-    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
-        final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
+    public Set<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        final Set<CAPTCHA_TYPE> types = EnumSet.noneOf(CAPTCHA_TYPE.class);
         types.add(CAPTCHA_TYPE.IMAGE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2);

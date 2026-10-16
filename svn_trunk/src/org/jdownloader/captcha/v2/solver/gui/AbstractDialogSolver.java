@@ -13,6 +13,7 @@ import jd.controlling.captcha.SkipRequest;
 import jd.gui.swing.jdgui.JDGui;
 
 public abstract class AbstractDialogSolver<T> extends ChallengeSolver<T> {
+
     public AbstractDialogSolver(int i) {
         super(DialogSolverService.getInstance(), i);
     }

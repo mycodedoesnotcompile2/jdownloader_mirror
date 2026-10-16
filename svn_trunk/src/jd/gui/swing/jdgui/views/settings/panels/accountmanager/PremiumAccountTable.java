@@ -18,6 +18,7 @@ import org.jdownloader.updatev2.gui.LAFOptions;
 import jd.gui.swing.jdgui.BasicJDTable;
 import jd.gui.swing.jdgui.components.premiumbar.ServiceCollection;
 import jd.gui.swing.jdgui.components.premiumbar.ServicePanel;
+import jd.gui.swing.jdgui.views.settings.components.ToggleEnabledSelectionAction;
 
 public class PremiumAccountTable extends BasicJDTable<AccountEntry> {
 
@@ -140,6 +141,24 @@ public class PremiumAccountTable extends BasicJDTable<AccountEntry> {
                 if (selection.size() == 1 && selection.get(0).hasConfiguration()) {
                     popup.add(new SettingsAction(selection));
                 }
+                popup.add(new ToggleEnabledSelectionAction<AccountEntry>(contextObject, selection) {
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    protected boolean isEntryEnabled(final AccountEntry entry) {
+                        return entry.getAccount().isEnabled();
+                    }
+
+                    @Override
+                    protected void setEntryEnabled(final AccountEntry entry, final boolean enabled) {
+                        entry.getAccount().setEnabled(enabled);
+                    }
+
+                    @Override
+                    protected void onFinished() {
+                        PremiumAccountTable.this.repaint();
+                    }
+                });
                 popup.add(new RemoveAction(selection, false));
                 popup.add(new RefreshAction(selection));
             }

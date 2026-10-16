@@ -1,6 +1,8 @@
 package org.jdownloader.captcha.v2.solver.service;
 
 import java.io.File;
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -207,15 +209,14 @@ public class BrowserSolverService extends AbstractSolverService {
     }
 
     @Override
-    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
-        final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
-        types.add(CAPTCHA_TYPE.HCAPTCHA);
-        types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
-        types.add(CAPTCHA_TYPE.RECAPTCHA_V3_ENTERPRISE);
-        types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
-        types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
-        types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
-        return types;
+    public Set<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        return EnumSet.of(
+                CAPTCHA_TYPE.HCAPTCHA,
+                CAPTCHA_TYPE.RECAPTCHA_V3,
+                CAPTCHA_TYPE.RECAPTCHA_V3_ENTERPRISE,
+                CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE,
+                CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE,
+                CAPTCHA_TYPE.RECAPTCHA_V2);
     }
 
     /** Typed config accessor used by the browser solver subsystem. */

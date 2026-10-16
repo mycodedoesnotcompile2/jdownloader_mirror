@@ -1,6 +1,8 @@
 package org.jdownloader.captcha.v2.solver.jac;
 
 import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -52,11 +54,9 @@ public class JacSolverService extends AbstractSolverService implements SolverSer
     }
 
     @Override
-    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+    public Set<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
         /* JAC only solves plain image captchas, see JACSolver#getSupportedCaptchaTypes. */
-        final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
-        types.add(CAPTCHA_TYPE.IMAGE);
-        return types;
+        return EnumSet.of(CAPTCHA_TYPE.IMAGE);
     }
 
     @Override

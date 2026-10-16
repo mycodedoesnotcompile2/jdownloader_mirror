@@ -104,7 +104,6 @@ public class CFG_GUI {
      * Customize the order of the Overview Panel Entries in x and y position
      **/
     public static final ObjectKeyHandler                               OVERVIEW_POSITIONS                                                   = SH.getKeyHandler("OverviewPositions", ObjectKeyHandler.class);
-    public static final BooleanKeyHandler                              CAPTCHA_DEBUG_MODE_ENABLED                                           = SH.getKeyHandler("CaptchaDebugModeEnabled", BooleanKeyHandler.class);
     /**
      * Interval of the Downloads Table Refresher. Default 1000ms (once per second). Decreasing this value will cost CPU Power
      **/
@@ -195,7 +194,6 @@ public class CFG_GUI {
     public static final BooleanKeyHandler                              OVERVIEW_PANEL_LINKGRABBER_STATUS_ONLINE_VISIBLE                     = SH.getKeyHandler("OverviewPanelLinkgrabberStatusOnlineVisible", BooleanKeyHandler.class);
     public static final BooleanKeyHandler                              MY_JDOWNLOADER_VIEW_VISIBLE                                          = SH.getKeyHandler("MyJDownloaderViewVisible", BooleanKeyHandler.class);
     public static final EnumKeyHandler                                 MAC_DOCK_PROGRESS_DISPLAY                                            = SH.getKeyHandler("MacDockProgressDisplay", EnumKeyHandler.class);
-    public static final BooleanKeyHandler                              SPECIAL_DEAL_OBOOM_DIALOG_VISIBLE_ON_STARTUP                         = SH.getKeyHandler("SpecialDealOboomDialogVisibleOnStartup", BooleanKeyHandler.class);
     public static final BooleanKeyHandler                              OVERVIEW_PANEL_DOWNLOAD_LINK_COUNT_VISIBLE                           = SH.getKeyHandler("OverviewPanelDownloadLinkCountVisible", BooleanKeyHandler.class);
     public static final EnumKeyHandler                                 SELECTED_DOWNLOAD_SEARCH_CATEGORY                                    = SH.getKeyHandler("SelectedDownloadSearchCategory", EnumKeyHandler.class);
     public static final EnumKeyHandler                                 CONFIRM_INCOMPLETE_ARCHIVE_ACTION                                    = SH.getKeyHandler("ConfirmIncompleteArchiveAction", EnumKeyHandler.class);

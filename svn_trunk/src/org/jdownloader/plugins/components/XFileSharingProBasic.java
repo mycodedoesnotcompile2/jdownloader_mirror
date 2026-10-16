@@ -93,7 +93,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 53638 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53653 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -3977,6 +3977,9 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         patterns.add(Pattern.compile(String.format("(https?://(?:\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|%s)(?::(?:\\d+)?)?/(?:files|d|cgi\\-bin/dl\\.cgi|dl)/(?:\\d+/)?[a-z0-9]+/[^<>\"/']*)", this.getDllinkHostPattern()) + "'\\s*\\)\\s*;"));
         /* Don't allow ' in URL */
         patterns.add(Pattern.compile(String.format("(https?://(?:\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|%s)(?::(?:\\d+)?)?/(?:files|d|cgi\\-bin/dl\\.cgi|dl)/(?:\\d+/)?[a-z0-9]+/[^<>\"'/]*)", this.getDllinkHostPattern())));
+        /* new XFileSharingPro */
+        patterns.add(Pattern.compile("href=\"(https?://[^\"]+)\"[^>]*>\\s*(?:<i[^>]*>[^>]*/i>)?\\s*Direct Download Link"));// hotlink.cc
+        patterns.add(Pattern.compile("href=\"(https?://[^\"]+)\"[^>]*>\\s*(?:<i[^>]*>[^>]*/i>)?\\s*Lancer le téléchargement"));// vidzy.org
         return patterns;
     }
 

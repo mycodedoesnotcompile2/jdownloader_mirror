@@ -1,6 +1,8 @@
 package org.jdownloader.api.captcha;
 
 import java.io.OutputStream;
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -54,17 +56,16 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
     }
 
     @Override
-    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
-        final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
-        types.add(CAPTCHA_TYPE.IMAGE);
-        types.add(CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA);
-        types.add(CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
-        types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
-        types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
-        types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
-        types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
-        types.add(CAPTCHA_TYPE.HCAPTCHA);
-        return types;
+    public Set<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        return EnumSet.of(
+                CAPTCHA_TYPE.IMAGE,
+                CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA,
+                CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA,
+                CAPTCHA_TYPE.RECAPTCHA_V3,
+                CAPTCHA_TYPE.RECAPTCHA_V2,
+                CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE,
+                CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE,
+                CAPTCHA_TYPE.HCAPTCHA);
     }
 
     private final RemoteAPIConfig remoteAPIConfig = JsonConfig.create(RemoteAPIConfig.class);

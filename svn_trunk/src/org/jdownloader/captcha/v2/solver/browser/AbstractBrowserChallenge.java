@@ -2,6 +2,7 @@ package org.jdownloader.captcha.v2.solver.browser;
 
 import java.awt.Rectangle;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import jd.controlling.captcha.CaptchaSettings;
 import jd.controlling.captcha.CaptchaSettings.INTERACTIVE_CAPTCHA_PRIVACY_LEVEL;
@@ -25,6 +26,16 @@ import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptcha
 public abstract class AbstractBrowserChallenge extends Challenge<String> {
     protected final Plugin  plugin;
     protected final Browser pluginBrowser;
+    /* Set if the auto click misclicked on one of our own skip buttons: No more auto clicking for this challenge (survives reopening) */
+    private final AtomicBoolean autoClickDisabled = new AtomicBoolean(false);
+
+    public boolean isAutoClickDisabled() {
+        return autoClickDisabled.get();
+    }
+
+    public void setAutoClickDisabled(final boolean disabled) {
+        autoClickDisabled.set(disabled);
+    }
 
     public static interface AbstractBrowserChallengeAPIStorable {
 

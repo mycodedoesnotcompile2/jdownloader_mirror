@@ -66,7 +66,7 @@ public class ClipboardMonitoring {
         }
     }
 
-    private static class ClipboardHash {
+    public static class ClipboardHash {
         private final int hash;
         private final int length;
 
@@ -171,6 +171,10 @@ public class ClipboardMonitoring {
                     break;
                 }
             }
+        }
+
+        protected boolean equals(ClipboardHash clipboardHash, final Object content) {
+            return clipboardHash.equals(content);
         }
 
         protected int getCurrentWaitTimeout() {
@@ -355,7 +359,20 @@ public class ClipboardMonitoring {
     public synchronized void startMonitoring() {
         if (clipboard != null) {
             if (!isMonitoring()) {
-                final boolean skipFirstRound = (GraphicalUserInterfaceSettings.CLIPBOARD_SKIP_MODE.ON_STARTUP.equals(CLIPBOARD_SKIP_MODE.get()) && monitoringThread.get() == null) || (GraphicalUserInterfaceSettings.CLIPBOARD_SKIP_MODE.ON_ENABLE.equals(CLIPBOARD_SKIP_MODE.get()));
+                final boolean skipFirstRound;
+                final boolean sync;
+                if (GraphicalUserInterfaceSettings.CLIPBOARD_SKIP_MODE.ON_ENABLE.equals(CLIPBOARD_SKIP_MODE.get())) {
+                    skipFirstRound = true;
+                    sync = false;
+                } else if (GraphicalUserInterfaceSettings.CLIPBOARD_SKIP_MODE.ON_STARTUP.equals(CLIPBOARD_SKIP_MODE.get()) && monitoringThread.get() == null) {
+                    skipFirstRound = !(clipboardChangeDetector instanceof WindowsClipboardChangeDetector);
+                    // special handling for WindowsClipboardChangeDetector, we want to skip current clipboard sequence number, that way we
+                    // can copy same text/content again and clipboard monitor will react to it
+                    sync = clipboardChangeDetector instanceof WindowsClipboardChangeDetector;
+                } else {
+                    skipFirstRound = false;
+                    sync = false;
+                }
                 final Thread newMonitoringThread = new Thread() {
                     private final AtomicLong roundIndex       = new AtomicLong(0);
                     private ClipboardHash    oldStringContent = new ClipboardHash(0, -1);
@@ -386,6 +403,9 @@ public class ClipboardMonitoring {
                     public void run() {
                         try {
                             clipboardChangeDetector.reset();
+                            if (sync && clipboardChangeDetector instanceof WindowsClipboardChangeDetector) {
+                                ((WindowsClipboardChangeDetector) clipboardChangeDetector).syncClipboardSequenceNumber();
+                            }
                             clipboardLoop: while (Thread.currentThread() == ClipboardMonitoring.this.monitoringThread.get()) {
                                 final CHANGE_FLAG changeFlag = clipboardChangeDetector.waitForClipboardChanges();
                                 if (Thread.currentThread() != ClipboardMonitoring.this.monitoringThread.get()) {
@@ -442,7 +462,7 @@ public class ClipboardMonitoring {
                                             clipboardChangeDetector.slowDown(e);
                                             continue clipboardLoop;
                                         }
-                                        if (!oldListContent.equals(newListContent)) {
+                                        if (!clipboardChangeDetector.equals(oldListContent, newListContent)) {
                                             handleThisRound = newListContent;
                                         }
                                     } catch (final Throwable e) {
@@ -468,7 +488,7 @@ public class ClipboardMonitoring {
                                             continue clipboardLoop;
                                         }
                                         final String handleThisRoundHTML;
-                                        if (!oldStringContent.equals(newStringContent)) {
+                                        if (!clipboardChangeDetector.equals(oldStringContent, newStringContent)) {
                                             /*
                                              * we only use normal String Content to detect a change
                                              */
@@ -489,7 +509,7 @@ public class ClipboardMonitoring {
                                                 clipboardChangeDetector.slowDown(e);
                                                 continue clipboardLoop;
                                             }
-                                            if (htmlFragment != null && !oldHTMLFragment.equals(htmlFragment.getFragment())) {
+                                            if (htmlFragment != null && !clipboardChangeDetector.equals(oldHTMLFragment, htmlFragment.getFragment())) {
                                                 browserURL = htmlFragment.getSourceURL();
                                                 /*
                                                  * Remember that we had HTML content this round

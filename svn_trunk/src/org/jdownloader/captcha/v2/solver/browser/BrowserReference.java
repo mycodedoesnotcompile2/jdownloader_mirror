@@ -12,10 +12,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
-import jd.controlling.captcha.SkipRequest;
-import jd.parser.Regex;
-import jd.plugins.Plugin;
-
 import org.appwork.controlling.SingleReachableState;
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
@@ -58,6 +54,10 @@ import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.controlling.UniqueAlltimeID;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
+
+import jd.controlling.captcha.SkipRequest;
+import jd.parser.Regex;
+import jd.plugins.Plugin;
 
 public abstract class BrowserReference implements ExtendedHttpRequestHandler, HttpRequestHandler {
     private final AbstractBrowserChallenge challenge;
@@ -340,7 +340,7 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
             if ("loaded".equals(pDo)) {
                 final HTTPHeader ua = request.getRequestHeaders().get("User-Agent");
                 final BrowserCaptchaSolverConfigV3 config = BrowserSolverService.getInstance().getConfig();
-                if (config.isAutoClickEnabled()) {
+                if (config.isAutoClickEnabled() && !challenge.isAutoClickDisabled()) {
                     // let bounds = element.getBoundingClientRect();
                     //
                     // let w = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
@@ -430,6 +430,7 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
                 }
                 final SolverJob<?> job = ChallengeResponseController.getInstance().getJobByChallengeId(challenge.getId().getID());
                 if (challenge.isSolved() || job == null || job.isDone() || BrowserSolver.getInstance().isJobDone(job)) {
+                    getLogger().info("canClose=true:solved=" + challenge.isSolved() + "|job==null=" + (job == null) + "|job.isDone=" + (job != null && job.isDone()) + "|solverJobDone=" + (job != null && BrowserSolver.getInstance().isJobDone(job)) + "|msSinceAutoClick=" + BrowserSolver.getInstance().getMillisSinceAutoClick());
                     response.getOutputStream(true).write("true".getBytes("UTF-8"));
                     canClose.setReached();
                     return true;
@@ -437,6 +438,18 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
                     response.getOutputStream(true).write("false".getBytes("UTF-8"));
                 }
             } else if ("skip".equals(pDo)) {
+                if (BrowserSolver.getInstance().hasRecentlyClicked()) {
+                    /**
+                     * Auto click most likely hit one of our own skip buttons by accident -> ignore <br>
+                     * Workaround for: https://svn.jdownloader.org/issues/88375
+                     */
+                    getLogger().info("Ignore skip request(" + skipType + "): auto click was " + BrowserSolver.getInstance().getMillisSinceAutoClick() + "ms ago");
+                    /* Disable auto click for this challenge so a manual reopen does not repeat the misclick */
+                    challenge.setAutoClickDisabled(true);
+                    getLogger().info("Auto click disabled for this challenge");
+                    response.getOutputStream(true).write("false".getBytes("UTF-8"));
+                    return true;
+                }
                 final ChallengeResponseController challengeResponseController = ChallengeResponseController.getInstance();
                 final SolverJob<?> job = challengeResponseController.getJobByChallengeId(challenge.getId().getID());
                 if (job != null) {

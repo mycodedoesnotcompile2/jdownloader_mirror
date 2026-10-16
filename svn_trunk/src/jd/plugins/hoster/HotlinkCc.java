@@ -40,7 +40,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 53628 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53654 $", interfaceVersion = 3, names = {}, urls = {})
 public class HotlinkCc extends XFileSharingProBasic {
     public HotlinkCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -334,17 +334,6 @@ public class HotlinkCc extends XFileSharingProBasic {
         } else {
             premiumWorkaroundActive = false;
             super.handlePremium(link, account);
-        }
-    }
-
-    @Override
-    protected String getDllink(final DownloadLink link, final Account account, final Browser br, String src) {
-        String dllink = new Regex(src, "href=\"(https?://[^\"]+)\"[^>]*>\\s*(?:<i[^>]*>[^>]*/i>)?\\s*Direct Download Link").getMatch(0);
-        if (dllink != null) {
-            return dllink;
-        } else {
-            /* Fallback to template handling */
-            return super.getDllink(link, account, br, src);
         }
     }
 

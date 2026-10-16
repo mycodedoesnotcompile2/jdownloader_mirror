@@ -15,6 +15,8 @@ import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.win32.StdCallLibrary;
 import com.sun.jna.win32.W32APIOptions;
 
+import jd.controlling.ClipboardMonitoring.ClipboardHash;
+
 public class WindowsClipboardChangeDetector extends ClipboardMonitoring.ClipboardChangeDetector {
     private interface User32 extends StdCallLibrary {
         // https://msdn.microsoft.com/en-us/library/windows/desktop/ms649042%28v=vs.85%29.aspx
@@ -89,6 +91,12 @@ public class WindowsClipboardChangeDetector extends ClipboardMonitoring.Clipboar
         return null;
     }
 
+    @Override
+    protected boolean equals(ClipboardHash clipboardHash, Object content) {
+        // we use GetClipboardSequenceNumber to detect changes in Clipboard
+        return false;
+    }
+
     private final boolean isProcessBlacklisted(final String process) {
         for (final Pattern blackListPattern : blackListPatterns) {
             if (blackListPattern.matcher(process).matches()) {
@@ -119,6 +127,10 @@ public class WindowsClipboardChangeDetector extends ClipboardMonitoring.Clipboar
     @Override
     protected void reset() {
         lastClipboardSequenceNumber = null;
+    }
+
+    public void syncClipboardSequenceNumber() {
+        lastClipboardSequenceNumber = user32.GetClipboardSequenceNumber();
     }
 
     private final boolean isChangeBlacklisted() {

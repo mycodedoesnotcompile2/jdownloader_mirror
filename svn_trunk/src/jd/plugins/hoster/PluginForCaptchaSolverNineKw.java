@@ -6,6 +6,8 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -51,7 +53,7 @@ import jd.plugins.PluginException;
 /**
  * Plugin for 9kw captcha solving service (https://9kw.eu/).
  */
-@HostPlugin(revision = "$Revision: 53615 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53649 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
 public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -68,8 +70,8 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
     }
 
     @Override
-    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
-        List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
+    public Set<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        final Set<CAPTCHA_TYPE> types = EnumSet.noneOf(CAPTCHA_TYPE.class);
         types.add(CAPTCHA_TYPE.IMAGE);
         types.add(CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA);
         types.add(CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
@@ -91,12 +93,8 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
     }
 
     @Override
-    public List<FeedbackType> getSupportedFeedbackTypes() {
-        final List<FeedbackType> types = new ArrayList<FeedbackType>();
-        types.add(FeedbackType.REPORT_INVALID_CAPTCHAS);
-        types.add(FeedbackType.REPORT_VALID_CAPTCHAS);
-        types.add(FeedbackType.ABORT_CAPTCHAS);
-        return types;
+    public Set<FeedbackType> getSupportedFeedbackTypes() {
+        return EnumSet.of(FeedbackType.REPORT_INVALID_CAPTCHAS, FeedbackType.REPORT_VALID_CAPTCHAS, FeedbackType.ABORT_CAPTCHAS);
     }
 
     protected String getApiBaseV2() {
@@ -127,25 +125,44 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
 
     @Override
     public boolean setInvalid(AbstractResponse<?> response, Account account) {
-        return sendCaptchaFeedback(response, account, 2);
+        return sendCaptchaFeedback(response.getCaptchaSolverTaskID(), account, CaptchaFeedback.INCORRECT);
     }
 
     @Override
     public boolean setValid(AbstractResponse<?> response, Account account) {
-        return sendCaptchaFeedback(response, account, 1);
+        return sendCaptchaFeedback(response.getCaptchaSolverTaskID(), account, CaptchaFeedback.CORRECT);
     }
 
+    /* 9kw has no dedicated cancel action: Feedback "unused" is how a submitted captcha that is no longer needed is released. */
     @Override
-    public boolean setUnused(AbstractResponse<?> response, Account account) {
-        return sendCaptchaFeedback(response, account, 3);
+    public boolean abortCaptcha(final AbstractResponse<?> response, final Account account) {
+        return sendCaptchaFeedback(response.getCaptchaSolverTaskID(), account, CaptchaFeedback.UNUSED);
     }
 
-    private boolean sendCaptchaFeedback(AbstractResponse<?> response, Account account, final int correct_value) {
+    /** Possible values of the "correct" parameter of the API action "usercaptchacorrectback". */
+    private enum CaptchaFeedback {
+        /** The captcha was solved correctly. */
+        CORRECT(1),
+        /** The captcha was solved incorrectly. */
+        INCORRECT(2),
+        /** The captcha was not used (e.g. already solved by another solver or no longer needed). */
+        UNUSED(3);
+        private final int apiValue;
+
+        private CaptchaFeedback(final int apiValue) {
+            this.apiValue = apiValue;
+        }
+
+        private int getAPIValue() {
+            return apiValue;
+        }
+    }
+
+    private boolean sendCaptchaFeedback(final String captchaSolverTaskID, Account account, final CaptchaFeedback feedback) {
         final UrlQuery query = new UrlQuery();
         query.appendEncoded("action", "usercaptchacorrectback");
-        /* 1 = correct, 2 = incorrect, 3 = unused */
-        query.appendEncoded("correct", String.valueOf(correct_value));
-        query.appendEncoded("id", response.getCaptchaSolverTaskID());
+        query.appendEncoded("correct", String.valueOf(feedback.getAPIValue()));
+        query.appendEncoded("id", captchaSolverTaskID);
         try {
             final Map<String, Object> resp = this.callAPI(query, account);
             final Map<String, Object> status = (Map<String, Object>) resp.get("status");
@@ -435,6 +452,7 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
         }
         final Map<String, Object> uploadresp = this.callAPI(upload_query, account, preparedImage != null ? preparedImage.data : null);
         final String captcha_id = uploadresp.get("captchaid").toString();
+        job.setCaptchaSolverTaskID(captcha_id);
         final UrlQuery polling_query = new UrlQuery();
         polling_query.appendEncoded("action", "usercaptchacorrectdata");
         polling_query.appendEncoded("id", captcha_id);

@@ -7,6 +7,7 @@ import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -463,7 +464,7 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
         this.addColumn(new ExtLongColumn<SolverService>(_GUI.T.SolverOrderTableModel_column_supportedCaptchaTypes(), this) {
             @Override
             protected long getLong(final SolverService value) {
-                final List<CAPTCHA_TYPE> supportedTypes = value.getSupportedCaptchaTypes();
+                final Set<CAPTCHA_TYPE> supportedTypes = value.getSupportedCaptchaTypes();
                 if (supportedTypes == null) {
                     /* A solver without a list of supported captcha types is a bug (see SolverService#getSupportedCaptchaTypes). */
                     return 0;

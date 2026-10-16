@@ -51,7 +51,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53257 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53655 $", interfaceVersion = 3, names = {}, urls = {})
 public class CivitaiCom extends PluginForHost {
     public CivitaiCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -195,9 +195,9 @@ public class CivitaiCom extends PluginForHost {
                 }
                 final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
                 /*
-                 * Find the SSR-prefetched ["image","get"] query. When the image is online, the server prefetches it into the tRPC
-                 * state; when it is offline/removed, that query is absent (only auxiliary queries such as ["hiddenPreferences",
-                 * "getHidden"] remain). Do not rely on a fixed query index - the image query is not always first.
+                 * Find the SSR-prefetched ["image","get"] query. When the image is online, the server prefetches it into the tRPC state;
+                 * when it is offline/removed, that query is absent (only auxiliary queries such as ["hiddenPreferences", "getHidden"]
+                 * remain). Do not rely on a fixed query index - the image query is not always first.
                  */
                 final List<Map<String, Object>> queries = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(entries, "props/pageProps/trpcState/json/queries");
                 Map<String, Object> imagemap = null;
@@ -240,6 +240,16 @@ public class CivitaiCom extends PluginForHost {
                 if (filesize != null) {
                     link.setDownloadSize(filesize.longValue());
                 }
+                /* Set Packagizer properties */
+                link.setProperty(PROPERTY_DATE, imagemap.get("createdAt"));
+                link.setProperty(PROPERTY_USERNAME, user.get("username"));
+                if (imagemap.get("url") == null) {
+                    final Number nsfwLevel = (Number) imagemap.get("nsfwLevel");
+                    if (nsfwLevel != null && nsfwLevel.intValue() > 1) {
+                        throw new AccountRequiredException("Mature content, account required, nsfwLevel=" + nsfwLevel);
+                    }
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
                 /**
                  * 2024-03-11: Important: Do not open up the regex for original image too much or you run into risk of accidentally
                  * downloading the wrong image, see: </br>
@@ -262,9 +272,6 @@ public class CivitaiCom extends PluginForHost {
                     final String directurl = baseURL + imagemap.get("url") + "/width=" + metadata.get("width") + "/" + Encoding.urlEncode(filename);
                     link.setProperty(PROPERTY_DIRECTURL, directurl);
                 }
-                /* Set Packagizer properties */
-                link.setProperty(PROPERTY_DATE, imagemap.get("createdAt"));
-                link.setProperty(PROPERTY_USERNAME, user.get("username"));
             } else {
                 if (PluginEnvironment.DOWNLOAD.isCurrentPluginEnvironment()) {
                     /* Do nothing - download handling will take care. */
@@ -308,7 +315,7 @@ public class CivitaiCom extends PluginForHost {
         }
         this.login(account);
         /* GET /api/v1/images?imageId=<id> — Authorization header already set by caller via login() */
-        br.getPage(getApiBase() + "/images?imageId=" + imageID);
+        br.getPage(getApiBase() + "/images?imageId=" + imageID + "&browsingLevel=31");// browsingLevel required to mature content
         final Map<String, Object> response = checkErrorsAPI(br, true);
         final List<Object> items = (List<Object>) response.get("items");
         if (items == null || items.isEmpty()) {
@@ -458,8 +465,8 @@ public class CivitaiCom extends PluginForHost {
         }
         if (entries != null) {
             /*
-             * Auth errors can appear in the JSON body independent of the HTTP status code. The "code" field is used by both the direct
-             * API ("bad_auth_token") and the tRPC layer ("UNAUTHORIZED"); the "error"/"status" fields are used by other endpoints (e.g.
+             * Auth errors can appear in the JSON body independent of the HTTP status code. The "code" field is used by both the direct API
+             * ("bad_auth_token") and the tRPC layer ("UNAUTHORIZED"); the "error"/"status" fields are used by other endpoints (e.g.
              * /api/v1/me).
              */
             final String code = StringUtils.valueOfOrNull(entries.get("code"));

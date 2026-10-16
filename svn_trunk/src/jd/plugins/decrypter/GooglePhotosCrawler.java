@@ -32,7 +32,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 53400 $", interfaceVersion = 3, names = { "photos.google.com" }, urls = { "https?://photos\\.google\\.com/share/[A-Za-z0-9\\-_]+\\?key=[A-Za-z0-9\\-_]+|https?://photos\\.app\\.goo\\.gl/[A-Za-z0-9]+" })
+@DecrypterPlugin(revision = "$Revision: 53641 $", interfaceVersion = 3, names = { "photos.google.com" }, urls = { "https?://photos\\.google\\.com/share/[A-Za-z0-9\\-_]+\\?key=[A-Za-z0-9\\-_]+|https?://photos\\.app\\.goo\\.gl/[A-Za-z0-9]+" })
 public class GooglePhotosCrawler extends PluginForDecrypt {
     public GooglePhotosCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -61,11 +61,7 @@ public class GooglePhotosCrawler extends PluginForDecrypt {
         }
         final String[] ids = br.getRegex("\\[\"([A-Za-z0-9\\-_]{22,})\",\\[\"https").getColumn(0);
         if (ids == null || ids.length == 0) {
-            if (br.containsHTML("data-disable-idom=\"true\"")) {
-                throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
+            throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
         }
         String title = br.getRegex("(?i)<title>(?:Shared album\\s*-\\s*)?[A-Za-z0-9 ]+ – ([^<>\"]+)\\s*-\\s*Google (?:Ph|F)otos</title>").getMatch(0);
         if (title == null) {

@@ -1,5 +1,6 @@
 package org.jdownloader.plugins.components.captchasolver;
 
+import java.util.Set;
 import java.util.Currency;
 import java.util.List;
 
@@ -20,6 +21,7 @@ import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
 import org.jdownloader.DomainInfo;
 import org.jdownloader.captcha.v2.CaptchaSolverConfigV3;
+import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
 import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
 import org.jdownloader.captcha.v2.solver.service.AbstractSolverService;
 import org.jdownloader.gui.translate._GUI;
@@ -41,7 +43,7 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
 
     /** Returns the captcha types supported by the underlying plugin, used e.g. for the "Supported by this service" overview. */
     @Override
-    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+    public Set<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
         return this.plugin.getSupportedCaptchaTypes();
     }
 
@@ -290,6 +292,14 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
      */
     public long getServerSideMinPollingIntervalMillis() {
         return plugin.getServerSideMinPollingIntervalMillis();
+    }
+
+    /**
+     * Returns the captcha feedback types this service supports (see {@link abstractPluginForCaptchaSolver#getSupportedFeedbackTypes()}),
+     * for display purposes. May be null or empty if the service offers no feedback.
+     */
+    public Set<FeedbackType> getSupportedFeedbackTypes() {
+        return plugin.getSupportedFeedbackTypes();
     }
 
     @Override

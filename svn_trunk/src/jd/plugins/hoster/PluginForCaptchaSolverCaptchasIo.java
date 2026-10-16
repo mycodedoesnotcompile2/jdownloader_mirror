@@ -1,5 +1,8 @@
 package jd.plugins.hoster;
 
+import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.Currency;
 import java.util.HashSet;
@@ -42,7 +45,7 @@ import jd.plugins.PluginException;
  * Docs: https://api.captchas.io/document/#/methods <br>
  * Formerly known as captchasolutions.com
  */
-@HostPlugin(revision = "$Revision: 53597 $", interfaceVersion = 3, names = { "captchas.io" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53648 $", interfaceVersion = 3, names = { "captchas.io" }, urls = { "" })
 public class PluginForCaptchaSolverCaptchasIo extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -59,8 +62,8 @@ public class PluginForCaptchaSolverCaptchasIo extends abstractPluginForCaptchaSo
     }
 
     @Override
-    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
-        final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
+    public Set<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        final Set<CAPTCHA_TYPE> types = EnumSet.noneOf(CAPTCHA_TYPE.class);
         types.add(CAPTCHA_TYPE.IMAGE);
         /**
          * 2026-09-23: Removed IMAGE_SINGLE_CLICK_CAPTCHA/IMAGE_MULTI_CLICK_CAPTCHA: captchas.io's API does not offer a
@@ -218,18 +221,6 @@ public class PluginForCaptchaSolverCaptchasIo extends abstractPluginForCaptchaSo
                 job.setAnswer(resp);
                 return;
             }
-    }
-
-    @Override
-    public boolean setInvalid(final AbstractResponse<?> response, final Account account) {
-        /* captchas.io does not offer any captcha feedback (report correct/incorrect) API method. */
-        return false;
-    }
-
-    @Override
-    public boolean setValid(final AbstractResponse<?> response, final Account account) {
-        /* captchas.io does not offer any captcha feedback (report correct/incorrect) API method. */
-        return false;
     }
 
     /** See docs: https://api.captchas.io/document/#/errors */

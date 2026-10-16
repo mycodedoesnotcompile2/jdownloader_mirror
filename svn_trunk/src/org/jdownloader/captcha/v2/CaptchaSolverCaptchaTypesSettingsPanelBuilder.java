@@ -4,6 +4,7 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.event.MouseEvent;
 import java.text.SimpleDateFormat;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -62,7 +63,7 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
             throw new IllegalArgumentException("accessor must not be null");
         }
         this.accessor = accessor;
-        final List<CAPTCHA_TYPE> allCaptchaTypes = CaptchaType.getProcessableCaptchaTypes();
+        final Set<CAPTCHA_TYPE> allCaptchaTypes = CaptchaType.getProcessableCaptchaTypes();
         /*
          * Which columns exist is always decided from ALL captcha types, not only the listed ones, so the set of columns (and with it the
          * stored column layout of the table) does not change when the list is narrowed down to the supported types.
@@ -86,7 +87,7 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
             }
             this.captchaTypes = supportedCaptchaTypes;
         } else {
-            this.captchaTypes = allCaptchaTypes;
+            this.captchaTypes = new ArrayList<CAPTCHA_TYPE>(allCaptchaTypes);
         }
     }
 
@@ -632,7 +633,7 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
             if (!(plg instanceof abstractPluginForCaptchaSolver)) {
                 return false;
             }
-            final List<CAPTCHA_TYPE> supportedTypes = ((abstractPluginForCaptchaSolver) plg).getSupportedCaptchaTypes(account);
+            final Set<CAPTCHA_TYPE> supportedTypes = ((abstractPluginForCaptchaSolver) plg).getSupportedCaptchaTypes(account);
             if (supportedTypes == null) {
                 return false;
             }
@@ -671,7 +672,7 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
 
         @Override
         public boolean isSupported(final CAPTCHA_TYPE ctype) {
-            final List<CAPTCHA_TYPE> supportedTypes = solver.getSupportedCaptchaTypes();
+            final Set<CAPTCHA_TYPE> supportedTypes = solver.getSupportedCaptchaTypes();
             /* A solver without a list of supported captcha types supports nothing (see SolverService#getSupportedCaptchaTypes). */
             return supportedTypes != null && supportedTypes.contains(ctype);
         }

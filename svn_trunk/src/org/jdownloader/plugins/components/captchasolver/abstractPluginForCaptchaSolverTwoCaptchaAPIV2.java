@@ -1,5 +1,9 @@
 package org.jdownloader.plugins.components.captchasolver;
 
+import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
+import java.util.EnumSet;
+import java.util.Set;
+import java.util.ArrayList;
 import java.util.Currency;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -213,6 +217,12 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
             job.setAnswer(resp);
             return;
         }
+    }
+
+    @Override
+    public Set<FeedbackType> getSupportedFeedbackTypes() {
+        /* https://2captcha.com/api-docs/report-correct and https://2captcha.com/api-docs/report-incorrect */
+        return EnumSet.of(FeedbackType.REPORT_INVALID_CAPTCHAS, FeedbackType.REPORT_VALID_CAPTCHAS);
     }
 
     @Override

@@ -6,6 +6,7 @@ import org.appwork.utils.logging2.LogSource;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeSolver;
+import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
 import org.jdownloader.captcha.v2.SolverStatus;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.gui.IconKey;
@@ -21,8 +22,33 @@ public class CESSolverJob<T> {
     private volatile SolverStatus    status;
     private CESBubble                bubble;
     private volatile boolean         answered;
+    private volatile boolean         answerDelivered;
     /** True once a final status (failed, aborted, answer rejected) was set, which hideBubble must not overwrite. */
     private volatile boolean         finalStatusSet;
+    /** Task ID the solver service assigned to the submitted captcha, or null as long as nothing has been submitted yet. */
+    private volatile String          captchaSolverTaskID;
+
+    /**
+     * Plugins must call this right after the captcha was submitted to the solver service, so JDownloader is able to abort the task on the
+     * server side (see {@link FeedbackType#ABORT_CAPTCHAS}) if the captcha runs into a timeout.
+     */
+    public void setCaptchaSolverTaskID(final String captchaSolverTaskID) {
+        this.captchaSolverTaskID = captchaSolverTaskID;
+    }
+
+    public String getCaptchaSolverTaskID() {
+        return captchaSolverTaskID;
+    }
+
+    /** True if this solver delivered an answer that the job accepted. */
+    public boolean isAnswered() {
+        return answered;
+    }
+
+    /** True if this solver delivered an answer at all, no matter whether the job accepted it (it may have arrived too late). */
+    public boolean isAnswerDelivered() {
+        return answerDelivered;
+    }
 
     public SolverJob<T> getJob() {
         return job;
@@ -155,6 +181,7 @@ public class CESSolverJob<T> {
     }
 
     public void setAnswer(AbstractResponse<?> abstractResponse) {
+        answerDelivered = true;
         if (job.addAnswer((AbstractResponse<T>) abstractResponse)) {
             answered = true;
             setStatus(_GUI.T.DeathByCaptchaSolver_solveBasicCaptchaChallenge_answer(abrev(abstractResponse.getValue() + "")), NewTheme.I().getIcon(IconKey.ICON_OK, 20));

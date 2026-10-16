@@ -1,7 +1,10 @@
 package jd.plugins.hoster;
 
+import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.Currency;
 import java.util.HashMap;
@@ -43,7 +46,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 53549 $", interfaceVersion = 3, names = { "cheapcaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53649 $", interfaceVersion = 3, names = { "cheapcaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -58,7 +61,6 @@ public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCapt
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
         br.getHeaders().put("Accept", "application/json");
-        br.getHeaders().put("User-Agent", "JDownloader");
         /*
          * cheapcaptcha.com is a DeathByCaptcha-compatible API (see https://deathbycaptcha.com/api#api_details): 403 = credentials
          * rejected OR insufficient credits, 400 = malformed request/invalid captcha, 500 = internal error, 503 = service overloaded. All
@@ -66,7 +68,6 @@ public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCapt
          * callAPI(), not treated as a transport error.
          */
         br.setAllowedResponseCodes(200, 400, 403, 500, 503);
-        br.setFollowRedirects(true);
         return br;
     }
 
@@ -76,8 +77,8 @@ public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCapt
     }
 
     @Override
-    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
-        final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
+    public Set<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        final Set<CAPTCHA_TYPE> types = EnumSet.noneOf(CAPTCHA_TYPE.class);
         types.add(CAPTCHA_TYPE.IMAGE);
         // types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
         // types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
@@ -229,6 +230,12 @@ public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCapt
             challenge.sendStatsError(job.getSolver(), e);
             throw e;
         }
+    }
+
+    @Override
+    public Set<FeedbackType> getSupportedFeedbackTypes() {
+        /* Only reporting incorrectly solved captchas is implemented, see setInvalid(). */
+        return EnumSet.of(FeedbackType.REPORT_INVALID_CAPTCHAS);
     }
 
     @Override

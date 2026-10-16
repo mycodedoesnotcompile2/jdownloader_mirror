@@ -21,6 +21,7 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSolverService;
 
 import jd.gui.swing.jdgui.BasicJDTable;
+import jd.gui.swing.jdgui.views.settings.components.ToggleEnabledSelectionAction;
 
 public class SolverOrderTable extends BasicJDTable<SolverService> {
     public interface SelectionListener {
@@ -82,7 +83,7 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
      * solver has a buy page, "Buy credits".</li>
      * <li>Browser solver -> "Select browser" (choose the browser used to open captcha pages, or the OS default).</li>
      * </ul>
-     * All other solver types (local JAC, dialog) get no context menu actions.
+     * All solver types additionally get an enable/disable action for the whole selection.
      */
     @Override
     protected JPopupMenu onContextMenu(final JPopupMenu popup, final SolverService contextObject, final List<SolverService> selection, final ExtColumn<SolverService> column, final MouseEvent mouseEvent) {
@@ -97,7 +98,6 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
                 }
             });
             popup.add(configure);
-            return popup;
         } else if (contextObject instanceof PluginForCaptchaSolverSolverService) {
             final PluginForCaptchaSolverSolverService external = (PluginForCaptchaSolverSolverService) contextObject;
             /* Account manager icon in front of the text (same icon the Account Manager settings panel uses). */
@@ -120,7 +120,6 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
                 });
                 popup.add(buyCredits);
             }
-            return popup;
         } else if (contextObject instanceof BrowserSolverService) {
             final BrowserSolverService browserSolver = (BrowserSolverService) contextObject;
             final JMenuItem selectBrowser = new JMenuItem(_GUI.T.SolverOrderTable_context_selectBrowser(), browserSolver.getIcon(18));
@@ -131,10 +130,45 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
                 }
             });
             popup.add(selectBrowser);
-            return popup;
         }
-        /* No context menu actions for any other solver type. */
-        return null;
+        if (selection != null && !selection.isEmpty()) {
+            /* Enable/disable all selected solvers at once, same behavior as in the download list. */
+            popup.add(new ToggleEnabledSelectionAction<SolverService>(contextObject, selection) {
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                protected boolean isEntryEnabled(final SolverService entry) {
+                    return entry.getConfigV3().isEnabled();
+                }
+
+                @Override
+                protected void setEntryEnabled(final SolverService entry, final boolean enabled) {
+                    entry.getConfigV3().setEnabled(enabled);
+                }
+
+                @Override
+                protected void onFinished() {
+                    SolverOrderTable.this.repaint();
+                }
+            });
+        }
+        if (contextObject != null && CaptchaConfigPanel.isDebugTabShown()) {
+            /* Only shown if the "Test & Debug" tab exists, and only for solvers that can be tested there (ready and enabled). */
+            final JMenuItem testAndDebug = new JMenuItem("Test & Debug", new AbstractIcon(IconKey.ICON_BUG, 18));
+            testAndDebug.setEnabled(CaptchaTestPanel.isSelectable(contextObject));
+            testAndDebug.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(final ActionEvent e) {
+                    CaptchaConfigPanel.showTestAndDebug(contextObject);
+                }
+            });
+            popup.add(testAndDebug);
+        }
+        if (popup.getComponentCount() == 0) {
+            /* No context menu actions at all. */
+            return null;
+        }
+        return popup;
     }
 
     @Override

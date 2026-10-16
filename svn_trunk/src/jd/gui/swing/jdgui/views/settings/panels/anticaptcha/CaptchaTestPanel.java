@@ -7,6 +7,8 @@ import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.Point;
+import java.awt.Toolkit;
+import java.awt.datatransfer.StringSelection;
 import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -17,9 +19,9 @@ import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -32,8 +34,7 @@ import javax.swing.DefaultListCellRenderer;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
-import javax.swing.RowSorter;
-import javax.swing.SortOrder;
+import javax.swing.JComponent;
 import javax.swing.JComboBox;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
@@ -51,15 +52,17 @@ import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingConstants;
 import javax.swing.Timer;
 import javax.swing.event.ListSelectionEvent;
-import javax.swing.event.RowSorterEvent;
-import javax.swing.event.RowSorterListener;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.filechooser.FileNameExtensionFilter;
-import javax.swing.table.AbstractTableModel;
-import javax.swing.table.TableCellRenderer;
-import javax.swing.table.TableRowSorter;
 
 import org.appwork.swing.MigPanel;
+import org.appwork.swing.exttable.ExtColumn;
+import org.appwork.swing.exttable.ExtDefaultRowSorter;
+import org.appwork.swing.exttable.ExtTableModel;
+import org.appwork.swing.exttable.columns.ExtComponentColumn;
+import org.appwork.swing.exttable.columns.ExtProgressColumn;
+import org.appwork.swing.exttable.columns.ExtTextColumn;
+import org.appwork.utils.swing.renderer.RendererMigPanel;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.swing.EDTRunner;
 import org.jdownloader.captcha.event.ChallengeResponseListener;
@@ -82,6 +85,7 @@ import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSo
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 
 import jd.controlling.AccountController;
+import jd.gui.swing.jdgui.BasicJDTable;
 import jd.controlling.captcha.SkipException;
 import jd.plugins.Account;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
@@ -96,7 +100,7 @@ import jd.plugins.CaptchaType.CAPTCHA_TYPE;
  * feedback/abort/retry buttons. If an expected result is given, the solver's answer is compared against it and the matching feedback button
  * is disabled (a correct answer cannot be reported as incorrect and vice versa).
  */
-public class CaptchaTestPanel extends MigPanel {
+public class CaptchaTestPanel extends WidthTrackingPanel {
     private static final long               serialVersionUID   = 1L;
     private static final Color              COLOR_ORANGE       = new Color(230, 126, 0);
     private final JComboBox                 sourceBox;
@@ -152,7 +156,7 @@ public class CaptchaTestPanel extends MigPanel {
     private final JProgressBar                activityBar        = new JProgressBar();
     private volatile List<TestRun>          batchRuns          = new ArrayList<TestRun>();
     private volatile long                   batchStartTime;
-    private final JTable                    runTable;
+    private final RunTable                 runTable;
     private final JScrollPane               runScroll;
     /* Details of the test selected in the table. */
     private final MigPanel                  runPanel;
@@ -166,7 +170,8 @@ public class CaptchaTestPanel extends MigPanel {
     private final JButton                   retryButton;
     private Timer                           refreshTimer;
     private final Color                     defaultButtonForeground;
-    private TableRowSorter<RunTableModel> runSorter;
+    /* True once the user clicked a column header: the automatic sorting is off until the next test is started. */
+    private boolean                     userSorted         = false;
     /* True while the sort order is changed by the panel itself (not by a click of the user on a column header). */
     private boolean                     internalSortChange = false;
     private volatile TestRun                selectedRun;
@@ -425,158 +430,14 @@ public class CaptchaTestPanel extends MigPanel {
         multiButtons.add(multiCancelButton);
         add(multiButtons, "skip 1, alignx left");
         /* Result table: hidden until the first test was started. */
-        runTable = new JTable(runModel);
-        runTable.setRowHeight(22);
-        runTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        runTable.getColumnModel().getColumn(0).setPreferredWidth(200);
-        runTable.getColumnModel().getColumn(1).setPreferredWidth(100);
-        runTable.getColumnModel().getColumn(2).setPreferredWidth(80);
-        runTable.getColumnModel().getColumn(3).setPreferredWidth(400);
-        /*
-         * All columns are sortable. Default order: passed, failed, running, pending. The table is sorted again after every change of a test
-         * (e.g. when a test finishes), so the order always follows the current state.
-         */
-        final TableRowSorter<RunTableModel> sorter = new TableRowSorter<RunTableModel>(runModel);
-        sorter.setSortsOnUpdates(true);
-        sorter.setComparator(0, new Comparator<CAPTCHA_TYPE>() {
-            @Override
-            public int compare(final CAPTCHA_TYPE o1, final CAPTCHA_TYPE o2) {
-                return o1.getDisplayName().compareToIgnoreCase(o2.getDisplayName());
-            }
-        });
-        sorter.setComparator(1, new Comparator<RunState>() {
-            @Override
-            public int compare(final RunState o1, final RunState o2) {
-                return o1.getSortRank() - o2.getSortRank();
-            }
-        });
-        sorter.setComparator(2, new Comparator<TestRun>() {
-            @Override
-            public int compare(final TestRun o1, final TestRun o2) {
-                final long d1 = getSortDuration(o1);
-                final long d2 = getSortDuration(o2);
-                return d1 < d2 ? -1 : (d1 == d2 ? 0 : 1);
-            }
-        });
-        sorter.setComparator(3, new Comparator<String>() {
-            @Override
-            public int compare(final String o1, final String o2) {
-                return o1.compareToIgnoreCase(o2);
-            }
-        });
-        runSorter = sorter;
-        runTable.setRowSorter(sorter);
-        /* Sorting by the user (click on a column header) switches the automatic sorting off until the next test is started. */
-        sorter.addRowSorterListener(new RowSorterListener() {
-            @Override
-            public void sorterChanged(final RowSorterEvent e) {
-                if (e.getType() == RowSorterEvent.Type.SORT_ORDER_CHANGED && !internalSortChange) {
-                    sorter.setSortsOnUpdates(false);
-                }
-            }
-        });
-        enableAutoSort();
-        runTable.setDefaultRenderer(CAPTCHA_TYPE.class, new TableCellRenderer() {
-            private final JLabel label = new JLabel();
-
-            @Override
-            public Component getTableCellRendererComponent(final JTable table, final Object value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
-                final CAPTCHA_TYPE type = (CAPTCHA_TYPE) value;
-                label.setOpaque(true);
-                label.setBackground(isSelected ? table.getSelectionBackground() : table.getBackground());
-                label.setForeground(isSelected ? table.getSelectionForeground() : table.getForeground());
-                label.setHorizontalAlignment(SwingConstants.LEFT);
-                label.setIcon(type.getIcon());
-                label.setText(type.getDisplayName());
-                return label;
-            }
-        });
-        runTable.setDefaultRenderer(RunState.class, new TableCellRenderer() {
-            private final JLabel label = new JLabel();
-
-            @Override
-            public Component getTableCellRendererComponent(final JTable table, final Object value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
-                final RunState state = (RunState) value;
-                label.setOpaque(true);
-                label.setBackground(isSelected ? table.getSelectionBackground() : table.getBackground());
-                label.setHorizontalAlignment(SwingConstants.LEFT);
-                label.setIcon(state.getIcon());
-                label.setText(state.getText());
-                label.setForeground(state.getColor());
-                return label;
-            }
-        });
-        /* Progress column: elapsed time in percent of the solvers' timeout (100% = timeout fully elapsed). */
-        runTable.getColumnModel().getColumn(2).setCellRenderer(new TableCellRenderer() {
-            private final JProgressBar bar = new JProgressBar(0, 100);
-
-            @Override
-            public Component getTableCellRendererComponent(final JTable table, final Object value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
-                final TestRun run = (TestRun) value;
-                final long duration = getDurationMillis(run);
-                final int percent = getProgressPercent(run);
-                bar.setValue(Math.max(percent, 0));
-                bar.setStringPainted(duration >= 0);
-                /* Example: "10.3s (34% of 30.00s)", or only "10.3s" if the timeout is unknown. */
-                if (duration < 0) {
-                    bar.setString("");
-                } else if (percent >= 0) {
-                    bar.setString((duration / 100 / 10d) + "s (" + percent + "% of " + String.format(java.util.Locale.ENGLISH, "%.2f", run.maxTimeoutMillis / 1000d) + "s)");
-                } else {
-                    bar.setString((duration / 100 / 10d) + "s");
-                }
-                return bar;
-            }
-        });
-        /* Answer column: a "Cancel" button while the test is still waiting/running, the answer text afterwards. */
-        runTable.getColumnModel().getColumn(3).setCellRenderer(new TableCellRenderer() {
-            private final JLabel  label  = new JLabel();
-            private final JButton button = new JButton("Cancel");
-
-            @Override
-            public Component getTableCellRendererComponent(final JTable table, final Object value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
-                final TestRun run = runModel.getRun(table.convertRowIndexToModel(row));
-                if (isCancellable(run)) {
-                    return button;
-                }
-                label.setOpaque(true);
-                label.setBackground(isSelected ? table.getSelectionBackground() : table.getBackground());
-                label.setForeground(isSelected ? table.getSelectionForeground() : table.getForeground());
-                label.setText(value == null ? "" : value.toString());
-                return label;
-            }
-        });
-        runTable.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(final MouseEvent e) {
-                if (e.getButton() != MouseEvent.BUTTON1) {
-                    return;
-                }
-                final int row = runTable.rowAtPoint(e.getPoint());
-                if (row >= 0 && runTable.convertColumnIndexToModel(runTable.columnAtPoint(e.getPoint())) == 3) {
-                    final TestRun run = runModel.getRun(runTable.convertRowIndexToModel(row));
-                    if (isCancellable(run)) {
-                        abortRun(run, false);
-                    }
-                }
-            }
-
-            @Override
-            public void mousePressed(final MouseEvent e) {
-                showContextMenu(e);
-            }
-
-            @Override
-            public void mouseReleased(final MouseEvent e) {
-                showContextMenu(e);
-            }
-        });
+        /* Based on BasicJDTable like the other tables: column menu in the header (show/hide columns), sortable columns, theme. */
+        runTable = new RunTable(runModel);
         runTable.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
             @Override
             public void valueChanged(final ListSelectionEvent e) {
                 if (!e.getValueIsAdjusting()) {
                     final int row = runTable.getSelectedRow();
-                    selectedRun = row < 0 ? null : runModel.getRun(runTable.convertRowIndexToModel(row));
+                    selectedRun = row < 0 ? null : runModel.getObjectbyRow(row);
                     syncMarkers();
                     refreshDetails();
                 }
@@ -595,7 +456,7 @@ public class CaptchaTestPanel extends MigPanel {
         activityBar.setVisible(false);
         add(batchBar, "span 2, growx");
         add(activityBar, "span 2, growx, gaptop 2");
-        add(runScroll, "span 2, growx");
+        add(runScroll, "span 2, growx, wmin 0");
         /* Details of the selected test (the former test dialog): hidden until a test is selected. */
         runPanel = new MigPanel("ins 0, wrap 1", "[grow,fill]", "[][][][grow,fill][][]");
         progress = new JProgressBar();
@@ -700,6 +561,14 @@ public class CaptchaTestPanel extends MigPanel {
         rebuildTypeList();
         solverBox.repaint();
         return replacement != null;
+    }
+
+    /** Selects the given solver for the multi test (only if it can be selected, see isSelectable). */
+    public void selectMultiTestSolver(final SolverService solver) {
+        updateNoSolverWarning();
+        if (!batchRunning && solver != null && isSelectable(solver)) {
+            solverBox.setSelectedItem(solver);
+        }
     }
 
     /** Shows the warning if not a single solver can be selected. */
@@ -933,7 +802,7 @@ public class CaptchaTestPanel extends MigPanel {
     }
 
     /** A solver can only be tested if it is ready and activated in the "Solver overview" tab. */
-    private static boolean isSelectable(final SolverService service) {
+    static boolean isSelectable(final SolverService service) {
         return service.isReady() && service.getConfigV3().isEnabled();
     }
 
@@ -946,7 +815,7 @@ public class CaptchaTestPanel extends MigPanel {
         typesPopup.add(selectAllBox);
         typesPopup.addSeparator();
         final SolverService service = (SolverService) solverBox.getSelectedItem();
-        final List<CAPTCHA_TYPE> supported = service == null || !isSelectable(service) ? null : service.getSupportedCaptchaTypes();
+        final Set<CAPTCHA_TYPE> supported = service == null || !isSelectable(service) ? null : service.getSupportedCaptchaTypes();
         if (supported != null) {
             for (final CAPTCHA_TYPE type : CAPTCHA_TYPE.values()) {
                 if (type.hasTestChallenges() && supported.contains(type)) {
@@ -1156,10 +1025,10 @@ public class CaptchaTestPanel extends MigPanel {
                 /* The solver that answered decides whether it accepts feedback. */
                 final Object solver = result.get(0).getSolver();
                 if (solver instanceof ChallengeSolver) {
-                    final List<FeedbackType> feedbackTypes = ((ChallengeSolver<?>) solver).getSupportedFeedbackTypes();
-                    /* null = no restriction declared (same interpretation as PluginChallengeSolver#setValid/setInvalid). */
-                    run.correctUnsupported = feedbackTypes != null && !feedbackTypes.contains(FeedbackType.REPORT_VALID_CAPTCHAS);
-                    run.incorrectUnsupported = feedbackTypes != null && !feedbackTypes.contains(FeedbackType.REPORT_INVALID_CAPTCHAS);
+                    final Set<FeedbackType> feedbackTypes = ((ChallengeSolver<?>) solver).getSupportedFeedbackTypes();
+                    /* Null or empty = the solver does not support any feedback. */
+                    run.correctUnsupported = feedbackTypes == null || !feedbackTypes.contains(FeedbackType.REPORT_VALID_CAPTCHAS);
+                    run.incorrectUnsupported = feedbackTypes == null || !feedbackTypes.contains(FeedbackType.REPORT_INVALID_CAPTCHAS);
                 }
                 if (result.getValue() instanceof MultiClickedPoint) {
                     /* Remember all clicked positions to mark them in the image. */
@@ -1213,6 +1082,10 @@ public class CaptchaTestPanel extends MigPanel {
             @Override
             protected void runInEDT() {
                 runModel.fireRunChanged(run);
+                if (finished && !userSorted) {
+                    /* Passed first, then failed, running, pending. */
+                    runModel.refreshSort();
+                }
                 if (run == selectedRun) {
                     if (finished) {
                         syncMarkers();
@@ -1265,9 +1138,12 @@ public class CaptchaTestPanel extends MigPanel {
      * without them the last row is partly cut and a scrollbar would be needed).
      */
     private void updateRunScrollHeight() {
-        final int headerHeight = runTable.getTableHeader() != null ? runTable.getTableHeader().getPreferredSize().height : 0;
-        final int height = headerHeight + runTable.getPreferredSize().height + 10;
-        runScroll.setPreferredSize(new Dimension(runTable.getPreferredSize().width, height));
+        final int height = SolverOrderContainer.tableFullHeight(runTable);
+        /*
+         * Only the height is fixed. The width must not follow the table's preferred width (sum of the column widths): it only grows when the
+         * window gets bigger and would then force a horizontal scroll bar on the surrounding panel when the window gets smaller again.
+         */
+        runScroll.setPreferredSize(new Dimension(100, height));
         runScroll.revalidate();
         revalidate();
     }
@@ -1307,44 +1183,21 @@ public class CaptchaTestPanel extends MigPanel {
         }
     }
 
-    /** Automatic sorting: passed, failed, running, pending, applied again after every change of a test. */
+    /** Automatic sorting: passed, failed, running, pending, applied again after every finished test (until the user sorts by himself). */
     private void enableAutoSort() {
         internalSortChange = true;
         try {
-            runSorter.setSortsOnUpdates(true);
-            runSorter.setSortKeys(Collections.singletonList(new RowSorter.SortKey(1, SortOrder.ASCENDING)));
+            runModel.passedColumn.setSortOrderIdentifier(ExtColumn.SORT_ASC);
+            runModel.setSortColumn(runModel.passedColumn);
         } finally {
             internalSortChange = false;
         }
+        userSorted = false;
     }
 
     /** True while a test is waiting for its turn or running, i.e. it can still be cancelled. */
     private static boolean isCancellable(final TestRun run) {
         return run.state == RunState.PENDING || run.state == RunState.RUNNING;
-    }
-
-    /** Right click on a test: selects it and offers "Cancel". */
-    private void showContextMenu(final MouseEvent e) {
-        if (!e.isPopupTrigger()) {
-            return;
-        }
-        final int row = runTable.rowAtPoint(e.getPoint());
-        if (row < 0) {
-            return;
-        }
-        runTable.setRowSelectionInterval(row, row);
-        final TestRun run = runModel.getRun(runTable.convertRowIndexToModel(row));
-        final JPopupMenu menu = new JPopupMenu();
-        final JMenuItem cancel = new JMenuItem("Cancel", NewTheme.I().getIcon(IconKey.ICON_FALSE, 16));
-        cancel.setEnabled(isCancellable(run));
-        cancel.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(final ActionEvent event) {
-                abortRun(run, false);
-            }
-        });
-        menu.add(cancel);
-        menu.show(runTable, e.getX(), e.getY());
     }
 
     /** Shows the state of the selected test (or hides the details if none is selected). */
@@ -1439,6 +1292,23 @@ public class CaptchaTestPanel extends MigPanel {
         default:
             return Long.MAX_VALUE;
         }
+    }
+
+    /** Example: "10.3s (34% of 30.00s)", or only "10.3s" if the timeout is unknown, empty if the test did not start yet. */
+    private static String formatDurationText(final TestRun value) {
+        final long duration = getDurationMillis(value);
+        final int percent = getProgressPercent(value);
+        if (duration < 0) {
+            return "";
+        } else if (percent >= 0) {
+            return (duration / 100 / 10d) + "s (" + percent + "% of " + String.format(java.util.Locale.ENGLISH, "%.2f", value.maxTimeoutMillis / 1000d) + "s)";
+        } else {
+            return (duration / 100 / 10d) + "s";
+        }
+    }
+
+    private static void copyToClipboard(final String text) {
+        Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text), null);
     }
 
     /** Duration of a test: until its end, or until now while it is running. */
@@ -1691,81 +1561,312 @@ public class CaptchaTestPanel extends MigPanel {
         }
     }
 
-    /** Table model of the tests: one row per test. */
-    private static class RunTableModel extends AbstractTableModel {
-        private static final long   serialVersionUID = 1L;
-        private final List<TestRun> runs             = new ArrayList<TestRun>();
-        private final String[]      columns          = { "Captcha type", "Passed", "Duration", "Answer" };
+    /** Table of the tests: right click on a test offers "Cancel", the header offers the show/hide column menu. */
+    private class RunTable extends BasicJDTable<TestRun> {
+        private static final long serialVersionUID = 1L;
+
+        private RunTable(final RunTableModel model) {
+            super(model);
+            setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+            /* Like the comparison table, if the columns fit: all columns follow the width of the table (shrink and grow together). */
+            setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
+        }
+
+        /*
+         * The table is always shown in full height without an own scroll bar. ExtTable's column button (upper right corner, the right click
+         * menu of the header stays available) would force a permanent vertical scroll bar.
+         */
+        @Override
+        public boolean isColumnButtonVisible() {
+            return false;
+        }
+
+        @Override
+        protected JPopupMenu onContextMenu(final JPopupMenu popup, final TestRun contextObject, final List<TestRun> selection, final ExtColumn<TestRun> column, final MouseEvent ev) {
+            if (contextObject != null) {
+                /* All selected tests (the clicked one if the selection is empty) that are still waiting or running can be cancelled. */
+                final List<TestRun> cancellable = new ArrayList<TestRun>();
+                final List<TestRun> targets = selection != null && !selection.isEmpty() ? selection : Collections.singletonList(contextObject);
+                for (final TestRun run : targets) {
+                    if (isCancellable(run)) {
+                        cancellable.add(run);
+                    }
+                }
+                final JMenuItem cancel = new JMenuItem(cancellable.size() > 1 ? "Cancel (" + cancellable.size() + " tests)" : "Cancel", NewTheme.I().getIcon(IconKey.ICON_FALSE, 16));
+                cancel.setEnabled(!cancellable.isEmpty());
+                cancel.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(final ActionEvent event) {
+                        for (final TestRun run : cancellable) {
+                            abortRun(run, false);
+                        }
+                    }
+                });
+                popup.add(cancel);
+                popup.addSeparator();
+                /* Copies the line of the test the right click was made on (all columns, separated by tabs). */
+                final JMenuItem copyRow = new JMenuItem("Copy row");
+                copyRow.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(final ActionEvent event) {
+                        copyToClipboard(contextObject.type.getDisplayName() + "	" + contextObject.state.getText() + "	" + formatDurationText(contextObject) + "	" + contextObject.answer);
+                    }
+                });
+                popup.add(copyRow);
+                final JMenuItem copyAnswer = new JMenuItem("Copy answer");
+                copyAnswer.setEnabled(!StringUtils.isEmpty(contextObject.answer));
+                copyAnswer.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(final ActionEvent event) {
+                        copyToClipboard(contextObject.answer);
+                    }
+                });
+                popup.add(copyAnswer);
+            }
+            return popup;
+        }
+    }
+
+    /** Table model of the tests: one row per test. All columns are sortable. */
+    private class RunTableModel extends ExtTableModel<TestRun> {
+        private static final long serialVersionUID = 1L;
+        /* Assigned in initColumns() (called by the super constructor), so it must not have an initializer. */
+        private ExtColumn<TestRun> passedColumn;
+
+        private RunTableModel() {
+            super("CaptchaTestPanelRunTable");
+        }
+
+        @Override
+        public void setSortColumn(final ExtColumn<TestRun> e) {
+            if (!internalSortChange) {
+                /* Click of the user on a column header: automatic sorting off until the next test is started. */
+                userSorted = true;
+            }
+            super.setSortColumn(e);
+        }
 
         void setRuns(final List<TestRun> newRuns) {
-            runs.clear();
-            runs.addAll(newRuns);
-            fireTableDataChanged();
+            _fireTableStructureChanged(new ArrayList<TestRun>(newRuns), true);
         }
 
         List<TestRun> getRuns() {
-            return new ArrayList<TestRun>(runs);
-        }
-
-        TestRun getRun(final int row) {
-            return runs.get(row);
+            return new ArrayList<TestRun>(getTableData());
         }
 
         void fireRunChanged(final TestRun run) {
-            final int row = runs.indexOf(run);
+            final int row = getRowforObject(run);
             if (row >= 0) {
                 fireTableRowsUpdated(row, row);
             }
         }
 
         void fireRunsChanged() {
-            if (!runs.isEmpty()) {
-                fireTableRowsUpdated(0, runs.size() - 1);
+            if (getRowCount() > 0) {
+                fireTableRowsUpdated(0, getRowCount() - 1);
             }
         }
 
         @Override
-        public int getRowCount() {
-            return runs.size();
-        }
+        protected void initColumns() {
+            addColumn(new ExtTextColumn<TestRun>("Captcha type") {
+                private static final long serialVersionUID = 1L;
 
-        @Override
-        public int getColumnCount() {
-            return columns.length;
-        }
+                @Override
+                public String getStringValue(final TestRun value) {
+                    return value.type.getDisplayName();
+                }
 
-        @Override
-        public String getColumnName(final int column) {
-            return columns[column];
-        }
+                @Override
+                protected javax.swing.Icon getIcon(final TestRun value) {
+                    return value.type.getIcon();
+                }
 
-        @Override
-        public Class<?> getColumnClass(final int column) {
-            switch (column) {
-            case 0:
-                return CAPTCHA_TYPE.class;
-            case 1:
-                return RunState.class;
-            case 2:
-                return TestRun.class;
-            default:
-                return String.class;
-            }
-        }
+                @Override
+                public int getDefaultWidth() {
+                    return 200;
+                }
+            });
+            passedColumn = new ExtTextColumn<TestRun>("Passed") {
+                private static final long serialVersionUID = 1L;
 
-        @Override
-        public Object getValueAt(final int row, final int column) {
-            final TestRun run = runs.get(row);
-            switch (column) {
-            case 0:
-                return run.type;
-            case 1:
-                return run.state;
-            case 2:
-                return run;
-            default:
-                return run.answer;
-            }
+                {
+                    /* Passed, failed, running, pending (descending: the other way round). */
+                    setRowSorter(new ExtDefaultRowSorter<TestRun>() {
+                        @Override
+                        public int compare(final TestRun o1, final TestRun o2) {
+                            final int diff = o1.state.getSortRank() - o2.state.getSortRank();
+                            return ExtColumn.SORT_ASC.equals(getSortOrderIdentifier()) ? diff : -diff;
+                        }
+                    });
+                }
+
+                @Override
+                public String getStringValue(final TestRun value) {
+                    return value.state.getText();
+                }
+
+                @Override
+                protected javax.swing.Icon getIcon(final TestRun value) {
+                    return value.state.getIcon();
+                }
+
+                @Override
+                public void configureRendererComponent(final TestRun value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
+                    super.configureRendererComponent(value, isSelected, hasFocus, row, column);
+                    /* Normal text, orange if the answer is not the expected one, red if failed. */
+                    final Color color = value.state.getColor();
+                    rendererField.setForeground(color == Color.BLACK ? null : color);
+                }
+
+                @Override
+                public int getDefaultWidth() {
+                    return 100;
+                }
+            };
+            addColumn(passedColumn);
+            addColumn(new ExtProgressColumn<TestRun>("Duration") {
+                private static final long serialVersionUID = 1L;
+
+                {
+                    /* Sorted by the duration of finished tests only, see getSortDuration. */
+                    setRowSorter(new ExtDefaultRowSorter<TestRun>() {
+                        @Override
+                        public int compare(final TestRun o1, final TestRun o2) {
+                            final long d1 = getSortDuration(o1);
+                            final long d2 = getSortDuration(o2);
+                            final int diff = d1 < d2 ? -1 : (d1 == d2 ? 0 : 1);
+                            return ExtColumn.SORT_ASC.equals(getSortOrderIdentifier()) ? diff : -diff;
+                        }
+                    });
+                }
+
+                @Override
+                protected long getValue(final TestRun value) {
+                    /* Elapsed time in percent of the timeout (100% = timeout fully elapsed). */
+                    return Math.max(0, getProgressPercent(value));
+                }
+
+                @Override
+                protected boolean isIndeterminated(final TestRun value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
+                    return false;
+                }
+
+                @Override
+                protected String getString(final TestRun value, final long current, final long total) {
+                    return formatDurationText(value);
+                }
+
+                @Override
+                public int getDefaultWidth() {
+                    return 160;
+                }
+            });
+            addColumn(new AnswerColumn());
         }
     }
+
+    /** Answer of the test; while the test is still waiting/running a "Cancel" button is shown instead. Sortable by the answer text. */
+    private class AnswerColumn extends ExtComponentColumn<TestRun> {
+        private static final long serialVersionUID = 1L;
+        private final MigPanel    renderer;
+        private final JLabel      rendererLabel = new JLabel();
+        private final JButton     rendererButton;
+        private final MigPanel    editor;
+        private final JLabel      editorLabel   = new JLabel();
+        private final JButton     editorButton;
+        private volatile TestRun  editorRun;
+
+        private AnswerColumn() {
+            super("Answer");
+            renderer = new RendererMigPanel("ins 2", "[grow,fill]", "[]");
+            editor = new RendererMigPanel("ins 2", "[grow,fill]", "[]");
+            rendererButton = createCancelButton();
+            editorButton = createCancelButton();
+            editorButton.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(final ActionEvent e) {
+                    final TestRun run = editorRun;
+                    if (run != null && isCancellable(run)) {
+                        abortRun(run, false);
+                    }
+                    stopCellEditing();
+                }
+            });
+            renderer.add(rendererLabel, "hidemode 3, growx, wmin 0");
+            renderer.add(rendererButton, "hidemode 3, alignx left");
+            editor.add(editorLabel, "hidemode 3, growx, wmin 0");
+            editor.add(editorButton, "hidemode 3, alignx left");
+            setRowSorter(new ExtDefaultRowSorter<TestRun>() {
+                @Override
+                public int compare(final TestRun o1, final TestRun o2) {
+                    final int diff = o1.answer.compareToIgnoreCase(o2.answer);
+                    return ExtColumn.SORT_ASC.equals(getSortOrderIdentifier()) ? diff : -diff;
+                }
+            });
+        }
+
+        private JButton createCancelButton() {
+            final JButton button = new JButton("Cancel", NewTheme.I().getIcon(IconKey.ICON_FALSE, 16));
+            button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            return button;
+        }
+
+        @Override
+        public boolean isSortable(final TestRun obj) {
+            return true;
+        }
+
+        /** Default width: about 20 characters. Longer answers are clipped, the user can still resize the column. */
+        @Override
+        public int getDefaultWidth() {
+            return rendererLabel.getFontMetrics(rendererLabel.getFont()).stringWidth("01234567890123456789") + 20;
+        }
+
+        @Override
+        public int getMinWidth() {
+            return 100;
+        }
+
+        private void configure(final TestRun value, final JLabel label, final JButton button) {
+            final boolean cancellable = isCancellable(value);
+            button.setVisible(cancellable);
+            label.setVisible(!cancellable);
+            label.setText(value.answer);
+        }
+
+        @Override
+        public void configureRendererComponent(final TestRun value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
+            configure(value, rendererLabel, rendererButton);
+        }
+
+        @Override
+        public void configureEditorComponent(final TestRun value, final boolean isSelected, final int row, final int column) {
+            editorRun = value;
+            configure(value, editorLabel, editorButton);
+        }
+
+        @Override
+        protected JComponent getInternalRendererComponent(final TestRun value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
+            return renderer;
+        }
+
+        @Override
+        protected JComponent getInternalEditorComponent(final TestRun value, final boolean isSelected, final int row, final int column) {
+            return editor;
+        }
+
+        @Override
+        public void resetEditor() {
+            editor.setBackground(null);
+            editor.setOpaque(false);
+        }
+
+        @Override
+        public void resetRenderer() {
+            renderer.setBackground(null);
+            renderer.setOpaque(false);
+        }
+    }
+
 }

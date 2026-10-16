@@ -6,6 +6,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.Currency;
 import java.util.HashMap;
@@ -68,7 +70,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 53619 $", interfaceVersion = 3, names = { "deathbycaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53649 $", interfaceVersion = 3, names = { "deathbycaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -87,14 +89,12 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
         br.getHeaders().put("Accept", "application/json");
-        br.getHeaders().put("User-Agent", "JDownloader");
         /*
          * Per https://deathbycaptcha.com/api#api_details: 403 = credentials rejected OR insufficient credits, 400 = malformed
          * request/invalid captcha, 500 = internal error, 503 = service overloaded. All of these still return a normal JSON body (status +
          * error fields), so they must be allowed here and classified by HTTP code in callAPI(), not treated as a transport error.
          */
         br.setAllowedResponseCodes(200, 400, 403, 500, 503);
-        br.setFollowRedirects(true);
         return br;
     }
 
@@ -104,8 +104,8 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
     }
 
     @Override
-    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
-        final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
+    public Set<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        final Set<CAPTCHA_TYPE> types = EnumSet.noneOf(CAPTCHA_TYPE.class);
         types.add(CAPTCHA_TYPE.IMAGE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
         /**
@@ -133,11 +133,9 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
     }
 
     @Override
-    public List<FeedbackType> getSupportedFeedbackTypes() {
+    public Set<FeedbackType> getSupportedFeedbackTypes() {
         /* API only offers reporting incorrectly solved captchas, see https://deathbycaptcha.com/api#api_details_report */
-        final List<FeedbackType> types = new ArrayList<FeedbackType>();
-        types.add(FeedbackType.REPORT_INVALID_CAPTCHAS);
-        return types;
+        return EnumSet.of(FeedbackType.REPORT_INVALID_CAPTCHAS);
     }
 
     private String getBaseURL() {

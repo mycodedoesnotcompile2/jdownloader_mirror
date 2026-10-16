@@ -27,6 +27,7 @@ import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.requests.PostRequest;
+import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
@@ -46,9 +47,10 @@ import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
 
-@HostPlugin(revision = "$Revision: 53623 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53641 $", interfaceVersion = 3, names = {}, urls = {})
 public class MegaloadOrg extends PluginForHost {
     /* API docs: "MEGALOAD Downloader API" (account/plan access to the Downloader API is required). */
     private static final String API_BASE                   = "https://megaload.org/API";
@@ -169,8 +171,25 @@ public class MegaloadOrg extends PluginForHost {
     public AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
         this.setBrowserExclusive();
         if (account == null) {
-            /* The file check API requires authentication. */
-            return AvailableStatus.UNCHECKABLE;
+            final Browser brc = br.cloneBrowser();
+            brc.setFollowRedirects(true);
+            brc.getPage(link.getPluginPatternMatcher());
+            if (brc.getHttpConnection().getResponseCode() == 404 || brc.containsHTML(">\\s*LINK NO LONGER AVAILABLE\\s*<")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            String name = brc.getRegex("class\\s*=\\s*\"file-details\"[^>]*>(?:<h[^>]*>)?\\s*(.*?)\\s*<").getMatch(0);
+            String size = brc.getRegex("class\\s*=\\s*\"download-meta\"[^>]*>(?:<h[^>]*>)?\\s*([0-9\\. TGMKB]+)").getMatch(0);
+            if (StringUtils.isAllEmpty(name, size)) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            if (name != null) {
+                name = Encoding.htmlDecode(name);
+                link.setName(name);
+            }
+            if (size != null) {
+                link.setDownloadSize(SizeFormatter.getSize(size, true, false));
+            }
+            return AvailableStatus.TRUE;
         }
         final String fid = StringUtils.firstNotEmpty(getFile_GUID(link), getShortCode(link));
         if (fid == null) {

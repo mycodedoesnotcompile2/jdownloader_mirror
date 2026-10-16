@@ -67,7 +67,7 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
      */
     private final MultiComboBox<CAPTCHA_TYPE>    typesCombo;
     /** All captcha types JDownloader can process, i.e. all possible columns. */
-    private final List<CAPTCHA_TYPE>             allTypes;
+    private final Set<CAPTCHA_TYPE>              allTypes;
     /** Captcha types whose columns are currently shown. */
     private final Set<CAPTCHA_TYPE>              selectedTypes = new LinkedHashSet<CAPTCHA_TYPE>();
     /** True while the dropdown/multi-select is modified programmatically so that its listener does not reset the user's selection. */
@@ -122,7 +122,7 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
         /* Many captcha type columns: keep their width and scroll horizontally instead of squeezing them. */
         table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         /* Multi-select "[x/y] [Type1, Type2]" control; CAPTCHA_TYPE has no LabelInterface, so the per-item label comes from getDisplayName(). */
-        typesCombo = new MultiComboBox<CAPTCHA_TYPE>(allTypes) {
+        typesCombo = new MultiComboBox<CAPTCHA_TYPE>(new ArrayList<CAPTCHA_TYPE>(allTypes)) {
             private static final long serialVersionUID = 1L;
 
             @Override

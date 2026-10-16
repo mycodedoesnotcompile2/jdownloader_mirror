@@ -1,5 +1,7 @@
 package jd.plugins.hoster;
 
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -16,7 +18,7 @@ import jd.plugins.Account;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 53593 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53648 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
     /**
      * hCaptcha support is cached per account via account properties (not an instance field): abstractPluginForCaptchaSolver creates a fresh
@@ -47,8 +49,8 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
     }
 
     @Override
-    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
-        final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
+    public Set<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        final Set<CAPTCHA_TYPE> types = EnumSet.noneOf(CAPTCHA_TYPE.class);
         types.add(CAPTCHA_TYPE.IMAGE);
         types.add(CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA);
         types.add(CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
@@ -90,9 +92,9 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
     }
 
     @Override
-    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes(final Account account) {
+    public Set<CAPTCHA_TYPE> getSupportedCaptchaTypes(final Account account) {
         /* Get list of all captcha types supported by this service. */
-        final List<CAPTCHA_TYPE> supported_captcha_types = this.getSupportedCaptchaTypes();
+        final Set<CAPTCHA_TYPE> supported_captcha_types = this.getSupportedCaptchaTypes();
         if (Boolean.FALSE.equals(supportsHcaptcha(account))) {
             /* hCaptcha is not supported by this account -> Remove from list of supported captcha types. */
             supported_captcha_types.remove(CAPTCHA_TYPE.HCAPTCHA);

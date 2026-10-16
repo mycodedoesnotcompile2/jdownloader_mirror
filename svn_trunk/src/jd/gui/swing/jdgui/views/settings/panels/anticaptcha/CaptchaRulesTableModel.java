@@ -645,7 +645,7 @@ public class CaptchaRulesTableModel extends ExtTableModel<CaptchaChallengeFilter
             /** Same "[selected/total] [Label1, Label2, ...]" format as the "Captcha request types" column. */
             private String labelFor(final CaptchaChallengeFilter rule) {
                 final Set<CAPTCHA_TYPE> selected = getIncludedCaptchaTypes(rule);
-                final List<CAPTCHA_TYPE> allTypes = CaptchaType.getProcessableCaptchaTypes();
+                final Set<CAPTCHA_TYPE> allTypes = CaptchaType.getProcessableCaptchaTypes();
                 final List<String> labels = new ArrayList<String>();
                 for (final CAPTCHA_TYPE type : allTypes) {
                     if (selected.contains(type)) {
@@ -663,7 +663,7 @@ public class CaptchaRulesTableModel extends ExtTableModel<CaptchaChallengeFilter
                  */
                 final ExtTableModel<CaptchaChallengeFilter> outerModel = getModel();
                 /* CAPTCHA_TYPE has no LabelInterface, so the per-item label comes from getDisplayName() (same as SolverComparisonContainer). */
-                final MultiComboBox<CAPTCHA_TYPE> comp = new MultiComboBox<CAPTCHA_TYPE>(CaptchaType.getProcessableCaptchaTypes()) {
+                final MultiComboBox<CAPTCHA_TYPE> comp = new MultiComboBox<CAPTCHA_TYPE>(new ArrayList<CAPTCHA_TYPE>(CaptchaType.getProcessableCaptchaTypes())) {
                     {
                         setSelectedItems(new ArrayList<CAPTCHA_TYPE>(getIncludedCaptchaTypes(rule)));
                     }

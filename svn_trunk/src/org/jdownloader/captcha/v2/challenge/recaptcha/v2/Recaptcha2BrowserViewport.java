@@ -6,6 +6,7 @@ import java.awt.event.InputEvent;
 
 import org.appwork.swing.components.tooltips.ToolTipController;
 import org.appwork.utils.os.CrossSystem;
+import org.jdownloader.captcha.v2.solver.browser.BrowserSolver;
 import org.jdownloader.captcha.v2.solver.browser.BrowserViewport;
 import org.jdownloader.captcha.v2.solver.browser.BrowserWindow;
 
@@ -41,9 +42,11 @@ public abstract class Recaptcha2BrowserViewport extends BrowserViewport {
         // first click ensure focus
         getRobot().mousePress(InputEvent.BUTTON1_MASK);
         getRobot().mouseRelease(InputEvent.BUTTON1_MASK);
+        BrowserSolver.getInstance().markAutoClick();
         // second click: press button
         getRobot().mousePress(InputEvent.BUTTON1_MASK);
         getRobot().mouseRelease(InputEvent.BUTTON1_MASK);
+        BrowserSolver.getInstance().markAutoClick();
         if (oldloc != null) {
             getRobot().mouseMove(oldloc.x, oldloc.y);
         }

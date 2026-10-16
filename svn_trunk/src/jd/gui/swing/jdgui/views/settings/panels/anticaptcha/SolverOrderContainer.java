@@ -2,6 +2,7 @@ package jd.gui.swing.jdgui.views.settings.panels.anticaptcha;
 
 import java.awt.Container;
 import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseWheelEvent;
@@ -10,8 +11,10 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.swing.ButtonGroup;
+import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JLabel;
@@ -31,6 +34,7 @@ import org.jdownloader.actions.AppAction;
 import org.jdownloader.captcha.v2.CaptchaSolverCaptchaTypesSettingsPanelBuilder;
 import org.jdownloader.captcha.v2.CaptchaSolverCaptchaTypesSettingsPanelBuilder.SolverServiceCaptchaTypeAccessor;
 import org.jdownloader.captcha.v2.CaptchaSolverLimitRule;
+import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
 import org.jdownloader.captcha.v2.SolverService;
 import org.jdownloader.captcha.v2.solver.service.BrowserSolverService;
 import org.jdownloader.gui.IconKey;
@@ -52,7 +56,7 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
     private JScrollPane                detailScrollPane;
     private JLabel                     detailLabel;
     private JLabel                     descriptionLabel;
-    private JLabel                     limitsLabel;
+    private MigPanel                   limitsPanel;
     private JLabel                     settingsLabel;
     private JScrollPane                configScrollPane;
     private MigPanel                   displayModePanel;
@@ -142,9 +146,10 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
         passMouseWheelToParent(detailScrollPane);
         add(detailScrollPane, "gaptop 6, growx, gapright 40, wrap");
         /* Server-side limits info line, shown below the captcha-types table for plugin-based (account) solvers only. */
-        limitsLabel = new JLabel();
-        limitsLabel.setVisible(false);
-        add(limitsLabel, "gaptop 6, wrap");
+        limitsPanel = new MigPanel("ins 0, wrap 1, gapy 2", "[]", "[]");
+        SwingUtils.setOpaque(limitsPanel, false);
+        limitsPanel.setVisible(false);
+        add(limitsPanel, "gaptop 12, wrap");
         /* "<solver> Settings" section header (gear icon) shown BELOW the captcha-types table, above the config panel. */
         settingsLabel = new JLabel("Settings", NewTheme.I().getIcon(IconKey.ICON_SETTINGS, 18), JLabel.LEADING);
         settingsLabel.setVisible(false);
@@ -207,7 +212,7 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
                     detailLabel.setVisible(false);
                     descriptionLabel.setVisible(false);
                     displayModePanel.setVisible(false);
-                    limitsLabel.setVisible(false);
+                    limitsPanel.setVisible(false);
                     settingsLabel.setVisible(false);
                     detailScrollPane.setVisible(false);
                     detailTable = null;
@@ -250,10 +255,23 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
                         final String maxPollingText = maxPollingMillis == Long.MAX_VALUE ? "~" : String.valueOf(maxPollingMillis / 1000L);
                         final long minPollingIntervalMillis = pluginSolver.getServerSideMinPollingIntervalMillis();
                         final String minPollingIntervalText = minPollingIntervalMillis <= 0 ? "~" : (minPollingIntervalMillis % 1000 == 0 ? String.valueOf(minPollingIntervalMillis / 1000) : String.valueOf(minPollingIntervalMillis / 1000.0d));
-                        limitsLabel.setText("<html>Max concurrent captcha threads per account: " + maxThreadsText + "<br>Server side max polling time: " + maxPollingText + "s<br>Server side min polling interval: " + minPollingIntervalText + (minPollingIntervalMillis <= 0 ? "" : "s") + "</html>");
-                        limitsLabel.setVisible(true);
+                        limitsPanel.removeAll();
+                        final JLabel limitsHeader = new JLabel("Other Features & Limits");
+                        limitsHeader.setFont(limitsHeader.getFont().deriveFont(Font.BOLD));
+                        limitsPanel.add(limitsHeader, "gapbottom 2");
+                        final Icon clockIcon = NewTheme.I().getIcon(IconKey.ICON_WAIT, 16);
+                        limitsPanel.add(new JLabel("Max concurrent captcha threads per account: " + maxThreadsText, NewTheme.I().getIcon(IconKey.ICON_PARALELL, 16), JLabel.LEADING));
+                        limitsPanel.add(new JLabel("Server side max polling time: " + maxPollingText + (maxPollingMillis == Long.MAX_VALUE ? "" : "s"), clockIcon, JLabel.LEADING));
+                        limitsPanel.add(new JLabel("Server side min polling interval: " + minPollingIntervalText + (minPollingIntervalMillis <= 0 ? "" : "s"), clockIcon, JLabel.LEADING));
+                        final Set<FeedbackType> feedbackTypes = pluginSolver.getSupportedFeedbackTypes();
+                        for (final FeedbackType type : FeedbackType.values()) {
+                            final boolean supported = feedbackTypes != null && feedbackTypes.contains(type);
+                            limitsPanel.add(new JLabel(type.getLabel(), NewTheme.I().getIcon(supported ? IconKey.ICON_TRUE : IconKey.ICON_FALSE, 16), JLabel.LEADING));
+                        }
+                        limitsPanel.revalidate();
+                        limitsPanel.setVisible(true);
                     } else {
-                        limitsLabel.setVisible(false);
+                        limitsPanel.setVisible(false);
                     }
                     /* Show the selected solver's config below the table (plugin config if available, else the local solver's config). */
                     /* Built generically from the solver's V3 config interface, just like plugin config panels. */
@@ -518,9 +536,9 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
             }
             /* gaptop 6 above the captcha-types table. */
             height += 6 + detailTableFullHeight();
-            if (limitsLabel.isVisible()) {
+            if (limitsPanel.isVisible()) {
                 /* gaptop 6 above the limits info line. */
-                height += 6 + limitsLabel.getPreferredSize().height;
+                height += 6 + limitsPanel.getPreferredSize().height;
             }
             if (settingsLabel.isVisible()) {
                 /* gaptop 12 above the "Settings" header. */

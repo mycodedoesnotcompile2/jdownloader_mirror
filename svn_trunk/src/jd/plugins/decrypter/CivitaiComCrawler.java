@@ -48,7 +48,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.CivitaiCom;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 53076 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53655 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { CivitaiCom.class })
 public class CivitaiComCrawler extends PluginForDecrypt {
     /* Docs: https://developer.civitai.com/site/reference/ */
@@ -200,7 +200,10 @@ public class CivitaiComCrawler extends PluginForDecrypt {
                 fp.setName(modelVersionName);
             }
             fp.setPackageKey("civitai://model/modelVersion/" + modelVersionId);
-            final List<Map<String, Object>> files = (List<Map<String, Object>>) entries.get("files");
+            List<Map<String, Object>> files = (List<Map<String, Object>>) entries.get("files");
+            if (files == null) {
+                files = new ArrayList<Map<String, Object>>();
+            }
             for (final Map<String, Object> file : files) {
                 final Map<String, Object> hashes = (Map<String, Object>) file.get("hashes");
                 final String downloadurl = file.get("downloadUrl").toString();
@@ -232,7 +235,10 @@ public class CivitaiComCrawler extends PluginForDecrypt {
                 // }
                 thisRet.add(link);
             }
-            final List<Map<String, Object>> images = (List<Map<String, Object>>) entries.get("images");
+            List<Map<String, Object>> images = (List<Map<String, Object>>) entries.get("images");
+            if (images == null) {
+                images = new ArrayList<Map<String, Object>>();
+            }
             for (final Map<String, Object> image : images) {
                 final String directurl = image.get("url").toString();
                 final String imageID = new Regex(directurl, "(\\d+)\\.[a-z]+$").getMatch(0);

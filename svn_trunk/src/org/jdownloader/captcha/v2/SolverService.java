@@ -1,5 +1,6 @@
 package org.jdownloader.captcha.v2;
 
+import java.util.Set;
 import java.util.Currency;
 import java.util.List;
 
@@ -19,7 +20,7 @@ public interface SolverService {
      * Captcha types supported by this solver. Must never return null or an empty list: a solver that does not declare any supported
      * captcha type cannot solve anything, so null/empty is treated as a bug in the solver implementation (it does NOT mean "supports all").
      */
-    public abstract List<CAPTCHA_TYPE> getSupportedCaptchaTypes();
+    public abstract Set<CAPTCHA_TYPE> getSupportedCaptchaTypes();
 
     /** Total account balance of this solver across its valid accounts, or null if this solver has no balance. */
     public abstract Double getBalance();

@@ -1,5 +1,7 @@
 package org.jdownloader.captcha.v2.challenge.oauth;
 
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,9 +38,9 @@ public class AccountOAuthSolver extends ChallengeSolver<Boolean> {
     }
 
     @Override
-    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+    public Set<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
         /* OAuth challenges are no captchas and have no CAPTCHA_TYPE, so this solver legitimately supports no captcha type. */
-        return new ArrayList<CAPTCHA_TYPE>();
+        return EnumSet.noneOf(CAPTCHA_TYPE.class);
     }
 
     private AccountOAuthSolver() {

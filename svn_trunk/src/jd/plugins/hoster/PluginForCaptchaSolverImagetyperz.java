@@ -4,6 +4,8 @@ import java.awt.Color;
 import java.awt.Container;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Currency;
@@ -20,11 +22,11 @@ import javax.swing.JPanel;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter.HighlightPainter;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtPasswordField;
 import org.appwork.swing.components.ExtTextField;
 import org.appwork.swing.components.ExtTextHighlighter;
-import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.AbstractResponse;
@@ -49,7 +51,6 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.gui.swing.components.linkbutton.JLink;
-import jd.http.Browser;
 import jd.http.Cookies;
 import jd.http.Request;
 import jd.plugins.Account;
@@ -62,7 +63,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 53620 $", interfaceVersion = 3, names = { "imagetyperz.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53649 $", interfaceVersion = 3, names = { "imagetyperz.com" }, urls = { "" })
 public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -79,34 +80,25 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
     private static final int    ACCOUNT_LOGIN_TYPE_USER_AND_PASSWORD = 1;
 
     @Override
-    public Browser createNewBrowserInstance() {
-        final Browser br = super.createNewBrowserInstance();
-        br.getHeaders().put("User-Agent", "JDownloader");
-        br.setFollowRedirects(true);
-        return br;
-    }
-
-    @Override
     public String getBuyPremiumUrl() {
         return this.getBaseURL() + "/Forms/Registration.aspx";
     }
 
     @Override
-    public List<FeedbackType> getSupportedFeedbackTypes() {
-        final List<FeedbackType> types = new ArrayList<FeedbackType>();
-        types.add(FeedbackType.REPORT_INVALID_CAPTCHAS);
-        return types;
+    public Set<FeedbackType> getSupportedFeedbackTypes() {
+        return EnumSet.of(FeedbackType.REPORT_INVALID_CAPTCHAS);
     }
 
     @Override
-    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
-        final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
+    public Set<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+        final Set<CAPTCHA_TYPE> types = EnumSet.noneOf(CAPTCHA_TYPE.class);
         /**
          * Their API also supports GeeTest, Capy, FunCaptcha, TikTok and "Task" captchas. Those are not added since the matching JD
          * challenges do not provide the required parameters (e.g. GeeTest "challenge" and "gt").
          */
         types.add(CAPTCHA_TYPE.IMAGE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V3_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
@@ -175,7 +167,7 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
             }
             try {
                 final Request req = br.createPostRequest(this.getApiBase() + path, query);
-                callAPI(req);
+                callAPI(req, currentLoginType);
                 account.setProperty(PROPERTY_ACCOUNT_LOGIN_TYPE, currentLoginType);
                 break;
             } catch (final PluginException pe) {
@@ -287,7 +279,8 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
         } else {
             throw new IllegalArgumentException("Unexpected captcha challenge type");
         }
-        this.callAPI(br.createPostRequest(this.getApiBase() + uploadPath, uploadQuery));
+        final int loginType = tokenLogin ? ACCOUNT_LOGIN_TYPE_AUTHTOKEN : ACCOUNT_LOGIN_TYPE_USER_AND_PASSWORD;
+        this.callAPI(br.createPostRequest(this.getApiBase() + uploadPath, uploadQuery), loginType);
         final String responseText = br.getRequest().getHtmlCode().trim();
         String solution = null;
         final String captchaID;
@@ -300,7 +293,16 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
             captchaID = idAndSolution[0];
             solution = idAndSolution[1];
         } else {
-            captchaID = responseText;
+            if (responseText.startsWith("[{\"")) {
+                /*
+                 * Response can also be a JSON array like [{"CaptchaId": "123456789"}], e.g. for Cloudflare Turnstile and hCaptcha captchas.
+                 */
+                final List<Object> list = restoreFromString(responseText, TypeRef.LIST);
+                final Map<String, Object> entries = (Map<String, Object>) list.get(0);
+                captchaID = entries.get("CaptchaId").toString();
+            } else {
+                captchaID = responseText;
+            }
             if (!captchaID.matches("\\d+")) {
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA, "Invalid captcha_id format or invalid response");
             }
@@ -313,7 +315,7 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
             final String pollingURL = this.getApiBase() + "/captchaapi/GetCaptchaResponseJson.ashx?" + pollingQuery.toString();
             while (true) {
                 waitDuringPolling(job.getChallenge(), account);
-                this.callAPI(br.createGetRequest(pollingURL));
+                this.callAPI(br.createGetRequest(pollingURL), loginType);
                 final String pollResponse = br.getRequest().getHtmlCode().trim();
                 if (!pollResponse.startsWith("{") && !pollResponse.startsWith("[")) {
                     /* Plain text response such as "ERROR: NOT_DECODED" (not solved yet) -> Continue */
@@ -354,7 +356,7 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
         query.appendEncoded("imageid", response.getCaptchaSolverTaskID());
         final String path = this.isLoginViaAuthtoken(account) ? "/Forms/SetBadImageToken.ashx" : "/Forms/SetBadImage.ashx";
         try {
-            this.callAPI(br.createPostRequest(this.getApiBase() + path, query));
+            this.callAPI(br.createPostRequest(this.getApiBase() + path, query), this.isLoginViaAuthtoken(account) ? ACCOUNT_LOGIN_TYPE_AUTHTOKEN : ACCOUNT_LOGIN_TYPE_USER_AND_PASSWORD);
             /* Success response is "SUCCESS" */
             return "SUCCESS".equalsIgnoreCase(br.getRequest().getHtmlCode().trim());
         } catch (final Exception e) {
@@ -397,7 +399,6 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
         map.put("INVALID_PASSWORD", "No password was provided.");
         map.put("INVALID_AFFILIATEID", "No affiliate ID was provided.");
         map.put("INVALID_IMAGE_FILE", "No file was uploaded, or the uploaded file is not an image.");
-        map.put("AUTHENTICATION_FAILED", "The provided username and password are invalid.");
         map.put("INVALID_IMAGE_SIZE_30_KB", "The uploaded image file must not be larger than 30 KB.");
         map.put("UNKNOWN", "Unknown error at the captcha service. Please try again.");
         map.put("NOT_DECODED", "The captcha has not been solved yet.");
@@ -414,7 +415,15 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
     }
 
     /** Returns the human readable message for an API error token, or a generic fallback containing the raw token when unknown. */
-    private static String getHumanReadableErrorMessage(final String errorToken) {
+    private static String getHumanReadableErrorMessage(final String errorToken, final int loginType) {
+        if (errorToken.equalsIgnoreCase("AUTHENTICATION_FAILED")) {
+            /* Error message depends on the login method used. */
+            if (loginType == ACCOUNT_LOGIN_TYPE_AUTHTOKEN) {
+                return "The provided API token is invalid.";
+            } else {
+                return "The provided username and/or password are invalid.";
+            }
+        }
         final String message = ERROR_MESSAGES.get(errorToken.toUpperCase(Locale.ENGLISH));
         if (message != null) {
             return message;
@@ -428,7 +437,11 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
         return token.equals("AUTHENTICATION_FAILED") || token.equals("INVALID_USERNAME") || token.equals("INVALID_PASSWORD") || token.equals("INVALID_TOKEN");
     }
 
-    private void callAPI(final Request req) throws Exception {
+    /**
+     * @param loginType
+     *            One of ACCOUNT_LOGIN_TYPE_*, the login method used for this request.
+     */
+    private void callAPI(final Request req, final int loginType) throws Exception {
         br.getPage(req);
         String error = br.getRegex("^ERROR:(.+)").getMatch(0);
         if (error == null) {
@@ -443,7 +456,7 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
              */
             return;
         }
-        final String message = getHumanReadableErrorMessage(error);
+        final String message = getHumanReadableErrorMessage(error, loginType);
         /* Credential/authentication related errors -> mark the account as invalid. */
         if (this.getPluginEnvironment() == PluginEnvironment.ACCOUNT_CHECK || isAccountError(error)) {
             throw new AccountInvalidException(message);

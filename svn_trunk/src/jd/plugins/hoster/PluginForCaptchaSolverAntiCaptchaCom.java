@@ -1,5 +1,7 @@
 package jd.plugins.hoster;
 
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.Currency;
 import java.util.HashMap;
@@ -41,7 +43,7 @@ import jd.plugins.PluginException;
 /**
  * Captcha solver plugin for anti-captcha.com: https://anti-captcha.com/apidoc
  */
-@HostPlugin(revision = "$Revision: 53615 $", interfaceVersion = 3, names = { "anti-captcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53649 $", interfaceVersion = 3, names = { "anti-captcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverAntiCaptchaCom extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -58,13 +60,13 @@ public class PluginForCaptchaSolverAntiCaptchaCom extends abstractPluginForCaptc
     }
 
     @Override
-    public List<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
+    public Set<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
         /*
          * List of task types anti-captcha.com's API offers: https://anti-captcha.com/apidoc (confirmed 2026-09-24). Only types with a
          * matching solve() branch are declared here -- declaring one without a matching branch would make solve() throw
          * IllegalArgumentException for such a challenge.
          */
-        final List<CAPTCHA_TYPE> types = new ArrayList<CAPTCHA_TYPE>();
+        final Set<CAPTCHA_TYPE> types = EnumSet.noneOf(CAPTCHA_TYPE.class);
         types.add(CAPTCHA_TYPE.IMAGE);
         /*
          * 2026-10-12: Click captchas are solved via "ImageToCoordinatesTask" (2captcha calls this "CoordinatesTask", which anti-captcha
@@ -95,15 +97,12 @@ public class PluginForCaptchaSolverAntiCaptchaCom extends abstractPluginForCaptc
     }
 
     @Override
-    public List<FeedbackType> getSupportedFeedbackTypes() {
+    public Set<FeedbackType> getSupportedFeedbackTypes() {
         /*
          * Invalid: image captchas + reCaptcha. Valid: reCaptcha only. Aborting captchas is not supported by the API. See
          * sendCaptchaFeedback() for details.
          */
-        final List<FeedbackType> types = new ArrayList<FeedbackType>();
-        types.add(FeedbackType.REPORT_INVALID_CAPTCHAS);
-        types.add(FeedbackType.REPORT_VALID_CAPTCHAS);
-        return types;
+        return EnumSet.of(FeedbackType.REPORT_INVALID_CAPTCHAS, FeedbackType.REPORT_VALID_CAPTCHAS);
     }
 
     @Override
