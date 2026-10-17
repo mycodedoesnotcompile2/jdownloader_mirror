@@ -17,26 +17,6 @@ import java.util.zip.ZipInputStream;
 
 import javax.swing.Icon;
 
-import jd.controlling.linkchecker.LinkChecker;
-import jd.controlling.linkcollector.LinkCollectingJob;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings;
-import jd.controlling.linkcollector.LinkCollector.JobLinkCrawler;
-import jd.controlling.linkcollector.LinkCollector.MoveLinksMode;
-import jd.controlling.linkcollector.LinkOrigin;
-import jd.controlling.linkcrawler.CheckableLink;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledLinkModifier;
-import jd.controlling.linkcrawler.CrawledLinkModifiers;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.linkcrawler.CrawledPackageView;
-import jd.controlling.linkcrawler.modifier.CommentModifier;
-import jd.controlling.linkcrawler.modifier.DownloadFolderModifier;
-import jd.controlling.linkcrawler.modifier.PackageNameModifier;
-import jd.plugins.DecrypterRetryException.RetryReason;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-
 import org.appwork.remoteapi.exceptions.BadParameterException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -66,6 +46,26 @@ import org.jdownloader.myjdownloader.client.bindings.UrlDisplayTypeStorable;
 import org.jdownloader.myjdownloader.client.bindings.interfaces.LinkgrabberInterface;
 import org.jdownloader.myjdownloader.client.json.JsonMap;
 import org.jdownloader.settings.GeneralSettings;
+
+import jd.controlling.linkchecker.LinkChecker;
+import jd.controlling.linkcollector.LinkCollectingJob;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings;
+import jd.controlling.linkcollector.LinkCollector.JobLinkCrawler;
+import jd.controlling.linkcollector.LinkCollector.MoveLinksMode;
+import jd.controlling.linkcollector.LinkOrigin;
+import jd.controlling.linkcrawler.CheckableLink;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledLinkModifier;
+import jd.controlling.linkcrawler.CrawledLinkModifiers;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.linkcrawler.CrawledPackageView;
+import jd.controlling.linkcrawler.modifier.CommentModifier;
+import jd.controlling.linkcrawler.modifier.DownloadFolderModifier;
+import jd.controlling.linkcrawler.modifier.PackageNameModifier;
+import jd.plugins.DecrypterRetryException.RetryReason;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
 
 public class LinkCollectorAPIImplV2 implements LinkCollectorAPIV2 {
     private LogSource                                                 logger;
@@ -206,7 +206,6 @@ public class LinkCollectorAPIImplV2 implements LinkCollectorAPIV2 {
             } else {
                 matched = lc.getPackagesCopy();
             }
-
             if (queryParams.getJobUUIDs() != null && queryParams.getJobUUIDs().length > 0) {
                 final Set<Long> jobUUIDs = new HashSet<Long>();
                 for (final long id : queryParams.getJobUUIDs()) {
@@ -473,7 +472,7 @@ public class LinkCollectorAPIImplV2 implements LinkCollectorAPIV2 {
                         } else if (!tmp.getParentFile().exists() && !tmp.getParentFile().mkdirs()) {
                             throw new IOException("Failed to create tmp folder:" + tmp.getParentFile());
                         }
-                        final InputStream is = IO.dataUrlToInputStream(dataURL);
+                        final InputStream is = IO.dataUrlToInputStream(new Regex(dataURL, "data:application/" + extension + ";(.+)").getMatch(0));
                         final FileOutputStream fos = new FileOutputStream(tmp);
                         try {
                             final byte[] buf = new byte[8192];

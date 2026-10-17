@@ -6,6 +6,7 @@ import java.io.OutputStream;
 
 import javax.swing.JFrame;
 
+import org.appwork.jna.windows.JNAOptions;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.logging2.extmanager.Log;
 import org.jdownloader.crosssystem.windows.apache.sanselan.BinaryConstants;
@@ -27,7 +28,6 @@ import com.sun.jna.platform.win32.WinDef.HWND;
 import com.sun.jna.platform.win32.WinNT;
 import com.sun.jna.ptr.PointerByReference;
 import com.sun.jna.win32.StdCallLibrary;
-import com.sun.jna.win32.W32APIOptions;
 
 /**
  * Copyright 2000-2012 JetBrains s.r.o.
@@ -75,7 +75,7 @@ public class Win7TaskBar {
     private static Function               mySetOverlayIcon;
 
     public interface User32Ex extends StdCallLibrary {
-        User32Ex INSTANCE = Native.load("user32", User32Ex.class, W32APIOptions.DEFAULT_OPTIONS);
+        User32Ex INSTANCE = Native.load("user32", User32Ex.class, JNAOptions.SYSTEM_DLLS_ONLY);
 
         int LookupIconIdFromDirectoryEx(Memory presbits, boolean fIcon, int cxDesired, int cyDesired, int Flags);
 

@@ -51,7 +51,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 53530 $", interfaceVersion = 3, names = { "dailyleech.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53670 $", interfaceVersion = 3, names = { "dailyleech.com" }, urls = { "" })
 public class DailyleechCom extends PluginForHost {
     /** DailyLeech Link API v1, see DAILYLEECH_LINK_API.md */
     private static final String          API_BASE                   = "https://dailyleech.com/v2/api/v1/";
@@ -448,22 +448,20 @@ public class DailyleechCom extends PluginForHost {
             ai.setExpired(true);
         }
         /* Status line. */
-        final Map<String, Object> submit = (Map<String, Object>) me.get("submit");
-        if (submit != null && !Boolean.TRUE.equals(submit.get("open"))) {
-            final StringBuilder status = new StringBuilder();
-            status.append(premium ? "Premium" : "Free");
-            status.append(" | Submitting currently disabled");
-            ai.setStatus(status.toString());
-            ai.setTrafficLeft(0);
-            return ai;
-        }
         /* quota is null for a non-premium account or when usage could not be read. */
         final Map<String, Object> quota = (Map<String, Object>) me.get("quota");
         if (quota != null) {
-            ai.setTrafficLeft(((Number) quota.get("traffic_left_bytes")).longValue());
+            final long trafficLeft = ((Number) quota.get("traffic_left_bytes")).longValue();
+            if (trafficLeft <= 0) {
+                /* Daily traffic used up -> account is unavailable until the quota resets. */
+                final long resetInSeconds = ((Number) quota.get("reset_in_seconds")).longValue();
+                throw new AccountUnavailableException("Daily traffic limit reached", resetInSeconds * 1000l);
+            }
+            ai.setTrafficLeft(trafficLeft);
         } else if (premium) {
             ai.setUnlimitedTraffic();
         } else {
+            /* Not a premium account -> Assume zero traffic left */
             ai.setTrafficLeft(0);
         }
         /* Supported hosts: use the public hosts.php list and overlay today's per-host usage from me.php. */

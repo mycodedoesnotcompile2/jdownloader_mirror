@@ -530,9 +530,11 @@ public class ChallengeResponseController {
             logger.info("Solving Done. Result: " + response);
             return job;
         } catch (InterruptedException e) { // for example downloads have been stopped
+            job.setInterrupted();
             job.kill();
             throw e;
         } finally {
+            logger.info("Job finished with status " + job.getStatus() + ": " + job);
             try {
                 synchronized (activeJobs) {
                     activeJobs.remove(job);

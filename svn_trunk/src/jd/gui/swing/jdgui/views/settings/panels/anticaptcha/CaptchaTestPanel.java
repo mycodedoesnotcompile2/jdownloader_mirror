@@ -389,7 +389,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                 startMultiTest();
             }
         });
-        multiCancelButton = new JButton("Cancel all");
+        multiCancelButton = new JButton("Cancel all", NewTheme.I().getIcon(IconKey.ICON_FALSE, 16));
         multiCancelButton.setEnabled(false);
         multiCancelButton.addActionListener(new ActionListener() {
             @Override
@@ -495,16 +495,13 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                 }
             }
         });
-        retryButton = new JButton("Retry");
+        retryButton = new JButton("Retry", NewTheme.I().getIcon(IconKey.ICON_REFRESH, 16));
         retryButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(final ActionEvent e) {
                 final TestRun run = selectedRun;
                 if (run != null) {
-                    run.reset();
-                    final List<TestRun> runs = new ArrayList<TestRun>();
-                    runs.add(run);
-                    startBatch(runs, false);
+                    retryRun(run);
                 }
             }
         });
@@ -1052,15 +1049,15 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                     finishRun(run, RunState.PASSED_UNEXPECTED_ANSWER, answer, solvedBy + " | does NOT match the expected result");
                 }
             } else {
-                finishRun(run, RunState.FAILED, "No answer received (skipped/timed out/killed).", null);
+                finishRun(run, RunState.FAILED, "No answer received (job status: " + job.getStatus() + ")", null);
             }
         } catch (final InterruptedException e) {
             finishRun(run, RunState.FAILED, batchCancelled ? "Cancelled" : "Aborted", null);
         } catch (final SkipException e) {
-            finishRun(run, RunState.FAILED, batchCancelled ? "Cancelled" : (run.aborted ? "Aborted" : "Skipped: " + e.getMessage()), null);
+            finishRun(run, RunState.FAILED, batchCancelled ? "Cancelled" : (run.aborted ? "Aborted" : "Skipped: " + e.getSkipRequest()), null);
         } catch (final Throwable e) {
             LogController.CL().log(e);
-            finishRun(run, RunState.FAILED, batchCancelled ? "Cancelled" : "Failed: " + e.getMessage(), null);
+            finishRun(run, RunState.FAILED, batchCancelled ? "Cancelled" : "Failed: " + e.getClass().getSimpleName() + ": " + e.getMessage(), null);
         } finally {
             run.thread = null;
             run.challenge = null;
@@ -1195,6 +1192,19 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         userSorted = false;
     }
 
+    /** A finished test can be run again, but not while another test is running. */
+    private boolean isRetryable(final TestRun run) {
+        return !batchRunning && !isCancellable(run);
+    }
+
+    /** Runs the given (finished) test again with the same input. */
+    private void retryRun(final TestRun run) {
+        run.reset();
+        final List<TestRun> runs = new ArrayList<TestRun>();
+        runs.add(run);
+        startBatch(runs, false);
+    }
+
     /** True while a test is waiting for its turn or running, i.e. it can still be cancelled. */
     private static boolean isCancellable(final TestRun run) {
         return run.state == RunState.PENDING || run.state == RunState.RUNNING;
@@ -1240,7 +1250,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         incorrectButton.setText(run.incorrectUnsupported ? "Incorrect (unsupported)" : "Incorrect");
         incorrectButton.setForeground(run.incorrectUnsupported ? Color.RED : defaultButtonForeground);
         abortButton.setEnabled(state == RunState.PENDING || state == RunState.RUNNING);
-        retryButton.setEnabled(!batchRunning && state != RunState.PENDING && state != RunState.RUNNING);
+        retryButton.setEnabled(isRetryable(run));
         runPanel.revalidate();
         revalidate();
     }
@@ -1603,6 +1613,16 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                     }
                 });
                 popup.add(cancel);
+                /* Only for finished tests. */
+                final JMenuItem retry = new JMenuItem("Retry", NewTheme.I().getIcon(IconKey.ICON_REFRESH, 16));
+                retry.setEnabled(isRetryable(contextObject));
+                retry.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(final ActionEvent event) {
+                        retryRun(contextObject);
+                    }
+                });
+                popup.add(retry);
                 popup.addSeparator();
                 /* Copies the line of the test the right click was made on (all columns, separated by tabs). */
                 final JMenuItem copyRow = new JMenuItem("Copy row");

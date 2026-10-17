@@ -1,13 +1,11 @@
 package jd.plugins.hoster;
 
-import java.util.EnumSet;
-import java.util.Set;
-import java.util.ArrayList;
 import java.util.Currency;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
@@ -45,7 +43,7 @@ import jd.plugins.PluginException;
  * The API is similar to the one of anti-captcha.com/2captcha.com (createTask/getTaskResult) but has its own task types and feedback
  * methods.
  */
-@HostPlugin(revision = "$Revision: 53649 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53673 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
 public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -74,7 +72,7 @@ public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCapt
          */
         // types.add(CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA);
         // types.add(CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
-        /* 2026-10-07: Works according to them but failed for me. */
+        /* 2026-10-16: hCaptcha is not supported. */
         types.add(CAPTCHA_TYPE.HCAPTCHA);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);

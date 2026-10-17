@@ -24,6 +24,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import jd.controlling.ClipboardMonitoring.ClipboardChangeDetector.CHANGE_FLAG;
+import jd.controlling.linkcollector.LinkCollectingJob;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcollector.LinkOrigin;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledLinkModifier;
+import jd.parser.html.HTMLParser;
+
 import org.appwork.utils.CharSequenceUtils;
 import org.appwork.utils.IO;
 import org.appwork.utils.IO.BOM;
@@ -37,14 +45,6 @@ import org.jdownloader.controlling.PasswordUtils;
 import org.jdownloader.gui.views.components.packagetable.dragdrop.PackageControllerTableTransferable;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
-
-import jd.controlling.ClipboardMonitoring.ClipboardChangeDetector.CHANGE_FLAG;
-import jd.controlling.linkcollector.LinkCollectingJob;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcollector.LinkOrigin;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledLinkModifier;
-import jd.parser.html.HTMLParser;
 
 public class ClipboardMonitoring {
     public static class HTMLFragment {
@@ -99,17 +99,20 @@ public class ClipboardMonitoring {
         }
 
         private boolean equals(final HTMLFragment fragment) {
-            if (fragment != null) {
-                return equals(fragment.getFragment());
-            } else {
-                return equals((String) null);
+            if (fragment == null) {
+                return equalsNull();
             }
+            return equals(fragment.getFragment());
+        }
+
+        private boolean equalsNull() {
+            return length == -1 && hash == 0;
         }
 
         @Override
         public boolean equals(Object obj) {
             if (obj == null) {
-                return false;
+                return equalsNull();
             } else if (obj == this) {
                 return true;
             } else if (obj instanceof String) {
@@ -125,10 +128,9 @@ public class ClipboardMonitoring {
 
         private boolean equals(String string) {
             if (string == null) {
-                return length == -1 && hash == 0;
-            } else {
-                return length == string.length() && hash == string.hashCode();
+                return equalsNull();
             }
+            return length == string.length() && hash == string.hashCode();
         }
     }
 
@@ -265,9 +267,9 @@ public class ClipboardMonitoring {
         }
     }
 
-    private static final ClipboardMonitoring INSTANCE = new ClipboardMonitoring();
-    private static final DataFlavor          URLFLAVOR;
-    private static final DataFlavor          URILISTFLAVOR;
+    private static final ClipboardMonitoring                                                 INSTANCE            = new ClipboardMonitoring();
+    private static final DataFlavor                                                          URLFLAVOR;
+    private static final DataFlavor                                                          URILISTFLAVOR;
     static {
         DataFlavor ret = null;
         try {

@@ -13,16 +13,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.encoding.URLEncode.Decoder;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.BunkrConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
@@ -41,7 +31,17 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BunkrAlbum;
 
-@HostPlugin(revision = "$Revision: 53578 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.encoding.URLEncode.Decoder;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.BunkrConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@HostPlugin(revision = "$Revision: 53668 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -62,13 +62,12 @@ public class Bunkr extends PluginForHost {
             return fid;
         }
         fid = getFID(link);
-        if (fid != null) {
-            fid = "bunkr://" + fid;
-            link.setProperty(PROPERTY_LAST_KNOWN_FID, fid);
-            return fid;
-        } else {
+        if (fid == null) {
             return super.getMirrorID(link);
         }
+        fid = "bunkr://" + fid;
+        link.setProperty(PROPERTY_LAST_KNOWN_FID, fid);
+        return fid;
     }
 
     @Override
@@ -78,13 +77,12 @@ public class Bunkr extends PluginForHost {
             return fid;
         }
         fid = getFID(link);
-        if (fid != null) {
-            fid = "bunkr://" + fid;
-            link.setProperty(PROPERTY_LAST_KNOWN_FID, fid);
-            return fid;
-        } else {
+        if (fid == null) {
             return super.getLinkID(link);
         }
+        fid = "bunkr://" + fid;
+        link.setProperty(PROPERTY_LAST_KNOWN_FID, fid);
+        return fid;
     }
 
     @Override
@@ -151,10 +149,9 @@ public class Bunkr extends PluginForHost {
         final int max = getMaxSimultaneousFreeAnonymousDownloads();
         if (max == -1) {
             return -1;
-        } else {
-            final int running = freeRunning.get();
-            return running + 1;
         }
+        final int running = freeRunning.get();
+        return running + 1;
     }
 
     private int getMaxSimultaneousFreeAnonymousDownloads() {
@@ -202,9 +199,8 @@ public class Bunkr extends PluginForHost {
         }
         if (filenameFromURL != null) {
             return Encoding.htmlDecode(filenameFromURL).trim();
-        } else {
-            return null;
         }
+        return null;
     }
 
     private String getFidFromURL(final String url) {
@@ -259,14 +255,6 @@ public class Bunkr extends PluginForHost {
         return "https://" + getHost() + "/f/" + filename;
     }
 
-    private String generateSingleImageURL(final String filename) {
-        return "https://" + getHost() + "/i/" + filename;
-    }
-
-    private String generateSingleVideoURL(final String filename) {
-        return "https://" + getHost() + "/v/" + filename;
-    }
-
     private boolean isExpired(final String url) throws IOException {
         final UrlQuery query = UrlQuery.parse(url);
         final String ex = query.get("ex");
@@ -276,9 +264,8 @@ public class Bunkr extends PluginForHost {
         final long expireOn = Long.parseLong(ex) * 1000;
         if (System.currentTimeMillis() + (5 * 60 * 1000) < expireOn) {
             return false;
-        } else {
-            return true;
         }
+        return true;
     }
 
     @Override
@@ -920,11 +907,13 @@ public class Bunkr extends PluginForHost {
         } else if (con.getResponseCode() == 416) {
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Error 416", 30 * 1000l);
         } else if (con.getResponseCode() == 429) {
-            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Error 429 too many requests", 30 * 1000l);
+            // per server, not globally for hoster
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Error 429 too many requests", TimeUnit.MINUTES.toMillis(1));
         } else if (con.getResponseCode() == 502) {
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Error 502 Bad Gateway", 60 * 1000l);
         } else if (con.getResponseCode() == 503) {
-            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Error 503 too many connections", 60 * 1000l);
+            // per server, not globally for hoster
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Error 503 too many connections", TimeUnit.MINUTES.toMillis(2));
         }
     }
 

@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.appwork.storage.config.JsonConfig;
+import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.Time;
 import org.appwork.utils.logging2.LogSource;
@@ -22,11 +23,68 @@ import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
 import org.jdownloader.captcha.v2.ChallengeSolver;
 import org.jdownloader.captcha.v2.ValidationResult;
+import org.jdownloader.gui.translate._GUI;
 
 import jd.controlling.captcha.CaptchaSettings;
 import jd.controlling.captcha.SkipRequest;
 
 public class SolverJob<T> {
+    /**
+     * Status of a {@link SolverJob} as a whole, see {@link SolverJob#getStatus()}. It says nothing about what happened inside the
+     * individual solvers: one solver can fail while another one solves the job.
+     */
+    public enum SolverJobStatus implements LabelInterface {
+        /** The job is still being processed. */
+        RUNNING {
+            @Override
+            public String getLabel() {
+                return _GUI.T.SolverJobStatus_RUNNING();
+            }
+        },
+        /** A solver delivered an answer that the job accepted. */
+        SOLVED {
+            @Override
+            public String getLabel() {
+                return _GUI.T.SolverJobStatus_SOLVED();
+            }
+        },
+        /** The job ran into its timeout (see Challenge#getTimeout) or every solver ran into its own timeout before the job was solved. */
+        TIMEOUT {
+            @Override
+            public String getLabel() {
+                return _GUI.T.SolverJobStatus_TIMEOUT();
+            }
+        },
+        /** The job was skipped/aborted (single skip, block hoster/package/all captchas, stop current action, ...). */
+        ABORTED_BY_USER {
+            @Override
+            public String getLabel() {
+                return _GUI.T.SolverJobStatus_ABORTED_BY_USER();
+            }
+        },
+        /** The captcha was refreshed, so this job was ended in order to get a new challenge. */
+        REFRESHED {
+            @Override
+            public String getLabel() {
+                return _GUI.T.SolverJobStatus_REFRESHED();
+            }
+        },
+        /** All solvers are done but none delivered an usable answer, and there was neither a timeout nor a skip. */
+        UNSOLVED {
+            @Override
+            public String getLabel() {
+                return _GUI.T.SolverJobStatus_UNSOLVED();
+            }
+        },
+        /** The thread waiting for the job was interrupted, e.g. because downloads were stopped. */
+        INTERRUPTED {
+            @Override
+            public String getLabel() {
+                return _GUI.T.SolverJobStatus_INTERRUPTED();
+            }
+        }
+    }
+
     private final Challenge<T>                                   challenge;
     private final CaptchaSettings                                config;
     private final ChallengeResponseController                    controller;
@@ -37,6 +95,7 @@ public class SolverJob<T> {
     private final CopyOnWriteArraySet<ChallengeSolver<T>>        solverList;
     private LogSource                                            logger;
     private volatile SkipRequest                                 skipRequest;
+    private volatile boolean                                     interrupted;
     private final CopyOnWriteArraySet<ChallengeSolver<?>>        solvingSet     = new CopyOnWriteArraySet<ChallengeSolver<?>>();
     private final CopyOnWriteArraySet<ChallengeSolver<?>>        timedOutSet    = new CopyOnWriteArraySet<ChallengeSolver<?>>();
     private final CopyOnWriteArraySet<ChallengeSolver<?>>        forcedStartSet = new CopyOnWriteArraySet<ChallengeSolver<?>>();
@@ -466,6 +525,46 @@ public class SolverJob<T> {
 
     public SkipRequest getSkipRequest() {
         return skipRequest;
+    }
+
+    /** Marks the job as ended because the thread waiting for it was interrupted. Call before the job is killed. */
+    public void setInterrupted() {
+        interrupted = true;
+    }
+
+    /**
+     * Returns the current status of this job as a whole. It is derived from the existing state on every call, so it changes while the job
+     * proceeds (RUNNING -> SOLVED/...). Once the job is finished the result is stable.
+     */
+    public SolverJobStatus getStatus() {
+        final SkipRequest skip = skipRequest;
+        if (skip != null) {
+            switch (skip) {
+            case TIMEOUT:
+                return SolverJobStatus.TIMEOUT;
+            case REFRESH:
+                return SolverJobStatus.REFRESHED;
+            default:
+                return SolverJobStatus.ABORTED_BY_USER;
+            }
+        }
+        if (isSolved()) {
+            return SolverJobStatus.SOLVED;
+        }
+        if (interrupted) {
+            return SolverJobStatus.INTERRUPTED;
+        }
+        if (isDone()) {
+            /*
+             * Every solver ran into its own timeout: The job itself did not get a skip request (its own timeout was not reached or the
+             * solvers were faster), but from the outside this is still a timeout.
+             */
+            if (solverList.size() > 0 && timedOutSet.containsAll(solverList)) {
+                return SolverJobStatus.TIMEOUT;
+            }
+            return SolverJobStatus.UNSOLVED;
+        }
+        return SolverJobStatus.RUNNING;
     }
 
     public boolean setSkipRequest(SkipRequest skipRequest) {

@@ -340,7 +340,7 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
             if ("loaded".equals(pDo)) {
                 final HTTPHeader ua = request.getRequestHeaders().get("User-Agent");
                 final BrowserCaptchaSolverConfigV3 config = BrowserSolverService.getInstance().getConfig();
-                if (config.isAutoClickEnabled() && !challenge.isAutoClickDisabled()) {
+                if (config.isAutoClickEnabled()) {
                     // let bounds = element.getBoundingClientRect();
                     //
                     // let w = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
@@ -430,7 +430,6 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
                 }
                 final SolverJob<?> job = ChallengeResponseController.getInstance().getJobByChallengeId(challenge.getId().getID());
                 if (challenge.isSolved() || job == null || job.isDone() || BrowserSolver.getInstance().isJobDone(job)) {
-                    getLogger().info("canClose=true:solved=" + challenge.isSolved() + "|job==null=" + (job == null) + "|job.isDone=" + (job != null && job.isDone()) + "|solverJobDone=" + (job != null && BrowserSolver.getInstance().isJobDone(job)) + "|msSinceAutoClick=" + BrowserSolver.getInstance().getMillisSinceAutoClick());
                     response.getOutputStream(true).write("true".getBytes("UTF-8"));
                     canClose.setReached();
                     return true;
@@ -438,18 +437,6 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
                     response.getOutputStream(true).write("false".getBytes("UTF-8"));
                 }
             } else if ("skip".equals(pDo)) {
-                if (BrowserSolver.getInstance().hasRecentlyClicked()) {
-                    /**
-                     * Auto click most likely hit one of our own skip buttons by accident -> ignore <br>
-                     * Workaround for: https://svn.jdownloader.org/issues/88375
-                     */
-                    getLogger().info("Ignore skip request(" + skipType + "): auto click was " + BrowserSolver.getInstance().getMillisSinceAutoClick() + "ms ago");
-                    /* Disable auto click for this challenge so a manual reopen does not repeat the misclick */
-                    challenge.setAutoClickDisabled(true);
-                    getLogger().info("Auto click disabled for this challenge");
-                    response.getOutputStream(true).write("false".getBytes("UTF-8"));
-                    return true;
-                }
                 final ChallengeResponseController challengeResponseController = ChallengeResponseController.getInstance();
                 final SolverJob<?> job = challengeResponseController.getJobByChallengeId(challenge.getId().getID());
                 if (job != null) {

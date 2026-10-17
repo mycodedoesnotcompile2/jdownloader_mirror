@@ -76,7 +76,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.RedditCom;
 
-@DecrypterPlugin(revision = "$Revision: 52894 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53678 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { RedditCom.class })
 public class RedditComCrawler extends PluginForDecrypt {
     public RedditComCrawler(PluginWrapper wrapper) {
@@ -122,10 +122,10 @@ public class RedditComCrawler extends PluginForDecrypt {
     public static final Pattern  PATTERN_SELFHOSTED_IMAGE                = Pattern.compile("(?i)https?://i\\.redd\\.it/([a-z0-9]+)\\.[A-Za-z]{2,5}");
     public static final Pattern  PATTERN_SELFHOSTED_VIDEO                = Pattern.compile("(?i)https?://v\\.redd\\.it/([a-z0-9]+)");
     private static final Pattern PATTERN_POST                            = Pattern.compile("/(r|user|u)/([\\w\\-\\.]+)/comments/([a-z0-9]+)(/([^/\\?]+)/?)?", Pattern.CASE_INSENSITIVE);
-    // URL patterns for annotation regex
-    private static final Pattern PATTERN_SUBREDDIT                       = Pattern.compile("r/([\\w\\-]+)(/(best|hot|new|top|rising))?.*");
-    private static final Pattern PATTERN_GALLERY                         = Pattern.compile("gallery/([a-z0-9]+)");
-    private static final Pattern PATTERN_USER_URL                        = Pattern.compile("(?:user|u)/([\\w\\-]+)(/saved)?.*");
+    // URL patterns for annotation regex, no leading / !
+    private static final Pattern PATTERN_ANNOTATION_SUBREDDIT            = Pattern.compile("r/([\\w\\-]+)(/(best|hot|new|top|rising))?.*");
+    private static final Pattern PATTERN_ANNOTATION_GALLERY              = Pattern.compile("gallery/([a-z0-9]+)");
+    private static final Pattern PATTERN_ANNOTATION_USER_URL             = Pattern.compile("(?:user|u)/([\\w\\-]+)(/saved)?.*");
     /** 2026-06: Reddit has closed down any API access for unauthorized users -> Login cookies required for all json API access! */
     private final boolean        ACCOUNT_REQUIRED_FOR_ANY_CRAWL_ACTIVITY = true;
 
@@ -133,9 +133,9 @@ public class RedditComCrawler extends PluginForDecrypt {
         final List<String> ret = new ArrayList<String>();
         final StringBuilder sb = new StringBuilder();
         sb.append("https?://(?:(?:www|old)\\.)?reddit\\.com/(?:");
-        sb.append(PATTERN_SUBREDDIT.pattern());
-        sb.append("|").append(PATTERN_GALLERY);
-        sb.append("|").append(PATTERN_USER_URL.pattern());
+        sb.append(PATTERN_ANNOTATION_SUBREDDIT.pattern());
+        sb.append("|").append(PATTERN_ANNOTATION_GALLERY);
+        sb.append("|").append(PATTERN_ANNOTATION_USER_URL.pattern());
         sb.append(")");
         sb.append("|").append(PATTERN_SELFHOSTED_VIDEO.pattern());
         ret.add(sb.toString());
@@ -147,7 +147,7 @@ public class RedditComCrawler extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         this.param = param;
         final String url = param.getCryptedUrl();
-        final Regex regex_user = new Regex(url, PATTERN_USER_URL);
+        final Regex regex_user = new Regex(url, "/" + PATTERN_ANNOTATION_USER_URL.pattern());
         if (new Regex(url, PATTERN_SELFHOSTED_VIDEO).patternFind()) {
             return crawlSingleVideourl(param);
         } else if (regex_user.getMatch(1) != null) {
@@ -156,7 +156,7 @@ public class RedditComCrawler extends PluginForDecrypt {
             return crawlUser(param, regex_user.getMatch(0));
         } else if (new Regex(url, PATTERN_POST).patternFind()) {
             return crawlCommentURL(param);
-        } else if (new Regex(url, PATTERN_GALLERY.pattern()).patternFind()) {
+        } else if (new Regex(url, "/" + PATTERN_ANNOTATION_GALLERY.pattern()).patternFind()) {
             return this.crawlGalleryURL(param);
         } else {
             return crawlSubreddit(param);
@@ -221,7 +221,7 @@ public class RedditComCrawler extends PluginForDecrypt {
     private ArrayList<DownloadLink> crawlSubreddit(final CryptedLink param) throws Exception {
         /* Prepare crawl process */
         final String contenturl = param.getCryptedUrl();
-        final Regex urlinfo = new Regex(contenturl, PATTERN_SUBREDDIT);
+        final Regex urlinfo = new Regex(contenturl, "/" + PATTERN_ANNOTATION_SUBREDDIT.pattern());
         final String subredditSlug = urlinfo.getMatch(0);
         if (subredditSlug == null) {
             /* Developer mistake */
@@ -422,7 +422,7 @@ public class RedditComCrawler extends PluginForDecrypt {
 
     /** 2020-11-11: Currently does the same as {@link #crawlCommentURL()} */
     private ArrayList<DownloadLink> crawlGalleryURL(final CryptedLink param) throws Exception {
-        final String commentID = new Regex(param.getCryptedUrl(), PATTERN_GALLERY).getMatch(0);
+        final String commentID = new Regex(param.getCryptedUrl(), "/" + PATTERN_ANNOTATION_GALLERY.pattern()).getMatch(0);
         return crawlComments(commentID);
     }
 

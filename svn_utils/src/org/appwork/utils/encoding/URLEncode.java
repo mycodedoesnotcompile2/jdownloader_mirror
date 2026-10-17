@@ -106,6 +106,15 @@ public class URLEncode {
 
     public static String decodeURIComponent(final String input) {
         try {
+            return decodeURIComponent((CharSequence) input, "UTF-8", true);
+        } catch (UnsupportedEncodingException ignore) {
+        } catch (IllegalArgumentException ignore) {
+        }
+        return null;
+    }
+
+    public static String decodeURIComponent(final CharSequence input) {
+        try {
             return decodeURIComponent(input, "UTF-8", true);
         } catch (UnsupportedEncodingException ignore) {
         } catch (IllegalArgumentException ignore) {
@@ -114,6 +123,10 @@ public class URLEncode {
     }
 
     public static String decodeURIComponent(final String input, final String charSet, final boolean ignoreDecodeError) throws UnsupportedEncodingException, IllegalArgumentException {
+        return decodeURIComponent((CharSequence) input, charSet, ignoreDecodeError);
+    }
+
+    public static String decodeURIComponent(final CharSequence input, final String charSet, final boolean ignoreDecodeError) throws UnsupportedEncodingException, IllegalArgumentException {
         return decodeURIComponent(input, new Decoder() {
 
             @Override

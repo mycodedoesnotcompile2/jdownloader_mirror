@@ -6,14 +6,14 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.util.EnumSet;
-import java.util.Set;
 import java.util.ArrayList;
 import java.util.Currency;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import javax.swing.JComboBox;
@@ -70,7 +70,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 53649 $", interfaceVersion = 3, names = { "deathbycaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53673 $", interfaceVersion = 3, names = { "deathbycaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -111,11 +111,12 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
         /**
          *
          * Enterprise supported via https://deathbycaptcha.com/api/newtokenrecaptcha#reCAPTCHAv2Enterprise <br>
-         * 2026-10-14: v3, v2 invisible and v2 enterprise fail with HTTP/1.1 501 Not Implemented
+         * 2026-10-14: v3, v2 invisible and v2 enterprise fail with HTTP/1.1 501 Not Implemented <br>
+         * 2026-10-16: Informed deathbycaptcha support.
          */
-        // types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
-        // types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
-        // types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
+        types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
         types.add(CAPTCHA_TYPE.CLOUDFLARE_TURNSTILE);
         types.add(CAPTCHA_TYPE.CUTCAPTCHA);
         /* 2025-02-24: Not supported anymore, see isChallengeSupported and: https://deathbycaptcha.com/api#supported_captchas */

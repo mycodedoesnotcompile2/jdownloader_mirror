@@ -219,7 +219,7 @@ public class CaptchaTestParameters {
              * isEnterprise() (declaration order), so a real MetArt challenge is actually handled as RECAPTCHA_V2_INVISIBLE. It is used here
              * anyway since it is the only in-repo source found for the enterprise flag.
              */
-            return new CaptchaTestParameters("6Ld3osYaAAAAAAXX89R8I6MFE1m5loKSWfUIfjLd", "https://www.metart.com/", null, null);
+            return new CaptchaTestParameters("6Ld3osYaAAAAAAXX89R8I6MFE1m5loKSWfUIfjLd", "https://sso.metartnetwork.com/login", null, null);
         case RECAPTCHA_V3:
             /*
              * Taken from 2captcha's public demo page (https://2captcha.com/de/demo/recaptcha-v3) which embeds a real

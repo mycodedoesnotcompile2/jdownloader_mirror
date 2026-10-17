@@ -868,6 +868,58 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Captcha Activity" })
     String StatusBarImpl_initGUI_captcha();
 
+    @Default(lngs = { "en" }, values = { "Type: %s1" })
+    String CaptchaIndicator_type(String type);
+
+    @Default(lngs = { "en" }, values = { "Package:" })
+    String CaptchaIndicator_package();
+
+    @Default(lngs = { "en" }, values = { "File:" })
+    String CaptchaIndicator_filename();
+
+    @Default(lngs = { "en" }, values = { "Time: %s1 / %s2 (%s3)" })
+    String CaptchaIndicator_time(String elapsed, String total, String percent);
+
+    @Default(lngs = { "en" }, values = { "Time: %s1 (no timeout)" })
+    String CaptchaIndicator_time_unlimited(String elapsed);
+
+    @Default(lngs = { "en" }, values = { "Running" })
+    String SolverJobStatus_RUNNING();
+
+    @Default(lngs = { "en" }, values = { "Solved" })
+    String SolverJobStatus_SOLVED();
+
+    @Default(lngs = { "en" }, values = { "Timed out" })
+    String SolverJobStatus_TIMEOUT();
+
+    @Default(lngs = { "en" }, values = { "Skipped/aborted by user" })
+    String SolverJobStatus_ABORTED_BY_USER();
+
+    @Default(lngs = { "en" }, values = { "Refreshed" })
+    String SolverJobStatus_REFRESHED();
+
+    @Default(lngs = { "en" }, values = { "Unsolved" })
+    String SolverJobStatus_UNSOLVED();
+
+    @Default(lngs = { "en" }, values = { "Interrupted" })
+    String SolverJobStatus_INTERRUPTED();
+
+    @Default(lngs = { "en" }, values = { "Solvers:" })
+    String CaptchaIndicator_solvers();
+
+    @Default(lngs = { "en" }, values = { "%s1 (waiting)" })
+    String CaptchaIndicator_solver_waiting(String solver);
+
+    @Default(lngs = { "en" }, values = { "%s1 (solving)" })
+    String CaptchaIndicator_solver_solving(String solver);
+
+    @Default(lngs = { "en" }, values = { "%s1 (done)" })
+    String CaptchaIndicator_solver_done(String solver);
+
+    @Default(lngs = { "en" }, values = { "%s1 (timed out)" })
+    String CaptchaIndicator_solver_timedout(String solver);
+
+
     @Default(lngs = { "en" }, values = { "Abort Linkchecker" })
     String StatusBarImpl_initGUI_abort_linkchecker();
 

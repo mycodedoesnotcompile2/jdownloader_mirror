@@ -54,7 +54,6 @@ import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.net.URL;
-import java.nio.CharBuffer;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
@@ -64,8 +63,6 @@ import java.util.zip.GZIPInputStream;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.Files.AbstractHandler;
 import org.appwork.utils.IO.BOM.BOMInputStream;
-import org.appwork.utils.net.Base64InputStream;
-import org.appwork.utils.net.CharSequenceInputStream;
 import org.appwork.utils.os.CrossSystem;
 
 public class IO {
@@ -138,9 +135,9 @@ public class IO {
             /*
              * The per-call transfer size is capped at a magic number (64MB - 32KB). This cap originates from an old Windows limitation:
              * copying more than ~64MB in a single transferTo call could fail with "Insufficient system resources exist to complete the
-             * requested service" (see http://forum.java.sun.com/thread.jspa?threadID=439695&messageID=2917510). We loop until the whole file
-             * has been transferred, which is also required on non-Windows platforms because transferTo is not guaranteed to move all bytes in
-             * one call. The behaviour is identical on all platforms, so there is no platform-specific branch.
+             * requested service" (see http://forum.java.sun.com/thread.jspa?threadID=439695&messageID=2917510). We loop until the whole
+             * file has been transferred, which is also required on non-Windows platforms because transferTo is not guaranteed to move all
+             * bytes in one call. The behaviour is identical on all platforms, so there is no platform-specific branch.
              */
             final int maxCount = 64 * 1024 * 1024 - 32 * 1024;
             final long size = inChannel.size();
@@ -356,8 +353,8 @@ public class IO {
     }
 
     /**
-     * Renames source to dest. Uses NIO Files.move on Java 7+ for better exceptions; falls back to File.renameTo on
-     * Java 6. Replaces existing destination on Java 7+.
+     * Renames source to dest. Uses NIO Files.move on Java 7+ for better exceptions; falls back to File.renameTo on Java 6. Replaces
+     * existing destination on Java 7+.
      *
      * @param source
      *            source file
@@ -1078,20 +1075,20 @@ public class IO {
      * @return
      * @throws IOException
      */
-    public static InputStream dataUrlToInputStream(String dataURL) throws IOException {
-        final int base64Index = dataURL.indexOf(";base64,");
-        final CharBuffer cb;
-        if (base64Index > 0 && base64Index + 8 < dataURL.length()) {
-            cb = CharBuffer.wrap(dataURL, base64Index + 8, dataURL.length());
-        } else {
-            cb = CharBuffer.wrap(dataURL);
+    public static DataURLInputStream dataUrlToInputStream(String dataURL) throws IOException {
+        final DataURLInputStream is = DataURLInputStream.open(dataURL);
+        if (is == null) {
+            return null;
         }
-        final InputStream is = new Base64InputStream(new CharSequenceInputStream(cb, BOM.UTF8.charSet));
-        final String gzip = "data:application/gzip;";
-        if (dataURL.length() > gzip.length() && dataURL.substring(0, gzip.length()).equalsIgnoreCase(gzip)) {
-            return new GZIPInputStream(is);
-        } else {
+        if (!"application/gzip".equals(is.getMimeType())) {
             return is;
         }
+        return new DataURLInputStream(new GZIPInputStream(is)) {
+
+            @Override
+            public String getMimeType() {
+                return is.getMimeType();
+            }
+        };
     }
 }

@@ -42,16 +42,6 @@ import javax.imageio.ImageIO;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 
-import jd.captcha.utils.GifDecoder;
-import jd.http.Browser;
-import jd.http.Browser.BlockedByException;
-import jd.http.Browser.BrowserException;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.plugins.PluginForHost;
-import net.sf.image4j.codec.ico.ICODecoder;
-
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.resources.MultiResolutionImageHelper;
 import org.appwork.shutdown.ShutdownController;
@@ -59,6 +49,7 @@ import org.appwork.shutdown.ShutdownEvent;
 import org.appwork.shutdown.ShutdownRequest;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.Application;
+import org.appwork.utils.DataURLInputStream;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.Files;
 import org.appwork.utils.IO;
@@ -70,6 +61,7 @@ import org.appwork.utils.images.svg.SVGFactory;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.net.PublicSuffixList;
+import org.appwork.utils.net.URLHelper;
 import org.jdownloader.controlling.FileCreationManager;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 import org.jdownloader.gui.IconKey;
@@ -82,6 +74,16 @@ import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.updatev2.gui.LAFOptions;
+
+import jd.captcha.utils.GifDecoder;
+import jd.http.Browser;
+import jd.http.Browser.BlockedByException;
+import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.plugins.PluginForHost;
+import net.sf.image4j.codec.ico.ICODecoder;
 
 public class FavIcons {
     private static final int                                                     BASE_SIZE       = 16;
@@ -105,7 +107,6 @@ public class FavIcons {
                 return t;
             }
         }, new ThreadPoolExecutor.AbortPolicy()) {
-
             @Override
             protected void afterExecute(Runnable r, Throwable t) {
                 super.afterExecute(r, t);
@@ -702,16 +703,26 @@ public class FavIcons {
         return true;
     }
 
-    private static boolean isFavIconURL(String host) {
+    private static String getFavIconURL(final Browser br, String url) {
         try {
-            if (!host.matches("(?i)^https?://.+")) {
-                return false;
+            if (url == null) {
+                return null;
+            } else if (url.matches("(?i)^data:image/.+")) {
+                return url;
+            } else if (!url.matches("(?i)^https?://.+")) {
+                if (br == null) {
+                    return null;
+                }
+                return getFavIconURL(br, URLHelper.parseLocation(br._getURL(), url));
             } else {
-                final String path = new URL(host).getFile();
-                return path.matches("(?i).+\\.(ico|png|svg|jpg)$");
+                final String path = new URL(url).getFile();
+                if (path.matches("(?i).+\\.(ico|png|svg|jpg|gif)$")) {
+                    return url;
+                }
             }
+            return null;
         } catch (MalformedURLException e) {
-            return false;
+            return null;
         }
     }
 
@@ -737,7 +748,7 @@ public class FavIcons {
         favBr.setConnectTimeout(10000);
         favBr.setReadTimeout(10000);
         final List<String> websites = new ArrayList<String>();
-        if (!isFavIconURL(host)) {
+        if (getFavIconURL(null, host) == null) {
             if (host.matches("(?i)^https?://.+")) {
                 websites.add(host);
             } else {
@@ -763,13 +774,14 @@ public class FavIcons {
                             favBr.getPage(wwwSubdomain);
                         }
                     }
-                    if (favBr.getRedirectLocation() != null) {
+                    final String redirectOrRefresh = StringUtils.firstNotEmpty(favBr.getRedirectLocation(), favBr.getRequest().getHTMLRefresh());
+                    if (redirectOrRefresh != null) {
                         try {
                             Thread.sleep(500);// helps to prevent cloudflare protection
                         } catch (InterruptedException e) {
                             throw new IOException(e);
                         }
-                        favBr.followRedirect(true);
+                        favBr.getPage(redirectOrRefresh);
                         if (!isSameDomain(favBr, host, siteSupportedNames)) {
                             throw new IOException("redirect to different domain?" + favBr._getURL().getHost() + "!=" + host);
                         }
@@ -825,6 +837,32 @@ public class FavIcons {
         return null;
     }
 
+    private static BufferedImage load_DataURL(DataURLInputStream is) throws IOException {
+        if ("image/svg+xml".equals(is.getMimeType())) {
+            final SVGFactory svgFactory = IconIO.getSvgFactory();
+            if (svgFactory == null) {
+                return null;
+            }
+            final Image img = svgFactory.getImageFromSVG(is, null, 64, 64, null);
+            if (img == null) {
+                return null;
+            }
+            return IconIO.toBufferedImage(img);
+        }
+        if (StringUtils.startsWithCaseInsensitive(is.getMimeType(), "data:image/")) {
+            final byte[] dataURL_data = IO.readStream(-1, is);
+            final BufferedImage ret = ImageIO.read(new ByteArrayInputStream(dataURL_data));
+            if (ret != null) {
+                return ret;
+            }
+            final GifDecoder gifDecoder = new GifDecoder();
+            if (gifDecoder.read(new ByteArrayInputStream(dataURL_data)) == 0) {
+                return gifDecoder.getImage();
+            }
+        }
+        return null;
+    }
+
     public static BufferedImage download_FavIconTag(Browser favBr, String host) throws IOException {
         final Set<String> favIconURLs = getFavIconURLs(favBr, host);
         final LogInterface logger = favBr.getLogger();
@@ -835,6 +873,18 @@ public class FavIcons {
             while (retryFlag) {
                 retryFlag = false;
                 try {
+                    final DataURLInputStream is = DataURLInputStream.open(favIconURL);
+                    if (is != null) {
+                        try {
+                            final BufferedImage ret = load_DataURL(is);
+                            if (ret != null) {
+                                images.add(ret);
+                            }
+                        } finally {
+                            is.close();
+                        }
+                        continue;
+                    }
                     final Browser brc = favBr.cloneBrowser();
                     try {
                         Thread.sleep(250);// helps to prevent cloudflare protection
@@ -872,29 +922,30 @@ public class FavIcons {
 
     public static Set<String> getFavIconURLs(final Browser favBr, final String host) throws IOException {
         final Set<String> ret = new LinkedHashSet<String>();
-        if (isFavIconURL(host)) {
-            ret.add(host);
+        String favIconURL = null;
+        if ((favIconURL = getFavIconURL(null, host)) != null) {
+            ret.add(favIconURL);
         } else {
             final String requestHtml = favBr.toString().replaceAll("(?s)<!--.*?-->", "");
             for (final String rel : new String[] { "icon", "shortcut icon", "apple-touch-icon" }) {
-                String urls[] = new Regex(requestHtml, "(?i)rel\\s*=\\s*('|\")" + rel + "('|\")[^>]*href\\s*=\\s*('|\")([^>'\"]*\\.(ico|png|svg|jpg|gif)[^>'\"]*)('|\")").getColumn(3);
+                String urls[] = new Regex(requestHtml, "(?i)rel\\s*=\\s*('|\")" + rel + "\\1[^>]*href\\s*=\\s*('|\")(.*?)\\2").getColumn(2);
                 if (urls != null && urls.length > 0) {
-                    ret.addAll(Arrays.asList(urls));
-                }
-                urls = new Regex(requestHtml, "(?i)href\\s*=\\s*('|\")([^>'\"]*\\.(ico|png|svg|jpg|gif)[^>'\"]*)('|\")[^>]*rel\\s*=\\s*('|\")" + rel + "('|\")").getColumn(1);
-                if (urls != null && urls.length > 0) {
-                    ret.addAll(Arrays.asList(urls));
-                }
-                if (ret.size() == 0) {
-                    /*
-                     * workaround for hoster with not complete url, eg rapidshare.com
-                     */
-                    String url = new Regex(requestHtml, "(?i)rel\\s*=\\s*('|\")" + rel + "('|\")[^>]*href\\s*=\\s*[^>]*//([^>'\"]*\\.(ico|png|svg|jpg|gif)[^>'\"]*)('|\")").getMatch(2);
-                    if (!StringUtils.isEmpty(url)) {
-                        if (!url.equalsIgnoreCase(host)) {
-                            url = "http://" + url;
+                    for (String url : urls) {
+                        favIconURL = getFavIconURL(favBr, url);
+                        if (favIconURL == null) {
+                            continue;
                         }
-                        ret.add(url);
+                        ret.add(favIconURL);
+                    }
+                }
+                urls = new Regex(requestHtml, "(?i)href\\s*=\\s*('|\")(.*?)\\1[^>]*rel\\s*=\\s*('|\")" + rel + "\\3").getColumn(1);
+                if (urls != null && urls.length > 0) {
+                    for (String url : urls) {
+                        favIconURL = getFavIconURL(favBr, url);
+                        if (favIconURL == null) {
+                            continue;
+                        }
+                        ret.add(favIconURL);
                     }
                 }
             }

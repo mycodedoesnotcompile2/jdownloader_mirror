@@ -45,12 +45,13 @@ import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
 
-@HostPlugin(revision = "$Revision: 53641 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53659 $", interfaceVersion = 3, names = {}, urls = {})
 public class MegaloadOrg extends PluginForHost {
     /* API docs: "MEGALOAD Downloader API" (account/plan access to the Downloader API is required). */
     private static final String API_BASE                   = "https://megaload.org/API";
@@ -104,7 +105,10 @@ public class MegaloadOrg extends PluginForHost {
         final Browser br = super.createNewBrowserInstance();
         br.getHeaders().put("Accept", "application/json");
         br.getHeaders().put("User-Agent", API_USER_AGENT);
-        br.setIPVersion(IPVERSION.IPV4_IPV6);
+        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            // they are working on ticket IP bridge support, testing in IDE
+            br.setIPVersion(IPVERSION.IPV4_IPV6);
+        }
         br.setFollowRedirects(true);
         return br;
     }
