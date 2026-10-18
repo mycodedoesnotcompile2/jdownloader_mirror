@@ -927,26 +927,26 @@ public class FavIcons {
             ret.add(favIconURL);
         } else {
             final String requestHtml = favBr.toString().replaceAll("(?s)<!--.*?-->", "");
-            for (final String rel : new String[] { "icon", "shortcut icon", "apple-touch-icon" }) {
-                String urls[] = new Regex(requestHtml, "(?i)rel\\s*=\\s*('|\")" + rel + "\\1[^>]*href\\s*=\\s*('|\")(.*?)\\2").getColumn(2);
-                if (urls != null && urls.length > 0) {
-                    for (String url : urls) {
-                        favIconURL = getFavIconURL(favBr, url);
-                        if (favIconURL == null) {
-                            continue;
-                        }
-                        ret.add(favIconURL);
+            String urls[] = new Regex(requestHtml, "(?i) rel\\s*=\\s*(['\"])" + "(?:icon|shortcut icon|apple-touch-icon)" + "\\1[^<>]*? href\\s*=\\s*((?:\"[^\"]*\")|(?:'[^']*'))").getColumn(1);
+            if (urls != null && urls.length > 0) {
+                for (String url : urls) {
+                    url = url.substring(1, url.length() - 1);// remove " and '
+                    favIconURL = getFavIconURL(favBr, url);
+                    if (favIconURL == null) {
+                        continue;
                     }
+                    ret.add(favIconURL);
                 }
-                urls = new Regex(requestHtml, "(?i)href\\s*=\\s*('|\")(.*?)\\1[^>]*rel\\s*=\\s*('|\")" + rel + "\\3").getColumn(1);
-                if (urls != null && urls.length > 0) {
-                    for (String url : urls) {
-                        favIconURL = getFavIconURL(favBr, url);
-                        if (favIconURL == null) {
-                            continue;
-                        }
-                        ret.add(favIconURL);
+            }
+            urls = new Regex(requestHtml, "(?i) href\\s*=\\s*((?:\"[^\"]*\")|(?:'[^']*'))[^<>]*? rel\\s*=\\s*(['\"])" + "(?:icon|shortcut icon|apple-touch-icon)" + "\\2").getColumn(0);
+            if (urls != null && urls.length > 0) {
+                for (String url : urls) {
+                    url = url.substring(1, url.length() - 1);// remove " and '
+                    favIconURL = getFavIconURL(favBr, url);
+                    if (favIconURL == null) {
+                        continue;
                     }
+                    ret.add(favIconURL);
                 }
             }
             ret.add("/favicon.ico");

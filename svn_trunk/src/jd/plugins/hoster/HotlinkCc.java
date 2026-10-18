@@ -39,8 +39,9 @@ import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53654 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53681 $", interfaceVersion = 3, names = {}, urls = {})
 public class HotlinkCc extends XFileSharingProBasic {
     public HotlinkCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -71,6 +72,22 @@ public class HotlinkCc extends XFileSharingProBasic {
     protected boolean supportsHEADRequestForDirecturlCheck() {
         // so we can see error messages in response
         return false;
+    }
+
+    @Override
+    public String buildExternalDownloadURL(DownloadLink link, PluginForHost buildForThisPlugin) {
+        final String fid = getFUIDFromURL(link);
+        if (fid != null) {
+            if (StringUtils.startsWithCaseInsensitive(getContentURL(link), "https:")) {
+                return "https://" + getHost() + "/" + fid;
+            } else if (this.useHTTPS()) {
+                return "https://" + getHost() + "/" + fid;
+            } else {
+                return "http://" + getHost() + "/" + fid;
+            }
+        } else {
+            return super.buildExternalDownloadURL(link, buildForThisPlugin);
+        }
     }
 
     @Override
