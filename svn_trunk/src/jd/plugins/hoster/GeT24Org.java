@@ -28,7 +28,7 @@ import jd.plugins.components.PluginJSonUtils;
 
 @HostPlugin(revision = "$Revision: 41665 $", interfaceVersion = 3, names = { "get24.org" }, urls = { "" })
 public class GeT24Org extends PluginForHost {
-    private static final String VERSION = "0.0.1";
+    private static final String VERSION = "0.0.2";
 
     public GeT24Org(PluginWrapper wrapper) {
         super(wrapper);
