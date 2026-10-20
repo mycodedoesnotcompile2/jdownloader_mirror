@@ -21,11 +21,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -35,7 +30,11 @@ import jd.plugins.AccountInfo;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52684 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 53684 $", interfaceVersion = 3, names = {}, urls = {})
 public class ElitefileNet extends XFileSharingProBasic {
     public ElitefileNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -184,20 +183,13 @@ public class ElitefileNet extends XFileSharingProBasic {
         /* Example non english: brupload.net */
         final boolean userHasUnlimitedTraffic = trafficLeftStr != null && trafficLeftStr.matches("(?i).*?(nlimited|Ilimitado).*?");
         if (trafficLeftStr != null && !userHasUnlimitedTraffic && !trafficLeftStr.equalsIgnoreCase("Mb")) {
-            trafficLeftStr = Encoding.htmlDecode(trafficLeftStr);
-            trafficLeftStr.trim();
+            trafficLeftStr = Encoding.htmlDecode(trafficLeftStr).trim();
             /* Need to set 0 traffic left, as getSize returns positive result, even when negative value supplied. */
-            long trafficLeft = 0;
-            if (trafficLeftStr.startsWith("-")) {
-                /* Negative traffic value = User downloaded more than he is allowed to (rare case) --> No traffic left */
-                trafficLeft = 0;
-            } else {
-                trafficLeft = SizeFormatter.getSize(trafficLeftStr);
-            }
+            long trafficLeft = parseSize(Size.TRAFFIC, trafficLeftStr);
             /* 2019-02-19: Users can buy additional traffic packages: Example(s): subyshare.com */
             final String usableBandwidth = br.getRegex("(?i)Usable Bandwidth\\s*<span[^>]*>\\s*([0-9\\.]+\\s*[TGMKB]+)\\s*/\\s*[0-9\\.]+\\s*[TGMKB]+\\s*<").getMatch(0);
             if (usableBandwidth != null) {
-                trafficLeft = Math.max(trafficLeft, SizeFormatter.getSize(usableBandwidth));
+                trafficLeft = Math.max(trafficLeft, parseSize(Size.TRAFFIC, usableBandwidth));
             }
             ai.setTrafficLeft(trafficLeft);
         } else {

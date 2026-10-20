@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -37,12 +38,13 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
 
-@HostPlugin(revision = "$Revision: 53623 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53683 $", interfaceVersion = 3, names = {}, urls = {})
 public class ExtMatrixCom extends PluginForHost {
     public ExtMatrixCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -155,7 +157,7 @@ public class ExtMatrixCom extends PluginForHost {
                 }
                 final Map<String, Object> postdata = new HashMap<String, Object>();
                 postdata.put("urls", sb.toString());
-                br.getHeaders().put("Content-Type", "application/json");
+                br.getHeaders().put(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json");
                 br.postPageRaw(getApiBase() + "/files/check-links", JSonStorage.serializeToJson(postdata));
                 final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 final List<Map<String, Object>> items = (List<Map<String, Object>>) entries.get("items");
@@ -174,7 +176,7 @@ public class ExtMatrixCom extends PluginForHost {
                     } else if ("valid".equals(match.get("status"))) {
                         link.setAvailable(true);
                         link.setFinalFileName(match.get("name").toString());
-                        link.setVerifiedFileSize(((Number) match.get("size")).longValue());
+                        link.setVerifiedFileSize((Long.parseLong(match.get("size").toString())));
                     } else {
                         /* E.g. status "dead" or item missing in response. */
                         link.setAvailable(false);
@@ -308,11 +310,6 @@ public class ExtMatrixCom extends PluginForHost {
     }
 
     private void handleDownload(final DownloadLink link, final Account account) throws Exception {
-        /** 2026-10-12: I was unable to find any files that can be downloaded without premium account. */
-        if (account == null || !AccountType.PREMIUM.equals(account.getType())) {
-            /* Free (anonymous) downloads are not possible. */
-            throw new AccountRequiredException();
-        }
         requestFileInformation(link);
         final String dllink = getDownloadURL(link, account);
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, isResumeable(link, account), getMaxChunks(account));
@@ -337,6 +334,16 @@ public class ExtMatrixCom extends PluginForHost {
         br.getPage(getApiBase() + "/download/" + fid);
         Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final Map<String, Object> viewer = (Map<String, Object>) entries.get("viewer");
+        final Map<String, Object> file = (Map<String, Object>) entries.get("file");
+        if (file != null) {
+            link.setFinalFileName((String) file.get("name"));
+            link.setVerifiedFileSize(Long.parseLong(file.get("size").toString()));
+            if (Boolean.TRUE.equals(file.get("premiumOnly")) && !AccountType.PREMIUM.is(account)) {
+                throw new AccountRequiredException();
+            } else if (Boolean.TRUE.equals(file.get("unavailable"))) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, TimeUnit.MINUTES.toMillis(30));
+            }
+        }
         if (br.getHttpConnection().getResponseCode() == 401 || (viewer != null && !Boolean.TRUE.equals(viewer.get("loggedIn")))) {
             /* Session expired -> Login again and retry once. */
             login(account, true);
@@ -348,6 +355,9 @@ public class ExtMatrixCom extends PluginForHost {
         if (StringUtils.isEmpty(url)) {
             final Map<String, Object> error = (Map<String, Object>) entries.get("error");
             final String message = error != null ? (String) error.get("message") : null;
+            if ("file_unavailable".equals(error.get("code"))) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, message);
         }
         return url;
@@ -384,11 +394,9 @@ public class ExtMatrixCom extends PluginForHost {
 
     @Override
     public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account != null && AccountType.PREMIUM.equals(account.getType())) {
-            /* Free (anonymous) downloads are not possible. */
-            return true;
-        }
-        return false;
+        /* Free (anonymous) downloads are not possible. */
+        /** 2026-10-12: I was unable to find any files that can be downloaded without premium account. */
+        return AccountType.PREMIUM.is(account);
     }
 
     @Override

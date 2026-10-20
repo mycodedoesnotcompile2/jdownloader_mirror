@@ -156,19 +156,16 @@ public class Files17 {
         }
     }
 
-    /**
-     * Renames/moves source to dest using NIO Files.move. Replaces existing destination.
-     * Use this from Java 7+ code paths for better exceptions than File.renameTo().
-     *
-     * @param source
-     *            source file
-     * @param dest
-     *            destination file
-     * @throws IOException
-     *             if move fails (e.g. access denied, cross-device link)
-     */
-    public static void rename(final File source, final File dest) throws IOException {
-        Files.move(source.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
+    public static void rename(final File source, final File dest, final boolean replaceExisting) throws IOException {
+        rename(source.toPath(), dest.toPath(), replaceExisting);
+    }
+
+    public static void rename(final Path source, final Path dest, final boolean replaceExisting) throws IOException {
+        if (replaceExisting) {
+            Files.move(source, dest, StandardCopyOption.REPLACE_EXISTING);
+        } else {
+            Files.move(source, dest);
+        }
     }
 
     protected static boolean deleteIfExists(final File file) throws IOException {

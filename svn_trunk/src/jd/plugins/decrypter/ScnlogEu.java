@@ -19,9 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -34,12 +31,15 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.antiDDoSForDecrypt;
+
 /**
  * So I had this written some time back, just never committed. Here is my original with proper error handling etc. -raz
  *
  * @author raztoki
  */
-@DecrypterPlugin(revision = "$Revision: 48644 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53683 $", interfaceVersion = 3, names = {}, urls = {})
 public class ScnlogEu extends antiDDoSForDecrypt {
     public ScnlogEu(PluginWrapper wrapper) {
         super(wrapper);
@@ -73,7 +73,7 @@ public class ScnlogEu extends antiDDoSForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:[a-z0-9_\\-]+/){2,}");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:[a-z0-9_\\-]+/?){2,}");
         }
         return ret.toArray(new String[0]);
     }

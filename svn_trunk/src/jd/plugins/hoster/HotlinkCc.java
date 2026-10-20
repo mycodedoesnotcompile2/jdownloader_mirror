@@ -19,10 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.config.XFSConfigVideoHotlinkCc;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -41,7 +37,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53681 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.config.XFSConfigVideoHotlinkCc;
+
+@HostPlugin(revision = "$Revision: 53683 $", interfaceVersion = 3, names = {}, urls = {})
 public class HotlinkCc extends XFileSharingProBasic {
     public HotlinkCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -265,13 +265,15 @@ public class HotlinkCc extends XFileSharingProBasic {
     @Override
     public String regExTrafficLeft(final Browser br) {
         String trafficleft = super.regExTrafficLeft(br);
-        if (StringUtils.isEmpty(trafficleft)) {
-            final String src = this.getCorrectBR(br);
-            trafficleft = new Regex(src, "(?i)Traffic available today</TD></TR>\\s*?</thead>\\s*?<TR><TD><b>\\s*([^<>\"]+)\\s*</b><").getMatch(0);
-            if (StringUtils.isEmpty(trafficleft)) {
-                trafficleft = new Regex(src, "(?i)Download traffic available\\s*:\\s*</TD></TR>\\s*</thead>\\s*<TR><TD[^>]*><b>([^<]+)</b></TD></TR>").getMatch(0);
-            }
+        if (!StringUtils.isEmpty(trafficleft)) {
+            return trafficleft;
         }
+        final String src = this.getCorrectBR(br);
+        trafficleft = new Regex(src, "(?i)Traffic available today</TD></TR>\\s*?</thead>\\s*?<TR><TD><b>\\s*([^<>\"]+)\\s*</b><").getMatch(0);
+        if (!StringUtils.isEmpty(trafficleft)) {
+            return trafficleft;
+        }
+        trafficleft = new Regex(src, "(?i)Download traffic available\\s*:\\s*</TD></TR>\\s*</thead>\\s*<TR><TD[^>]*><b>([^<]+)</b></TD></TR>").getMatch(0);
         return trafficleft;
     }
 
@@ -411,6 +413,11 @@ public class HotlinkCc extends XFileSharingProBasic {
         final Form ret = super.findFormDownload2Free(br);
         modifyFreeDownloadForm(br, ret);
         return ret;
+    }
+
+    @Override
+    protected String[] supportsPreciseExpireDate() {
+        return new String[] { "/?op=payments" };
     }
 
     private static Object LOCK = new Object();

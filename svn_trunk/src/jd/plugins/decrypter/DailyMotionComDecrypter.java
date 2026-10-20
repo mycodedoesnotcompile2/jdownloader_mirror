@@ -65,7 +65,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 //Decrypts embedded videos from dailymotion
-@DecrypterPlugin(revision = "$Revision: 53581 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
+@DecrypterPlugin(revision = "$Revision: 53685 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.|geo\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
 public class DailyMotionComDecrypter extends PluginForDecrypt {
     public DailyMotionComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -184,6 +184,19 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
         }
     }
 
+    private void checkUserExists(final Browser br, final String username) throws Exception {
+        final Browser brc = br.cloneBrowser();
+        brc.setAllowedResponseCodes(400);
+        prepGraphqlBrowser(brc);
+        final PostRequest METADATA_QUERY = br.createJSonPostRequest(DailyMotionCom.API_BASE_GRAPHQL, "{\"operationName\":\"METADATA_QUERY\",\"variables\":{\"uri\":\"/user/" + username + "\"},\"query\":\"query METADATA_QUERY($uri: String!) {\\n  views {\\n    id\\n    neon {\\n      id\\n      web(uri: $uri) {\\n        id\\n        author\\n        description\\n        title\\n        metadatas {\\n          id\\n          attributes {\\n            id\\n            name\\n            content\\n            __typename\\n          }\\n          __typename\\n        }\\n        language {\\n          id\\n          codeAlpha2\\n          __typename\\n        }\\n        country {\\n          id\\n          codeAlpha2\\n          __typename\\n        }\\n        __typename\\n      }\\n      __typename\\n    }\\n    __typename\\n  }\\n}\\n\"}");
+        brc.getPage(METADATA_QUERY);
+        final Map<String, Object> response = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+        final String errorType = (String) JavaScriptEngineFactory.walkJson(response, "errors/{0}/type");
+        if ("not_found".equals(errorType)) {
+            throw new DecrypterRetryException(RetryReason.FILE_NOT_FOUND);
+        }
+    }
+
     /**
      * Crawls all videos of a user. In some cases it is not possible to crawl all videos due to website- AND API limitations (both have the
      * same limits).
@@ -199,6 +212,7 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        checkUserExists(br, username);
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(username);
         if (getPluginConfig().getBooleanProperty(DailyMotionCom.USER_PACKAGE, false)) {
@@ -416,6 +430,7 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
         }
         final String main_search_url = new Regex(contenturl, "(.+/)\\d+$").getMatch(0);
         final String username = new Regex(contenturl, "/user/([^/]+)/").getMatch(0);
+        checkUserExists(br, username);
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(username);
         String desiredPage = new Regex(contenturl, "(\\d+)$").getMatch(0);

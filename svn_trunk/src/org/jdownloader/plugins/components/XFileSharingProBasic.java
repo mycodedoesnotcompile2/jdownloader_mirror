@@ -29,6 +29,37 @@ import java.util.regex.Pattern;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
+import jd.PluginWrapper;
+import jd.config.SubConfiguration;
+import jd.controlling.AccountController;
+import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.parser.html.Form.MethodType;
+import jd.parser.html.HTMLParser;
+import jd.parser.html.InputField;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadConnectionVerifier;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.PluginJSonUtils;
+import jd.plugins.components.SiteType.SiteTemplate;
+
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
@@ -62,38 +93,7 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-import jd.PluginWrapper;
-import jd.config.SubConfiguration;
-import jd.controlling.AccountController;
-import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.parser.html.Form.MethodType;
-import jd.parser.html.HTMLParser;
-import jd.parser.html.InputField;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadConnectionVerifier;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.PluginJSonUtils;
-import jd.plugins.components.SiteType.SiteTemplate;
-
-@HostPlugin(revision = "$Revision: 53653 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53683 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -489,8 +489,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * don't display the filesize anywhere! <br>
      * CAUTION: Only set this to true if a filehost: <br>
      * 1. Allows users to embed videos via '/embed-<fuid>.html'. <br>
-     * 2. Does not display a filesize anywhere inside html code or other calls where we do not have to do an http request on a directurl.
-     * <br>
+     * 2. Does not display a filesize anywhere inside html code or other calls where we do not have to do an http request on a directurl. <br>
      * 3. Allows a lot of simultaneous connections. <br>
      * 4. Is FAST - if it is not fast, this will noticably slow down the linkchecking procedure! <br>
      * 5. Allows using a generated direct-URL at least two times.
@@ -1762,8 +1761,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             if (obtainedLongFileIDFromURL && this.canHandle(br.getURL())) {
                 /**
                  * We know that the file_id is contained in our current URL, we know that the plugin can handle that URL (and the domain in
-                 * it) so we know that the current URL is the full URL to the file. The initial short-url will always redirect to this URL.
-                 * <br>
+                 * it) so we know that the current URL is the full URL to the file. The initial short-url will always redirect to this URL. <br>
                  * We also know that the URL-type is a supported one so it doesn't matter which one it is.
                  */
                 mainPage = getMainPage(br);
@@ -2327,8 +2325,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * Wrapper for requestFileInformationWebsiteMassLinkcheckerSingle which contains a bit of extra log output <br>
      * Often used as fallback if e.g. only logged-in users can see filesize or filesize is not given in html code for whatever reason.<br>
      * Often needed for <b><u>IMAGEHOSTER</u>S</b>.<br>
-     * Important: Only call this if <b><u>supports_availablecheck_alt</u></b> is <b>true</b> (meaning omly try this if website supports
-     * it)!<br>
+     * Important: Only call this if <b><u>supports_availablecheck_alt</u></b> is <b>true</b> (meaning omly try this if website supports it)!<br>
      * Some older XFS versions AND videohosts have versions of this linkchecker which only return online/offline and NO FILESIZE!<br>
      * In case there is no filesize given, offline status will still be recognized! <br>
      *
@@ -2971,8 +2968,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * Admins may sometimes setup waittimes that are higher than the interactive captcha timeout so lets say they set up 180 seconds of
      * pre-download-waittime --> User solves captcha immediately --> Captcha-solution times out after 120 seconds --> User has to re-enter
      * it in browser (and it would fail in JD)! <br>
-     * If admins set it up in a way that users can solve the captcha via the waittime counts down, this failure may even happen via browser!
-     * <br>
+     * If admins set it up in a way that users can solve the captcha via the waittime counts down, this failure may even happen via browser! <br>
      * This is basically a workaround which avoids running into said timeout: Make sure that we wait less than 120 seconds after the user
      * has solved the captcha by waiting some of this time in beforehand.
      */
@@ -3980,6 +3976,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         /* new XFileSharingPro */
         patterns.add(Pattern.compile("href=\"(https?://[^\"]+)\"[^>]*>\\s*(?:<i[^>]*>[^>]*/i>)?\\s*Direct Download Link"));// hotlink.cc
         patterns.add(Pattern.compile("href=\"(https?://[^\"]+)\"[^>]*>\\s*(?:<i[^>]*>[^>]*/i>)?\\s*Lancer le téléchargement"));// vidzy.org
+        patterns.add(Pattern.compile("href=\"(https?://[^\"]+)\"[^>]*>\\s*<i[^>]*class\\s*=\\s*\"[^\"]*fa-download[^\"]*\""));// href..<i
+        // class="fa fa-download"
         return patterns;
     }
 
@@ -4573,12 +4571,23 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
     }
 
+    protected String[] getTrafficDetails(final Browser br, Account account) throws Exception {
+        final String[] ret = new String[2];
+        ret[0] = regExTrafficLeft(br);
+        if (ret[0] == null) {
+            return null;
+        }
+        ret[1] = regExTrafficMax(br);
+        return ret;
+    }
+
     protected void fetchAccountInfoWebsiteTraffic(final Browser br, final Account account, final AccountInfo ai) throws Exception {
         /*
          * trafficleft is usually not given via API so we'll have to check for it via website. Also we do not trust 'unlimited traffic' via
          * API yet.
          */
-        String trafficLeftStr = regExTrafficLeft(br);
+        final String[] trafficDetails = getTrafficDetails(br, account);
+        String trafficLeftStr = trafficDetails != null ? trafficDetails[0] : null;
         /* Example non english: brupload.net */
         final boolean userHasUnlimitedTraffic = trafficLeftStr != null && trafficLeftStr.matches(".*?(nlimited|Ilimitado).*?");
         // Early return for unlimited traffic or invalid traffic string
@@ -4600,6 +4609,16 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             trafficLeft = Math.max(trafficLeft, parseSize(Size.TRAFFIC, usableBandwidth));
         }
         ai.setTrafficLeft(trafficLeft);
+        if (trafficDetails[1] != null) {
+            String trafficMaxStr = trafficDetails[1];
+            if (trafficMaxStr != null) {
+                trafficMaxStr = Encoding.htmlDecode(trafficMaxStr).trim();
+                final long trafficMax = parseSize(Size.TRAFFIC, trafficMaxStr);
+                if (trafficMax > 0) {
+                    ai.setTrafficMax(trafficMax);
+                }
+            }
+        }
     }
 
     public enum Size {
@@ -4813,7 +4832,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 if (!StringUtils.isEmpty(tmpsec)) {
                     seconds = Integer.parseInt(tmpsec);
                 }
-                expire_milliseconds_precise_to_the_second = ((years * 86400000 * 365) + (days * 86400000) + (hours * 3600000) + (minutes * 60000) + (seconds * 1000));
+                expire_milliseconds_precise_to_the_second = ((TimeUnit.DAYS.toSeconds(365 * years)) + (TimeUnit.DAYS.toSeconds(days)) + (TimeUnit.HOURS.toSeconds(hours)) + (TimeUnit.MINUTES.toSeconds(minutes)) + (TimeUnit.SECONDS.toSeconds(seconds)));
                 if (expire_milliseconds_precise_to_the_second <= 0) {
                     logger.info("Failed to find precise expire-date via paymentURL: \"" + paymentURL + "\"");
                     continue;
@@ -4857,20 +4876,9 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     protected Long findExpireTimestamp(final Account account, final Browser br, AtomicBoolean isPreciseTimestampFlag) throws Exception {
-        String expireStr = new Regex(getCorrectBR(br), "(\\d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \\d{4})").getMatch(0);
-        if (expireStr != null) {
-            /*
-             * 2019-12-17: XFS premium accounts usually don't expire just before the next day. They will end to the same time of the day
-             * when they were bought but website only displays it to the day which is why we set it to just before the next day to prevent
-             * them from expiring too early in JD. XFS websites with API may provide more precise information on the expiredate (down to the
-             * second).
-             */
-            expireStr += " 23:59:59";
-            return TimeFormatter.getMilliSeconds(expireStr, "dd MMMM yyyy HH:mm:ss", Locale.ENGLISH);
-        }
         // XFileSharingPro Version 4 has broken tag, <span class="text-body"Premium account expire</span>
         // filesfly.cc -> <td>Premium expiration</td><td>2025-XX-XX XX:XX:XX</td>
-        expireStr = new Regex(getCorrectBR(br), "(?:>\\s*|<span[^>]*)Premium\\s*(?:account expire|until|expiration):?\\s*</(?:span|td)>\\s*[^>]*>([\\d]+-[\\w{2}]+-[\\d]+\\s[\\d:]+)</").getMatch(0);
+        String expireStr = new Regex(getCorrectBR(br), "(?:>\\s*|<span[^>]*)Premium\\s*(?:account expire|until|expiration):?\\s*</(?:span|td)>\\s*[^>]*>([\\d]+-[\\w{2}]+-[\\d]+\\s[\\d:]+)</").getMatch(0);
         if (expireStr == null) {
             // upload-4ever.com -> <span>Premium until <b>2026-XX-XX XX:XX:XX</b></span>
             expireStr = new Regex(getCorrectBR(br), "(?:>\\s*|<span[^>]*)Premium\\s*(?:account expire|until|expiration):?\\s*[^>]*>([\\d]+-[\\w{2}]+-[\\d]+\\s[\\d:]+)</").getMatch(0);
@@ -4891,6 +4899,17 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 return ret;
             }
         }
+        expireStr = new Regex(getCorrectBR(br), "(\\d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \\d{4})").getMatch(0);
+        if (expireStr != null) {
+            /*
+             * 2019-12-17: XFS premium accounts usually don't expire just before the next day. They will end to the same time of the day
+             * when they were bought but website only displays it to the day which is why we set it to just before the next day to prevent
+             * them from expiring too early in JD. XFS websites with API may provide more precise information on the expiredate (down to the
+             * second).
+             */
+            expireStr += " 23:59:59";
+            return TimeFormatter.getMilliSeconds(expireStr, "dd MMMM yyyy HH:mm:ss", Locale.ENGLISH);
+        }
         return -1l;
     }
 
@@ -4905,7 +4924,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             preciseExpireHTML = getCorrectBR(br);
         }
         // pattern good enough for all html
-        String expireSecond = new Regex(preciseExpireHTML, "(?:Premium(-| )Account expires?(?: in)?|Twoje premium wygaśnie za)\\s*:\\s*(?:</span>)?\\s*(?:</span>)?\\s*(?:<span>)?\\s*([a-zA-Z0-9, ]+)\\s*</").getMatch(-1);
+        String expireSecond = new Regex(preciseExpireHTML, "(?:Premium(-| )Account expires?(?: in)?|Twoje premium wygaśnie za)\\s*:\\s*(?:</span>)?\\s*(?:</span>)?\\s*(?:<(span|b)>)?\\s*([a-zA-Z0-9, ]+)\\s*</").getMatch(-1);
         if (StringUtils.isEmpty(expireSecond)) {
             /* e.g. kenfiles.com */
             expireSecond = new Regex(preciseExpireHTML, Pattern.compile(">\\s*Your premium expires?\\s*:\\s*(\\d+ years?, )?(\\d+ days?, )?(\\d+ hours?, )?(\\d+ minutes?, )?\\d+ seconds\\s*<", Pattern.CASE_INSENSITIVE)).getMatch(-1);
@@ -4927,7 +4946,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
              */
             expireSecond = new Regex(preciseExpireHTML, Pattern.compile(">\\s*(\\d+ years?, )?(\\d+ days?, )?(\\d+ hours?, )?(\\d+ minutes?, )?\\d+ seconds\\s*<", Pattern.CASE_INSENSITIVE)).getMatch(-1);
         }
-        if (StringUtils.isEmpty(expireSecond) && !StringUtils.isEmpty(preciseExpireHTML)) {
+        if (StringUtils.isEmpty(expireSecond) && !allHTML && !StringUtils.isEmpty(preciseExpireHTML)) {
             /*
              * 2019-09-07: This html-class may also be given for non-premium accounts e.g. fileup.cc
              */
@@ -4937,8 +4956,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     /**
-     * Tries to find apikey on website which, if given, usually camn be found on /?op=my_account Example host which has 'API mod'
-     * installed:<br>
+     * Tries to find apikey on website which, if given, usually camn be found on /?op=my_account Example host which has 'API mod' installed:<br>
      * This will also try to get- and save the API host with protocol in case it differs from the plugins' main host (examples:
      * ddownload.co, vup.to). clicknupload.org <br>
      * apikey will usually be located here: "/?op=my_account" <br>
@@ -5116,6 +5134,21 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         return imghost_next_form;
     }
 
+    protected String regExTrafficMax(final Browser br) {
+        final String src = this.getCorrectBR(br);
+        /** hotlink: <small class="ma-stat-sub">53.7 / 66 GB (81%)</small> **/
+        final String avail_max_traffic[] = new Regex(src, ">\\s*([0-9\\. TGMKB]+)\\s*/\\s*([0-9\\. TGMKB]+)").getRow(0);
+        String trafficMax = avail_max_traffic == null ? null : avail_max_traffic[1];
+        if (avail_max_traffic != null && trafficMax.matches("^[0-9\\. ]+$")) {
+            trafficMax = avail_max_traffic[1] + " " + avail_max_traffic[0].replaceFirst("[0-9\\. ]+", "");
+        }
+        if (trafficMax != null && trafficMax.matches("^[0-9\\. ]+$")) {
+            // fallback, add GB unit
+            trafficMax = trafficMax + " GB";
+        }
+        return trafficMax;
+    }
+
     /** Tries to find available traffic-left value inside html code. */
     protected String regExTrafficLeft(final Browser br) {
         /* 2020-30-09: progressbar with tooltip */
@@ -5143,16 +5176,17 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 }
             }
         }
+
         if (StringUtils.isEmpty(availabletraffic)) {
             /* filejoker.net */
             final String formGroup = new Regex(src, ">\\s*(?:Remaining traffic|Traffic available)(?:\\s*today)?\\s*:?\\s*</[^>]*>(.*?)<div\\s*class\\s*=\\s*\"form-group").getMatch(0);
-            String trafficDetails[] = new Regex(formGroup, "title\\s*=\\s*\"\\s*([0-9\\.]+\\s*[TGMB]+\\s*)/\\s*([0-9\\.]+\\s*[TGMB]+\\s*)\"").getRow(0);
+            final String trafficDetails[] = new Regex(formGroup, "title\\s*=\\s*\"\\s*([0-9\\.]+\\s*[TGMB]+\\s*)/\\s*([0-9\\.]+\\s*[TGMB]+\\s*)\"").getRow(0);
             if (trafficDetails != null) {
                 /**
                  * kenfiles.com
                  *
-                 * >Traffic available
-                 * today</span><span><a href="https://kenfiles.com/contact" title="671Mb/50000Mb" data-toggle="tooltip">49329 Mb</a></span>
+                 * >Traffic available today</span><span><a href="https://kenfiles.com/contact" title="671Mb/50000Mb"
+                 * data-toggle="tooltip">49329 Mb</a></span>
                  */
                 final long used = parseSize(Size.TRAFFIC, trafficDetails[0]);
                 final long max = parseSize(Size.TRAFFIC, trafficDetails[1]);
@@ -5163,17 +5197,29 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             /**
              * filejoker.net
              *
-             * >Traffic Available:</label> <div class="col-12 col-md-8 col-lg"> <div class="progress">
-             * <div class="progress-bar progress-bar-striped bg-success" role="progressbar" style="width:47.95%" aria-valuenow="47.95"
+             * >Traffic Available:</label> <div class="col-12 col-md-8 col-lg"> <div class="progress"> <div
+             * class="progress-bar progress-bar-striped bg-success" role="progressbar" style="width:47.95%" aria-valuenow="47.95"
              * aria-valuemin="0" aria-valuemax="100" title="47951 MB available">47.95%</div>
              */
             availabletraffic = new Regex(formGroup, "title\\s*=\\s*\"\\s*([\\-\\s*]*[0-9\\.]+\\s*[TGMB]+\\s*)(?:available)?\"").getMatch(0);
         }
+        if (StringUtils.isEmpty(availabletraffic)) {
+            /** hotlink: <small class="ma-stat-sub">53.7 / 66 GB (81%)</small> **/
+            final String avail_max_traffic[] = new Regex(src, ">\\s*([0-9\\. TGMKB]+)\\s*/\\s*([0-9\\. TGMKB]+)").getRow(0);
+            availabletraffic = avail_max_traffic == null ? null : avail_max_traffic[0];
+            if (availabletraffic != null && availabletraffic.matches("^[0-9\\. ]+$")) {
+                // add missing unit, take from max
+                availabletraffic = avail_max_traffic[0] + " " + avail_max_traffic[1].replaceFirst("[0-9\\. ]+", "");
+            }
+            if (availabletraffic != null && availabletraffic.matches("^[0-9\\. ]+$")) {
+                // fallback, add GB unit
+                availabletraffic = availabletraffic + " GB";
+            }
+        }
         if (StringUtils.isNotEmpty(availabletraffic)) {
             return availabletraffic;
-        } else {
-            return null;
         }
+        return null;
     }
 
     public boolean isLoggedin(final Browser brc) {
