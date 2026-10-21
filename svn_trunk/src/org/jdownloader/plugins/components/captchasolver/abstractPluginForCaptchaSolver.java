@@ -180,7 +180,7 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
         return false;
     }
 
-    public Set<CAPTCHA_TYPE> getUserDisabledCaptchaTypes(final Account account) {
+    public Set<CAPTCHA_TYPE> getUserAccountDisabledCaptchaTypes(final Account account) {
         final AccountInfo ai = account.getAccountInfo();
         if (ai == null) {
             return null;

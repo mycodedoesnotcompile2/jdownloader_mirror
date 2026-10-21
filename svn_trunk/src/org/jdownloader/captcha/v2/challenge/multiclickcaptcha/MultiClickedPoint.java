@@ -12,11 +12,8 @@ public class MultiClickedPoint implements Storable {
     public MultiClickedPoint(int[] x, int[] y) {
         if (x == null || y == null) {
             throw new IllegalArgumentException();
-        } else if (x.length == 0 || x.length == 0) {
-            throw new IllegalArgumentException();
-        } else if (x.length != y.length) {
-            throw new IllegalArgumentException();
         }
+        /* No further validation here on purpose: MultiClickCaptchaChallenge#validateResponse reports the exact reason. */
         this.x = x;
         this.y = y;
     }

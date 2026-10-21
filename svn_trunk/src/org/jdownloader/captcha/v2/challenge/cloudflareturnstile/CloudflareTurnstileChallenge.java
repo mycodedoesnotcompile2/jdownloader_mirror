@@ -5,6 +5,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 
 import org.jdownloader.captcha.v2.AbstractResponse;
+import org.jdownloader.captcha.v2.ValidationResult;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
 
 public abstract class CloudflareTurnstileChallenge extends AbstractBrowserChallenge {
@@ -36,7 +37,11 @@ public abstract class CloudflareTurnstileChallenge extends AbstractBrowserChalle
     }
 
     @Override
-    public boolean validateResponse(AbstractResponse<String> response) {
-        return super.validateResponse(response) && AbstractCloudflareTurnstileCaptcha.looksLikeValidToken(response.getValue());
+    public ValidationResult validateResponse(AbstractResponse<String> response) {
+        final ValidationResult result = super.validateResponse(response);
+        if (result != ValidationResult.VALID) {
+            return result;
+        }
+        return AbstractCloudflareTurnstileCaptcha.looksLikeValidToken(response.getValue()) ? ValidationResult.VALID : ValidationResult.INVALID_TOKEN;
     }
 }

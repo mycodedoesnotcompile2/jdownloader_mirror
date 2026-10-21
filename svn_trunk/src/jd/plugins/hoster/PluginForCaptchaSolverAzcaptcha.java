@@ -44,7 +44,7 @@ import jd.plugins.PluginException;
  * - reCAPTCHA v2 uses the task type "NoCaptchaTaskProxyless" and reCAPTCHA v3 Enterprise has its own task type <br>
  * - Negative feedback is only available via the classic API (res.php?action=reportbad), there is no "report correct" method.
  */
-@HostPlugin(revision = "$Revision: 53671 $", interfaceVersion = 3, names = { "azcaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53699 $", interfaceVersion = 3, names = { "azcaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -213,6 +213,7 @@ public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSol
         try {
             final Browser brc = br.cloneBrowser();
             brc.getPage(this.getApiBase() + "/res.php?key=" + account.getPass() + "&action=reportbad&id=" + response.getCaptchaSolverTaskID());
+            /* e.g. OK_REPORT_RECORDED */
             return brc.getRequest().getHtmlCode().trim().startsWith("OK");
         } catch (final Throwable e) {
             e.printStackTrace();
@@ -246,7 +247,14 @@ public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSol
             return;
         }
         final String errorCode = entries.get("errorCode").toString();
-        final String errorDescription = entries.get("errorDescription").toString();
+        /* errorDescription can be null. */
+        final Object errorDescriptionO = entries.get("errorDescription");
+        final String errorDescription;
+        if (errorDescriptionO != null) {
+            errorDescription = errorCode + ": " + errorDescriptionO.toString();
+        } else {
+            errorDescription = errorCode;
+        }
         if (accountErrorsPermament.contains(errorCode)) {
             throw new AccountInvalidException(errorDescription);
         } else if (accountErrorsTemp.contains(errorCode)) {

@@ -35,7 +35,7 @@ import jd.plugins.hoster.DirectHTTP;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 
-@DecrypterPlugin(revision = "$Revision: 52848 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53686 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornpicsCom extends PluginForDecrypt {
     public PornpicsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -92,11 +92,11 @@ public class PornpicsCom extends PluginForDecrypt {
             final String urlSlug = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
             galleryTitle = urlSlug.replace("-", " ").trim();
         }
-        String modelNamesCommaSeparated = br.getRegex("<div class=\"hidden suggest-2_source-list__model\"[^>]*>([^<]+)</div>").getMatch(0);
+        String modelNamesCommaSeparated = br.getRegex("<div class=\"hidden suggest-2_source-list__model\"[^>]*>\\s*([^<]+)\\s*</div>").getMatch(0);
         if (modelNamesCommaSeparated != null) {
             modelNamesCommaSeparated = Encoding.htmlDecode(modelNamesCommaSeparated).trim();
         }
-        final String[] links = br.getRegex("class='thumbwook'[^>]*>\\s*<a class='rel-link' href='(https?://[^']+)").getColumn(0);
+        final String[] links = br.getRegex("class='[^']*thumbwook[^']*'[^>]*>\\s*<a class='rel-link' href='(https?://[^']+)").getColumn(0);
         if (links == null || links.length == 0) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }

@@ -131,14 +131,7 @@ public class EditColumn extends ExtTextColumn<AdvancedConfigEntry> {
         }
 
         public void setEntry(AdvancedConfigEntry value) {
-            final Object currentValue = value.getValue();
-            if (currentValue == null) {
-                setEnabledIntern(value.hasDefaultValue());
-            } else {
-                final Object defaultValue = value.getDefault();
-                final boolean isDefault = AdvancedConfigEntry.equals(currentValue, defaultValue);
-                setEnabledIntern(!isDefault);
-            }
+            setEnabledIntern(value.isResetToDefaultPossible());
             this.value = value;
         }
 

@@ -87,7 +87,6 @@ AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_countdown_download=Download Captch
 AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_reset=Reset Solver Timing
 AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_reset_lit_are_you_sure=Are you sure that you want to reset all timing setups. \r\nThis will reset the order your captcha solvers run.
 AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_solver=Captcha Solver Services
-AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_sounds=Play Notify Sound for Captchas
 AntiCaptchaConfigPanel_getTitle=Captchas
 AntiCaptchaConfigPanel_onShow_description=Many services ask you to enter a so called 'Captcha'. Usually, a Captcha is a tiny image that contains a few letters. You have to type these letters to prove that you are human. JDownloader will try to solve these captchas without asking you. However, there are captchas that are too hard to read for JDownloader - thus JD will ask you.
 AntiCaptchaConfigPanel_onShow_description_ces=Earn 'credits' by solving Captchas for others. In return, others solve your Captchas while you are not in front of your computer. Check out the service's Website for more details.

@@ -62,20 +62,6 @@ public interface CaptchaSettings extends ConfigInterface {
     void setAvoidAutoSolverForLoginCaptchas(boolean b);
 
     @AboutConfig
-    @DefaultBooleanValue(true)
-    @DescriptionForConfigEntry("True to enable a countdown in captcha dialogs. Dialog will close automated after the coundown")
-    boolean isDialogCountdownForDownloadsEnabled();
-
-    void setDialogCountdownForDownloadsEnabled(boolean b);
-
-    @AboutConfig
-    @DefaultBooleanValue(false)
-    @DescriptionForConfigEntry("True to enable a countdown in crawler captcha dialogs. Dialog will close automated after the coundown")
-    boolean isDialogCountdownForCrawlerEnabled();
-
-    void setDialogCountdownForCrawlerEnabled(boolean b);
-
-    @AboutConfig
     @DefaultEnumValue("SKIP")
     @LookUpKeys({ "captchatimeoutaction", "hostercaptchatimeoutaction" })
     @DescriptionForConfigEntry("Defines what should happen if a captcha prompt runs into a timeout meaning that neither the user nor any captcha solver did answer the captcha prompt. This setting affects all HOSTER download/account-check processes.")
@@ -90,14 +76,6 @@ public interface CaptchaSettings extends ConfigInterface {
     CAPTCHA_TIMEOUT_ACTION getOnCrawlerCaptchaTimeoutAction();
 
     void setOnCrawlerCaptchaTimeoutAction(CAPTCHA_TIMEOUT_ACTION b);
-
-    @AboutConfig
-    @DefaultIntValue(300000)
-    @SpinnerValidator(min = 10000, max = 900000)
-    @DescriptionForConfigEntry("MS to wait until captcha dialog gets answered. Close dialog after this timeout unanswered")
-    int getCaptchaDialogDefaultCountdown2();
-
-    void setCaptchaDialogDefaultCountdown2(int seconds);
 
     @AboutConfig
     @DefaultIntValue(95)

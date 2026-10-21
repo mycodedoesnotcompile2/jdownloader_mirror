@@ -18,11 +18,20 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.plugins.PluginTaskID;
+import org.jdownloader.plugins.components.config.FakirdebridNetConfig;
+import org.jdownloader.plugins.components.config.FakirdebridNetConfig.BlockDownloadSlotsMode;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -42,16 +51,23 @@ import jd.plugins.MultiHostHost;
 import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
+import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 52815 $", interfaceVersion = 3, names = { "fakirdebrid.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53691 $", interfaceVersion = 3, names = { "fakirdebrid.net" }, urls = { "" })
 public class FakirdebridNet extends PluginForHost {
-    private static final String          API_BASE           = "https://api.fakirdebrid.net";
-    private static MultiHosterManagement mhm                = new MultiHosterManagement("fakirdebrid.net");
-    private static final boolean         defaultResume      = true;
-    private static final int             defaultMaxchunks   = -10;
-    private final String                 PROPERTY_RESUME    = "fakirdebrid_resume";
-    private final String                 PROPERTY_MAXCHUNKS = "fakirdebrid_maxchunks";
+    private static final String          API_BASE                                 = "https://api.fakirdebrid.net";
+    private static MultiHosterManagement mhm                                      = new MultiHosterManagement("fakirdebrid.net");
+    private static final boolean         defaultResume                            = true;
+    private static final int             defaultMaxchunks                         = -10;
+    private final String                 PROPERTY_RESUME                          = "fakirdebrid_resume";
+    private final String                 PROPERTY_MAXCHUNKS                       = "fakirdebrid_maxchunks";
+    private final String                 PROPERTY_APILINK                         = "fakirdebrid_apilink";
+    private final String                 PROPERTY_APILINK_TIMESTAMP               = "fakirdebrid_apilink_timestamp";
+    private static final long            APILINK_MAX_AGE_MILLIS                   = 6 * 60 * 60 * 1000l;
+    /* No retry/eta field is known in the API -> fixed poll interval. */
+    private static final long            SERVERSIDE_DOWNLOAD_POLL_INTERVAL_MILLIS = 5 * 1000l;
+    private static final long            SERVERSIDE_DOWNLOAD_MAX_WAIT_MILLIS      = 10 * 60 * 1000l;
 
     @SuppressWarnings("deprecation")
     public FakirdebridNet(PluginWrapper wrapper) {
@@ -96,52 +112,92 @@ public class FakirdebridNet extends PluginForHost {
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
         if (!attemptStoredDownloadurlDownload(link, this.getHost() + "directlink", link.getBooleanProperty(PROPERTY_RESUME, defaultResume), link.getIntegerProperty(PROPERTY_MAXCHUNKS, defaultMaxchunks))) {
             Map<String, Object> entries = null;
-            int counter = 0;
-            String passCode = link.getDownloadPassword();
-            do {
-                String postData = "url=" + Encoding.urlEncode(link.getDefaultPlugin().buildExternalDownloadURL(link, this));
-                if (counter > 0) {
-                    /* 2nd try: First provided password was invalid or no password has been tried on first attempt. */
-                    passCode = getUserInput("Password?", link);
-                }
-                if (passCode != null) {
-                    /* Append password like: "|<password>" */
-                    postData += Encoding.urlEncode("|" + passCode);
-                }
-                br.postPage(API_BASE + "/generate/" + Encoding.urlEncode(account.getPass()), postData);
-                entries = parseAPIResponse(account, link);
-                final Object errorCodeO = entries.get("code");
-                if (errorCodeO != null && errorCodeO instanceof String && errorCodeO.toString().equalsIgnoreCase("Password_Required")) {
-                    logger.info("Password required");
-                    counter += 1;
-                } else if (errorCodeO != null && errorCodeO instanceof String && errorCodeO.toString().equalsIgnoreCase("Wrong_Password")) {
-                    logger.info("Wrong password");
-                    counter += 1;
+            String apilink = null;
+            boolean resumable = defaultResume;
+            int maxChunks = defaultMaxchunks;
+            final String storedApilink = link.getStringProperty(PROPERTY_APILINK);
+            if (storedApilink != null && System.currentTimeMillis() - link.getLongProperty(PROPERTY_APILINK_TIMESTAMP, 0) < APILINK_MAX_AGE_MILLIS) {
+                logger.info("Re-using stored apilink: " + storedApilink);
+                br.getPage(storedApilink);
+                final Map<String, Object> storedEntries = parseAPIResponse(account, link);
+                if (Boolean.FALSE.equals(storedEntries.get("success"))) {
+                    logger.info("Stored apilink is no longer valid: " + storedEntries.get("message"));
+                    link.removeProperty(PROPERTY_APILINK);
+                    link.removeProperty(PROPERTY_APILINK_TIMESTAMP);
                 } else {
-                    /* No password required or correct password entered */
-                    break;
+                    apilink = storedApilink;
+                    resumable = link.getBooleanProperty(PROPERTY_RESUME, defaultResume);
+                    maxChunks = link.getIntegerProperty(PROPERTY_MAXCHUNKS, defaultMaxchunks);
+                    entries = (Map<String, Object>) storedEntries.get("data");
                 }
-            } while (counter <= 2);
-            /* entries is already parsed above – pass directly to avoid re-parsing */
-            entries = handleAPIErrors(entries, account, link);
-            if (passCode != null) {
-                /* Save password for the next time. */
-                link.setDownloadPassword(passCode);
             }
-            entries = (Map<String, Object>) entries.get("data");
-            final boolean resumable = ((Boolean) entries.get("resumable")).booleanValue();
-            int maxChunks = ((Number) entries.get("maxchunks")).intValue();
-            if (maxChunks > 1) {
-                maxChunks = -maxChunks;
+            if (apilink == null) {
+                int counter = 0;
+                String passCode = link.getDownloadPassword();
+                do {
+                    String url = link.getDefaultPlugin().buildExternalDownloadURL(link, this);
+                    if (counter > 0) {
+                        /* 2nd try: First provided password was invalid or no password has been tried on first attempt. */
+                        passCode = getUserInput("Password?", link);
+                    }
+                    if (passCode != null) {
+                        /* Append password like: "|<password>" */
+                        url += "|" + passCode;
+                    }
+                    final UrlQuery query = new UrlQuery();
+                    query.appendEncoded("url", url);
+                    /* Add filename/siue/hash to query for better server-side mirror matching. */
+                    query.appendEncoded("filename", link.getName());
+                    final long filesize = link.getKnownDownloadSize();
+                    if (filesize >= 0) {
+                        /* Only send filesize if it is known. */
+                        query.appendEncoded("filesize", Long.toString(filesize));
+                    }
+                    final String hash = getStrongestHash(link);
+                    if (hash != null) {
+                        query.appendEncoded("hash", hash);
+                    }
+                    br.postPage(API_BASE + "/generate/" + Encoding.urlEncode(account.getPass()), query);
+                    entries = parseAPIResponse(account, link);
+                    final Object errorCodeO = entries.get("code");
+                    if (errorCodeO != null && errorCodeO instanceof String && errorCodeO.toString().equalsIgnoreCase("Password_Required")) {
+                        logger.info("Password required");
+                        counter += 1;
+                    } else if (errorCodeO != null && errorCodeO instanceof String && errorCodeO.toString().equalsIgnoreCase("Wrong_Password")) {
+                        logger.info("Wrong password");
+                        counter += 1;
+                    } else {
+                        /* No password required or correct password entered */
+                        break;
+                    }
+                } while (counter <= 2);
+                /* entries is already parsed above – pass directly to avoid re-parsing */
+                entries = handleAPIErrors(entries, account, link);
+                if (passCode != null) {
+                    /* Save password for the next time. */
+                    link.setDownloadPassword(passCode);
+                }
+                entries = (Map<String, Object>) entries.get("data");
+                resumable = ((Boolean) entries.get("resumable")).booleanValue();
+                maxChunks = ((Number) entries.get("maxchunks")).intValue();
+                if (maxChunks > 1) {
+                    maxChunks = -maxChunks;
+                }
+                apilink = (String) entries.get("link");
+                /* Store apilink (and the info needed to re-use it) as DownloadLink properties. */
+                link.setProperty(PROPERTY_APILINK, apilink);
+                link.setProperty(PROPERTY_APILINK_TIMESTAMP, System.currentTimeMillis());
+                link.setProperty(PROPERTY_RESUME, resumable);
+                link.setProperty(PROPERTY_MAXCHUNKS, maxChunks);
+                br.getPage(apilink);
+                entries = handleAPIErrors(account, link);
+                entries = (Map<String, Object>) entries.get("data");
             }
-            final String apilink = (String) entries.get("link");
-            br.getPage(apilink);
-            entries = handleAPIErrors(account, link);
-            entries = (Map<String, Object>) entries.get("data");
+            if ("processing".equalsIgnoreCase((String) entries.get("state"))) {
+                entries = waitForServersideDownload(entries, apilink, account, link);
+            }
             final String state = (String) entries.get("state");
-            if ("processing".equalsIgnoreCase(state)) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "File is being transferred to fakirdebrid servers: " + entries.get("completed") + "%", 10 * 1000l);
-            } else if (!"completed".equals(state)) {
+            if (!"completed".equals(state)) {
                 mhm.handleErrorGeneric(account, link, "Unknown state: " + state, 50);
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -159,6 +215,94 @@ public class FakirdebridNet extends PluginForHost {
             link.setProperty(PROPERTY_MAXCHUNKS, maxChunks);
         }
         this.dl.startDownload();
+    }
+
+    /** Returns the strongest hash known for the given link (SHA256 > SHA1 > MD5) or null if none is available. */
+    private String getStrongestHash(final DownloadLink link) {
+        final String sha256 = link.getSha256Hash();
+        if (!StringUtils.isEmpty(sha256)) {
+            return sha256;
+        }
+        final String sha1 = link.getSha1Hash();
+        if (!StringUtils.isEmpty(sha1)) {
+            return sha1;
+        }
+        final String md5 = link.getMD5Hash();
+        if (!StringUtils.isEmpty(md5)) {
+            return md5;
+        }
+        return null;
+    }
+
+    /**
+     * Block download slots for files which have to be downloaded to the multihost's servers first? If this returns true, the download stays
+     * active (and occupies its slot) while waiting for the serverside download. If false, the link is set temporarily unavailable so other
+     * download candidates can be tried.
+     */
+    protected boolean blockDownloadSlotsForCloudDownloads(final Account account) {
+        return get(getConfigInterface()).getBlockDownloadSlotsForCloudDownloads().getMode() == BlockDownloadSlotsMode.BLOCK;
+    }
+
+    /**
+     * Polls the given API link until the serverside download is finished. Stops as soon as an API error occurs (thrown by handleAPIErrors),
+     * the user aborts or {@link #SERVERSIDE_DOWNLOAD_MAX_WAIT_MILLIS} have passed.
+     *
+     * @return "data" map of the last API response.
+     */
+    private Map<String, Object> waitForServersideDownload(Map<String, Object> data, final String apilink, final Account account, final DownloadLink link) throws Exception {
+        final AtomicReference<String> statusText = new AtomicReference<String>("Waiting for serverside download...");
+        final PluginProgress waitProgress = new PluginProgress(0, 100, null) {
+            @Override
+            public PluginTaskID getID() {
+                return PluginTaskID.WAIT;
+            }
+
+            @Override
+            public String getMessage(Object requestor) {
+                return statusText.get();
+            }
+        };
+        waitProgress.setIcon(new AbstractIcon(IconKey.ICON_WAIT, 16));
+        waitProgress.setProgressSource(this);
+        final long startTimeStamp = Time.systemIndependentCurrentJVMTimeMillis();
+        try {
+            while (true) {
+                /* "completed" is a percentage with decimals e.g. 9.93 */
+                final double percent = ((Number) data.get("completed")).doubleValue();
+                final String text = "File is being transferred to fakirdebrid servers: " + String.format(Locale.US, "%.1f", percent) + "%";
+                if (!blockDownloadSlotsForCloudDownloads(account)) {
+                    /* Throw exception right away so other download candidates will be tried. */
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, text, SERVERSIDE_DOWNLOAD_POLL_INTERVAL_MILLIS);
+                }
+                final long waited = Time.systemIndependentCurrentJVMTimeMillis() - startTimeStamp;
+                if (waited >= SERVERSIDE_DOWNLOAD_MAX_WAIT_MILLIS) {
+                    logger.info("Serverside download wait timeout after ms: " + waited);
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, text, SERVERSIDE_DOWNLOAD_POLL_INTERVAL_MILLIS);
+                }
+                /*
+                 * Do not use sleep(): It adds its own progress which hides ours. Use 1000 as total so the progress bar has a resolution of
+                 * 0.1%.
+                 */
+                final String speedText = data.get("speed_text").toString();
+                statusText.set("Serverside download: " + String.format(Locale.US, "%.1f", percent) + "%" + (StringUtils.isEmpty(speedText) ? "" : " (" + speedText + "/s)"));
+                waitProgress.updateValues(Math.round(percent * 10), 1000);
+                link.addPluginProgress(waitProgress);
+                final long pollEnd = Time.systemIndependentCurrentJVMTimeMillis() + SERVERSIDE_DOWNLOAD_POLL_INTERVAL_MILLIS;
+                while (Time.systemIndependentCurrentJVMTimeMillis() < pollEnd) {
+                    if (this.isAbort()) {
+                        throw new InterruptedException();
+                    }
+                    Thread.sleep(250);
+                }
+                br.getPage(apilink);
+                data = (Map<String, Object>) handleAPIErrors(account, link).get("data");
+                if (!"processing".equalsIgnoreCase((String) data.get("state"))) {
+                    return data;
+                }
+            }
+        } finally {
+            link.removePluginProgress(waitProgress);
+        }
     }
 
     private boolean attemptStoredDownloadurlDownload(final DownloadLink link, final String directlinkproperty, final boolean resumable, final int maxchunks) throws Exception {
@@ -200,6 +344,8 @@ public class FakirdebridNet extends PluginForHost {
             account.setUser(username);
         }
         account.setType(AccountType.PREMIUM);
+        /* 2026-10-20: Limit according to admin */
+        account.setMaxSimultanDownloads(2);
         final String message = (String) entries.get("message");
         final String planStr = (String) accountData.get("plan");
         if (!StringUtils.isEmpty(message) && !StringUtils.isEmpty(planStr)) {
@@ -336,6 +482,11 @@ public class FakirdebridNet extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
+    }
+
+    @Override
+    public Class<? extends FakirdebridNetConfig> getConfigInterface() {
+        return FakirdebridNetConfig.class;
     }
 
     @Override

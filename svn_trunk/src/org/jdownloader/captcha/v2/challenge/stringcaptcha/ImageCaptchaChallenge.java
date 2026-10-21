@@ -13,7 +13,9 @@ import jd.plugins.Plugin;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.images.IconIO;
 import org.appwork.utils.net.Base64OutputStream;
+import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.ValidationResult;
 import org.seamless.util.io.IO;
 
 public abstract class ImageCaptchaChallenge<T> extends Challenge<T> {
@@ -46,6 +48,23 @@ public abstract class ImageCaptchaChallenge<T> extends Challenge<T> {
 
     public void setNumeric(final Boolean numeric) {
         this.numeric = numeric;
+    }
+
+    /**
+     * If the challenge is numeric, text answers may only consist of digits. Answers that are not text (e.g. click positions) are not
+     * checked here.
+     */
+    @Override
+    public ValidationResult validateResponse(final AbstractResponse<T> response) {
+        final ValidationResult result = super.validateResponse(response);
+        if (result != ValidationResult.VALID) {
+            return result;
+        }
+        final Object value = response.getValue();
+        if (Boolean.TRUE.equals(numeric) && value instanceof String && !((String) value).matches("\\d+")) {
+            return ValidationResult.NOT_NUMERIC;
+        }
+        return ValidationResult.VALID;
     }
 
     public Image getImage() throws IOException {

@@ -1,8 +1,6 @@
 package jd.gui.swing.jdgui.views.settings.panels.anticaptcha;
 
 import java.awt.Component;
-import java.awt.event.ItemEvent;
-import java.awt.event.ItemListener;
 
 import javax.swing.Icon;
 import javax.swing.JLabel;
@@ -15,7 +13,6 @@ import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.utils.DebugMode;
 import org.jdownloader.captcha.v2.SolverService;
 import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.notify.captcha.CESBubbleSupport;
 import org.jdownloader.gui.settings.AbstractConfigPanel;
 import org.jdownloader.gui.settings.Pair;
 import org.jdownloader.gui.translate._GUI;
@@ -23,20 +20,16 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
-import org.jdownloader.settings.staticreferences.CFG_SOUND;
 
 import jd.gui.swing.jdgui.JDGui;
 import jd.gui.swing.jdgui.views.settings.ConfigurationView;
 import jd.gui.swing.jdgui.views.settings.components.Checkbox;
-import jd.gui.swing.jdgui.views.settings.components.Spinner;
 
 public class CaptchaConfigPanel extends AbstractConfigPanel {
     private static final long         serialVersionUID = 1L;
     // private CESSettingsPanel psp;
     private SolverOrderTable          solverOrderTable;
     private SolverComparisonContainer solverComparisonContainer;
-    private Pair<Spinner>             skipBubbleTimeoutPair;
-    private Pair<Checkbox>            useExternalSolverAccountsPair;
     private CaptchaSettingsTabbedPane tabs;
     private JScrollPane               solversScrollPane;
     private CaptchaTestPanel          testPanel;
@@ -51,21 +44,10 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
         debugTabShown = false;
         this.addHeader(getTitle(), new AbstractIcon(IconKey.ICON_OCR, 32));
         this.addDescriptionPlain(_GUI.T.AntiCaptchaConfigPanel_onShow_description());
-        addPair(_GUI.T.AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_sounds(), null, new Checkbox(CFG_SOUND.CAPTCHA_SOUND_ENABLED));
-        addPair(_GUI.T.AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_countdown_download(), null, new Checkbox(CFG_CAPTCHA.DIALOG_COUNTDOWN_FOR_DOWNLOADS_ENABLED));
-        final Pair<Checkbox> useExternalSolverAccounts = this.useExternalSolverAccountsPair = addPair(_GUI.T.CaptchaConfigPanel_useExternalSolverAccounts(), null, new Checkbox(CFG_GENERAL.USE_AVAILABLE_CAPTCHA_SOLVER_ACCOUNTS));
+        final Pair<Checkbox> useExternalSolverAccounts = addPair(_GUI.T.CaptchaConfigPanel_useExternalSolverAccounts(), null, new Checkbox(CFG_GENERAL.USE_AVAILABLE_CAPTCHA_SOLVER_ACCOUNTS));
         final Pair<Checkbox> avoidAutoSolverForLoginCaptchas = addPair(_GUI.T.CaptchaConfigPanel_avoidAutoSolverForLoginCaptchas(), null, new Checkbox(CFG_CAPTCHA.AVOID_AUTO_SOLVER_FOR_LOGIN_CAPTCHAS));
         avoidAutoSolverForLoginCaptchas.setToolTipText(_GUI.T.CaptchaConfigPanel_avoidAutoSolverForLoginCaptchas_tooltip());
         avoidAutoSolverForLoginCaptchas.setConditionPair(useExternalSolverAccounts);
-        skipBubbleTimeoutPair = addPair(_GUI.T.CaptchaExchangeSpinnerAction_skipbubbletimeout_(), null, new Spinner(CFG_CAPTCHA.EXTERNAL_CAPTCHA_SOLVER_CHANCE_TO_ABORT_EXTERNAL_CAPTCHA_SOLVER));
-        /* Not setConditionPair: the enabled state also depends on the bubble settings, see updateSkipBubbleTimeoutEnabled(). */
-        useExternalSolverAccounts.getComponent().addItemListener(new ItemListener() {
-            @Override
-            public void itemStateChanged(ItemEvent e) {
-                updateSkipBubbleTimeoutEnabled();
-            }
-        });
-        updateSkipBubbleTimeoutEnabled();
         /* Tabbed area at the top: solver overview and captcha rules (similar to the Linkgrabber Filter panel). */
         final SolverOrderTable table = this.solverOrderTable = new SolverOrderTable();
         final SolverOrderContainer container = new SolverOrderContainer(table);
@@ -95,15 +77,6 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
         // this.addHeader(_GUI.T.AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_solver(), new AbstractIcon(IconKey.ICON_share", 32));
         // this.addDescriptionPlain(_GUI.T.AntiCaptchaConfigPanel_onShow_description_solver());
         // add(psp = new CESSettingsPanel());
-    }
-
-    /**
-     * The "chance to abort" timeout is the duration of the captcha solver bubble (see CESSolverJob#showBubble), so it has no effect if that
-     * bubble is disabled (either all bubble notifications are switched off or this bubble type is) or if external solver accounts are not
-     * used at all.
-     */
-    private void updateSkipBubbleTimeoutEnabled() {
-        skipBubbleTimeoutPair.setEnabled(CESBubbleSupport.getInstance().isEnabled() && useExternalSolverAccountsPair.getComponent().isSelected());
     }
 
     /**
@@ -197,8 +170,6 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
 
     @Override
     protected void onShow() {
-        /* The bubble settings may have been changed in another settings panel in the meantime. */
-        updateSkipBubbleTimeoutEnabled();
         /*
          * Re-apply the currently active column sort (e.g. "Status") against the solvers' current values. Live updates while this panel is
          * visible only repaint cells (see SolverOrderTableModel.refreshRows()) so rows don't jump around under the user's cursor; returning

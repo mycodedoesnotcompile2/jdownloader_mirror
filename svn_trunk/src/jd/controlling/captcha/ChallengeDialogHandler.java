@@ -16,7 +16,6 @@ import jd.plugins.PluginForHost;
 
 import org.appwork.exceptions.ThrowUncheckedException;
 import org.appwork.exceptions.WTFException;
-import org.appwork.storage.config.JsonConfig;
 import org.appwork.uio.CloseReason;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Exceptions;
@@ -38,15 +37,14 @@ import org.jdownloader.DomainInfo;
 import org.jdownloader.captcha.v2.AbstractCaptchaDialog;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
+import org.jdownloader.captcha.v2.solver.service.DialogSolverService;
 import org.jdownloader.controlling.UniqueAlltimeID;
 import org.jdownloader.settings.SilentModeSettings.CaptchaDuringSilentModeAction;
-import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.settings.staticreferences.CFG_SILENTMODE;
 
 public abstract class ChallengeDialogHandler<D extends AbstractCaptchaDialog<ResultType>, T extends Challenge<ResultType>, ResultType> {
     private DomainInfo            host;
     protected T                   captchaChallenge;
-    private CaptchaSettings       config;
     private final UniqueAlltimeID id              = new UniqueAlltimeID();
     protected DialogHandler       dialogHandler;
     private LogSource             logger;
@@ -57,7 +55,6 @@ public abstract class ChallengeDialogHandler<D extends AbstractCaptchaDialog<Res
     public ChallengeDialogHandler(DomainInfo instance, T captchaChallenge2) {
         this.host = instance;
         this.captchaChallenge = captchaChallenge2;
-        config = JsonConfig.create(CaptchaSettings.class);
         logger = JDGui.getInstance().getLogger();
         dialogHandler = new DialogHandler() {
             @Override
@@ -361,14 +358,16 @@ public abstract class ChallengeDialogHandler<D extends AbstractCaptchaDialog<Res
         }
     }
 
+    /**
+     * Returns the countdown of the dialog in milliseconds. Captcha dialogs always have a countdown. The value is configured in the config
+     * of the solver that shows the dialog. Default: the config of the "Dialog in JDownloader" solver.
+     */
+    protected int getDialogCountdownInMS() {
+        return DialogSolverService.getInstance().getConfigV3().getDialogCountdownSeconds() * 1000;
+    }
+
     protected int getTimeoutInMS() {
-        int countdown = -1;
-        final Plugin plugin = captchaChallenge.getPlugin();
-        if (plugin instanceof PluginForHost && config.isDialogCountdownForDownloadsEnabled()) {
-            countdown = CFG_CAPTCHA.CAPTCHA_DIALOG_DEFAULT_COUNTDOWN.getValue().intValue();
-        } else if (plugin instanceof PluginForDecrypt && config.isDialogCountdownForCrawlerEnabled()) {
-            countdown = CFG_CAPTCHA.CAPTCHA_DIALOG_DEFAULT_COUNTDOWN.getValue().intValue();
-        }
+        int countdown = getDialogCountdownInMS();
         final int remainingTimeout = captchaChallenge.getRemainingTimeout();
         if (remainingTimeout > 0) {
             if (countdown <= 0 || remainingTimeout < countdown) {

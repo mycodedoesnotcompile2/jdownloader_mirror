@@ -42,6 +42,7 @@ import javax.swing.JList;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.JToggleButton;
 import javax.swing.KeyStroke;
 
 import org.appwork.exceptions.WTFException;
@@ -79,6 +80,7 @@ import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.settings.SoundSettings;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
+import org.jdownloader.settings.staticreferences.CFG_SOUND;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
 import jd.controlling.linkcrawler.CrawledLink;
@@ -325,7 +327,7 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
                             clip.open(stream);
                             try {
                                 final FloatControl gainControl = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
-                                float db = (20f * (float) Math.log(JsonConfig.create(SoundSettings.class).getCaptchaSoundVolume() / 100f));
+                                float db = (20f * (float) Math.log(JsonConfig.create(SoundSettings.class).getCaptchaSoundVolumePercent() / 100f));
                                 gainControl.setValue(Math.max(-80f, db));
                                 BooleanControl muteControl = (BooleanControl) clip.getControl(BooleanControl.Type.MUTE);
                                 muteControl.setValue(true);
@@ -402,6 +404,29 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
         }
     }
 
+    /** True if the dialog shows the toggle for the (global) captcha sound. Not the case for dialogs that are no real captchas. */
+    protected boolean isSoundToggleVisible() {
+        return true;
+    }
+
+    /**
+     * Creates the toggle for the global captcha sound setting (CaptchaSoundEnabled). It is the same setting for all captcha dialogs. The
+     * volume is only available in the advanced settings.
+     */
+    protected JToggleButton createSoundToggle() {
+        final JToggleButton ret = new JToggleButton(new AbstractIcon(IconKey.ICON_AUDIO, 18));
+        ret.setSelected(CFG_SOUND.CAPTCHA_SOUND_ENABLED.getValue().booleanValue());
+        ret.setToolTipText(_GUI.T.AbstractCaptchaDialog_soundToggle_tooltip());
+        ret.setFocusable(false);
+        ret.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                CFG_SOUND.CAPTCHA_SOUND_ENABLED.setValue(ret.isSelected());
+            }
+        });
+        return ret;
+    }
+
     @Override
     protected DefaultButtonPanel getDefaultButtonPanel() {
         final DefaultButtonPanel ret = new DefaultButtonPanel("ins 0", "[]", "0[grow,fill]0") {
@@ -455,6 +480,9 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
             }
         };
         ret.setOpaque(false);
+        if (isSoundToggleVisible()) {
+            ret.add(createSoundToggle(), "width 28!");
+        }
         ExtButton premium = new ExtButton(new AppAction() {
             /**
              *

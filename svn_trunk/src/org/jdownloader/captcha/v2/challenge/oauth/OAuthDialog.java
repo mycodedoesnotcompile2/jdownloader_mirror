@@ -27,6 +27,12 @@ import org.jdownloader.captcha.v2.solverjob.ChallengeSolverJobListener;
 import org.jdownloader.gui.translate._GUI;
 
 public class OAuthDialog extends AbstractCaptchaDialog<Boolean> implements ActionListener, ChallengeSolverJobListener, ConfirmDialogInterface {
+    /* OAuth dialogs are no real captchas: no captcha sound toggle. */
+    @Override
+    protected boolean isSoundToggleVisible() {
+        return false;
+    }
+
 
     private JPanel p;
 

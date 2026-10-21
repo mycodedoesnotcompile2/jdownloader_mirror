@@ -32,9 +32,16 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.net.httpconnection.tests;
 
+import java.io.IOException;
 import java.util.List;
 
+import javax.net.ssl.SSLHandshakeException;
+
 import org.appwork.loggingv3.LogV3;
+import org.appwork.utils.Exceptions;
+import org.appwork.utils.net.httpclient.HttpClient;
+import org.appwork.utils.net.httpclient.HttpClient.RequestContext;
+import org.appwork.utils.net.httpclient.HttpClientException;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 
 /**
@@ -42,6 +49,8 @@ import org.appwork.utils.net.httpconnection.HTTPProxy;
  * proxy server lifecycle and {@link #getConnectionVariants()} so tests can iterate without duplicating setup.
  */
 public abstract class ProxyConnectionTestBase extends SSLTrustProviderTestBase {
+    /** Extra attempts after the first call when badssl cannot be reached. */
+    protected static final int BADSSL_RETRIES = 5;
     private TestHttpProxyServer  httpProxyServer;
     private TestSocksProxyServer socksProxyServer;
     private List<HTTPProxy>      connectionVariants;
@@ -97,5 +106,49 @@ public abstract class ProxyConnectionTestBase extends SSLTrustProviderTestBase {
     protected boolean isProxyServersRunning() {
         final List<HTTPProxy> connectionVariants = this.connectionVariants;
         return connectionVariants != null && connectionVariants.size() > 2;
+    }
+
+    /**
+     * GET {@code url}, retrying when badssl (or the proxy path to it) is unreachable. Certificate and TLS handshake results are not retried:
+     * those are the assertion under test.
+     */
+    protected RequestContext getBadSsl(final HttpClient client, final String url) throws Exception {
+        for (int attempt = 0;; attempt++) {
+            try {
+                return client.get(url);
+            } catch (final InterruptedException e) {
+                throw e;
+            } catch (final Exception e) {
+                if (!isBadSslReachabilityFailure(e) || attempt >= BADSSL_RETRIES) {
+                    throw e;
+                }
+                LogV3.info("badssl unreachable, retry " + (attempt + 1) + "/" + BADSSL_RETRIES + " " + url + ": " + e);
+                Thread.sleep(1000);
+            }
+        }
+    }
+
+    /**
+     * True when the call never reached certificate or TLS evaluation (host unreachable, proxy connect failure, timeout). False when a trust
+     * result or {@link SSLHandshakeException} is already present.
+     */
+    protected boolean isBadSslReachabilityFailure(final Throwable error) {
+        if (error instanceof InterruptedException || Exceptions.containsInstanceOf(error, InterruptedException.class)) {
+            return false;
+        }
+        if (Exceptions.containsInstanceOf(error, SSLHandshakeException.class)) {
+            return false;
+        }
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof HttpClientException) {
+                final RequestContext context = ((HttpClientException) current).getContext();
+                if (context != null && context.getTrustResult() != null) {
+                    return false;
+                }
+            }
+            current = current.getCause();
+        }
+        return error instanceof IOException;
     }
 }

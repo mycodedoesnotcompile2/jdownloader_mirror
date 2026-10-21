@@ -43,7 +43,7 @@ import jd.plugins.PluginException;
  * The API is similar to the one of anti-captcha.com/2captcha.com (createTask/getTaskResult) but has its own task types and feedback
  * methods.
  */
-@HostPlugin(revision = "$Revision: 53673 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53697 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
 public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -73,7 +73,7 @@ public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCapt
         // types.add(CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA);
         // types.add(CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
         /* 2026-10-16: hCaptcha is not supported. */
-        types.add(CAPTCHA_TYPE.HCAPTCHA);
+        // types.add(CAPTCHA_TYPE.HCAPTCHA);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);

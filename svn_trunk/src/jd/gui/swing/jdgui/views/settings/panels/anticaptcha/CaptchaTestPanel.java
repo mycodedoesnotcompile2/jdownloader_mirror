@@ -64,6 +64,7 @@ import org.appwork.swing.exttable.columns.ExtProgressColumn;
 import org.appwork.swing.exttable.columns.ExtTextColumn;
 import org.appwork.utils.swing.renderer.RendererMigPanel;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.EDTRunner;
 import org.jdownloader.captcha.event.ChallengeResponseListener;
 import org.jdownloader.captcha.v2.AbstractResponse;
@@ -113,6 +114,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     private final MigPanel                  imagePanel;
     private final JLabel                    imagePreview;
     private final JLabel                    imageResolutionLabel;
+    private final JButton                   openFolderButton;
     /* Original captcha image of the preview, the clicked positions of the result and whether it is shown in full size. */
     private BufferedImage                   previewSource;
     private final List<Point>               resultMarkers      = new ArrayList<Point>();
@@ -250,12 +252,12 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         add(sourceBox, "growx");
         add(new JLabel("Captcha type"));
         add(typeBox, "growx");
-        siteUrlLabel = new JLabel("Site URL");
-        add(siteUrlLabel);
-        add(siteUrlField, "growx");
         siteKeyLabel = new JLabel("Site key");
         add(siteKeyLabel);
         add(siteKeyField, "growx");
+        siteUrlLabel = new JLabel("Site URL");
+        add(siteUrlLabel);
+        add(siteUrlField, "growx");
         /* Image captcha types: the captcha image can be replaced by an own one. */
         imageLabel = new JLabel("Captcha image");
         imagePanel = new MigPanel("ins 0, wrap 1", "[grow,fill]", "[]");
@@ -280,6 +282,18 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         imagePanel.add(imagePreview);
         imageResolutionLabel = new JLabel();
         imagePanel.add(imageResolutionLabel, "alignx left");
+        /* Opens the folder that contains the image, disabled if there is no valid folder (see updateOpenFolderButton). */
+        openFolderButton = new JButton("Open folder", NewTheme.I().getIcon(IconKey.ICON_FOLDER_OPEN, 16));
+        openFolderButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(final ActionEvent e) {
+                if (getImageFolder() != null) {
+                    /* Same as the other places that reveal a file: opens its folder and selects the file (or just opens the folder if the file does not exist). */
+                    CrossSystem.showInExplorer(imageFile);
+                }
+            }
+        });
+        imagePanel.add(openFolderButton, "alignx left");
         add(imageLabel, "aligny top");
         add(imagePanel, "growx");
         descriptionLabel = new JLabel("Challenge Description");
@@ -628,6 +642,17 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         startButton.setEnabled(!batchRunning && (!CaptchaTestParameters.usesImage(type) || (imageFile != null && imageFile.isFile())));
     }
 
+    /** The folder that contains the captcha image, or null if there is no image path or the folder does not exist. */
+    private File getImageFolder() {
+        final File file = imageFile;
+        final File folder = file == null ? null : file.getParentFile();
+        return folder != null && folder.isDirectory() ? folder : null;
+    }
+
+    private void updateOpenFolderButton() {
+        openFolderButton.setEnabled(getImageFolder() != null);
+    }
+
     /** Shows the given captcha image (or an error text if it cannot be read) in the preview. */
     private void setImageFile(final File file) {
         imageFile = file;
@@ -635,6 +660,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         previewExpanded = false;
         resultMarkers.clear();
         updateStartButtonEnabled();
+        updateOpenFolderButton();
         imagePreview.setIcon(null);
         imagePreview.setText(null);
         imageResolutionLabel.setText(null);
@@ -1049,7 +1075,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                     finishRun(run, RunState.PASSED_UNEXPECTED_ANSWER, answer, solvedBy + " | does NOT match the expected result");
                 }
             } else {
-                finishRun(run, RunState.FAILED, "No answer received (job status: " + job.getStatus() + ")", null);
+                finishRun(run, RunState.FAILED, "No answer received (" + job.getStatusDetail() + ")", null);
             }
         } catch (final InterruptedException e) {
             finishRun(run, RunState.FAILED, batchCancelled ? "Cancelled" : "Aborted", null);
@@ -1625,7 +1651,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                 popup.add(retry);
                 popup.addSeparator();
                 /* Copies the line of the test the right click was made on (all columns, separated by tabs). */
-                final JMenuItem copyRow = new JMenuItem("Copy row");
+                final JMenuItem copyRow = new JMenuItem("Copy row", NewTheme.I().getIcon(IconKey.ICON_COPY, 16));
                 copyRow.addActionListener(new ActionListener() {
                     @Override
                     public void actionPerformed(final ActionEvent event) {
@@ -1633,7 +1659,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                     }
                 });
                 popup.add(copyRow);
-                final JMenuItem copyAnswer = new JMenuItem("Copy answer");
+                final JMenuItem copyAnswer = new JMenuItem("Copy answer", NewTheme.I().getIcon(IconKey.ICON_COPY, 16));
                 copyAnswer.setEnabled(!StringUtils.isEmpty(contextObject.answer));
                 copyAnswer.addActionListener(new ActionListener() {
                     @Override

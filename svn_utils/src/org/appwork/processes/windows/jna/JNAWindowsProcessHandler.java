@@ -372,6 +372,57 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
         return foundWindow[0];
     }
 
+    /**
+     * Title of the process main window, or of any other visible window of that process when the main window has no title.
+     *
+     * @return trimmed title, or null when no visible titled window exists
+     */
+    public String getMainWindowTitle(final int targetPID) {
+        final String main = readWindowTitle(findMainWindow(targetPID));
+        if (StringUtils.isNotEmpty(main)) {
+            return main;
+        }
+        final String[] any = new String[] { null };
+        User32.INSTANCE.EnumWindows(new WinUser.WNDENUMPROC() {
+            @Override
+            public boolean callback(final WinDef.HWND hWnd, final Pointer arg1) {
+                try {
+                    final IntByReference processId = new IntByReference();
+                    User32.INSTANCE.GetWindowThreadProcessId(hWnd, processId);
+                    if (processId.getValue() != targetPID || !User32.INSTANCE.IsWindowVisible(hWnd)) {
+                        return true;
+                    }
+                    final String title = readWindowTitle(hWnd);
+                    if (StringUtils.isNotEmpty(title)) {
+                        any[0] = title;
+                        return false;
+                    }
+                } catch (final RuntimeException e) {
+                    LogV3.log(e);
+                }
+                return true;
+            }
+        }, null);
+        return any[0];
+    }
+
+    private String readWindowTitle(final HWND window) {
+        if (!isValid(window)) {
+            return null;
+        }
+        final int length = User32.INSTANCE.GetWindowTextLength(window);
+        if (length <= 0) {
+            return null;
+        }
+        final char[] chars = new char[length + 1];
+        User32.INSTANCE.GetWindowText(window, chars, length + 1);
+        final String title = Native.toString(chars);
+        if (StringUtils.isEmpty(title)) {
+            return null;
+        }
+        return title.trim();
+    }
+
     protected void sendCTRLToPID(final int pid) throws IOException {
         new NonInterruptibleRunnable<Void, IOException>() {
             @Override

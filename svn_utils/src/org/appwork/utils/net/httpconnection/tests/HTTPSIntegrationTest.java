@@ -95,19 +95,25 @@ public class HTTPSIntegrationTest extends ProxyConnectionTestBase {
             // Test various certificate scenarios over all connection variants
             for (final HTTPProxy proxy : getConnectionVariants()) {
                 LogV3.info("badssl / public HTTPS tests via " + proxy);
-                new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()).get("https://sha256.badssl.com/");
+                getBadSsl(new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()), "https://sha256.badssl.com/");
                 try {
-                    new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()).get("https://sha384.badssl.com/");
+                    getBadSsl(new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()), "https://sha384.badssl.com/");
                     throw new WTFException("Chrome says: net::ERR_CERT_DATE_INVALID");
                 } catch (HttpClientException e) {
+                    if (isBadSslReachabilityFailure(e)) {
+                        throw e;
+                    }
                 }
                 try {
-                    new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()).get("https://sha512.badssl.com/");
+                    getBadSsl(new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()), "https://sha512.badssl.com/");
                     throw new WTFException("Chrome says: net::ERR_CERT_DATE_INVALID");
                 } catch (HttpClientException e) {
+                    if (isBadSslReachabilityFailure(e)) {
+                        throw e;
+                    }
                 }
-                new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()).get("https://rsa2048.badssl.com/");
-                new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()).get("https://rsa4096.badssl.com/");
+                getBadSsl(new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()), "https://rsa2048.badssl.com/");
+                getBadSsl(new HttpClient().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()), "https://rsa4096.badssl.com/");
                 testPublicHttpsWithValidCertificateForProxy(proxy);
                 testPublicHttpsByIpForProxy(proxy);
                 testNativeHttpsURLConnectionWithTrustProvider();

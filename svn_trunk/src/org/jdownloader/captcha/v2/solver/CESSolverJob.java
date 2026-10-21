@@ -9,6 +9,7 @@ import org.jdownloader.captcha.v2.ChallengeSolver;
 import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
 import org.jdownloader.captcha.v2.SolverStatus;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
+import org.jdownloader.captcha.v2.solverjob.SolverJob.SolverOutcome;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.notify.captcha.CESBubble;
 import org.jdownloader.gui.notify.captcha.CESBubbleSupport;
@@ -43,6 +44,11 @@ public class CESSolverJob<T> {
     /** True if this solver delivered an answer that the job accepted. */
     public boolean isAnswered() {
         return answered;
+    }
+
+    /** True once a final status (failed, timed out, aborted, answer rejected) was set. */
+    public boolean isFinalStatusSet() {
+        return finalStatusSet;
     }
 
     /** True if this solver delivered an answer at all, no matter whether the job accepted it (it may have arrived too late). */
@@ -184,10 +190,12 @@ public class CESSolverJob<T> {
         answerDelivered = true;
         if (job.addAnswer((AbstractResponse<T>) abstractResponse)) {
             answered = true;
+            job.setSolverResult(solver, SolverOutcome.ANSWERED, null);
             setStatus(_GUI.T.DeathByCaptchaSolver_solveBasicCaptchaChallenge_answer(abrev(abstractResponse.getValue() + "")), NewTheme.I().getIcon(IconKey.ICON_OK, 20));
         } else {
             /* Answer rejected by the job: keep this status instead of the generic "No Answer!" later. */
             finalStatusSet = true;
+            job.setSolverResult(solver, SolverOutcome.ANSWER_REJECTED, null);
             setStatus(_GUI.T.DeathByCaptchaSolver_solveBasicCaptchaChallenge_answer_bad(abrev(abstractResponse.getValue() + "")), NewTheme.I().getIcon(IconKey.ICON_BAD, 20));
         }
     }

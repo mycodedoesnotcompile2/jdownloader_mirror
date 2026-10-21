@@ -39,7 +39,7 @@ import jd.plugins.hoster.SaintTo;
 
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 53581 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53687 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { SaintTo.class })
 public class SaintToFolder extends PluginForDecrypt {
     public SaintToFolder(PluginWrapper wrapper) {
@@ -147,11 +147,14 @@ public class SaintToFolder extends PluginForDecrypt {
 
     private ArrayList<DownloadLink> parseJSON(Browser br) throws Exception {
         final String json = br.getRegex("const[^>]*FILES[^>]*=[^>]*(\\[.*?\\])\\s*;").getMatch(0);
-        if (json == null) {
+        final List<Object> list = (List<Object>) JavaScriptEngineFactory.jsonToJavaObject(json);
+        if (json == null || list == null || list.size() == 0) {
+            if (br.containsHTML(">\\s*Nothing in this album matches that")) {
+                throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
+            }
             return null;
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final List<Object> list = (List<Object>) JavaScriptEngineFactory.jsonToJavaObject(json);
         for (Object entry : list) {
             final Map<String, Object> map = (Map<String, Object>) entry;
             final String file_id = map.get("id").toString();

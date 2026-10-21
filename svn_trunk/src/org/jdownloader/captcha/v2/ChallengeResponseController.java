@@ -534,7 +534,7 @@ public class ChallengeResponseController {
             job.kill();
             throw e;
         } finally {
-            logger.info("Job finished with status " + job.getStatus() + ": " + job);
+            logger.info("Job finished with status " + job.getStatus() + " | " + job.getStatusDetail() + " | " + job);
             try {
                 synchronized (activeJobs) {
                     activeJobs.remove(job);

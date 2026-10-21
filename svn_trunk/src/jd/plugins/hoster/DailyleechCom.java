@@ -51,7 +51,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 53670 $", interfaceVersion = 3, names = { "dailyleech.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53689 $", interfaceVersion = 3, names = { "dailyleech.com" }, urls = { "" })
 public class DailyleechCom extends PluginForHost {
     /** DailyLeech Link API v1, see DAILYLEECH_LINK_API.md */
     private static final String          API_BASE                   = "https://dailyleech.com/v2/api/v1/";
@@ -216,7 +216,15 @@ public class DailyleechCom extends PluginForHost {
         return handleJobResult(jobdata, account, link);
     }
 
-    /** Posts a single link via submit.php and returns the created job_id. */
+    /**
+     * Posts a single link via submit.php and returns the created job_id. <br>
+     * According to support (2026-10-20): submit.php accepts at most 3 links per call (more -> 422 TOO_MANY_LINKS), each job becomes one
+     * post in the premium chat, and at most 6 submit.php calls per minute are allowed (refused submits such as PENDING_LIMIT count too).
+     * We always send exactly one link per call. <br>
+     * me.php also contains a "submit" object (open, reason, max_links_per_job, max_pending_jobs, pending_jobs, submits_per_minute, busy)
+     * which tells whether submitting is currently allowed. It is intentionally NOT evaluated: it has been seen returning open=false /
+     * reason="beta" for a working account.
+     */
     private String submitLink(final DownloadLink link, final Account account) throws Exception {
         final String sourceurl = link.getDefaultPlugin().buildExternalDownloadURL(link, this);
         String idempotencyKey = link.getStringProperty(PROPERTY_IDEMPOTENCY);
@@ -245,7 +253,11 @@ public class DailyleechCom extends PluginForHost {
         return data.get("job_id").toString();
     }
 
-    /** Polls job.php until the job is done or failed and returns the job data object. */
+    /**
+     * Polls job.php until the job is done or failed and returns the job data object. <br>
+     * According to support (2026-10-20): if the site's bot is behind ("busy"), submitting still works but jobs wait longer (wait_reason:
+     * "bot_busy"). Do not resubmit because of it -> we keep polling the same job.
+     */
     private Map<String, Object> pollJob(final Account account, final DownloadLink link, final String jobID) throws Exception {
         final long timeout = 20 * 60 * 1000l;
         final long startTime = System.currentTimeMillis();
@@ -398,11 +410,18 @@ public class DailyleechCom extends PluginForHost {
         }
         /* Temporary account errors. */
         if ("RATE".equals(code)) {
-            throw new AccountUnavailableException(display, 10 * 60 * 1000l);
+            /*
+             * According to support (2026-10-20): max 6 submit.php calls per minute, refused submits count too -> the window is over after
+             * about a minute.
+             */
+            throw new AccountUnavailableException(display, 1 * 60 * 1000l);
         } else if ("API_DISABLED".equals(code)) {
             throw new AccountUnavailableException(display, 30 * 60 * 1000l);
         }
-        /* Too many unfinished jobs -> wait for a running job to finish, then retry. */
+        /*
+         * Too many unfinished jobs -> wait for a running job to finish, then retry. According to support (2026-10-20): max 2 unfinished
+         * jobs per account (me.php: submit.max_pending_jobs / pending_jobs).
+         */
         if ("PENDING_LIMIT".equals(code)) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, display, 1 * 60 * 1000l);
         }
@@ -432,6 +451,10 @@ public class DailyleechCom extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
         final Map<String, Object> me = checkErrors(callAPI(account, "me.php", null, null), account, null);
+        /*
+         * According to support (2026-10-20): the account is valid if ok is true, premium if premium is true, validUntil = premium_until
+         * (UTC+7) and trafficLeft = quota.traffic_left_bytes.
+         */
         final boolean premium = Boolean.TRUE.equals(me.get("premium"));
         final String premiumUntil = (String) me.get("premium_until");
         if (premium) {
@@ -532,7 +555,8 @@ public class DailyleechCom extends PluginForHost {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         /*
-         * The API allows at most 2 unfinished jobs per member (one job = one link here). A job only counts as unfinished while the bot is
+         * The API allows at most 2 unfinished jobs per member (one job = one link here; confirmed by support on 2026-10-20). A job only
+         * counts as unfinished while the bot is
          * generating the file, not during the actual file transfer, but keeping the simultaneous download count at 2 avoids running into
          * PENDING_LIMIT.
          */

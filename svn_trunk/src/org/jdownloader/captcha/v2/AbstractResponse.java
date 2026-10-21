@@ -24,6 +24,13 @@ public class AbstractResponse<T> {
             if (solver != null && solver instanceof ChallengeSolver) {
                 final Challenge<T> c = getChallenge();
                 switch (validation) {
+                case EMPTY_RESPONSE:
+                case INVALID_TOKEN:
+                case NOT_NUMERIC:
+                case COORDINATES_MISMATCH:
+                case TOO_FEW_CLICKS:
+                case TOO_MANY_CLICKS:
+                case WRONG_CLICK_COUNT:
                 case INVALID:
                     if (c != null) {
                         c.sendStatsValidation(((ChallengeSolver) solver), "false");

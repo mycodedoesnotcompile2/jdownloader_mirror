@@ -118,7 +118,7 @@ public abstract class ChallengeSolver<T> {
         CAPTCHA_TYPE_DISABLED_BY_USER,
         ACCOUNT_DISABLED,
         ACCOUNT_IN_ERROR_STATE,
-        ACCOUNT_NOT_ENOUGH_CREDITS,
+        ACCOUNT_NOT_ENOUGH_BALANCE,
         /** One of the solver's enabled custom limit rules (max captchas per time interval) is currently used up. */
         CUSTOM_LIMIT_REACHED,
         /**

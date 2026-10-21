@@ -85,51 +85,63 @@ public class SSLProtocolVersionTest extends ProxyConnectionTestBase {
             // Test TLS 1.1 - should fail on Java 11+ (disabled by default)
             for (final HTTPProxy proxy : directOnlyVariants) {
                 try {
-                    getClientWithSSLProtocol(TLS.TLS_1_1.id).proxy(proxy).trust(AllTrustProvider.getInstance()).get(HTTPS_TLS_V1_1_BADSSL_COM_1011);
+                    getBadSsl(getClientWithSSLProtocol(TLS.TLS_1_1.id).proxy(proxy).trust(AllTrustProvider.getInstance()), HTTPS_TLS_V1_1_BADSSL_COM_1011);
                     if (JavaVersion.getVersion().isMinimum(JavaVersion.JVM_11_0)) {
                         throw new Exception("Java should have disable TLS1.1 via " + proxy);
                     }
                 } catch (HttpClientException e) {
+                    if (isBadSslReachabilityFailure(e)) {
+                        throw e;
+                    }
                     assertTrue(Exceptions.containsInstanceOf(e, SSLHandshakeException.class));
                 }
             }
             // Test TLS 1.0 - should fail on Java 11+ (disabled by default)
             for (final HTTPProxy proxy : directOnlyVariants) {
                 try {
-                    getClientWithSSLProtocol(TLS.TLS_1_0.id).proxy(proxy).trust(AllTrustProvider.getInstance()).get(HTTPS_TLS_V1_0_BADSSL_COM_1010);
+                    getBadSsl(getClientWithSSLProtocol(TLS.TLS_1_0.id).proxy(proxy).trust(AllTrustProvider.getInstance()), HTTPS_TLS_V1_0_BADSSL_COM_1010);
                     if (JavaVersion.getVersion().isMinimum(JavaVersion.JVM_11_0)) {
                         throw new Exception("Java should have disable TLS1.0 via " + proxy);
                     }
                 } catch (HttpClientException e) {
+                    if (isBadSslReachabilityFailure(e)) {
+                        throw e;
+                    }
                     assertTrue(Exceptions.containsInstanceOf(e, SSLHandshakeException.class));
                 }
             }
             // Test TLS 1.2 / 1.3 and default client (getClientWithSSLProtocol only via direct/none)
             for (final HTTPProxy proxy : directOnlyVariants) {
                 LogV3.info("SSL protocol tests via " + proxy);
-                getClientWithSSLProtocol(TLS.TLS_1_2.id).proxy(proxy).trust(AllTrustProvider.getInstance()).get("https://tls-v1-2.badssl.com:1012/");
+                getBadSsl(getClientWithSSLProtocol(TLS.TLS_1_2.id).proxy(proxy).trust(AllTrustProvider.getInstance()), "https://tls-v1-2.badssl.com:1012/");
                 if (JavaSSLSocketStreamFactory.getInstance().isTLSSupported(TLS.TLS_1_3, null, null)) {
                     getClientWithSSLProtocol(TLS.TLS_1_3.id).proxy(proxy).trust(AllTrustProvider.getInstance()).get("https://appwork.org");
                 }
-                new HttpClient().proxy(proxy).trust(AllTrustProvider.getInstance()).get("https://tls-v1-2.badssl.com:1012/");
+                getBadSsl(new HttpClient().proxy(proxy).trust(AllTrustProvider.getInstance()), "https://tls-v1-2.badssl.com:1012/");
                 new HttpClient().proxy(proxy).trust(AllTrustProvider.getInstance()).get("https://appwork.org");
             }
             // Test that TLS 1.1/1.0 are rejected even with TrustAllProvider (all variants) on Java 11+
             for (final HTTPProxy proxy : variants) {
                 try {
-                    new HttpClient().proxy(proxy).trust(AllTrustProvider.getInstance()).get(HTTPS_TLS_V1_1_BADSSL_COM_1011);
+                    getBadSsl(new HttpClient().proxy(proxy).trust(AllTrustProvider.getInstance()), HTTPS_TLS_V1_1_BADSSL_COM_1011);
                     if (JavaVersion.getVersion().isMinimum(JavaVersion.JVM_11_0)) {
                         throw new WTFException("Should fail. 1.1 not allowed via " + proxy);
                     }
                 } catch (HttpClientException e) {
+                    if (isBadSslReachabilityFailure(e)) {
+                        throw e;
+                    }
                     assertTrue(Exceptions.containsInstanceOf(e, SSLHandshakeException.class));
                 }
                 try {
-                    new HttpClient().proxy(proxy).trust(AllTrustProvider.getInstance()).get(HTTPS_TLS_V1_0_BADSSL_COM_1010);
+                    getBadSsl(new HttpClient().proxy(proxy).trust(AllTrustProvider.getInstance()), HTTPS_TLS_V1_0_BADSSL_COM_1010);
                     if (JavaVersion.getVersion().isMinimum(JavaVersion.JVM_11_0)) {
                         throw new WTFException("Should fail. 1.0 not allowed via " + proxy);
                     }
                 } catch (HttpClientException e) {
+                    if (isBadSslReachabilityFailure(e)) {
+                        throw e;
+                    }
                     assertTrue(Exceptions.containsInstanceOf(e, SSLHandshakeException.class));
                 }
             }

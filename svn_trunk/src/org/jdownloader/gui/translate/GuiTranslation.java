@@ -910,6 +910,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "%s1 (waiting)" })
     String CaptchaIndicator_solver_waiting(String solver);
 
+    @Default(lngs = { "en" }, values = { "%s1 (waiting, starts in %s2)" })
+    String CaptchaIndicator_solver_waiting_countdown(String solver, String time);
+
     @Default(lngs = { "en" }, values = { "%s1 (solving)" })
     String CaptchaIndicator_solver_solving(String solver);
 
@@ -918,7 +921,6 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "%s1 (timed out)" })
     String CaptchaIndicator_solver_timedout(String solver);
-
 
     @Default(lngs = { "en" }, values = { "Abort Linkchecker" })
     String StatusBarImpl_initGUI_abort_linkchecker();
@@ -2831,9 +2833,6 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Silent Mode" })
     String SilentModeToggleAction_getNameWhenEnabled_();
 
-    @Default(lngs = { "en" }, values = { "Timeout for the chance to abort the upload to external captcha solvers" })
-    String CaptchaExchangeSpinnerAction_skipbubbletimeout_();
-
     @Default(lngs = { "en" }, values = { "More..." })
     String premiumaccounttablemodel_column_info();
 
@@ -3203,11 +3202,8 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Many websites ask you to solve a so-called captcha, e.g. before a download or when logging in, to prove that you are human.\r\nCaptcha solvers solve these captchas for JDownloader: you can solve captchas yourself (in a dialog or in your browser), let My.JDownloader apps solve them remotely, or use external captcha solvers. External captcha solvers are third-party services which solve captchas automatically, usually for a fee. They need an account, which you can add in the account manager.\r\nBelow you can see all captcha solvers with their status, configure them and see which captcha types they support. With captcha rules you can define which solvers are used for which captchas." })
     String AntiCaptchaConfigPanel_onShow_description();
 
-    @Default(lngs = { "en" }, values = { "Play Notify Sound for Captchas" })
-    String AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_sounds();
-
-    @Default(lngs = { "en" }, values = { "Download Captchas auto close after timeout" })
-    String AntiCaptchaConfigPanel_AntiCaptchaConfigPanel_countdown_download();
+    @Default(lngs = { "en" }, values = { "Play sound when a captcha dialog opens. Volume can be adjusted in advanced settings, see 'SoundSettings.captchasoundvolumepercent'" })
+    String AbstractCaptchaDialog_soundToggle_tooltip();
 
     @Default(lngs = { "en" }, values = { "Visit the Website" })
     String lit_open_website();
@@ -5550,7 +5546,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Usage of solver accounts is globally disabled, click here to enable" })
     String SolverOrderTableModel_status_enableSolverAccounts();
 
-    @Default(lngs = { "en" }, values = { "Accounts disabled or invalid, click to open account manager" })
+    @Default(lngs = { "en" }, values = { "Accounts disabled or invalid, go to account manager" })
     String SolverOrderTableModel_status_accountsUnusable();
 
     @Default(lngs = { "en" }, values = { "Configure" })
@@ -7376,4 +7372,34 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "is not a duplicate in linkgrabber" })
     String FilterRule_LinkgrabberDupeFilter_false();
+
+    @Default(lngs = { "en" }, values = { "Invalid" })
+    String ValidationResult_INVALID();
+
+    @Default(lngs = { "en" }, values = { "Valid" })
+    String ValidationResult_VALID();
+
+    @Default(lngs = { "en" }, values = { "Unused" })
+    String ValidationResult_UNUSED();
+
+    @Default(lngs = { "en" }, values = { "Response is empty" })
+    String ValidationResult_EMPTY_RESPONSE();
+
+    @Default(lngs = { "en" }, values = { "Response is not a valid token" })
+    String ValidationResult_INVALID_TOKEN();
+
+    @Default(lngs = { "en" }, values = { "Response contains non-digit characters but a numeric response is expected" })
+    String ValidationResult_NOT_NUMERIC();
+
+    @Default(lngs = { "en" }, values = { "Amount of x and y coordinates differs" })
+    String ValidationResult_COORDINATES_MISMATCH();
+
+    @Default(lngs = { "en" }, values = { "Less clicks than the required minimum" })
+    String ValidationResult_TOO_FEW_CLICKS();
+
+    @Default(lngs = { "en" }, values = { "More clicks than the allowed maximum" })
+    String ValidationResult_TOO_MANY_CLICKS();
+
+    @Default(lngs = { "en" }, values = { "Amount of clicks differs from the expected amount" })
+    String ValidationResult_WRONG_CLICK_COUNT();
 }

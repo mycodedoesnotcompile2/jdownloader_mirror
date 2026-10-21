@@ -11,6 +11,7 @@ import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.storage.JSonStorage;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
+import org.jdownloader.captcha.v2.solverjob.SolverJob.SolverOutcome;
 
 import jd.controlling.captcha.SkipException;
 import jd.controlling.captcha.SkipRequest;
@@ -155,11 +156,13 @@ public class JobRunnable<T> implements Runnable {
                     /* The controller already logged which custom limit rule is used up. */
                     job.getLogger().info(solver + " has reached one of its custom limits -> Skipping this solver for this job.");
                     job.logSolverStatus(solver, "NOT STARTED (custom limit reached)");
+                    job.setSolverResult(solver, SolverOutcome.NOT_STARTED, "Custom limit reached");
                     break;
                 case NO_FREE_SLOT:
                 default:
                     job.getLogger().info(solver + " gave up waiting for a free max-simultaneous-captchas slot -> Skipping this solver for this job.");
                     job.logSolverStatus(solver, "NOT STARTED (no free captcha slot)");
+                    job.setSolverResult(solver, SolverOutcome.NOT_STARTED, "No free captcha slot");
                     break;
                 }
             } catch (SkipException e) {
@@ -178,6 +181,7 @@ public class JobRunnable<T> implements Runnable {
                 getJob().getLogger().log(e);
             } catch (Throwable e) {
                 job.logSolverStatus(solver, "FAILED (" + e + ")");
+                job.setSolverResult(solver, SolverOutcome.SOLVER_ERROR, String.valueOf(e));
                 getJob().getLogger().log(e);
             } finally {
                 if (timeout != null) {

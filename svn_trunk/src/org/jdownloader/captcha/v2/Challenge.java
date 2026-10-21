@@ -155,9 +155,13 @@ public abstract class Challenge<T> {
         }
     }
 
-    /* can be overridden to validate a response before adding it to the job */
-    public boolean validateResponse(AbstractResponse<T> response) {
-        return true;
+    /**
+     * Can be overridden to validate a response before adding it to the job.
+     *
+     * @return {@link ValidationResult#VALID} or the exact reason why the response was rejected
+     */
+    public ValidationResult validateResponse(AbstractResponse<T> response) {
+        return ValidationResult.VALID;
     }
 
     public UniqueAlltimeID getId() {

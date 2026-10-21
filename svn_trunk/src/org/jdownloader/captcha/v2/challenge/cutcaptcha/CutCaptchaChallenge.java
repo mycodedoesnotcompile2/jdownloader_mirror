@@ -19,6 +19,7 @@ import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.requests.PostRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.jdownloader.captcha.v2.AbstractResponse;
+import org.jdownloader.captcha.v2.ValidationResult;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
 import org.jdownloader.captcha.v2.solver.browser.BrowserReference;
 
@@ -115,7 +116,11 @@ public abstract class CutCaptchaChallenge extends AbstractBrowserChallenge {
     }
 
     @Override
-    public boolean validateResponse(AbstractResponse<String> response) {
-        return super.validateResponse(response) && looksLikeValidToken(response.getValue());
+    public ValidationResult validateResponse(AbstractResponse<String> response) {
+        final ValidationResult result = super.validateResponse(response);
+        if (result != ValidationResult.VALID) {
+            return result;
+        }
+        return looksLikeValidToken(response.getValue()) ? ValidationResult.VALID : ValidationResult.INVALID_TOKEN;
     }
 }

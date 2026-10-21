@@ -26,18 +26,10 @@ public class CFG_CAPTCHA {
      **/
     public static final IntegerKeyHandler               DEFAULT_CHALLENGE_TIMEOUT                      = SH.getKeyHandler("DefaultChallengeTimeout", IntegerKeyHandler.class);
     /**
-     * True to enable a countdown in captcha dialogs. Dialog will close automated after the coundown
-     **/
-    public static final BooleanKeyHandler               DIALOG_COUNTDOWN_FOR_DOWNLOADS_ENABLED         = SH.getKeyHandler("DialogCountdownForDownloadsEnabled", BooleanKeyHandler.class);
-    /**
      * If the notifications for external captcha solvers are enabled, the notification gives the user a chance to cancel the usage of the external captcha solver. This is the timeout for this skip
      * option
      **/
     public static final IntegerKeyHandler               EXTERNAL_CAPTCHA_SOLVER_CHANCE_TO_ABORT_EXTERNAL_CAPTCHA_SOLVER = SH.getKeyHandler("ExternalCaptchaSolverChanceToAbortExternalCaptchaSolver", IntegerKeyHandler.class);
-    /**
-     * True to enable a countdown in crawler captcha dialogs. Dialog will close automated after the coundown
-     **/
-    public static final BooleanKeyHandler               DIALOG_COUNTDOWN_FOR_CRAWLER_ENABLED           = SH.getKeyHandler("DialogCountdownForCrawlerEnabled", BooleanKeyHandler.class);
     /**
      * Enable the CES & Remote Captcha Bubbles
      **/
@@ -46,10 +38,6 @@ public class CFG_CAPTCHA {
      * Captcha Mode
      **/
     public static final EnumKeyHandler                  CAPTCHA_MODE                                   = SH.getKeyHandler("CaptchaMode", EnumKeyHandler.class);
-    /**
-     * MS to wait until captcha dialog gets answered. Close dialog after this timeout unanswered
-     **/
-    public static final IntegerKeyHandler               CAPTCHA_DIALOG_DEFAULT_COUNTDOWN               = SH.getKeyHandler("CaptchaDialogDefaultCountdown2", IntegerKeyHandler.class);
     /**
      * Affects login captchas only: If a login captcha is required and at least one manual captcha solver is available, only manual
      * captcha solvers will be allowed to solve this login captcha.

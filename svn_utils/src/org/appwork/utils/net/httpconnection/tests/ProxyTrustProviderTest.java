@@ -113,14 +113,14 @@ public class ProxyTrustProviderTest extends ProxyConnectionTestBase {
                 assertTrue(context.getTrustResult().getTrustProvider() instanceof CCADBTrustProvider);
             }
             {
-                RequestContext context = createClientz().proxy(proxy).trust(AllTrustProvider.getInstance()).get("https://sha384.badssl.com/");
+                RequestContext context = getBadSsl(createClientz().proxy(proxy).trust(AllTrustProvider.getInstance()), "https://sha384.badssl.com/");
                 assertTrue(context.getCode() == 200 || context.getCode() == 301 || context.getCode() == 302, "Request should succeed via SOCKS proxy");
                 assertTrue(context.getTrustResult() != null, "TrustResult should not be null");
                 assertTrue(context.getTrustResult().isTrusted(), "Certificate should be trusted");
                 assertTrue(context.getTrustResult().getTrustProvider() instanceof AllTrustProvider);
             }
             {
-                RequestContext context = createClientz().proxy(proxy).get("https://sha384.badssl.com/");
+                RequestContext context = getBadSsl(createClientz().proxy(proxy), "https://sha384.badssl.com/");
                 assertTrue(context.getCode() == 200 || context.getCode() == 301 || context.getCode() == 302, "Request should succeed via SOCKS proxy");
                 assertTrue(context.getTrustResult() != null, "TrustResult should not be null");
                 assertTrue(context.getTrustResult().getTrustProvider() == TrustUtils.getDefaultProvider());
@@ -135,34 +135,47 @@ public class ProxyTrustProviderTest extends ProxyConnectionTestBase {
                 assertFalse(succeededTrustResult.getTrustProvider() instanceof AllTrustProvider);
             }
             try {
-                createClientz().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()).get("https://sha384.badssl.com/");
+                getBadSsl(createClientz().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()), "https://sha384.badssl.com/");
                 throw new WTFException("Chrome says: net::ERR_CERT_DATE_INVALID");
             } catch (HttpClientException e) {
+                if (isBadSslReachabilityFailure(e)) {
+                    throw e;
+                }
                 assertTrue(e.getContext().getTrustResult() != null);
                 assertFalse(e.getContext().getTrustResult().isTrusted());
                 assertTrue(e.getContext().getTrustResult().getTrustProvider() instanceof CurrentJRETrustProvider);
             }
             try {
-                createClientz().proxy(proxy).trust(new CCADBTrustProvider()).get("https://sha384.badssl.com/");
+                getBadSsl(createClientz().proxy(proxy).trust(new CCADBTrustProvider()), "https://sha384.badssl.com/");
                 throw new WTFException("Chrome says: net::ERR_CERT_DATE_INVALID");
             } catch (HttpClientException e) {
+                if (isBadSslReachabilityFailure(e)) {
+                    throw e;
+                }
+                DebugMode.breakIf(e.getContext().getTrustResult() == null);
                 assertTrue(e.getContext().getTrustResult() != null);
                 assertFalse(e.getContext().getTrustResult().isTrusted());
                 assertTrue(e.getContext().getTrustResult().getTrustProvider() instanceof CCADBTrustProvider);
             }
             try {
-                createClientz().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()).get("https://sha512.badssl.com/");
+                getBadSsl(createClientz().proxy(proxy).trust(CurrentJRETrustProvider.getInstance()), "https://sha512.badssl.com/");
                 throw new WTFException("Chrome says: net::ERR_CERT_DATE_INVALID");
             } catch (HttpClientException e) {
+                if (isBadSslReachabilityFailure(e)) {
+                    throw e;
+                }
                 DebugMode.breakIf(e.getContext().getTrustResult() == null);
                 assertTrue(e.getContext().getTrustResult() != null);
                 assertFalse(e.getContext().getTrustResult().isTrusted());
                 assertTrue(e.getContext().getTrustResult().getTrustProvider() instanceof CurrentJRETrustProvider);
             }
             try {
-                createClientz().proxy(proxy).trust(new CCADBTrustProvider()).get("https://sha512.badssl.com/");
+                getBadSsl(createClientz().proxy(proxy).trust(new CCADBTrustProvider()), "https://sha512.badssl.com/");
                 throw new WTFException("Chrome says: net::ERR_CERT_DATE_INVALID");
             } catch (HttpClientException e) {
+                if (isBadSslReachabilityFailure(e)) {
+                    throw e;
+                }
                 DebugMode.breakIf(e.getContext().getTrustResult() == null);
                 assertTrue(e.getContext().getTrustResult() != null);
                 assertFalse(e.getContext().getTrustResult().isTrusted());

@@ -355,6 +355,16 @@ public class AdvancedConfigEntry {
         return getKeyHandler().getDefaultValue();
     }
 
+    /** True if the entry can be reset to its default value, which means that it has a default value and the current value differs from it. */
+    public boolean isResetToDefaultPossible() {
+        final Object currentValue = getValue();
+        if (currentValue == null) {
+            return hasDefaultValue();
+        } else {
+            return !AdvancedConfigEntry.equals(currentValue, getDefault());
+        }
+    }
+
     public String getTypeString() {
         final Validator v = getValidator();
         final Type gen = getKeyHandler().getGetMethod().getGenericReturnType();

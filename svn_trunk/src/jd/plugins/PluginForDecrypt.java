@@ -53,6 +53,7 @@ import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaC
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
+import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.dialog.AskCrawlerPasswordDialogInterface;
@@ -761,9 +762,9 @@ public abstract class PluginForDecrypt extends Plugin {
                 logger.warning("Cancel. Blacklist Matching");
                 throw new CaptchaException(blackListEntry);
             }
-            ChallengeResponseController.getInstance().handle(c);
+            final SolverJob<ReturnType> job =ChallengeResponseController.getInstance().handle(c);
             if (!c.isSolved()) {
-                throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+                throw new PluginException(LinkStatus.ERROR_CAPTCHA, job.getStatusDetail());
             } else if (!c.isCaptchaResponseValid()) {
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA, "Captcha reponse value did not validate!");
             } else {

@@ -1,12 +1,13 @@
 package org.jdownloader.captcha.v2;
 
-import java.util.Set;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
+import org.jdownloader.captcha.v2.solverjob.SolverJob.SolverOutcome;
 import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSolverService;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
@@ -136,11 +137,11 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
 
     @Override
     public Set<CAPTCHA_TYPE> getUserDisabledCaptchaTypes() {
-        return this.plugin.getUserDisabledCaptchaTypes(account);
+        return this.plugin.getUserAccountDisabledCaptchaTypes(account);
     }
 
     @Override
-    public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+    public ChallengeVetoReason getChallengeVetoReason(final Challenge<?> c) {
         if (!account.isEnabled()) {
             return ChallengeVetoReason.ACCOUNT_DISABLED;
         }
@@ -148,7 +149,7 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
             return ChallengeVetoReason.ACCOUNT_IN_ERROR_STATE;
         }
         if (!plugin.enoughBalanceFor(c, account)) {
-            return ChallengeVetoReason.ACCOUNT_NOT_ENOUGH_CREDITS;
+            return ChallengeVetoReason.ACCOUNT_NOT_ENOUGH_BALANCE;
         }
         /* Check if plugin provides a veto reason */
         final ChallengeVetoReason veto = plugin.getVetoReason(c, account);
@@ -172,6 +173,7 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
         if (ChallengeResponseController.getInstance().isCustomLimitReached(this)) {
             return ChallengeVetoReason.CUSTOM_LIMIT_REACHED;
         }
+        /* No veto = Given challenge can be solved by this solver. */
         return null;
     }
 
@@ -259,6 +261,26 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
         }
     }
 
+    /**
+     * Sets the final status of the bubble (and the result of this solver in the job) if the solver was stopped from outside without an
+     * answer or an error: either because of a timeout or because the job does not need an answer anymore (skipped/aborted, solved by
+     * another solver). Covers both a solver that was interrupted and one that ended its polling on its own because the job is not alive.
+     */
+    private void setStoppedStatus(final SolverJob<T> job, final CESSolverJob<T> cesJob) {
+        if (cesJob.isAnswerDelivered() || cesJob.isFinalStatusSet()) {
+            return;
+        }
+        if (job.isSolverTimedOut(this)) {
+            job.logSolverStatus(this, "TIMED OUT (solver or job timeout)");
+            job.setSolverResult(this, SolverOutcome.TIMED_OUT, null);
+            cesJob.setTimedOut();
+        } else if (!job.isAlive()) {
+            job.logSolverStatus(this, "INTERRUPTED/CANCELED (job does not need an answer anymore)");
+            job.setSolverResult(this, SolverOutcome.ABORTED, null);
+            cesJob.setAborted();
+        }
+    }
+
     /** Returns the error text of the solver service/plugin if there is one, else a generic description of the exception. */
     private static String getFailureReason(final Exception e) {
         final String message = e.getMessage();
@@ -278,7 +300,6 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
             plugin.setCurrentCaptchaChallenge(job.getChallenge());
             plugin.solve(cesJob, account);
         } catch (final PluginException e) {
-            // TODO: Set detailed failure feedback on SolverJob e.g. if failure was account related.
             if (e.getLinkStatus() == LinkStatus.ERROR_CAPTCHA) {
                 /*
                  * Captcha could not be solved (e.g. unsolvable captcha). This is a problem of the captcha itself and not of the account ->
@@ -286,31 +307,31 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
                  */
                 job.logSolverStatus(this, "FAILED (captcha could not be solved: " + e.getMessage() + ")");
                 cesJob.setFailed(getFailureReason(e));
+                job.setSolverResult(this, SolverOutcome.UNSOLVABLE, getFailureReason(e));
                 plugin.getLogger().log(e);
             } else {
                 job.logSolverStatus(this, "FAILED (account/plugin error: " + LinkStatus.toString(e.getLinkStatus()) + " " + e.getMessage() + ")");
                 cesJob.setFailed(getFailureReason(e));
+                job.setSolverResult(this, SolverOutcome.SOLVER_ERROR_ACCOUNT, getFailureReason(e));
                 plugin.handleAccountException(account, plugin.getLogger(), e);
             }
         } catch (InterruptedException e) {
-            /* Not a failure: the solver was stopped from outside (job solved/skipped, other solver chosen, timeout). */
-            if (job.isSolverTimedOut(this)) {
-                job.logSolverStatus(this, "TIMED OUT (solver or job timeout, solver was interrupted)");
-                cesJob.setTimedOut();
-            } else {
-                job.logSolverStatus(this, "INTERRUPTED/CANCELED");
-                cesJob.setAborted();
-            }
-            plugin.getLogger().log(e);
+            /*
+             * Not a failure: the solver was stopped from outside (job solved/skipped, other solver chosen, timeout). Not handled here: it is
+             * passed on to JobRunnable, the status for the bubble and the job is set in the finally block.
+             */
+            throw e;
         } catch (Exception e) {
             job.logSolverStatus(this, "FAILED (" + e + ")");
             cesJob.setFailed(getFailureReason(e));
+            job.setSolverResult(this, SolverOutcome.SOLVER_ERROR, getFailureReason(e));
             /* E.g. SolverException with the error text of the solver service: Make sure it ends up in the plugin log. */
             plugin.getLogger().log(e);
             // TODO
             e.printStackTrace();
         } finally {
             abortServerSideIfNotNeeded(job, cesJob);
+            setStoppedStatus(job, cesJob);
             cesJob.hideBubble();
             // TODO: Check if it's fine to nullify here
             plugin.setCurrentCaptchaChallenge(null);

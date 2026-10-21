@@ -67,6 +67,7 @@ import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.net.UploadProgress;
 import org.appwork.utils.net.httpconnection.HTTPConnection;
 import org.appwork.utils.net.httpconnection.HTTPConnectionFactory;
+import org.appwork.utils.net.httpconnection.CertificateTrustRecovery;
 import org.appwork.utils.net.httpconnection.HTTPOutputStream;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.net.httpconnection.RequestMethod;
@@ -81,7 +82,8 @@ public class BasicHTTP implements Interruptible {
     protected int                           connectTimeout = 15000;
     protected int                           readTimeout    = 30000;
     protected HTTPProxy                     proxy          = HTTPProxy.NONE;
-    protected TrustProviderInterface        trustProvider  = null;
+    protected TrustProviderInterface        trustProvider            = null;
+    protected CertificateTrustRecovery      certificateTrustRecovery = null;
     protected LogInterface                  logger         = null;
     protected final Object                  lock           = new Object();
 
@@ -271,7 +273,7 @@ public class BasicHTTP implements Interruptible {
                         rangeRequest = false;
                     }
                     progress.onConnect(connection);
-                    connection.connect();
+                    this.connectAndRecover(connection);
                     progress.onConnected(connection);
                     if (rangeRequest && connection.getResponseCode() == 200) {
                         throw new BadRangeResponse(connection);
@@ -516,7 +518,7 @@ public class BasicHTTP implements Interruptible {
                 int lookupTry = 0;
                 while (true) {
                     try {
-                        connection.connect();
+                        this.connectAndRecover(connection);
                         break;
                     } catch (final UnknownHostException e) {
                         if (++lookupTry > 3) {
@@ -862,7 +864,7 @@ public class BasicHTTP implements Interruptible {
         try {
             while (true) {
                 try {
-                    connection.connect();
+                    this.connectAndRecover(connection);
                     if (finalUploadProgress != null) {
                         finalUploadProgress.onConnected(connection);
                     }
@@ -959,6 +961,26 @@ public class BasicHTTP implements Interruptible {
 
     public void setTrustProvider(final TrustProviderInterface trustProvider) {
         this.trustProvider = trustProvider;
+    }
+
+    public void setCertificateTrustRecovery(final CertificateTrustRecovery certificateTrustRecovery) {
+        this.certificateTrustRecovery = certificateTrustRecovery;
+    }
+
+    /**
+     * One extra attempt when a certificate recovery accepts the failure. The dialog, if any, runs here, after the handshake has already failed.
+     */
+    protected void connectAndRecover(final HTTPConnection connection) throws IOException {
+        try {
+            connection.connect();
+        } catch (final IOException e) {
+            final CertificateTrustRecovery recovery = this.certificateTrustRecovery;
+            if (recovery != null && recovery.recover(connection, e)) {
+                connection.connect();
+                return;
+            }
+            throw e;
+        }
     }
 
     public void setReadTimeout(final int readTimeout) {

@@ -179,6 +179,9 @@ public class BrowserCaptchaDialog extends AbstractCaptchaDialog<String> {
             }
         };
         ret.setOpaque(false);
+        if (isSoundToggleVisible()) {
+            ret.add(createSoundToggle(), "width 28!");
+        }
         ExtButton premium = new ExtButton(new AppAction() {
             /**
              *

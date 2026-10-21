@@ -6,6 +6,7 @@ import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.ChallengeSolver;
+import org.jdownloader.captcha.v2.ValidationResult;
 import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
 
@@ -45,6 +46,33 @@ public class MultiClickCaptchaChallenge extends ImageCaptchaChallenge<MultiClick
     /** True if exactly one click is expected, see CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA. */
     public boolean isSingleClick() {
         return maxClicks == 1;
+    }
+
+    /**
+     * Rejects answers whose amount of clicks does not fit the expectation: fewer than minClicks, or - if min and max are equal - any
+     * amount other than exactly that number. If only a max is set, answers with more clicks are rejected as well.
+     */
+    @Override
+    public ValidationResult validateResponse(AbstractResponse<MultiClickedPoint> response) {
+        final ValidationResult result = super.validateResponse(response);
+        if (result != ValidationResult.VALID) {
+            return result;
+        }
+        final MultiClickedPoint value = response.getValue();
+        if (value == null || value.getX() == null || value.getY() == null) {
+            return ValidationResult.EMPTY_RESPONSE;
+        }
+        final int clicks = value.getX().length;
+        if (clicks != value.getY().length) {
+            return ValidationResult.COORDINATES_MISMATCH;
+        } else if (minClicks > 0 && minClicks == maxClicks && clicks != minClicks) {
+            return ValidationResult.WRONG_CLICK_COUNT;
+        } else if (clicks < minClicks) {
+            return ValidationResult.TOO_FEW_CLICKS;
+        } else if (maxClicks > 0 && clicks > maxClicks) {
+            return ValidationResult.TOO_MANY_CLICKS;
+        }
+        return ValidationResult.VALID;
     }
 
     @Override

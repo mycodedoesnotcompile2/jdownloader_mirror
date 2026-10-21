@@ -40,6 +40,8 @@ import com.sun.jna.Pointer;
 import org.appwork.jna.windows.structs.NOTIFYICONDATA;
 import org.appwork.jna.windows.structs.NOTIFYICONIDENTIFIER;
 
+import com.sun.jna.platform.win32.Guid;
+import com.sun.jna.platform.win32.WinDef.HWND;
 import com.sun.jna.platform.win32.WinNT.HRESULT;
 import com.sun.jna.platform.win32.WinUser;
 import com.sun.jna.ptr.IntByReference;
@@ -115,4 +117,12 @@ public interface Shell32Ext extends com.sun.jna.platform.win32.Shell32 {
      *      "https://learn.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shopenfolderandselectitems">SHOpenFolderAndSelectItems</a>
      */
     HRESULT SHOpenFolderAndSelectItems(Pointer pidlFolder, int cidl, Pointer[] apidl, int dwFlags);
+
+    /**
+     * Retrieves an {@code IPropertyStore} for a window (AppUserModel / relaunch properties for taskbar pinning).
+     *
+     * @see <a href=
+     *      "https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shgetpropertystoreforwindow">SHGetPropertyStoreForWindow</a>
+     */
+    HRESULT SHGetPropertyStoreForWindow(HWND hwnd, Guid.REFIID riid, PointerByReference ppv);
 }

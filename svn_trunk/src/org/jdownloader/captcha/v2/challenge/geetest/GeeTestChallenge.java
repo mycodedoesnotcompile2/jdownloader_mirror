@@ -19,6 +19,7 @@ import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.requests.PostRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.jdownloader.captcha.v2.AbstractResponse;
+import org.jdownloader.captcha.v2.ValidationResult;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
 import org.jdownloader.captcha.v2.solver.browser.BrowserReference;
 
@@ -74,8 +75,12 @@ public abstract class GeeTestChallenge extends AbstractBrowserChallenge {
     }
 
     @Override
-    public boolean validateResponse(AbstractResponse<String> response) {
-        return super.validateResponse(response) && isCaptchaResponseValid();
+    public ValidationResult validateResponse(AbstractResponse<String> response) {
+        final ValidationResult result = super.validateResponse(response);
+        if (result != ValidationResult.VALID) {
+            return result;
+        }
+        return isCaptchaResponseValid() ? ValidationResult.VALID : ValidationResult.INVALID;
     }
 
     @Override

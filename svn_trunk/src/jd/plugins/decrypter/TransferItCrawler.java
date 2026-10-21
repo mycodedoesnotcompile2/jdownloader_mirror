@@ -15,56 +15,48 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
-import java.io.UnsupportedEncodingException;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
+import java.util.Set;
 
-import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.JsonConfig;
-import org.appwork.utils.DebugMode;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.appwork.utils.StringUtils;
 import org.jdownloader.settings.GeneralSettings;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
-import jd.http.Browser;
-import jd.nutils.encoding.Base64;
 import jd.parser.Regex;
-import jd.plugins.Account;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.MegaNz;
+import jd.plugins.hoster.TransferIt;
 
-@DecrypterPlugin(revision = "$Revision: 51683 $", interfaceVersion = 3, names = {}, urls = {})
+/**
+ * Most of the work on this plugin was done by Fabio Orlandi.
+ */
+@DecrypterPlugin(revision = "$Revision: 53696 $", interfaceVersion = 3, names = {}, urls = {})
 public class TransferItCrawler extends PluginForDecrypt {
     public TransferItCrawler(PluginWrapper wrapper) {
         super(wrapper);
     }
 
-    @Override
-    public Browser createNewBrowserInstance() {
-        final Browser br = super.createNewBrowserInstance();
-        br.setFollowRedirects(true);
-        return br;
-    }
+    private static final String PASSWORD_NOT_SUPPORTED = "Password protected transfer.it transfers are not yet supported.";
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -89,147 +81,162 @@ public class TransferItCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://" + buildHostsPatternPart(domains) + "/t/([a-zA-Z0-9]{12})");
+            ret.add("https?://" + buildHostsPatternPart(domains) + "/t/([A-Za-z0-9_-]{12,})");
         }
         return ret.toArray(new String[0]);
     }
 
+    @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            logger.info("Unfinished plugin -> Doing nothing in Stable JDownloader version");
-            return ret;
+        final String transferID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
+        /* Transfer information such as title and password protection */
+        final TransferIt hosterplugin = (TransferIt) this.getNewPluginForHostInstance(this.getHost());
+        final Map<String, Object> transferInfo = hosterplugin.callAPI(br, null, "{\"a\":\"xi\",\"xh\":\"" + transferID + "\"}");
+        final Object passwordProtected = transferInfo.get("pw");
+        if (passwordProtected != null && !Boolean.FALSE.equals(passwordProtected) && !"0".equals(passwordProtected.toString()) && !"".equals(passwordProtected.toString())) {
+            throw new DecrypterRetryException(RetryReason.PASSWORD, "PASSWORD_PROTECTED_" + transferID, PASSWORD_NOT_SUPPORTED);
         }
-        final String folder_id = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
-        br.getPage(param.getCryptedUrl());
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        String transferTitle = null;
+        if (transferInfo.get("t") instanceof String) {
+            transferTitle = new String(MegaNz.b64decode((String) transferInfo.get("t")), "UTF-8").trim();
         }
-        /**
-         * URL: see "apipath" in: https://st.transfer.it/js/BDL-3_7ae552ce54d47cc67cbee9b5e560beb791e67c69a1888fea49827b5a4f02b1a5.js <br>
-         * And: https://st.transfer.it/js/transferit-group1_dc1bee43e28bd7d4eedc513745c35bf4ff42d778d714e185868befbc418aca81.js
-         */
-        final String id = generateNineDigitNumber();
-        br.postPageRaw("https://bt7.api.mega.co.nz/cs?id=" + id + "&v=3&lang=de&domain=transferit&x=" + folder_id + "&bc=1", "[{\"a\":\"f\",\"c\":1,\"r\":1}]");
-        // TODO: Add decryption
-        final List<Map<String, Object>> items_root = (List<Map<String, Object>>) this.checkErrorsAPI(br);
-        final List<Map<String, Object>> items = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(items_root, "{0}/f");
-        /* First item in array = Folder information such as folder title and total size of folder */
-        final Map<String, Object> folder_info = items.remove(0);
-        String folderTitle = folder_info.get("a").toString();
-        final FilePackage fp = FilePackage.getInstance();
-        fp.setName(folderTitle);
-        fp.setPackageKey("transfer_it_mega://folder/" + folder_id);
-        for (final Map<String, Object> item : items) {
-            // TODO: Add key decryption
-            final String key_encrypted = item.get("k").toString();
-            final String filename = item.get("a").toString();
-            final long filesize = ((Number) item.get("s")).longValue();
-            final Number lastModifiedDate = (Number) item.get("ts");
-            final DownloadLink file = this.createDownloadlink("TODO");
-            file.setFinalFileName(filename);
-            file.setVerifiedFileSize(filesize);
-            if (lastModifiedDate != null && JsonConfig.create(GeneralSettings.class).isUseOriginalLastModified()) {
-                /* set desired/original lastModified timestamp */
-                file.setLastModifiedTimestamp(lastModifiedDate.longValue() * 1000);
+        if (StringUtils.isEmpty(transferTitle)) {
+            transferTitle = transferID;
+        }
+        /* Transfer description (message) is optional and encoded the same way as the title. */
+        String transferDescription = null;
+        if (transferInfo.get("m") instanceof String) {
+            transferDescription = new String(MegaNz.b64decode((String) transferInfo.get("m")), "UTF-8").trim();
+        }
+        /* Nodes of this transfer: Node keys are plain AES keys, node attributes are encrypted like regular MEGA node attributes. */
+        final Map<String, Object> listing;
+        try {
+            listing = hosterplugin.callAPI(br, transferID, "{\"a\":\"f\",\"c\":1,\"r\":1}");
+        } catch (final PluginException e) {
+            if (e.getLinkStatus() == LinkStatus.ERROR_FATAL) {
+                /* API error -14: password required (in case the "pw" flag above was not set) */
+                throw new DecrypterRetryException(RetryReason.PASSWORD, "PASSWORD_PROTECTED_" + transferID, PASSWORD_NOT_SUPPORTED);
             }
-            file.setAvailable(true);
-            ret.add(file);
+            throw e;
+        }
+        @SuppressWarnings("unchecked")
+        final List<Map<String, Object>> nodes = (List<Map<String, Object>>) listing.get("f");
+        final Map<String, Map<String, Object>> nodesByID = new HashMap<String, Map<String, Object>>();
+        for (final Map<String, Object> node : nodes) {
+            nodesByID.put((String) node.get("h"), node);
+        }
+        final boolean useOriginalLastModified = JsonConfig.create(GeneralSettings.class).isUseOriginalLastModified();
+        final Map<String, FilePackage> packagesByPath = new HashMap<String, FilePackage>();
+        for (final Map<String, Object> node : nodes) {
+            if (((Number) node.get("t")).intValue() != 0) {
+                /* Skip folders */
+                continue;
+            }
+            final String nodeID = (String) node.get("h");
+            final String path = getFolderPath(nodesByID, node);
+            final Map<String, Object> attributes = decryptNodeAttributes(node);
+            String filename = getName(attributes);
+            if (filename == null) {
+                logger.warning("Failed to decrypt name of node: " + nodeID);
+                filename = nodeID;
+            }
+            final DownloadLink link = createDownloadlink("");
+            link.setDefaultPlugin(hosterplugin);
+            link.setHost(this.getHost());
+            link.setContentUrl(param.getCryptedUrl());
+            link.setProperty(TransferIt.PROPERTY_TRANSFER_ID, transferID);
+            link.setProperty(TransferIt.PROPERTY_NODE_ID, nodeID);
+            link.setFinalFileName(filename);
+            link.setVerifiedFileSize(((Number) node.get("s")).longValue());
+            if (useOriginalLastModified && attributes != null) {
+                /* Original last modified timestamp is stored in the file fingerprint attribute */
+                final long lastModified = MegaNz.getTimestamp(this, attributes);
+                if (lastModified > 0) {
+                    link.setLastModifiedTimestamp(lastModified * 1000);
+                }
+            }
+            link.setAvailable(true);
+            final String packagePath = path != null ? path : transferTitle;
+            FilePackage fp = packagesByPath.get(packagePath);
+            if (fp == null) {
+                fp = FilePackage.getInstance();
+                fp.setName(packagePath.substring(packagePath.lastIndexOf("/") + 1));
+                /* Fixed identifier instead of getHost() so the key stays stable even if the domain changes. */
+                fp.setPackageKey("transferit://transfer/" + transferID + "/" + packagePath);
+                if (!StringUtils.isEmpty(transferDescription)) {
+                    fp.setComment(transferDescription);
+                }
+                packagesByPath.put(packagePath, fp);
+            }
+            if (path != null) {
+                link.setRelativeDownloadFolderPath(path);
+            }
+            link._setFilePackage(fp);
+            ret.add(link);
+        }
+        if (ret.isEmpty()) {
+            throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, transferTitle);
         }
         return ret;
     }
-    // public static String generateNineDigitNumber() {
-    // Random random = new Random();
-    // // Generate a number between 100000000 and 999999999 (inclusive)
-    // int number = 100000000 + random.nextInt(900000000);
-    // return String.valueOf(number);
-    // }
 
-    private Object checkErrorsAPI(final Browser br) throws PluginException {
-        final Object object = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
-        if (object == null || object instanceof Byte) {
-            /* Not a json response */
-            final String respText = br.getRequest().getHtmlCode();
-            if (!respText.matches("^-?\\d+$")) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Invalid API response");
+    /** Returns path of all parent folders of given node e.g. "Root/Subfolder" or null if there is no such folder. */
+    private String getFolderPath(final Map<String, Map<String, Object>> nodesByID, final Map<String, Object> node) {
+        String path = null;
+        final Set<String> visited = new HashSet<String>();
+        Object folderID = node.get("p");
+        while (folderID instanceof String && visited.add((String) folderID)) {
+            final Map<String, Object> folder = nodesByID.get(folderID);
+            if (folder == null) {
+                break;
             }
-            final int errorCode = Integer.parseInt(respText);
-            if (errorCode == -8) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            String name = getName(decryptNodeAttributes(folder));
+            if (name == null) {
+                name = (String) folderID;
             }
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unknown API error_code: " + respText);
+            name = name.trim();
+            path = path == null ? name : name + "/" + path;
+            folderID = folder.get("p");
         }
-        if (!(object instanceof List)) {
-            return object;
-        }
-        final List<Object> ressourcelist = (List<Object>) object;
-        if (ressourcelist.size() != 1) {
-            return ressourcelist;
-        }
-        // TODO: Add error handling e.g. code "-8" means "item not found", possible use the handling from MegaNz plugin.
-        final Object errorO = ressourcelist.get(0);
-        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "ErrorCode " + errorO);
+        return path;
     }
 
-    public static String generateNineDigitNumber() {
-        String[] digits = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9" };
-        Random random = new Random();
-        StringBuilder result = new StringBuilder();
-        for (int i = 0; i < 9; i++) {
-            int index = random.nextInt(10);
-            result.append(digits[index]);
-        }
-        return result.toString();
+    private static String getName(final Map<String, Object> attributes) {
+        final Object name = attributes != null ? attributes.get("n") : null;
+        return name instanceof String ? (String) name : null;
     }
 
-    private Cipher cipher = null;
-
-    private String decryptNodeKey(String encryptedNodeKey, String masterKey) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException {
-        final byte[] masterKeyBytes = MegaNz.b64decode(masterKey);
-        final byte[] encryptedNodeKeyBytes = MegaNz.b64decode(encryptedNodeKey);
-        final byte[] ret = new byte[encryptedNodeKeyBytes.length];
-        final byte[] iv = MegaNz.aInt_to_aByte(0, 0, 0, 0);
-        for (int index = 0; index < ret.length; index = index + 16) {
-            final IvParameterSpec ivSpec = new IvParameterSpec(iv);
-            final SecretKeySpec skeySpec = new SecretKeySpec(masterKeyBytes, "AES");
-            cipher.init(Cipher.DECRYPT_MODE, skeySpec, ivSpec);
-            System.arraycopy(cipher.doFinal(Arrays.copyOfRange(encryptedNodeKeyBytes, index, index + 16)), 0, ret, index, 16);
-        }
-        return Base64.encodeToString(ret, false);
-    }
-
-    private String decrypt(String input, String keyString) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException, UnsupportedEncodingException, PluginException {
-        byte[] b64Dec = MegaNz.b64decode(keyString);
-        int[] intKey = MegaNz.aByte_to_aInt(b64Dec);
-        byte[] key = null;
-        if (intKey.length == 4) {
-            /* folder key */
-            key = b64Dec;
-        } else {
-            /* file key */
-            key = MegaNz.aInt_to_aByte(intKey[0] ^ intKey[4], intKey[1] ^ intKey[5], intKey[2] ^ intKey[6], intKey[3] ^ intKey[7]);
-        }
-        byte[] iv = MegaNz.aInt_to_aByte(0, 0, 0, 0);
-        final IvParameterSpec ivSpec = new IvParameterSpec(iv);
-        final SecretKeySpec skeySpec = new SecretKeySpec(key, "AES");
-        cipher.init(Cipher.DECRYPT_MODE, skeySpec, ivSpec);
-        byte[] unPadded = MegaNz.b64decode(input);
-        int len = 16 - ((unPadded.length - 1) & 15) - 1;
-        byte[] payLoadBytes = new byte[unPadded.length + len];
-        System.arraycopy(unPadded, 0, payLoadBytes, 0, unPadded.length);
-        payLoadBytes = cipher.doFinal(payLoadBytes);
-        String ret = new String(payLoadBytes, "UTF-8");
-        ret = new Regex(ret, "MEGA(\\{.+\\})").getMatch(0);
-        if (ret == null) {
-            /* verify if the keyString is correct */
+    /** Decrypts attributes of given node with its plain node key and returns them or null on failure. */
+    private Map<String, Object> decryptNodeAttributes(final Map<String, Object> node) {
+        final String attributes = (String) node.get("a");
+        final String nodeKey = (String) node.get("k");
+        try {
+            byte[] key = MegaNz.b64decode(nodeKey);
+            if (key.length == 32) {
+                /* file key: AES key = first half XOR second half */
+                final byte[] fileKey = new byte[16];
+                for (int i = 0; i < 16; i++) {
+                    fileKey[i] = (byte) (key[i] ^ key[i + 16]);
+                }
+                key = fileKey;
+            } else if (key.length != 16) {
+                return null;
+            }
+            final byte[] encrypted = MegaNz.b64decode(attributes);
+            final byte[] padded = new byte[(encrypted.length + 15) / 16 * 16];
+            System.arraycopy(encrypted, 0, padded, 0, encrypted.length);
+            final Cipher cipher = Cipher.getInstance("AES/CBC/NoPadding");
+            cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(new byte[16]));
+            final String decrypted = new String(cipher.doFinal(padded), "UTF-8");
+            final String json = new Regex(decrypted, "^MEGA(\\{.+\\})").getMatch(0);
+            if (json == null) {
+                return null;
+            }
+            return JSonStorage.restoreFromString(json, TypeRef.MAP);
+        } catch (final Exception e) {
+            logger.log(e);
             return null;
-        } else {
-            return ret;
         }
-    }
-
-    @Override
-    public boolean hasCaptcha(CryptedLink link, Account acc) {
-        return false;
     }
 }

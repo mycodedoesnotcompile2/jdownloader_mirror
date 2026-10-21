@@ -885,7 +885,7 @@ public class ScriptEnvironment {
                     clip.open(stream);
                     try {
                         final FloatControl gainControl = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
-                        float db = (20f * (float) Math.log(JsonConfig.create(SoundSettings.class).getCaptchaSoundVolume() / 100f));
+                        float db = (20f * (float) Math.log(JsonConfig.create(SoundSettings.class).getCaptchaSoundVolumePercent() / 100f));
                         gainControl.setValue(Math.max(-80f, db));
                         BooleanControl muteControl = (BooleanControl) clip.getControl(BooleanControl.Type.MUTE);
                         muteControl.setValue(true);

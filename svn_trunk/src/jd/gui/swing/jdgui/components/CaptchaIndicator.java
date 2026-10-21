@@ -39,6 +39,7 @@ import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
 import org.jdownloader.captcha.v2.ChallengeSolver;
+import org.jdownloader.captcha.v2.JobRunnable;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
@@ -204,6 +205,30 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
         rows.add(new LiveRow(addTooltipRow(panel, provider.getText(), icon, indent), provider));
     }
 
+    /**
+     * Returns how long the given solver still waits for the other solvers before it starts, mirroring the wait logic in
+     * {@link JobRunnable}: it waits for every other unfinished solver in turn, but all waits count from the same start, so the longest one
+     * decides. Solvers that are already done are not waited for any more. The start of the waiting is approximated by the creation of the
+     * job. Returns a value &lt;= 0 if there is no (known) remaining wait.
+     */
+    private <T> long getRemainingWaitMillis(final SolverJob<T> job, final ChallengeSolver<T> solver) {
+        if (job.isForcedStart(solver)) {
+            return 0;
+        }
+        long wait = 0;
+        for (final ChallengeSolver<T> other : job.getSolverList()) {
+            if (other == solver || job.isDone(other)) {
+                continue;
+            }
+            final int waitForOther = JobRunnable.getWaitFor(solver.getService(), other.getService(), job);
+            /* JobRunnable ignores waits of one second or less */
+            if (waitForOther > 1000) {
+                wait = Math.max(wait, waitForOther);
+            }
+        }
+        return wait - (System.currentTimeMillis() - job.getCreated());
+    }
+
     private <T> void addSolverRows(final JPanel panel, final List<LiveRow> rows, final SolverJob<T> job) {
         for (final ChallengeSolver<T> solver : job.getSolverList()) {
             final String name = solver.getService().getName();
@@ -223,6 +248,11 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
                     } else if (job.isSolverSolving(solver)) {
                         return _GUI.T.CaptchaIndicator_solver_solving(name);
                     } else {
+                        final long remaining = getRemainingWaitMillis(job, solver);
+                        if (remaining > 0) {
+                            /* Round up so the countdown does not show 0:00 while the solver still waits */
+                            return _GUI.T.CaptchaIndicator_solver_waiting_countdown(name, formatTime(remaining + 999));
+                        }
                         return _GUI.T.CaptchaIndicator_solver_waiting(name);
                     }
                 }

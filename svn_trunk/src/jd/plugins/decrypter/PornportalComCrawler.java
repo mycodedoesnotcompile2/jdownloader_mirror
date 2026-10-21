@@ -42,6 +42,8 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
+import jd.plugins.download.HashInfo;
+import jd.plugins.download.HashInfo.TYPE;
 import jd.plugins.hoster.PornportalCom;
 import jd.utils.JDUtilities;
 
@@ -54,7 +56,7 @@ import org.jdownloader.plugins.components.config.PornportalComConfig.QualitySele
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 52465 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53687 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornportalCom.class })
 public class PornportalComCrawler extends PluginForDecrypt {
     public PornportalComCrawler(PluginWrapper wrapper) {
@@ -152,6 +154,7 @@ public class PornportalComCrawler extends PluginForDecrypt {
         }
         final Map<String, Object> root = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final Map<String, Object> result = (Map<String, Object>) root.get("result");
+        final Boolean isDownloadable = (Boolean) result.get("isDownloadable");
         final ArrayList<Map<String, Object>> videoObjects = new ArrayList<Map<String, Object>>();
         /* Add current object - that itself could be a video object! */
         videoObjects.add(result);
@@ -247,7 +250,23 @@ public class PornportalComCrawler extends PluginForDecrypt {
             final List<Map<String, Object>> videoRenditionsToProcess;
             /* Prefer full videos over trailers */
             if (!allFullVideos.isEmpty()) {
-                videoRenditionsToProcess = allFullVideos;
+                videoRenditionsToProcess = new ArrayList<Map<String, Object>>();
+                if (Boolean.TRUE.equals(isDownloadable)) {
+                    try {
+                        final Browser brc = br.cloneBrowser();
+                        brc.getPage(api_base + "/v1/video-download/" + contentID);
+                        final Map<String, Object> response = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+                        final Object files = response.get("files");
+                        if (files instanceof List) {
+                            videoRenditionsToProcess.addAll((List<Map<String, Object>>) files);
+                        } else {
+                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                        }
+                    } catch (Exception e) {
+                        logger.log(e);
+                    }
+                }
+                videoRenditionsToProcess.addAll(allFullVideos);
             } else {
                 videoRenditionsToProcess = allTrailers;
             }
@@ -259,13 +278,17 @@ public class PornportalComCrawler extends PluginForDecrypt {
                 }
                 final String codec = (String) videomap.get("codec");
                 String qualityIdentifier = (String) videomap.get("format");
+                final String md5 = (String) videomap.get("md5");
                 final String streamType;
                 final long filesize = JavaScriptEngineFactory.toLong(videomap.get("sizeBytes"), 0);
                 final Map<String, Object> downloadInfo = (Map<String, Object>) urlsO;
                 String downloadurl = (String) downloadInfo.get("download");
+                final boolean isDownload;
                 if (!StringUtils.isEmpty(downloadurl)) {
                     streamType = "progressive";
+                    isDownload = true;
                 } else {
+                    isDownload = false;
                     /* Fallback to stream-URL (most times, an official downloadurl is available!) */
                     downloadurl = (String) downloadInfo.get("view");
                     streamType = videomap.get("type").toString();
@@ -308,23 +331,35 @@ public class PornportalComCrawler extends PluginForDecrypt {
                 dl.setProperty(PornportalCom.PROPERTY_VIDEO_QUALITY, qualityIdentifier);
                 dl.setProperty(PornportalCom.PROPERTY_VIDEO_STREAM_TYPE, streamType);
                 dl.setProperty(PornportalCom.PROPERTY_directurl, downloadurl);
+                dl.setProperty(PornportalCom.PROPERTY_IS_DOWNLOAD, isDownload);
                 dl.setProperty(PornportalCom.PROPERTY_ACTORS_COMMA_SEPARATED, actorsCommaSeparated);
                 if (filesize > 0) {
-                    dl.setDownloadSize(filesize);
+                    if (isDownload) {
+                        dl.setVerifiedFileSize(filesize);
+                    } else {
+                        dl.setDownloadSize(filesize);
+                    }
                 }
+                final HashInfo hashInfo = isDownload && md5 != null ? HashInfo.newInstanceSafe(md5, TYPE.MD5) : null;
+                dl.setHashInfo(hashInfo);
                 dl.setAvailable(true);
                 dl._setFilePackage(videoPackage);
-                final HashMap<String, List<DownloadLink>> targetQualityMap;
-                if (isTrailer) {
-                    targetQualityMap = resultsTrailers;
-                } else {
-                    targetQualityMap = resultsFullVideos;
-                }
+                final HashMap<String, List<DownloadLink>> targetQualityMap = isTrailer ? resultsTrailers : resultsFullVideos;
                 if (!targetQualityMap.containsKey(qualityIdentifier)) {
                     targetQualityMap.put(qualityIdentifier, new ArrayList<DownloadLink>());
                 }
                 final List<DownloadLink> list = targetQualityMap.get(qualityIdentifier);
-                list.add(dl);
+                if (list.size() == 0) {
+                    // first result
+                    list.add(dl);
+                } else if (isDownload) {
+                    // only keep download
+                    list.clear();
+                    list.add(dl);
+                } else if (!list.get(0).getBooleanProperty(PornportalCom.PROPERTY_IS_DOWNLOAD, Boolean.FALSE)) {
+                    // only add if no download added yet
+                    list.add(dl);
+                }
             }
             if (!resultsFullVideos.isEmpty()) {
                 /*

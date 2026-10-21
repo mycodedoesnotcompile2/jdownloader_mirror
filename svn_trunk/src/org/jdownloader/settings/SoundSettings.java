@@ -18,8 +18,9 @@ public interface SoundSettings extends ConfigInterface {
     @DefaultIntValue(100)
     @SpinnerValidator(min = 0, max = 100)
     @AboutConfig
-    int getCaptchaSoundVolume();
+    @DescriptionForConfigEntry("Volume in percent (0-100) of the sound that is played when a captcha dialog opens. Applies to all captcha dialogs (image, click and browser captchas).")
+    int getCaptchaSoundVolumePercent();
 
-    void setCaptchaSoundVolume(int percent);
+    void setCaptchaSoundVolumePercent(int percent);
 
 }

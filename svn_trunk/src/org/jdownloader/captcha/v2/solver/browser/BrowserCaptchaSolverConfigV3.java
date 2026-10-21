@@ -61,4 +61,13 @@ public interface BrowserCaptchaSolverConfigV3 extends CaptchaSolverConfigV3 {
     int getLocalHttpPort();
 
     void setLocalHttpPort(int port);
+
+    @DefaultIntValue(300)
+    @SpinnerValidator(min = 10, max = 600, step = 1)
+    @DescriptionForConfigEntry("Countdown in seconds of the captcha dialog shown while the captcha is solved in the browser. The dialog closes automatically when the countdown runs out.")
+    @AboutConfig
+    @Order(8000)
+    int getDialogCountdownSeconds();
+
+    void setDialogCountdownSeconds(int seconds);
 }

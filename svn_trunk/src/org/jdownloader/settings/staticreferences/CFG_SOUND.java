@@ -16,7 +16,7 @@ public class CFG_SOUND {
     // let's do this mapping here. If we map all methods to static handlers, access is faster, and we get an error on init if mappings are
     // wrong.
     // 100
-    public static final IntegerKeyHandler             CAPTCHA_SOUND_VOLUME  = SH.getKeyHandler("CaptchaSoundVolume", IntegerKeyHandler.class);
+    public static final IntegerKeyHandler             CAPTCHA_SOUND_VOLUME_PERCENT = SH.getKeyHandler("CaptchaSoundVolumePercent", IntegerKeyHandler.class);
     // true
     /**
      * Play a Sound when a Captchadialog opens

@@ -75,6 +75,7 @@ import org.appwork.utils.net.CountingConnection;
 import org.appwork.utils.net.CountingInputStream;
 import org.appwork.utils.net.DownloadProgress;
 import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.net.httpconnection.CertificateTrustRecovery;
 import org.appwork.utils.net.httpconnection.HTTPConnection;
 import org.appwork.utils.net.httpconnection.HTTPConnectionFactory;
 import org.appwork.utils.net.httpconnection.HTTPConnectionProfilerAdapter;
@@ -655,7 +656,8 @@ public class HttpClient {
     protected final HashMap<String, String> requestHeader;
     private final List<RequestContext>      requests             = new CopyOnWriteArrayList<RequestContext>();
     private boolean                         verboseLog           = false;
-    private TrustProviderInterface          trustProvider        = null;
+    private TrustProviderInterface          trustProvider            = null;
+    private CertificateTrustRecovery        certificateTrustRecovery = null;
     private KeyManager[]                    keyManagers          = null;
     private DNSResolver                     dnsResolver         = null;
 
@@ -721,7 +723,7 @@ public class HttpClient {
                     if (this.isVerboseLog()) {
                         LogV3.fine("HttpClient.connect: Starting connection.connect() to " + context.getUrl());
                     }
-                    context.getConnection().connect();
+                    this.connectAndRecover(context.getConnection());
                     if (this.isVerboseLog()) {
                         final long connectElapsed = Time.systemIndependentCurrentJVMTimeMillis() - connectStartTime;
                         LogV3.fine("HttpClient.connect: connection.connect() completed in " + connectElapsed + "ms");
@@ -1373,6 +1375,26 @@ public class HttpClient {
 
     public void setTrustProvider(TrustProviderInterface sslTrustProvider) {
         this.trustProvider = sslTrustProvider;
+    }
+
+    public void setCertificateTrustRecovery(final CertificateTrustRecovery certificateTrustRecovery) {
+        this.certificateTrustRecovery = certificateTrustRecovery;
+    }
+
+    /**
+     * One extra attempt when a certificate recovery accepts the failure. The dialog, if any, runs here, after the handshake has already failed.
+     */
+    protected void connectAndRecover(final HTTPConnection connection) throws IOException {
+        try {
+            connection.connect();
+        } catch (final IOException e) {
+            final CertificateTrustRecovery recovery = this.certificateTrustRecovery;
+            if (recovery != null && recovery.recover(connection, e)) {
+                connection.connect();
+                return;
+            }
+            throw e;
+        }
     }
 
     /**

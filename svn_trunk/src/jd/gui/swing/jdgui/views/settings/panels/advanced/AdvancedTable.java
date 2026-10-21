@@ -33,7 +33,15 @@ public class AdvancedTable extends BasicJDTable<AdvancedConfigEntry> {
     protected JPopupMenu onContextMenu(JPopupMenu popup, AdvancedConfigEntry contextObject, final List<AdvancedConfigEntry> selection, ExtColumn<AdvancedConfigEntry> column, MouseEvent mouseEvent) {
         if (selection != null) {
             final JPopupMenu p = new JPopupMenu();
-            p.add(new AppAction() {
+            /* Enabled if at least one of the selected settings is not at its default value. */
+            boolean resetPossible = false;
+            for (AdvancedConfigEntry ce : selection) {
+                if (ce.isResetToDefaultPossible()) {
+                    resetPossible = true;
+                    break;
+                }
+            }
+            final AppAction resetAction = new AppAction() {
                 {
                     setSmallIcon(new AbstractIcon(IconKey.ICON_RESET, 20));
                     setName(_GUI.T.AdvancedTable_onContextMenu_reset_selection());
@@ -48,7 +56,9 @@ public class AdvancedTable extends BasicJDTable<AdvancedConfigEntry> {
                         repaint();
                     }
                 }
-            });
+            };
+            resetAction.setEnabled(resetPossible);
+            p.add(resetAction);
             if (selection.size() == 1) {
                 final AdvancedConfigEntry item = selection.get(0);
                 final Class<? extends AdvandedValueEditor> advancedValueEditor = item.getAdvancedValueEditor();

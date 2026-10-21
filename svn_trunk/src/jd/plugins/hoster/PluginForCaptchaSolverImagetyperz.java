@@ -4,15 +4,15 @@ import java.awt.Color;
 import java.awt.Container;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.util.EnumSet;
-import java.util.Set;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Currency;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import javax.swing.JComboBox;
@@ -63,7 +63,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 53649 $", interfaceVersion = 3, names = { "imagetyperz.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53697 $", interfaceVersion = 3, names = { "imagetyperz.com" }, urls = { "" })
 public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -96,13 +96,15 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
          * Their API also supports GeeTest, Capy, FunCaptcha, TikTok and "Task" captchas. Those are not added since the matching JD
          * challenges do not provide the required parameters (e.g. GeeTest "challenge" and "gt").
          */
+        /** 2026-10-20: Coordinate based image captchas are not supported according to imagetyperz support. */
         types.add(CAPTCHA_TYPE.IMAGE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V3_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
-        types.add(CAPTCHA_TYPE.CLOUDFLARE_TURNSTILE);
+        /* 2026-10-20: Turnstile is not supported anymore according to imagetyperz support. */
+        // types.add(CAPTCHA_TYPE.CLOUDFLARE_TURNSTILE);
         types.add(CAPTCHA_TYPE.HCAPTCHA);
         // types.add(CAPTCHA_TYPE.GEETEST_V1);
         // types.add(CAPTCHA_TYPE.GEETEST_V4);

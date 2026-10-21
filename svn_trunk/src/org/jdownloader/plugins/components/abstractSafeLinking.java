@@ -9,6 +9,7 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
 import org.appwork.utils.StringUtils;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
@@ -37,7 +38,7 @@ import jd.plugins.components.PluginJSonUtils;
  * @author bismarck - parts of the original
  * @author psp - parts of the original
  */
-@DecrypterPlugin(revision = "$Revision: 52717 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53695 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
     public abstractSafeLinking(PluginWrapper wrapper) {
         super(wrapper);
@@ -273,8 +274,7 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
             }
         }
         if (ret.isEmpty()) {
-            logger.warning("Decrypter out of date for link: " + parameter);
-            return null;
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         return ret;
     }
@@ -337,7 +337,7 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
         }
         if (br.getRedirectLocation() != null && br.getRedirectLocation().matches("^.+" + regexSupportedDomains() + "/404$")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("(?i)>\\s*This link does not exist")) {
+        } else if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML(">\\s*This link does not exist")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         br.setFollowRedirects(false);
@@ -348,8 +348,7 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
             ret.addAll(crawlMultipleLinks(param));
         }
         if (ret.isEmpty()) {
-            logger.warning("Decrypter out of date for link: " + parameter);
-            return null;
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         return ret;
     }
@@ -455,6 +454,8 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
             return 11;
         } else if ("simplecaptcha".equals(cType)) {
             return 12;
+        } else if ("turnstile".equals(cType)) {
+            return 13;
         } else {
             // Not detected or other case
             return 0;
@@ -467,6 +468,10 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
 
     protected String regexCaptchaRecaptcha() {
         return "(api\\.recaptcha\\.net|google\\.com/recaptcha/api/|class\\s*=\\s*\"g-recaptcha(?:-response)?\")";
+    }
+
+    protected String regexCaptchaTurnstile() {
+        return "class\\s*=\\s*\"cf-turnstile\"|challenges\\.cloudflare\\.com/turnstile/";
     }
 
     protected String regexCaptchaBasic() {
@@ -514,6 +519,7 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
         final LinkedHashMap<String, String> captchaRegex = new LinkedHashMap<String, String>();
         captchaRegex.put("solvemedia", regexCaptchaSolveMedia());
         captchaRegex.put("recaptcha", regexCaptchaRecaptcha());
+        captchaRegex.put("turnstile", regexCaptchaTurnstile());
         captchaRegex.put("basic", regexCaptchaBasic());
         captchaRegex.put("threeD", regexCaptchaThreeD());
         captchaRegex.put("fancy", regexCaptchaFancy());
@@ -621,6 +627,12 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
                         protectedForm.put("captchatype", "Simple");
                     }
                     protectedForm.put("norobot", Encoding.urlEncode(getCaptchaCode(captchaurl, param)));
+                    break;
+                }
+                case 13: {
+                    /* Cloudflare Turnstile: sitekey is auto-detected from the current page (data-sitekey) */
+                    final String cfTurnstileResponse = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, br).getToken();
+                    protectedForm.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
                     break;
                 }
                 }
