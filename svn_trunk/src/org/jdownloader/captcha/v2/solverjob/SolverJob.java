@@ -77,6 +77,20 @@ public class SolverJob<T> {
                 return _GUI.T.SolverJobStatus_UNSOLVED();
             }
         },
+        /** All solvers are done and every one of them delivered an answer that was rejected (see ValidationResult for the reasons). */
+        ANSWER_REJECTED {
+            @Override
+            public String getLabel() {
+                return _GUI.T.SolverJobStatus_ANSWER_REJECTED();
+            }
+        },
+        /** All solvers are done and every one of them failed because of an account problem (e.g. invalid API key, no balance). */
+        SOLVER_ACCOUNT_ERROR {
+            @Override
+            public String getLabel() {
+                return _GUI.T.SolverJobStatus_SOLVER_ACCOUNT_ERROR();
+            }
+        },
         /** The thread waiting for the job was interrupted, e.g. because downloads were stopped. */
         INTERRUPTED {
             @Override
@@ -144,6 +158,9 @@ public class SolverJob<T> {
     private volatile boolean                                          interrupted;
     private final ConcurrentHashMap<ChallengeSolver<?>, SolverResult> solverResults         = new ConcurrentHashMap<ChallengeSolver<?>, SolverResult>();
     private final CopyOnWriteArraySet<ChallengeSolver<?>>             solvingSet            = new CopyOnWriteArraySet<ChallengeSolver<?>>();
+    /* Time stamps (ms) of when a solver started working on this job (see setSolverSolving) and of when it was done (see setSolverDone). */
+    private final ConcurrentHashMap<ChallengeSolver<?>, Long>         solvingStartTimes     = new ConcurrentHashMap<ChallengeSolver<?>, Long>();
+    private final ConcurrentHashMap<ChallengeSolver<?>, Long>         solvingEndTimes       = new ConcurrentHashMap<ChallengeSolver<?>, Long>();
     private final CopyOnWriteArraySet<ChallengeSolver<?>>             timedOutSet           = new CopyOnWriteArraySet<ChallengeSolver<?>>();
     private final CopyOnWriteArraySet<ChallengeSolver<?>>             forcedStartSet        = new CopyOnWriteArraySet<ChallengeSolver<?>>();
     private final AtomicInteger                                       LOCK                  = new AtomicInteger();
@@ -293,7 +310,8 @@ public class SolverJob<T> {
                     return;
                 }
             }
-            logSolverStatus(solver, "DONE (" + doneList.size() + "/" + solverList.size() + " solvers done)");
+            solvingEndTimes.putIfAbsent(solver, Long.valueOf(System.currentTimeMillis()));
+            logSolverStatus(solver, "DONE (" + doneList.size() + "/" + solverList.size() + " solvers done) | " + getSolverTimesText(solver));
             final ChallengeSolverJobEventSender eventSender = getEventSender(false);
             if (eventSender != null) {
                 eventSender.fireEvent(new ChallengeSolverJobEvent(this, ChallengeSolverJobEvent.Type.SOLVER_DONE, solver));
@@ -459,9 +477,39 @@ public class SolverJob<T> {
      */
     public void setSolverSolving(final ChallengeSolver<?> solver) {
         if (solvingSet.add(solver)) {
+            solvingStartTimes.putIfAbsent(solver, Long.valueOf(System.currentTimeMillis()));
             logSolverStatus(solver, "SOLVING (wait times over, captcha slot reserved)");
         }
         _notifyAll();
+    }
+
+    /**
+     * Returns how long the given solver actually worked on this job (from the moment it started solving until it was done, or until now
+     * if it is still working), regardless of how it ended (answer, error, timeout, skipped/aborted by the user). Returns -1 if the solver
+     * never started solving (e.g. it was only waiting for other solvers or was not started at all).
+     */
+    public long getSolverWorkingMillis(final ChallengeSolver<?> solver) {
+        final Long start = solvingStartTimes.get(solver);
+        if (start == null) {
+            return -1;
+        }
+        final Long end = solvingEndTimes.get(solver);
+        return (end != null ? end.longValue() : System.currentTimeMillis()) - start.longValue();
+    }
+
+    /** Text for the log: working time of the solver and how long it waited (for other solvers) before it started. */
+    private String getSolverTimesText(final ChallengeSolver<?> solver) {
+        final long working = getSolverWorkingMillis(solver);
+        final Long start = solvingStartTimes.get(solver);
+        if (working < 0 || start == null) {
+            /* Never started: the whole time in the job was waiting. */
+            return "solver time: not started, waited " + formatSeconds(System.currentTimeMillis() - created);
+        }
+        return "solver time: " + formatSeconds(working) + ", waited " + formatSeconds(start.longValue() - created) + " before start";
+    }
+
+    private static String formatSeconds(final long millis) {
+        return (Math.max(0, millis) / 100 / 10d) + "s";
     }
 
     /** Marks the solver as stopped because of its own timeout (see JobRunnable#fireTimeoutEvent). Call before the solver is killed. */
@@ -490,13 +538,18 @@ public class SolverJob<T> {
 
     /**
      * Returns a complete, human readable description of the current status of this job, ready to be shown or logged. It always starts with
-     * the label of {@link #getStatus()}. If the job is {@link SolverJobStatus#UNSOLVED}, the results of its solvers are appended to explain
-     * why (with a single solver just its result, with several solvers one entry per solver), e.g. "Unsolved: UNSOLVABLE: error text of the
+     * the label of {@link #getStatus()}. If the job is {@link SolverJobStatus#UNSOLVED}, {@link SolverJobStatus#ANSWER_REJECTED} or
+     * {@link SolverJobStatus#SOLVER_ACCOUNT_ERROR}, the results of its solvers are appended to explain why (with a single solver just its result, with several solvers one entry per solver), e.g. "Unsolved: UNSOLVABLE: error text of the
      * solver service".
      */
     public String getStatusDetail() {
         final SolverJobStatus status = getStatus();
-        if (status != SolverJobStatus.UNSOLVED) {
+        switch (status) {
+        case UNSOLVED:
+        case ANSWER_REJECTED:
+        case SOLVER_ACCOUNT_ERROR:
+            break;
+        default:
             return status.getLabel();
         }
         /* Combine status of all solvers although in most cases, that list will contain exactly one element. */
@@ -655,16 +708,48 @@ public class SolverJob<T> {
             return SolverJobStatus.INTERRUPTED;
         }
         if (isDone()) {
-            /*
-             * Every solver ran into its own timeout: The job itself did not get a skip request (its own timeout was not reached or the
-             * solvers were faster), but from the outside this is still a timeout.
-             */
-            if (solverList.size() > 0 && timedOutSet.containsAll(solverList)) {
-                return SolverJobStatus.TIMEOUT;
+            final SolverOutcome uniformOutcome = getUniformOutcome();
+            if (uniformOutcome != null) {
+                switch (uniformOutcome) {
+                case TIMED_OUT:
+                    /*
+                     * Every solver ran into its own timeout: The job itself did not get a skip request (its own timeout was not reached
+                     * or the solvers were faster), but from the outside this is still a timeout.
+                     */
+                    return SolverJobStatus.TIMEOUT;
+                case ANSWER_REJECTED:
+                    return SolverJobStatus.ANSWER_REJECTED;
+                case SOLVER_ERROR_ACCOUNT:
+                    return SolverJobStatus.SOLVER_ACCOUNT_ERROR;
+                default:
+                    break;
+                }
             }
             return SolverJobStatus.UNSOLVED;
         }
         return SolverJobStatus.RUNNING;
+    }
+
+    /**
+     * Returns the outcome that all solvers of this job have in common, or null if there are no solvers, a solver has no result yet or the
+     * solvers ended up with different outcomes.
+     */
+    public SolverOutcome getUniformOutcome() {
+        if (solverList.size() == 0) {
+            return null;
+        }
+        SolverOutcome uniform = null;
+        for (final ChallengeSolver<T> solver : solverList) {
+            final SolverResult result = solverResults.get(solver);
+            if (result == null) {
+                return null;
+            } else if (uniform == null) {
+                uniform = result.getOutcome();
+            } else if (uniform != result.getOutcome()) {
+                return null;
+            }
+        }
+        return uniform;
     }
 
     public boolean setSkipRequest(SkipRequest skipRequest) {
@@ -706,7 +791,6 @@ public class SolverJob<T> {
                     response.setValidation(ValidationResult.VALID);
                 } else {
                     // unused responses
-                    // maybe send invalid instead?
                     response.setValidation(ValidationResult.UNUSED);
                 }
             }

@@ -14,6 +14,7 @@ import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
 import org.jdownloader.captcha.v2.SolverStatus;
+import org.jdownloader.captcha.v2.challenge.altcha.AltchaChallenge;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.CaptchaResponse;
@@ -44,7 +45,7 @@ import jd.plugins.PluginException;
  * - reCAPTCHA v2 uses the task type "NoCaptchaTaskProxyless" and reCAPTCHA v3 Enterprise has its own task type <br>
  * - Negative feedback is only available via the classic API (res.php?action=reportbad), there is no "report correct" method.
  */
-@HostPlugin(revision = "$Revision: 53699 $", interfaceVersion = 3, names = { "azcaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53706 $", interfaceVersion = 3, names = { "azcaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -71,9 +72,11 @@ public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSol
         types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V3_ENTERPRISE);
         types.add(CAPTCHA_TYPE.CLOUDFLARE_TURNSTILE);
+        /* 2026-10-22: https://azcaptcha.com/docs#altcha */
+        types.add(CAPTCHA_TYPE.ALTCHA);
         /*
          * hCaptcha is only mentioned in the queue statistics and the classic API (method=hcaptcha) but has no documented V2 task, so it is
-         * not declared. Same for click captchas (only "RecaptchaV2GridTask" exists), CutCaptcha, MTCaptcha, FriendlyCaptcha, ALTCHA, ...
+         * not declared. Same for click captchas (only "RecaptchaV2GridTask" exists), CutCaptcha, MTCaptcha, FriendlyCaptcha, ...
          */
         return types;
     }
@@ -131,6 +134,19 @@ public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSol
             task.put("type", "TurnstileTaskProxyless");
             task.put("websiteURL", challenge.getSiteUrl(this));
             task.put("websiteKey", challenge.getSiteKey());
+        } else if (captchachallenge instanceof AltchaChallenge) {
+            /*
+             * https://azcaptcha.com/docs#altcha -> Either challengeURL or challengeJSON. Supports v1 (SHA) and v2 (PBKDF2, Argon2id, Scrypt)
+             * challenges.
+             */
+            final AltchaChallenge challenge = (AltchaChallenge) captchachallenge;
+            task.put("type", "AltchaTaskProxyless");
+            task.put("websiteURL", challenge.getSiteUrl(this));
+            if (challenge.getChallengeJson() != null) {
+                task.put("challengeJSON", challenge.getChallengeJson());
+            } else {
+                task.put("challengeURL", challenge.getChallengeUrl());
+            }
         } else if (captchachallenge instanceof ImageCaptchaChallenge) {
             final ImageCaptchaChallenge<?> challenge = (ImageCaptchaChallenge<?>) captchachallenge;
             task.put("type", "ImageToTextTask");

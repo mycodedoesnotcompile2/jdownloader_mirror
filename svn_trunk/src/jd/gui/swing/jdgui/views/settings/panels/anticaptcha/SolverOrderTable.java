@@ -45,13 +45,22 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
                 if (e.getValueIsAdjusting()) {
                     return;
                 }
-                if (selectionListener != null) {
-                    int row = getSelectedRow();
-                    SolverService solver = row >= 0 ? getModel().getObjectbyRow(row) : null;
-                    selectionListener.onSolverSelected(solver);
+                /* The model clears and restores the selection while reloading its rows: not a user action, ignore it. */
+                if (((SolverOrderTableModel) getModel()).isReloading()) {
+                    return;
                 }
+                fireSelectionChanged();
             }
         });
+    }
+
+    /** Informs the selection listener about the currently selected solver (null = nothing selected). */
+    public void fireSelectionChanged() {
+        if (selectionListener != null) {
+            final int row = getSelectedRow();
+            final SolverService solver = row >= 0 ? getModel().getObjectbyRow(row) : null;
+            selectionListener.onSolverSelected(solver);
+        }
     }
 
     @Override

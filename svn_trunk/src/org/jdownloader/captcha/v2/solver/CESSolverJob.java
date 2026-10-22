@@ -88,9 +88,6 @@ public class CESSolverJob<T> {
 
     public void setStatus(SolverStatus solverStatus) {
         this.status = solverStatus;
-        if (solverStatus != null) {
-            job.logSolverStatus(solver, "UI status: " + solverStatus.getLabel());
-        }
         if (bubble != null) {
             bubble.update();
         }

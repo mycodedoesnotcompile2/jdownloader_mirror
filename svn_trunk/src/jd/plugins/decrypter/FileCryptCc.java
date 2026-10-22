@@ -22,6 +22,24 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
+import org.jdownloader.captcha.v2.challenge.cutcaptcha.CaptchaHelperCrawlerPluginCutCaptcha;
+import org.jdownloader.captcha.v2.challenge.powcaptcha.AbstractPowCaptcha;
+import org.jdownloader.captcha.v2.challenge.powcaptcha.CaptchaHelperCrawlerPluginPowCaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+import org.jdownloader.plugins.components.config.FileCryptConfig;
+import org.jdownloader.plugins.components.config.FileCryptConfig.CrawlMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -41,22 +59,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.HexFormatter;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
-import org.jdownloader.captcha.v2.challenge.cutcaptcha.CaptchaHelperCrawlerPluginCutCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.config.FileCryptConfig;
-import org.jdownloader.plugins.components.config.FileCryptConfig.CrawlMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
-@DecrypterPlugin(revision = "$Revision: 52828 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53705 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileCryptCc extends PluginForDecrypt {
     public FileCryptCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -488,13 +491,15 @@ public class FileCryptCc extends PluginForDecrypt {
             return logoPW;
         }
         /**
-         * Search password based on folder-logo. </br> Only do this one time in the first run of this loop.
+         * Search password based on folder-logo. </br>
+         * Only do this one time in the first run of this loop.
          */
         final String customLogoID = br.getRegex("(?:logo|custom)/([a-z0-9]+)\\.png").getMatch(0);
         if (customLogoID != null) {
             /**
-             * Magic auto passwords: </br> Creators can set custom logos on each folder. Each logo has a unique ID. This way we can try
-             * specific passwords first that are typically associated with folders published by those sources.
+             * Magic auto passwords: </br>
+             * Creators can set custom logos on each folder. Each logo has a unique ID. This way we can try specific passwords first that
+             * are typically associated with folders published by those sources.
              */
             final String password = getLogoPassword(customLogoID);
             if (password != null) {
@@ -649,8 +654,18 @@ public class FileCryptCc extends PluginForDecrypt {
                 logger.info("Attempting to solve CutCaptcha");
                 final String cutcaptchaToken = new CaptchaHelperCrawlerPluginCutCaptcha(this, br, null).getToken();
                 captchaForm.put("cap_token", Encoding.urlEncode(cutcaptchaToken));
-            } else if (br.containsHTML("/js/pow_captcha\\.js") && br.containsHTML("name=\"pow_")) {
-                throw new DecrypterRetryException(RetryReason.UNSUPPORTED_CAPTCHA, "Unsupported captcha type 'powcaptcha.com'");
+            } else if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && AbstractPowCaptcha.containsPowCaptchaClass(captchaForm)) {
+                logger.info("Attempting to solve powCAPTCHA");
+                final String powSolution = new CaptchaHelperCrawlerPluginPowCaptcha(this, br).getToken();
+                /*
+                 * The solution contains the values for the form fields 'pow_id', 'pow_nonce', 'pow_elapsed', 'pow_pauses', 'pow_data' and
+                 * 'pow_x'.
+                 */
+                logger.info("powCAPTCHA solution: " + powSolution);
+                final Map<String, Object> powFields = restoreFromString(powSolution, TypeRef.MAP);
+                for (final Map.Entry<String, Object> entry : powFields.entrySet()) {
+                    captchaForm.put(entry.getKey(), Encoding.urlEncode(String.valueOf(entry.getValue())));
+                }
             } else {
                 final String code = getCaptchaCode(captchaURL, param);
                 captchaForm.put("recaptcha_response_field", Encoding.urlEncode(code));

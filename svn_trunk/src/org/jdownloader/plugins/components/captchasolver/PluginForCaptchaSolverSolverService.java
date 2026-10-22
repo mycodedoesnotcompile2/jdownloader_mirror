@@ -93,22 +93,47 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
     }
 
     /**
-     * The states the Status column can be in for this solver, in priority order: a globally disabled usage-of-solver-accounts setting takes
-     * priority over everything else (it blocks the solver regardless of account state), followed by having no account at all (routine "Add
-     * Account" case), followed by having accounts that all exist but are unusable (disabled or invalid; needs the user's attention, unlike
-     * the routine "no account yet" case), and finally the normal ready state.
+     * The states the Status column can be in for this solver, in priority order: having no account at all (routine "Add Account" case),
+     * followed by having accounts that all exist but are unusable (disabled or invalid; needs the user's attention, unlike the routine "no
+     * account yet" case), and finally the normal ready state. A globally disabled usage-of-solver-accounts setting is not part of this
+     * state: it is shown by a separate warning button (see {@link #getStatusWarningButtonTooltip()}).
      */
     private enum Status {
-        ACCOUNTS_GLOBALLY_DISABLED,
         NO_ACCOUNT,
         ACCOUNTS_UNUSABLE,
         READY
     }
 
-    private Status getResolvedStatus() {
-        if (!CFG_GENERAL.CFG.isUseAvailableCaptchaSolverAccounts()) {
-            return Status.ACCOUNTS_GLOBALLY_DISABLED;
+    /**
+     * True if external solver accounts are globally disabled while this solver is enabled and would otherwise be ready. Disabled solvers
+     * are not used anyway, and solvers that already show an action button (no/unusable account) need no second warning on top of it.
+     */
+    private boolean isAccountsGloballyDisabledWarning() {
+        return !CFG_GENERAL.CFG.isUseAvailableCaptchaSolverAccounts() && getConfigV3().isEnabled() && getResolvedStatus() == Status.READY;
+    }
+
+    @Override
+    public String getStatusWarningButtonTooltip() {
+        return isAccountsGloballyDisabledWarning() ? _GUI.T.SolverOrderTableModel_status_enableSolverAccounts() : null;
+    }
+
+    @Override
+    public void onStatusWarningButton() {
+        try {
+            CFG_GENERAL.USE_AVAILABLE_CAPTCHA_SOLVER_ACCOUNTS.setValue(true);
+        } catch (final ValidationException e) {
+            /* Should never happen for a plain boolean key. */
+            e.printStackTrace();
         }
+    }
+
+    /** Not ready while the solver is enabled but its accounts are globally disabled. */
+    @Override
+    public boolean isReady() {
+        return super.isReady() && !isAccountsGloballyDisabledWarning();
+    }
+
+    private Status getResolvedStatus() {
         final List<Account> allAccounts = AccountController.getInstance().list(plugin.getHost());
         if (allAccounts == null || allAccounts.isEmpty()) {
             return Status.NO_ACCOUNT;
@@ -160,8 +185,6 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
     @Override
     public String getStatusActionName() {
         switch (getResolvedStatus()) {
-        case ACCOUNTS_GLOBALLY_DISABLED:
-            return _GUI.T.SolverOrderTableModel_status_enableSolverAccounts();
         case NO_ACCOUNT:
             return _GUI.T.lit_add_account();
         case ACCOUNTS_UNUSABLE:
@@ -175,7 +198,6 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
     @Override
     public boolean isStatusActionWarning() {
         switch (getResolvedStatus()) {
-        case ACCOUNTS_GLOBALLY_DISABLED:
         case ACCOUNTS_UNUSABLE:
             return true;
         case NO_ACCOUNT:
@@ -189,14 +211,6 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
     @Override
     public void onStatusAction() {
         switch (getResolvedStatus()) {
-        case ACCOUNTS_GLOBALLY_DISABLED:
-            try {
-                CFG_GENERAL.USE_AVAILABLE_CAPTCHA_SOLVER_ACCOUNTS.setValue(true);
-            } catch (final ValidationException e) {
-                /* Should never happen for a plain boolean key. */
-                e.printStackTrace();
-            }
-            return;
         case ACCOUNTS_UNUSABLE:
             openAccountManager(getFirstAccountOrNull());
             return;

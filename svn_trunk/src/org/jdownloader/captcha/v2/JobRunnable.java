@@ -147,7 +147,6 @@ public class JobRunnable<T> implements Runnable {
                         job.setSolverSolving(solver);
                         job.getLogger().info("Solver Start: " + solver);
                         solver.solve(job);
-                        job.logSolverStatus(solver, "FINISHED (solve() returned normally)");
                     } finally {
                         ChallengeResponseController.getInstance().releaseCaptchaSlot(solver);
                     }

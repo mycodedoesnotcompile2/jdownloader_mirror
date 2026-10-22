@@ -36,6 +36,9 @@ package org.appwork.testframework.tests;
 import java.awt.Dimension;
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.charset.Charset;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
@@ -98,6 +101,42 @@ public class JavaFileLineEndingAWTest implements TestInterface {
     private static final byte   NL             = (byte) 0x0A;
     private static final long   POLL_INTERVAL  = 10000;
     private static final long   RETRY_SLEEP_MS = 2000;
+    /** Cross-process lock on the cache, held until JVM exit. Prevents concurrent instances from corrupting the shared cache file. */
+    private static FileLock     INSTANCE_LOCK  = null;
+
+    /**
+     * Acquires the cross-process instance lock (lock file next to the cache). Returns true if this JVM holds it, false if another process does.
+     */
+    private static synchronized boolean acquireInstanceLock(File cacheFile) {
+        if (INSTANCE_LOCK != null && INSTANCE_LOCK.isValid()) {
+            return true;
+        }
+        File lockFile = new File(cacheFile.getAbsolutePath() + ".lock");
+        File parent = lockFile.getParentFile();
+        if (parent != null && !parent.exists()) {
+            parent.mkdirs();
+        }
+        FileChannel channel = null;
+        try {
+            channel = new RandomAccessFile(lockFile, "rw").getChannel();
+            FileLock lock = channel.tryLock();
+            if (lock == null) {
+                channel.close();
+                return false;
+            }
+            INSTANCE_LOCK = lock;
+            return true;
+        } catch (IOException e) {
+            LogV3.log(e);
+            if (channel != null) {
+                try {
+                    channel.close();
+                } catch (IOException ignore) {
+                }
+            }
+            return false;
+        }
+    }
 
     @Override
     public boolean isMaintenance() {
@@ -134,6 +173,10 @@ public class JavaFileLineEndingAWTest implements TestInterface {
         File cacheFile = Application.getResource(CACHE_FILENAME);
         if (cacheFile == null) {
             LogV3.info("JavaFileLineEndingAWTest: no cache path, skip");
+            return;
+        }
+        if (!acquireInstanceLock(cacheFile)) {
+            LogV3.info("JavaFileLineEndingAWTest: another instance holds the line-ending cache lock, skip");
             return;
         }
         Map<String, String> cache = loadCache(cacheFile);
@@ -509,6 +552,21 @@ public class JavaFileLineEndingAWTest implements TestInterface {
         } catch (IOException e) {
             LogV3.log(e);
             return new HashMap<String, String>();
+        } catch (RuntimeException e) {
+            // corrupt cache (e.g. concurrent writers) - rebuild instead of crashing
+            LogV3.info("JavaFileLineEndingAWTest: line-ending cache is corrupt, rebuilding: " + cacheFile);
+            LogV3.log(e);
+            // keep the first corrupt cache for analysis; never overwrite an existing copy
+            final File corruptCopy = new File(cacheFile.getParentFile(), "lineEndingCacheCorrupt.json");
+            if (!corruptCopy.exists()) {
+                try {
+                    java.nio.file.Files.copy(cacheFile.toPath(), corruptCopy.toPath());
+                    LogV3.info("JavaFileLineEndingAWTest: saved corrupt cache as " + corruptCopy);
+                } catch (Throwable copyError) {
+                    LogV3.log(copyError);
+                }
+            }
+            return new HashMap<String, String>();
         }
     }
 
@@ -526,6 +584,11 @@ public class JavaFileLineEndingAWTest implements TestInterface {
 
     public static void main(String[] args) throws Exception {
         Application.setApplication(".tests");
+        File cacheFile = Application.getResource(CACHE_FILENAME);
+        if (cacheFile != null && !acquireInstanceLock(cacheFile)) {
+            LogV3.info("JavaFileLineEndingAWTest: another instance is already running, exit");
+            return;
+        }
         JavaFileLineEndingAWTest test = new JavaFileLineEndingAWTest();
         if (!test.runObserverModeFromMain()) {
             test.runPollingModeFromMain();

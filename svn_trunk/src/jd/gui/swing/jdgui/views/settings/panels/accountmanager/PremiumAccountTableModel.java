@@ -1,6 +1,7 @@
 package jd.gui.swing.jdgui.views.settings.panels.accountmanager;
 
 import java.awt.Component;
+import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
@@ -15,12 +16,18 @@ import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 
 import javax.swing.Icon;
+import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JTable;
+import javax.swing.SwingConstants;
 import javax.swing.table.JTableHeader;
 
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.storage.config.JsonConfig;
+import org.appwork.storage.config.ValidationException;
+import org.appwork.storage.config.events.GenericConfigEventListener;
+import org.appwork.storage.config.handler.KeyHandler;
+import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtMergedIcon;
 import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtDefaultRowSorter;
@@ -37,6 +44,8 @@ import org.appwork.swing.exttable.columns.ExtTextColumn;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.swing.EDTRunner;
+import org.appwork.utils.swing.renderer.RenderLabel;
+import org.appwork.utils.swing.renderer.RendererMigPanel;
 import org.jdownloader.DomainInfo;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.components.ColumnButton;
@@ -46,6 +55,7 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
@@ -354,6 +364,28 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
                         }
                     }
                 });
+                /*
+                 * The Status column shows an "enable" button for accounts affected by a globally disabled "use accounts" setting, so
+                 * toggling either setting has to redraw the rows (fireTableDataChanged also cancels a running cell editing, so a clicked
+                 * button disappears immediately).
+                 */
+                final GenericConfigEventListener<Boolean> useAccountsListener = new GenericConfigEventListener<Boolean>() {
+                    @Override
+                    public void onConfigValueModified(final KeyHandler<Boolean> keyHandler, final Boolean newValue) {
+                        new EDTRunner() {
+                            @Override
+                            protected void runInEDT() {
+                                fireTableDataChanged();
+                            }
+                        };
+                    }
+
+                    @Override
+                    public void onConfigValidatorError(final KeyHandler<Boolean> keyHandler, final Boolean invalidValue, final ValidationException validateException) {
+                    }
+                };
+                CFG_GENERAL.USE_AVAILABLE_ACCOUNTS.getEventSender().addListener(useAccountsListener, false);
+                CFG_GENERAL.USE_AVAILABLE_CAPTCHA_SOLVER_ACCOUNTS.getEventSender().addListener(useAccountsListener, false);
                 AccountChecker.getInstance().getEventSender().addListener(PremiumAccountTableModel.this);
                 accountManagerSettings.getBroadcaster().addListener(new SwitchPanelListener() {
                     @Override
@@ -483,31 +515,132 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
         });
     }
 
+    /**
+     * What the Status column offers instead of the normal status text: a button that re-enables the global "use accounts" setting which
+     * currently blocks the account.
+     */
+    protected static enum StatusAction {
+        NONE,
+        ENABLE_ACCOUNTS,
+        ENABLE_SOLVER_ACCOUNTS
+    }
+
+    protected StatusAction getStatusAction(final Account acc) {
+        if (!acc.isEnabled()) {
+            /* Disabled accounts are not affected by the global setting in a way the user needs to be warned about. */
+            return StatusAction.NONE;
+        }
+        switch (getAccountManagerType(acc)) {
+        case CAPTCHA_SOLVER:
+            return CFG_GENERAL.CFG.isUseAvailableCaptchaSolverAccounts() ? StatusAction.NONE : StatusAction.ENABLE_SOLVER_ACCOUNTS;
+        case MULTIHOST:
+        case DOWNLOAD:
+        default:
+            return CFG_GENERAL.CFG.isUseAvailableAccounts() ? StatusAction.NONE : StatusAction.ENABLE_ACCOUNTS;
+        }
+    }
+
     protected void addStatusColumn() {
-        this.addColumn(new ExtTextColumn<AccountEntry>(_GUI.T.premiumaccounttablemodel_column_status()) {
-            private static final long serialVersionUID = -3693931358975303164L;
+        this.addColumn(new ExtComponentColumn<AccountEntry>(_GUI.T.premiumaccounttablemodel_column_status()) {
+            private static final long      serialVersionUID = -3693931358975303164L;
+            private AccountEntry           editing;
+            private final RendererMigPanel renderer;
+            private final RenderLabel      rendererLabel;
+            private final JButton          rendererBtn;
+            private final MigPanel         editor;
+            private final RenderLabel      editorLabel;
+            private final JButton          editorBtn;
+            private final Icon             warningIcon      = new AbstractIcon(IconKey.ICON_WARNING, 14);
             {
+                /*
+                 * Layout: [warning button (icon only, only visible if an action is available)] [normal status text]. The explanation is
+                 * shown as tooltip (see getTooltipText).
+                 */
+                rendererLabel = new RenderLabel();
+                rendererBtn = new JButton();
+                rendererBtn.setIcon(warningIcon);
+                rendererBtn.setMargin(new Insets(0, 2, 0, 2));
+                renderer = new RendererMigPanel("ins 0, gap 2", "[][grow,fill]", "[grow,fill]");
+                renderer.add(rendererBtn, "hidemode 3, height 18!");
+                renderer.add(rendererLabel);
+                editorLabel = new RenderLabel();
+                editorBtn = new JButton();
+                editorBtn.setIcon(warningIcon);
+                editorBtn.setMargin(new Insets(0, 2, 0, 2));
+                editorBtn.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(final ActionEvent e) {
+                        if (editing == null) {
+                            return;
+                        }
+                        try {
+                            switch (getStatusAction(editing.getAccount())) {
+                            case ENABLE_ACCOUNTS:
+                                CFG_GENERAL.USE_AVAILABLE_ACCOUNTS.setValue(true);
+                                break;
+                            case ENABLE_SOLVER_ACCOUNTS:
+                                CFG_GENERAL.USE_AVAILABLE_CAPTCHA_SOLVER_ACCOUNTS.setValue(true);
+                                break;
+                            case NONE:
+                            default:
+                                break;
+                            }
+                        } catch (final ValidationException ex) {
+                            /* Should never happen for a plain boolean key. */
+                            ex.printStackTrace();
+                        }
+                    }
+                });
+                editor = new MigPanel("ins 0, gap 2", "[][grow,fill]", "[grow,fill]");
+                editor.add(editorBtn, "height 18!");
+                editor.add(editorLabel);
+                setClickcount(1);
+                /* Same ordering as the former text column: sort by the displayed status text. */
+                this.setRowSorter(new ExtDefaultRowSorter<AccountEntry>() {
+                    @Override
+                    public int compare(final AccountEntry o1, final AccountEntry o2) {
+                        final String s1 = accountToStatusString(o1.getAccount());
+                        final String s2 = accountToStatusString(o2.getAccount());
+                        if (this.getSortOrderIdentifier() == ExtColumn.SORT_ASC) {
+                            return s1.compareToIgnoreCase(s2);
+                        } else {
+                            return s2.compareToIgnoreCase(s1);
+                        }
+                    }
+                });
                 replaceSorter(this);
             }
 
-            @Override
-            public boolean isEnabled(AccountEntry obj) {
-                return obj.getAccount().isEnabled();
+            private String getButtonText(final StatusAction action) {
+                switch (action) {
+                case ENABLE_SOLVER_ACCOUNTS:
+                    return _GUI.T.SolverOrderTableModel_status_enableSolverAccounts();
+                case ENABLE_ACCOUNTS:
+                default:
+                    return _GUI.T.PremiumAccountTableModel_status_enableAccounts();
+                }
             }
 
             @Override
-            public boolean isSortable(AccountEntry obj) {
+            public boolean isEnabled(final AccountEntry obj) {
+                /* The button must stay usable even if the account itself is disabled. */
+                return obj.getAccount().isEnabled() || getStatusAction(obj.getAccount()) != StatusAction.NONE;
+            }
+
+            @Override
+            public boolean isEditable(final AccountEntry obj) {
+                /* Only rows that show an action button are clickable. */
+                return getStatusAction(obj.getAccount()) != StatusAction.NONE;
+            }
+
+            @Override
+            public boolean isSortable(final AccountEntry obj) {
                 return PremiumAccountTableModel.this.isSortable();
             }
 
             @Override
             public boolean isHidable() {
                 return true;
-            }
-
-            @Override
-            protected Icon getIcon(AccountEntry value) {
-                return accountToStatusIcon(value.getAccount());
             }
 
             @Override
@@ -520,34 +653,60 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
                 return 24;
             }
 
-            // @Override
-            // protected String getTooltipText(AccountEntry obj) {
-            // return obj.getAccount().getHoster();
-            // }
             @Override
-            public void resetRenderer() {
-                super.resetRenderer();
-                /* Back to the inherited default color (the warning color below is set per cell). */
-                this.rendererField.setForeground(null);
+            protected JComponent getInternalEditorComponent(final AccountEntry value, final boolean isSelected, final int row, final int column) {
+                return editor;
             }
 
             @Override
-            public void configureRendererComponent(AccountEntry value, boolean isSelected, boolean hasFocus, int row, int column) {
-                super.configureRendererComponent(value, isSelected, hasFocus, row, column);
+            protected JComponent getInternalRendererComponent(final AccountEntry value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
+                return renderer;
+            }
+
+            /* The button has no text: its explanation is shown as tooltip of the cell. */
+            @Override
+            protected String getTooltipText(final AccountEntry value) {
+                final StatusAction action = getStatusAction(value.getAccount());
+                if (action == StatusAction.NONE) {
+                    return null;
+                }
+                return getButtonText(action);
+            }
+
+            @Override
+            public void configureEditorComponent(final AccountEntry value, final boolean isSelected, final int row, final int column) {
+                editing = value;
+                editorBtn.setToolTipText(getButtonText(getStatusAction(value.getAccount())));
+                editorLabel.setText(accountToStatusString(value.getAccount()));
+                editorLabel.setIcon(accountToStatusIcon(value.getAccount()));
+            }
+
+            @Override
+            public void configureRendererComponent(final AccountEntry value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
                 final Account account = value.getAccount();
+                rendererBtn.setVisible(getStatusAction(account) != StatusAction.NONE);
+                rendererLabel.setText(accountToStatusString(account));
+                rendererLabel.setIcon(accountToStatusIcon(account));
+                rendererLabel.setEnabled(account.isEnabled());
                 if (account.isValid() && !account.isTempDisabled() && account.isLowBalance()) {
                     /*
                      * Captcha solver account with low balance: show its status text (which contains the low balance warning) in the theme's
                      * error color. Not for invalid/temp disabled accounts: Their whole row is already highlighted by the row highlighters of
                      * the table (see PremiumAccountTable), so an error colored text would be red on red.
                      */
-                    this.rendererField.setForeground(LAFOptions.getInstance().getColorForErrorForeground());
+                    rendererLabel.setForeground(LAFOptions.getInstance().getColorForErrorForeground());
+                } else {
+                    /* The renderer is reused for all rows, so the foreground has to be reset for every row. */
+                    rendererLabel.setForeground(null);
                 }
             }
 
             @Override
-            public String getStringValue(AccountEntry value) {
-                return accountToStatusString(value.getAccount());
+            public void resetEditor() {
+            }
+
+            @Override
+            public void resetRenderer() {
             }
         });
     }

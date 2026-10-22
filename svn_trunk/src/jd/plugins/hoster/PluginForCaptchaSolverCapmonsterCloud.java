@@ -12,8 +12,10 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.ReflectionUtils;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.ChallengeSolver.ChallengeVetoReason;
 import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
 import org.jdownloader.captcha.v2.SolverStatus;
+import org.jdownloader.captcha.v2.challenge.altcha.AltchaChallenge;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
@@ -43,7 +45,7 @@ import jd.plugins.PluginException;
  * The API is similar to the one of anti-captcha.com/2captcha.com (createTask/getTaskResult) but has its own task types and feedback
  * methods.
  */
-@HostPlugin(revision = "$Revision: 53697 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53706 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
 public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -81,12 +83,29 @@ public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCapt
         types.add(CAPTCHA_TYPE.RECAPTCHA_V3_ENTERPRISE);
         types.add(CAPTCHA_TYPE.CLOUDFLARE_TURNSTILE);
         /*
+         * 2026-10-22: https://docs.capmonster.cloud/docs/captchas/altcha-task/ -> Only v1 challenges are supported, see getVetoReason().
+         */
+        types.add(CAPTCHA_TYPE.ALTCHA);
+        /*
          * 2026-09-24: capmonster.cloud's API does offer MtCaptchaTaskProxyless, but solve() has no request handling for it yet, so it is
          * NOT declared here. Declaring it without a matching solve() branch would make solve() throw for such a challenge. Re-add together
          * with the corresponding solve() handling.
          */
         // types.add(CAPTCHA_TYPE.MT_CAPTCHA);
         return types;
+    }
+
+    @Override
+    public ChallengeVetoReason getVetoReason(final Challenge<?> c, final Account account) {
+        final ChallengeVetoReason reason = super.getVetoReason(c, account);
+        if (reason != null) {
+            return reason;
+        } else if (c instanceof AltchaChallenge && ((AltchaChallenge) c).getChallengeV1() == null) {
+            /* The ALTCHA task expects the fields of a v1 challenge (challenge, maxnumber, salt, signature), v2 challenges cannot be sent. */
+            return ChallengeVetoReason.UNSUITABLE_FOR_SOLVER;
+        } else {
+            return null;
+        }
     }
 
     @Override
@@ -158,6 +177,27 @@ public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCapt
             task.put("type", "TurnstileTaskProxyless");
             task.put("websiteURL", challenge.getSiteUrl(this));
             task.put("websiteKey", challenge.getSiteKey());
+        } else if (captchachallenge instanceof AltchaChallenge) {
+            /* https://docs.capmonster.cloud/docs/captchas/altcha-task/ */
+            final AltchaChallenge challenge = (AltchaChallenge) captchachallenge;
+            final Map<String, Object> challengeV1 = challenge.getChallengeV1();
+            if (challengeV1 == null) {
+                /* Should never happen, see getVetoReason() */
+                throw new IllegalArgumentException("Unsupported ALTCHA challenge version");
+            }
+            task.put("type", "CustomTask");
+            task.put("class", "altcha");
+            task.put("websiteURL", challenge.getSiteUrl(this));
+            /* Empty string is allowed. */
+            task.put("websiteKey", "");
+            final Map<String, Object> metadata = new HashMap<String, Object>();
+            metadata.put("challenge", challengeV1.get("challenge").toString());
+            /* "iterations" is the "maxnumber" value. All values must be sent as strings. */
+            metadata.put("iterations", challengeV1.get("maxnumber").toString());
+            /* Full salt including parameters such as "?expires=..." */
+            metadata.put("salt", challengeV1.get("salt").toString());
+            metadata.put("signature", challengeV1.get("signature").toString());
+            task.put("metadata", metadata);
         } else if (captchachallenge instanceof ImageCaptchaChallenge) {
             final ImageCaptchaChallenge<?> challenge = (ImageCaptchaChallenge<?>) captchachallenge;
             /* https://docs.capmonster.cloud/docs/captchas/ImageToText/image-to-text/ */
@@ -206,6 +246,10 @@ public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCapt
             if (captchachallenge instanceof ImageCaptchaChallenge) {
                 /* ImageToTextTask: {"solution":{"text":"answer"},"status":"ready",...} */
                 resp = new CaptchaResponse((Challenge<String>) captchachallenge, job.getSolver(), solutionmap.get("text").toString());
+            } else if (captchachallenge instanceof AltchaChallenge) {
+                /* CustomTask: {"solution":{"data":{"token":"<base64 payload>","number":44619}},"status":"ready",...} */
+                final Map<String, Object> data = (Map<String, Object>) solutionmap.get("data");
+                resp = new TokenCaptchaResponse((Challenge<String>) captchachallenge, job.getSolver(), (String) data.get("token"));
             } else {
                 /* Token captchas: Turnstile returns "token", the others return "gRecaptchaResponse". */
                 String token = (String) solutionmap.get("token");

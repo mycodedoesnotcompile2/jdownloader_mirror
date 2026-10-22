@@ -12,6 +12,7 @@ import java.awt.Point;
 import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
@@ -34,6 +35,7 @@ import javax.sound.sampled.LineEvent.Type;
 import javax.sound.sampled.LineListener;
 import javax.swing.BorderFactory;
 import javax.swing.DefaultListCellRenderer;
+import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
@@ -42,8 +44,11 @@ import javax.swing.JList;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.JSlider;
 import javax.swing.JToggleButton;
 import javax.swing.KeyStroke;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.config.JsonConfig;
@@ -410,18 +415,76 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
     }
 
     /**
-     * Creates the toggle for the global captcha sound setting (CaptchaSoundEnabled). It is the same setting for all captcha dialogs. The
-     * volume is only available in the advanced settings.
+     * Creates the toggle for the global captcha sound setting (CaptchaSoundEnabled). It is the same setting for all captcha dialogs. Left
+     * click: sound on/off. Right click: popup with a volume slider (CaptchaSoundVolumePercent).
      */
     protected JToggleButton createSoundToggle() {
-        final JToggleButton ret = new JToggleButton(new AbstractIcon(IconKey.ICON_AUDIO, 18));
-        ret.setSelected(CFG_SOUND.CAPTCHA_SOUND_ENABLED.getValue().booleanValue());
-        ret.setToolTipText(_GUI.T.AbstractCaptchaDialog_soundToggle_tooltip());
+        final Icon iconOn = new AbstractIcon(IconKey.ICON_AUDIO, 18);
+        final Icon iconOff = NewTheme.I().getDisabledIcon(iconOn);
+        final JToggleButton ret = new JToggleButton(iconOn);
+        final Runnable update = new Runnable() {
+            @Override
+            public void run() {
+                final boolean enabled = CFG_SOUND.CAPTCHA_SOUND_ENABLED.getValue().booleanValue();
+                ret.setSelected(enabled);
+                ret.setIcon(enabled ? iconOn : iconOff);
+                ret.setToolTipText(_GUI.T.AbstractCaptchaDialog_soundToggle_tooltip(enabled ? CFG_SOUND.CAPTCHA_SOUND_VOLUME_PERCENT.getValue().intValue() + "%" : "off"));
+            }
+        };
+        update.run();
         ret.setFocusable(false);
+        final Runnable showVolumePopup = new Runnable() {
+            @Override
+            public void run() {
+                final JSlider slider = new JSlider(0, 100, CFG_SOUND.CAPTCHA_SOUND_VOLUME_PERCENT.getValue().intValue());
+                slider.setOpaque(false);
+                slider.addChangeListener(new ChangeListener() {
+                    @Override
+                    public void stateChanged(ChangeEvent ev) {
+                        CFG_SOUND.CAPTCHA_SOUND_VOLUME_PERCENT.setValue(slider.getValue());
+                        /* Changing the volume enables the sound, a volume of 0 disables it */
+                        CFG_SOUND.CAPTCHA_SOUND_ENABLED.setValue(slider.getValue() > 0);
+                        update.run();
+                        if (!slider.getValueIsAdjusting()) {
+                            /* Preview of the new volume */
+                            playCaptchaSound();
+                        }
+                    }
+                });
+                final JPopupMenu popup = new JPopupMenu();
+                popup.add(slider);
+                popup.show(ret, 0, ret.getHeight());
+            }
+        };
         ret.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
+                if (ret.isSelected() && CFG_SOUND.CAPTCHA_SOUND_VOLUME_PERCENT.getValue().intValue() <= 0) {
+                    /* Volume is 0: enabling the sound makes no sense without a volume. Only open the slider and keep the sound disabled. */
+                    update.run();
+                    showVolumePopup.run();
+                    return;
+                }
                 CFG_SOUND.CAPTCHA_SOUND_ENABLED.setValue(ret.isSelected());
+                update.run();
+            }
+        });
+        ret.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                showPopup(e);
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                showPopup(e);
+            }
+
+            private void showPopup(MouseEvent e) {
+                if (!e.isPopupTrigger()) {
+                    return;
+                }
+                showVolumePopup.run();
             }
         });
         return ret;

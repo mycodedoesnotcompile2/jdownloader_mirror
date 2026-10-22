@@ -21,6 +21,7 @@ import org.appwork.timetracker.TrackerRule;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Time;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.logging2.LogSource;
@@ -206,7 +207,6 @@ public class ChallengeResponseController {
     }
 
     public void fireAfterSolveEvent(SolverJob<?> job, ChallengeSolver<?> solver) {
-        job.getLogger().info("Solver " + solver + " finished job " + job);
         job._notifyAll();
         eventSender.fireEvent(new ChallengeResponseEvent(this, ChallengeResponseEvent.Type.SOLVER_END, solver, job));
     }
@@ -526,8 +526,7 @@ public class ChallengeResponseController {
                 throw new SkipException(c, job.getSkipRequest());
             }
             final ResponseList<T> response = job.getResponseAndKill();
-            logger.info("All Responses: " + job.getResponses());
-            logger.info("Solving Done. Result: " + response);
+            logger.info("Solving Done. Result: " + response + " | All responses: " + job.getResponses());
             return job;
         } catch (InterruptedException e) { // for example downloads have been stopped
             job.setInterrupted();
@@ -774,7 +773,8 @@ public class ChallengeResponseController {
                     logger.log(e);
                 }
             }
-            if (unavailableSolverDomains.size() > 0) {
+            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && unavailableSolverDomains.size() > 0) {
+                /* Debug logger */
                 logger.info("Existing solver accounts that cannot be used for this challenge: " + unavailableSolverDomains + "|vetoReasons=" + unavailableSolverDomainVetoReasons);
             }
         }

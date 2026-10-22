@@ -2,17 +2,17 @@ package jd.plugins;
 
 import java.util.EnumSet;
 import java.util.Set;
-import java.util.ArrayList;
-import java.util.List;
 
 import javax.swing.Icon;
 
 import org.jdownloader.DomainInfo;
 import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.challenge.altcha.AltchaChallenge;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
+import org.jdownloader.captcha.v2.challenge.powcaptcha.PowCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
 import org.jdownloader.gui.IconKey;
@@ -347,6 +347,63 @@ public class CaptchaType {
                 return "cutcaptcha.com";
             }
         },
+        POW_CAPTCHA {
+            @Override
+            public boolean canHandle(Challenge<?> c) {
+                return c instanceof PowCaptchaChallenge;
+            }
+
+            @Override
+            public String getDisplayName() {
+                return "powCAPTCHA";
+            }
+
+            @Override
+            public String getDemoUrl() {
+                return "https://powcaptcha.com/";
+            }
+
+            @Override
+            public String getDescription() {
+                return "Proof-of-work captcha which requires no user interaction but a calculation.";
+            }
+
+            @Override
+            public String getDomain() {
+                return "powcaptcha.com";
+            }
+        },
+        ALTCHA {
+            @Override
+            public boolean canHandle(Challenge<?> c) {
+                return c instanceof AltchaChallenge;
+            }
+
+            @Override
+            public String getDisplayName() {
+                return "ALTCHA";
+            }
+
+            @Override
+            public String getDemoUrl() {
+                return "https://altcha.org/";
+            }
+
+            @Override
+            public String getDescription() {
+                return "Open source proof-of-work captcha which usually requires no user interaction but a calculation. 'The privacy-friendly CAPTCHA that stops bots and spam.'";
+            }
+
+            @Override
+            public String getDomain() {
+                return "altcha.org";
+            }
+
+            @Override
+            public boolean hasTestChallenges() {
+                return true;
+            }
+        },
         /* Types that exist but we don't support. */
         GEETEST_V1 {
             @Override
@@ -542,9 +599,10 @@ public class CaptchaType {
         public abstract String getDomain();
 
         /**
-         * True if this captcha type has test data available, i.e. {@link org.jdownloader.captcha.v2.test.CaptchaTestParameters#getDefaults(CAPTCHA_TYPE)}
-         * returns pre-filled values and {@link org.jdownloader.captcha.v2.test.CaptchaTestChallengeFactory} can build a test challenge for it. Used by
-         * the IDE-only "Test &amp; Debug" tab in the captcha settings to decide which types can be selected for testing.
+         * True if this captcha type has test data available, i.e.
+         * {@link org.jdownloader.captcha.v2.tester.CaptchaTestParameters#getDefaults(CAPTCHA_TYPE)} returns pre-filled values and
+         * {@link org.jdownloader.captcha.v2.tester.CaptchaTestChallengeFactory} can build a test challenge for it. Used by the IDE-only
+         * "Test &amp; Debug" tab in the captcha settings to decide which types can be selected for testing.
          */
         public boolean hasTestChallenges() {
             return false;

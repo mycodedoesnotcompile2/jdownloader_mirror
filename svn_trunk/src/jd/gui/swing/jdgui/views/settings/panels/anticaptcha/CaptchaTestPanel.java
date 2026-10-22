@@ -77,8 +77,8 @@ import org.jdownloader.captcha.v2.SolverService;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
 import org.jdownloader.captcha.v2.solverjob.ResponseList;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
-import org.jdownloader.captcha.v2.test.CaptchaTestChallengeFactory;
-import org.jdownloader.captcha.v2.test.CaptchaTestParameters;
+import org.jdownloader.captcha.v2.tester.CaptchaTestChallengeFactory;
+import org.jdownloader.captcha.v2.tester.CaptchaTestParameters;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.logging.LogController;
@@ -600,6 +600,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         final CaptchaTestParameters defaults = CaptchaTestParameters.getDefaults(type);
         siteUrlField.setText(defaults.getSiteUrl() == null ? "" : defaults.getSiteUrl());
         siteKeyField.setText(defaults.getSiteKey() == null ? "" : defaults.getSiteKey());
+        siteKeyLabel.setText(CaptchaTestParameters.getSiteKeyLabel(type));
         final boolean usesImage = CaptchaTestParameters.usesImage(type);
         siteUrlLabel.setEnabled(!usesImage);
         siteUrlField.setEnabled(!usesImage);

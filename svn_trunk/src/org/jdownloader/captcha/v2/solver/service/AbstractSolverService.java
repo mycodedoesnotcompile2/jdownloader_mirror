@@ -61,6 +61,16 @@ public abstract class AbstractSolverService implements SolverService {
         return false;
     }
 
+    /* Default: no warning button. */
+    @Override
+    public String getStatusWarningButtonTooltip() {
+        return null;
+    }
+
+    @Override
+    public void onStatusWarningButton() {
+    }
+
     /**
      * Default: a solver is ready when it does not require a status action (e.g. "Add Account"/"Configure"). Overridable.
      */

@@ -28,6 +28,7 @@ import org.appwork.swing.MigPanel;
 import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtDefaultRowSorter;
 import org.appwork.swing.exttable.ExtTableHeaderRenderer;
+import org.appwork.swing.exttable.ExtTable;
 import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.swing.exttable.columns.ExtCheckColumn;
 import org.appwork.swing.exttable.columns.ExtComponentColumn;
@@ -122,12 +123,50 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
         }
     }
 
+    /** True while the rows are being reloaded: the selection is cleared and restored then, which is not a user action. */
+    private volatile boolean reloading = false;
+
+    public boolean isReloading() {
+        return reloading;
+    }
+
+    /**
+     * Runs a reload of the rows (EDT only) and keeps the selected solver selected afterwards. Reloading clears the selection, which would
+     * make the detail panels below the table disappear. The selection events fired in between are suppressed (see {@link #isReloading()}).
+     * Only if the selected solver is gone afterwards, the listeners are informed about the lost selection.
+     */
+    private void reloadPreservingSelection(final Runnable reload) {
+        final ExtTable<SolverService> table = getTable();
+        final int selectedRow = table == null ? -1 : table.getSelectedRow();
+        final SolverService selected = selectedRow >= 0 ? getObjectbyRow(selectedRow) : null;
+        reloading = true;
+        try {
+            reload.run();
+            if (selected != null) {
+                final int row = getRowforObject(selected);
+                if (row >= 0) {
+                    table.getSelectionModel().setSelectionInterval(row, row);
+                }
+            }
+        } finally {
+            reloading = false;
+        }
+        if (selected != null && table.getSelectedRow() < 0 && table instanceof SolverOrderTable) {
+            ((SolverOrderTable) table).fireSelectionChanged();
+        }
+    }
+
     /** Redraws all rows on the EDT without changing their order. */
     private void refreshRows() {
         new EDTRunner() {
             @Override
             protected void runInEDT() {
-                fireTableDataChanged();
+                reloadPreservingSelection(new Runnable() {
+                    @Override
+                    public void run() {
+                        fireTableDataChanged();
+                    }
+                });
             }
         };
     }
@@ -147,7 +186,12 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
                         return ra - rb;
                     }
                 });
-                _fireTableStructureChanged(visible, true);
+                reloadPreservingSelection(new Runnable() {
+                    @Override
+                    public void run() {
+                        _fireTableStructureChanged(visible, true);
+                    }
+                });
             }
         };
     }
@@ -281,6 +325,9 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
             private final JButton          rendererBtn;
             private final MigPanel         editor;
             private final JButton          editorBtn;
+            private final JButton          rendererWarnBtn;
+            private final JButton          editorWarnBtn;
+            private final RenderLabel      editorLabel;
             private final Icon             addIcon     = new AbstractIcon(IconKey.ICON_ADD, 14);
             private final Icon             warningIcon = new AbstractIcon(IconKey.ICON_WARNING, 14);
             private final Color            defaultStatusForeground;
@@ -291,9 +338,29 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
                 rendererBtn.setIcon(addIcon);
                 rendererBtn.setHorizontalAlignment(SwingConstants.LEFT);
                 rendererBtn.setMargin(new Insets(0, 4, 0, 4));
-                renderer = new RendererMigPanel("ins 0", "[grow,fill]", "[grow,fill]");
-                renderer.add(rendererLabel, "hidemode 3");
-                renderer.add(rendererBtn, "hidemode 3, height 18!");
+                /*
+                 * Icon-only warning button in front of the status (e.g. "solver accounts are globally disabled"); its explanation is
+                 * shown as tooltip (see getTooltipText). Status label and action button share the second cell.
+                 */
+                rendererWarnBtn = new JButton();
+                rendererWarnBtn.setIcon(warningIcon);
+                rendererWarnBtn.setMargin(new Insets(0, 2, 0, 2));
+                renderer = new RendererMigPanel("ins 0, gap 2", "[][grow,fill]", "[grow,fill]");
+                renderer.add(rendererWarnBtn, "cell 0 0, hidemode 3, height 18!");
+                renderer.add(rendererLabel, "cell 1 0, hidemode 3");
+                renderer.add(rendererBtn, "cell 1 0, hidemode 3, height 18!");
+                editorLabel = new RenderLabel();
+                editorWarnBtn = new JButton();
+                editorWarnBtn.setIcon(warningIcon);
+                editorWarnBtn.setMargin(new Insets(0, 2, 0, 2));
+                editorWarnBtn.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        if (editing != null) {
+                            editing.onStatusWarningButton();
+                        }
+                    }
+                });
                 editorBtn = new JButton();
                 editorBtn.setIcon(addIcon);
                 editorBtn.setHorizontalAlignment(SwingConstants.LEFT);
@@ -318,8 +385,10 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
                         }
                     }
                 });
-                editor = new MigPanel("ins 0", "[grow,fill]", "[grow,fill]");
-                editor.add(editorBtn, "height 18!");
+                editor = new MigPanel("ins 0, gap 2", "[][grow,fill]", "[grow,fill]");
+                editor.add(editorWarnBtn, "cell 0 0, hidemode 3, height 18!");
+                editor.add(editorBtn, "cell 1 0, hidemode 3, height 18!");
+                editor.add(editorLabel, "cell 1 0, hidemode 3");
                 setClickcount(1);
                 /*
                  * No single scalar backs this column (it shows either a status text or an action button), so sort by readiness first
@@ -358,8 +427,14 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
 
             @Override
             public boolean isEditable(final SolverService service) {
-                /* Only rows that show an action button are editable (clickable). */
-                return service.getStatusActionName() != null;
+                /* Only rows that show an action button or a warning button are editable (clickable). */
+                return service.getStatusActionName() != null || service.getStatusWarningButtonTooltip() != null;
+            }
+
+            /* The warning button has no text: its explanation is shown as tooltip. */
+            @Override
+            protected String getTooltipText(final SolverService value) {
+                return value.getStatusWarningButtonTooltip();
             }
 
             @Override
@@ -375,12 +450,26 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
             @Override
             public void configureEditorComponent(final SolverService value, final boolean isSelected, final int row, final int column) {
                 editing = value;
-                editorBtn.setText(value.getStatusActionName());
-                editorBtn.setIcon(value.isStatusActionWarning() ? warningIcon : addIcon);
+                final String warningTooltip = value.getStatusWarningButtonTooltip();
+                editorWarnBtn.setVisible(warningTooltip != null);
+                editorWarnBtn.setToolTipText(warningTooltip);
+                final String action = value.getStatusActionName();
+                if (action != null) {
+                    editorBtn.setText(action);
+                    editorBtn.setIcon(value.isStatusActionWarning() ? warningIcon : addIcon);
+                    editorBtn.setVisible(true);
+                    editorLabel.setVisible(false);
+                } else {
+                    editorLabel.setText(value.getStatusText());
+                    editorLabel.setIcon(null);
+                    editorLabel.setVisible(true);
+                    editorBtn.setVisible(false);
+                }
             }
 
             @Override
             public void configureRendererComponent(final SolverService value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
+                rendererWarnBtn.setVisible(value.getStatusWarningButtonTooltip() != null);
                 final String action = value.getStatusActionName();
                 if (action != null) {
                     rendererBtn.setText(action);

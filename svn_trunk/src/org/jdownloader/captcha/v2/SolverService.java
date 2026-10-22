@@ -61,6 +61,15 @@ public interface SolverService {
     public abstract boolean isStatusTextWarning();
 
     /**
+     * Tooltip of the icon-only warning button shown in front of the status (e.g. "external captcha solver accounts are globally disabled,
+     * click here to enable"), or null when no warning button should be shown. The button is independent of the regular status text/action.
+     */
+    public abstract String getStatusWarningButtonTooltip();
+
+    /** Performs the action of the warning button (only called when {@link #getStatusWarningButtonTooltip()} is non-null). */
+    public abstract void onStatusWarningButton();
+
+    /**
      * Returns true if this solver is ready to be used right now (e.g. has a valid account / is connected). Not-ready solvers are sorted to
      * the bottom of the solver overview.
      */

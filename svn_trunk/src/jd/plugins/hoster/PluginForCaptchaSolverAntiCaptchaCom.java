@@ -16,6 +16,7 @@ import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
 import org.jdownloader.captcha.v2.SolverStatus;
+import org.jdownloader.captcha.v2.challenge.altcha.AltchaChallenge;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
@@ -43,7 +44,7 @@ import jd.plugins.PluginException;
 /**
  * Captcha solver plugin for anti-captcha.com: https://anti-captcha.com/apidoc
  */
-@HostPlugin(revision = "$Revision: 53649 $", interfaceVersion = 3, names = { "anti-captcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53706 $", interfaceVersion = 3, names = { "anti-captcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverAntiCaptchaCom extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -86,6 +87,8 @@ public class PluginForCaptchaSolverAntiCaptchaCom extends abstractPluginForCaptc
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
         types.add(CAPTCHA_TYPE.CLOUDFLARE_TURNSTILE);
+        /* 2026-10-22: https://anti-captcha.com/apidoc/task-types/AltchaTaskProxyless */
+        types.add(CAPTCHA_TYPE.ALTCHA);
         /*
          * 2026-09-24: anti-captcha.com's API does offer GeeTestTaskProxyless/FriendlyCaptchaTaskProxyless, but solve() has no request
          * handling for them yet, so they are NOT declared here. Re-add together with the corresponding solve() handling.
@@ -165,6 +168,16 @@ public class PluginForCaptchaSolverAntiCaptchaCom extends abstractPluginForCaptc
             task.put("type", "TurnstileTaskProxyless");
             task.put("websiteURL", challenge.getSiteUrl(this));
             task.put("websiteKey", challenge.getSiteKey());
+        } else if (captchachallenge instanceof AltchaChallenge) {
+            /* https://anti-captcha.com/apidoc/task-types/AltchaTaskProxyless -> Either challengeURL or challengeJSON. */
+            final AltchaChallenge challenge = (AltchaChallenge) captchachallenge;
+            task.put("type", "AltchaTaskProxyless");
+            task.put("websiteURL", challenge.getSiteUrl(this));
+            if (challenge.getChallengeJson() != null) {
+                task.put("challengeJSON", challenge.getChallengeJson());
+            } else {
+                task.put("challengeURL", challenge.getChallengeUrl());
+            }
         } else if (captchachallenge instanceof MultiClickCaptchaChallenge) {
             /*
              * https://anti-captcha.com/apidoc/task-types/ImageToCoordinatesTask <br> No min/maxClicks supported, the "comment" is the only
@@ -227,7 +240,7 @@ public class PluginForCaptchaSolverAntiCaptchaCom extends abstractPluginForCaptc
             final AbstractResponse<?> resp;
             if (captchachallenge instanceof RecaptchaV2Challenge) {
                 resp = new TokenCaptchaResponse((Challenge<String>) captchachallenge, job.getSolver(), (String) solutionmap.get("gRecaptchaResponse"));
-            } else if (captchachallenge instanceof CloudflareTurnstileChallenge) {
+            } else if (captchachallenge instanceof CloudflareTurnstileChallenge || captchachallenge instanceof AltchaChallenge) {
                 resp = new TokenCaptchaResponse((Challenge<String>) captchachallenge, job.getSolver(), (String) solutionmap.get("token"));
             } else if (captchachallenge instanceof MultiClickCaptchaChallenge) {
                 /* Format: "coordinates":[[x,y],[x,y]] */

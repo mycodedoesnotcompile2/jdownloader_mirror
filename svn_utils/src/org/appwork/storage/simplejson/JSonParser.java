@@ -103,7 +103,8 @@ public class JSonParser {
 
     protected ParserException bam(final String expected, final Object path, final Throwable cause) {
         final int lastX = Math.min(str.length(), 20);
-        String pre = str.substring(Math.max(global - lastX, 0), lastX);
+        final int end = Math.max(0, Math.min(str.length(), global));
+        String pre = str.substring(Math.max(end - lastX, 0), end);
         pre = pre.replace("\r", "\\r").replace("\n", "\\n");
         final StringBuilder sb = new StringBuilder();
         sb.append(expected);

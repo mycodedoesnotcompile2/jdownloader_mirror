@@ -102,7 +102,7 @@ import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 53382 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53703 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     /* Account properties */
     private final String        PROPERTY_ACCOUNT_USE_CDN_CREDITS                                  = "use_cdn_credits";
@@ -887,6 +887,10 @@ public class OneFichierCom extends PluginForHost {
             // <b>High demand:</b> all free guest slots are currently in use.
             // <br>✅ Free slots are still available for <b>registered users</b> — instant, free access.
             return true;
+        } else if (br.containsHTML(">\\s*all free download slots are currently in use")) {
+            // <b>High demand:</b> all free download slots are currently in use.
+            // <br>Unlock <b>instant</b> download — no waiting, no ads and full speed.
+            return true;
         }
         return false;
     }
@@ -899,7 +903,7 @@ public class OneFichierCom extends PluginForHost {
         final OneFichierConfigInterface cfg = get(this.getConfigInterface());
         final long waitMillis = cfg.getNoFreeSlotsWaitMinutes() * 60 * 1000;
         if (account != null) {
-            if (AccountType.FREE != account.getType()) {
+            if (!AccountType.FREE.is(account)) {
                 logger.warning("This error should only happen for free accounts");
             }
             throw new AccountUnavailableException("Free account download is temporarily limited. Buy premium or try again later.", waitMillis);

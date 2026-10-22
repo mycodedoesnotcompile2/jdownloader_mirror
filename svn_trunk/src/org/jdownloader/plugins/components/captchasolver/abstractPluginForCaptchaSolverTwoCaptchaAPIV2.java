@@ -1,28 +1,32 @@
 package org.jdownloader.plugins.components.captchasolver;
 
-import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
-import java.util.EnumSet;
-import java.util.Set;
-import java.util.ArrayList;
 import java.util.Currency;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
+import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
 import org.jdownloader.captcha.v2.SolverStatus;
+import org.jdownloader.captcha.v2.challenge.altcha.AltchaChallenge;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
+import org.jdownloader.captcha.v2.challenge.powcaptcha.PowCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.CaptchaResponse;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
@@ -74,6 +78,10 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
     @Override
     public void solve(CESSolverJob<?> job, Account account) throws Exception {
         final Challenge<?> captchachallenge = job.getChallenge();
+        if (captchachallenge instanceof PowCaptchaChallenge) {
+            solvePowCaptcha(job, account);
+            return;
+        }
         job.setStatus(SolverStatus.UPLOADING);
         final Map<String, Object> postdata = new HashMap<String, Object>();
         final String apikey = account.getPass();
@@ -132,6 +140,16 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
             task.put("type", "TurnstileTaskProxyless");
             task.put("websiteURL", challenge.getSiteUrl(this));
             task.put("websiteKey", challenge.getSiteKey());
+        } else if (captchachallenge instanceof AltchaChallenge) {
+            /* ALTCHA: https://2captcha.com/api-docs/altcha -> Either challengeURL or challengeJSON, not both. */
+            final AltchaChallenge challenge = (AltchaChallenge) captchachallenge;
+            task.put("type", "AltchaTaskProxyless");
+            task.put("websiteURL", challenge.getSiteUrl(this));
+            if (challenge.getChallengeJson() != null) {
+                task.put("challengeJSON", challenge.getChallengeJson());
+            } else {
+                task.put("challengeURL", challenge.getChallengeUrl());
+            }
         } else if (captchachallenge instanceof MultiClickCaptchaChallenge) {
             /* Coordinates task: https://2captcha.com/api-docs/coordinates */
             final MultiClickCaptchaChallenge challenge = (MultiClickCaptchaChallenge) captchachallenge;
@@ -177,7 +195,6 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
             final PostRequest req_getTaskResult = br.createJSonPostRequest(this.getApiBase() + "/getTaskResult", postdata_getTaskResult);
             br.getPage(req_getTaskResult);
             entries = this.handleAPIErrors(br, account);
-            logger.info(br.getRequest().getHtmlCode());
             final String status = entries.get("status").toString();
             if (status.equalsIgnoreCase("processing")) {
                 /* Not yet ready */
@@ -195,7 +212,7 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
                 token = (String) solutionmap.get("gRecaptchaResponse");
             }
             AbstractResponse resp = null;
-            if (captchachallenge instanceof RecaptchaV2Challenge || captchachallenge instanceof HCaptchaChallenge || captchachallenge instanceof CloudflareTurnstileChallenge || captchachallenge instanceof CutCaptchaChallenge) {
+            if (captchachallenge instanceof RecaptchaV2Challenge || captchachallenge instanceof HCaptchaChallenge || captchachallenge instanceof CloudflareTurnstileChallenge || captchachallenge instanceof CutCaptchaChallenge || captchachallenge instanceof AltchaChallenge) {
                 resp = new TokenCaptchaResponse((Challenge<String>) captchachallenge, job.getSolver(), token);
             } else if (captchachallenge instanceof MultiClickCaptchaChallenge) {
                 /* Coordinates task: https://2captcha.com/api-docs/coordinates */
@@ -217,6 +234,83 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
             job.setAnswer(resp);
             return;
         }
+    }
+
+    /**
+     * powCAPTCHA is not available in the APIv2 (createTask) but only via the legacy API (in.php/res.php). <br>
+     * See: https://2captcha.com/h/how-to-bypass-pow-captcha-on-filecrypt
+     */
+    protected void solvePowCaptcha(final CESSolverJob<?> job, final Account account) throws Exception {
+        final PowCaptchaChallenge challenge = (PowCaptchaChallenge) job.getChallenge();
+        job.setStatus(SolverStatus.UPLOADING);
+        final String apikey = account.getPass();
+        final UrlQuery query_createTask = new UrlQuery();
+        query_createTask.appendEncoded("key", apikey);
+        query_createTask.appendEncoded("method", "pow_captcha");
+        query_createTask.appendEncoded("pageurl", challenge.getSiteUrl(this));
+        query_createTask.appendEncoded("data_session", challenge.getSessionUrl());
+        query_createTask.appendEncoded("useragent", challenge.getUserAgent());
+        query_createTask.appendEncoded("json", "1");
+        br.getPage(br.createPostRequest("https://" + getHost() + "/in.php", query_createTask));
+        Map<String, Object> entries = this.handleLegacyAPIErrors(br, account);
+        final String id = entries.get("request").toString();
+        job.setStatus(SolverStatus.SOLVING);
+        while (job.getJob().isAlive() && !job.getJob().isSolved()) {
+            waitDuringPolling(challenge, account);
+            final UrlQuery query_getResult = new UrlQuery();
+            query_getResult.appendEncoded("key", apikey);
+            query_getResult.appendEncoded("action", "get");
+            query_getResult.appendEncoded("json", "1");
+            query_getResult.appendEncoded("id", id);
+            br.getPage("https://" + getHost() + "/res.php?" + query_getResult.toString());
+            entries = this.handleLegacyAPIErrors(br, account);
+            if (((Number) entries.get("status")).intValue() == 0) {
+                /* CAPCHA_NOT_READY */
+                continue;
+            }
+            /*
+             * The format of the solution is not documented: Accept a JSON object (containing the values for the form fields 'pow_*') as
+             * well as a plain String.
+             */
+            final Object solution = entries.get("request");
+            final String token;
+            if (solution instanceof String) {
+                token = (String) solution;
+            } else {
+                token = JSonStorage.serializeToJson(solution);
+            }
+            final AbstractResponse resp = new TokenCaptchaResponse(challenge, job.getSolver(), token);
+            resp.setCaptchaSolverTaskID(id);
+            job.setAnswer(resp);
+            return;
+        }
+    }
+
+    /**
+     * Legacy API: Errors are returned as {"status":0,"request":"ERROR_CODE"}, "CAPCHA_NOT_READY" means that the captcha is still being
+     * solved. Errors are converted to the APIv2 format so that they are handled by the common error handling.
+     */
+    protected Map<String, Object> handleLegacyAPIErrors(final Browser br, final Account account) throws Exception {
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        if (((Number) entries.get("status")).intValue() == 1) {
+            return entries;
+        }
+        final String request = entries.get("request").toString();
+        if ("CAPCHA_NOT_READY".equals(request)) {
+            return entries;
+        }
+        final Map<String, Object> error = new HashMap<String, Object>();
+        error.put("errorId", 1);
+        if ("ERROR_WRONG_USER_KEY".equals(request)) {
+            /* Legacy name of ERROR_KEY_DOES_NOT_EXIST */
+            error.put("errorCode", "ERROR_KEY_DOES_NOT_EXIST");
+        } else {
+            error.put("errorCode", request);
+        }
+        error.put("errorDescription", request);
+        this.handleAPIErrors(error, account);
+        /* Unreachable code */
+        throw new WTFException();
     }
 
     @Override
@@ -305,9 +399,10 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
         } else if (accountErrorsTemp.contains(errorCode)) {
             throw new AccountUnavailableException(errorDescription, 5 * 60 * 1000);
         } else {
-            /*
+            /**
              * Everything else (bad captcha data/parameters, unsolvable captcha, unsupported/unknown task type, missing method, ...) is a
-             * per-request/captcha problem, not an account problem, see https://2captcha.com/api-docs/error-codes
+             * per-request/captcha problem, not an account problem, see https://2captcha.com/api-docs/error-codes <br>
+             * Example: {"status":0,"request":"ERROR_CAPTCHA_UNSOLVABLE","error_text":"Workers could not solve the Captcha"}
              */
             throw new PluginException(LinkStatus.ERROR_CAPTCHA, errorDescription);
         }

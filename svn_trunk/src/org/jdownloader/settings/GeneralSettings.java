@@ -441,7 +441,7 @@ public interface GeneralSettings extends ConfigInterface {
 
     @AboutConfig
     @DefaultBooleanValue(true)
-    @DescriptionForConfigEntry("Use available accounts for downloading")
+    @DescriptionForConfigEntry("Use available download accounts for downloading")
     boolean isUseAvailableAccounts();
 
     /**

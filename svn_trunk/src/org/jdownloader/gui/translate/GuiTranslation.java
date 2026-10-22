@@ -901,6 +901,12 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Unsolved" })
     String SolverJobStatus_UNSOLVED();
 
+    @Default(lngs = { "en" }, values = { "Answer rejected" })
+    String SolverJobStatus_ANSWER_REJECTED();
+
+    @Default(lngs = { "en" }, values = { "Solver account error" })
+    String SolverJobStatus_SOLVER_ACCOUNT_ERROR();
+
     @Default(lngs = { "en" }, values = { "Interrupted" })
     String SolverJobStatus_INTERRUPTED();
 
@@ -2713,7 +2719,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "An Error occurred..." })
     String lit_error_occured();
 
-    @Default(lngs = { "en" }, values = { "Use Account(s) to download" })
+    @Default(lngs = { "en" }, values = { "Use download account(s)" })
     String AccountManagerSettings_AccountManagerSettings_disable_global();
 
     @Default(lngs = { "en" }, values = { "Main Toolbar" })
@@ -2821,10 +2827,10 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "When moving links from linkgrabber to downloadlist, merge them into existing same named packages in the downloadlist" })
     String MergeSameNamedPackagesOnConfirmToggleAction_tooltip();
 
-    @Default(lngs = { "en" }, values = { "Premium Downloads" })
+    @Default(lngs = { "en" }, values = { "Download Accounts" })
     String GlobalPremiumSwitchToggleAction_getNameWhenDisabled_();
 
-    @Default(lngs = { "en" }, values = { "Premium Downloads" })
+    @Default(lngs = { "en" }, values = { "Download Accounts" })
     String GlobalPremiumSwitchToggleAction_getNameWhenEnabled_();
 
     @Default(lngs = { "en" }, values = { "Silent Mode" })
@@ -3202,8 +3208,8 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Many websites ask you to solve a so-called captcha, e.g. before a download or when logging in, to prove that you are human.\r\nCaptcha solvers solve these captchas for JDownloader: you can solve captchas yourself (in a dialog or in your browser), let My.JDownloader apps solve them remotely, or use external captcha solvers. External captcha solvers are third-party services which solve captchas automatically, usually for a fee. They need an account, which you can add in the account manager.\r\nBelow you can see all captcha solvers with their status, configure them and see which captcha types they support. With captcha rules you can define which solvers are used for which captchas." })
     String AntiCaptchaConfigPanel_onShow_description();
 
-    @Default(lngs = { "en" }, values = { "Play sound when a captcha dialog opens. Volume can be adjusted in advanced settings, see 'SoundSettings.captchasoundvolumepercent'" })
-    String AbstractCaptchaDialog_soundToggle_tooltip();
+    @Default(lngs = { "en" }, values = { "Play sound when a captcha dialog opens (%s1). Click: on/off. Right click: change volume." })
+    String AbstractCaptchaDialog_soundToggle_tooltip(String state);
 
     @Default(lngs = { "en" }, values = { "Visit the Website" })
     String lit_open_website();
@@ -5546,6 +5552,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Usage of solver accounts is globally disabled, click here to enable" })
     String SolverOrderTableModel_status_enableSolverAccounts();
 
+    @Default(lngs = { "en" }, values = { "Usage of download accounts is globally disabled, click here to enable" })
+    String PremiumAccountTableModel_status_enableAccounts();
+
     @Default(lngs = { "en" }, values = { "Accounts disabled or invalid, go to account manager" })
     String SolverOrderTableModel_status_accountsUnusable();
 
@@ -6701,13 +6710,13 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "... Force Start" })
     String ConfirmSelectionBarAction_sub_button_add_and_force_all();
 
-    @Default(lngs = { "en" }, values = { "Are you sure? You are trying to disable all premium accounts.\r\nIf you continue, JDownloader will NOT use your premium accounts unless you re-enable this feature." })
+    @Default(lngs = { "en" }, values = { "Are you sure? You are trying to disable all download accounts.\r\nIf you continue, JDownloader will NOT use your download accounts unless you re-enable this feature." })
     String are_you_sure_disabled_premium();
 
-    @Default(lngs = { "en" }, values = { "Premium Account usage enabled. If you add a premium account, JDownloader will use it." })
+    @Default(lngs = { "en" }, values = { "Download account usage enabled. If you add a download account, JDownloader will use it." })
     String Premium_enabled_button_tooltip_selected();
 
-    @Default(lngs = { "en" }, values = { "Premium Account usage disabled!. JDownloader will not use ANY accounts to download." })
+    @Default(lngs = { "en" }, values = { "Download account usage disabled! JDownloader will not use ANY download accounts to download." })
     String Premium_enabled_button_tooltip_not_selected();
 
     @Default(lngs = { "en" }, values = { "Stop all running downloads" })

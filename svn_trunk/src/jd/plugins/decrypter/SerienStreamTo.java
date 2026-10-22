@@ -57,7 +57,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 53370 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53706 $", interfaceVersion = 3, names = {}, urls = {})
 public class SerienStreamTo extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public SerienStreamTo(final PluginWrapper wrapper) {
@@ -195,7 +195,11 @@ public class SerienStreamTo extends PluginForDecrypt {
                 /**
                  * 2026-04-01: Cloudflare Turnstile + Altcaptcha required (we do not support Altcaptcha) <br>
                  * See: https://board.jdownloader.org/showthread.php?p=556817#post556817 * <br>
-                 * Screenshot: https://snipboard.io/Bk79ul.jpg/
+                 * Screenshot: https://snipboard.io/Bk79ul.jpg/ <br>
+                 * TODO: 2026-10-22: ALTCHA is now supported via CaptchaHelperCrawlerPluginAltcha (solved by external captcha solvers, see
+                 * CAPTCHA_TYPE.ALTCHA). Implement it here once a test link is available: Analyze the page (challenge URL/JSON, form field
+                 * name, order of Turnstile + ALTCHA), then submit the token returned by
+                 * "new CaptchaHelperCrawlerPluginAltcha(this, br).getToken()" (default form field: AbstractAltchaCaptcha.FORM_FIELD_NAME).
                  */
                 throw new DecrypterRetryException(RetryReason.HOST_RATE_LIMIT, "BLOCKIERT_DURCH_NICHT_UNTERSTÜTZTEN_CAPTCHA_TYP_ALTCAPTCHA", "Bitte lesen: https://board.jdownloader.org/showthread.php?p=556817#post556817");
             }

@@ -305,10 +305,9 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
                  * Captcha could not be solved (e.g. unsolvable captcha). This is a problem of the captcha itself and not of the account ->
                  * Only log it and do not set an account error.
                  */
-                job.logSolverStatus(this, "FAILED (captcha could not be solved: " + e.getMessage() + ")");
                 cesJob.setFailed(getFailureReason(e));
+                /* Logged by setSolverResult (RESULT UNSOLVABLE (<message>)): no further status line and no stack trace for this expected case. */
                 job.setSolverResult(this, SolverOutcome.UNSOLVABLE, getFailureReason(e));
-                plugin.getLogger().log(e);
             } else {
                 job.logSolverStatus(this, "FAILED (account/plugin error: " + LinkStatus.toString(e.getLinkStatus()) + " " + e.getMessage() + ")");
                 cesJob.setFailed(getFailureReason(e));
