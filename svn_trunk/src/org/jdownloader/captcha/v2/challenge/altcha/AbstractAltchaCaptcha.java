@@ -2,6 +2,7 @@ package org.jdownloader.captcha.v2.challenge.altcha;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -14,7 +15,6 @@ import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
 import org.appwork.utils.logging2.LogInterface;
 import org.jdownloader.captcha.v2.solver.browser.BrowserViewport;
 import org.jdownloader.captcha.v2.solver.browser.BrowserWindow;
@@ -33,6 +33,8 @@ import org.jdownloader.logging.LogController;
 public abstract class AbstractAltchaCaptcha<T extends Plugin> {
     /** Default name of the form field which holds the solution. */
     public static final String   FORM_FIELD_NAME = "altcha";
+    /* Base64 encoded JSON object, see looksLikeValidToken */
+    private final static Pattern PATTERN_VALID_TOKEN = Pattern.compile("^eyJ[A-Za-z0-9+/]+={0,2}$");
     protected final T            plugin;
     protected final LogInterface logger;
     protected final Browser      br;
@@ -240,17 +242,13 @@ public abstract class AbstractAltchaCaptcha<T extends Plugin> {
         return challenge;
     }
 
-    /** The solution (payload) is a base64 encoded JSON object. */
+    /**
+     * The solution (payload) is a base64 encoded JSON object without whitespace: btoa(JSON.stringify(...)). <br>
+     * It always starts with '{"' followed by a letter (v1: {"algorithm":..., v2: {"challenge":...}) which is "eyJ" in base64 -> no need to
+     * decode it.
+     */
     public static boolean looksLikeValidToken(final String str) {
-        if (StringUtils.isEmpty(str)) {
-            return false;
-        }
-        try {
-            final String decoded = Base64.decodeToString(str);
-            return decoded != null && decoded.trim().startsWith("{");
-        } catch (final RuntimeException e) {
-            return false;
-        }
+        return str != null && PATTERN_VALID_TOKEN.matcher(str).matches();
     }
 
     /** URL of the page which contains the captcha. */

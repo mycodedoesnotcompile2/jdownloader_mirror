@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -78,7 +79,6 @@ import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
 import org.jdownloader.captcha.v2.solverjob.ResponseList;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.captcha.v2.tester.CaptchaTestChallengeFactory;
-import org.jdownloader.captcha.v2.tester.CaptchaTestParameters;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.logging.LogController;
@@ -93,7 +93,7 @@ import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 /**
  * IDE-only "Test &amp; Debug" tab of the captcha settings: lets the developer pick the captcha source (download/login/crawler captcha) and
- * the captcha type to test, edit the site URL/site key (pre-filled with the known test values, see {@link CaptchaTestParameters}) and run
+ * the captcha type to test, edit the site URL/site key (pre-filled with the known test values, see {@link CaptchaTestChallengeFactory}) and run
  * real throwaway test {@link Challenge}s (see {@link CaptchaTestChallengeFactory}) through the normal solving pipeline
  * ({@link ChallengeResponseController#handle(Challenge)}) on a background thread. <br>
  * Every test (a single test is just a table with one row, a multi test runs all selected captcha types of one solver one after another) is
@@ -110,6 +110,8 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     private final JTextField                siteUrlField;
     private final JLabel                    siteKeyLabel;
     private final JTextField                siteKeyField;
+    private final JLabel                    challengeUrlLabel;
+    private final JTextField                challengeUrlField;
     private final JLabel                    imageLabel;
     private final MigPanel                  imagePanel;
     private final JLabel                    imagePreview;
@@ -133,6 +135,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     private final JLabel                    actionLabel;
     private final JTextField                actionField;
     private final JLabel                    minScoreLabel;
+    private final MigPanel                  minScorePanel;
     private final JCheckBox                 minScoreCheckBox;
     private final JSpinner                  minScoreSpinner;
     private final JLabel                    minClicksLabel;
@@ -240,6 +243,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         });
         siteUrlField = new JTextField();
         siteKeyField = new JTextField();
+        challengeUrlField = new JTextField();
         actionField = new JTextField();
         expectedResultField = new JTextField();
         typeBox.addActionListener(new ActionListener() {
@@ -253,11 +257,14 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         add(new JLabel("Captcha type"));
         add(typeBox, "growx");
         siteKeyLabel = new JLabel("Site key");
-        add(siteKeyLabel);
-        add(siteKeyField, "growx");
+        add(siteKeyLabel, "hidemode 3");
+        add(siteKeyField, "growx, hidemode 3");
         siteUrlLabel = new JLabel("Site URL");
-        add(siteUrlLabel);
-        add(siteUrlField, "growx");
+        add(siteUrlLabel, "hidemode 3");
+        add(siteUrlField, "growx, hidemode 3");
+        challengeUrlLabel = new JLabel("Challenge URL");
+        add(challengeUrlLabel, "hidemode 3");
+        add(challengeUrlField, "growx, hidemode 3");
         /* Image captcha types: the captcha image can be replaced by an own one. */
         imageLabel = new JLabel("Captcha image");
         imagePanel = new MigPanel("ins 0, wrap 1", "[grow,fill]", "[]");
@@ -294,19 +301,19 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
             }
         });
         imagePanel.add(openFolderButton, "alignx left");
-        add(imageLabel, "aligny top");
-        add(imagePanel, "growx");
+        add(imageLabel, "aligny top, hidemode 3");
+        add(imagePanel, "growx, hidemode 3");
         descriptionLabel = new JLabel("Challenge Description");
         descriptionField = new JTextField();
-        add(descriptionLabel);
-        add(descriptionField, "growx");
+        add(descriptionLabel, "hidemode 3");
+        add(descriptionField, "growx, hidemode 3");
         caseSensitiveLabel = new JLabel("Case sensitive (image captcha)");
         caseSensitiveBox = new JComboBox(new String[] { "Unset", "true", "false" });
-        add(caseSensitiveLabel);
-        add(caseSensitiveBox, "growx");
+        add(caseSensitiveLabel, "hidemode 3");
+        add(caseSensitiveBox, "growx, hidemode 3");
         actionLabel = new JLabel("Action (reCAPTCHA v3)");
-        add(actionLabel);
-        add(actionField, "growx");
+        add(actionLabel, "hidemode 3");
+        add(actionField, "growx, hidemode 3");
         minScoreLabel = new JLabel("Min score (reCAPTCHA v3)");
         minScoreCheckBox = new JCheckBox("Set");
         /* Default: no min score is requested. */
@@ -318,15 +325,15 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                 minScoreSpinner.setEnabled(minScoreCheckBox.isSelected());
             }
         });
-        final MigPanel minScorePanel = new MigPanel("ins 0", "[][]", "[]");
+        minScorePanel = new MigPanel("ins 0", "[][]", "[]");
         minScorePanel.add(minScoreCheckBox);
         minScorePanel.add(minScoreSpinner);
-        add(minScoreLabel);
-        add(minScorePanel, "growx");
+        add(minScoreLabel, "hidemode 3");
+        add(minScorePanel, "growx, hidemode 3");
         minClicksLabel = new JLabel("Min clicks (multi click captcha)");
         minClicksSpinner = new JSpinner(new SpinnerNumberModel(8, 1, 100, 1));
-        add(minClicksLabel);
-        add(minClicksSpinner, "growx");
+        add(minClicksLabel, "hidemode 3");
+        add(minClicksSpinner, "growx, hidemode 3");
         add(new JLabel("Expected result"));
         add(expectedResultField, "growx");
         startButton = new JButton("Start Single Test");
@@ -597,50 +604,74 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     /** Fills the site URL/site key/action/expected result fields with the pre-filled test values of the selected captcha type. */
     private void applyDefaults() {
         final CAPTCHA_TYPE type = (CAPTCHA_TYPE) typeBox.getSelectedItem();
-        final CaptchaTestParameters defaults = CaptchaTestParameters.getDefaults(type);
-        siteUrlField.setText(defaults.getSiteUrl() == null ? "" : defaults.getSiteUrl());
-        siteKeyField.setText(defaults.getSiteKey() == null ? "" : defaults.getSiteKey());
-        siteKeyLabel.setText(CaptchaTestParameters.getSiteKeyLabel(type));
-        final boolean usesImage = CaptchaTestParameters.usesImage(type);
-        siteUrlLabel.setEnabled(!usesImage);
-        siteUrlField.setEnabled(!usesImage);
-        siteKeyLabel.setEnabled(!usesImage);
-        siteKeyField.setEnabled(!usesImage);
+        /* A key in the defaults is a value this captcha type uses: only these fields are enabled. */
+        final Map<String, Object> defaults = CaptchaTestChallengeFactory.getDefaults(type);
+        final boolean usesSiteUrl = defaults.containsKey(CaptchaTestChallengeFactory.KEY_SITE_URL);
+        siteUrlField.setText(text(defaults.get(CaptchaTestChallengeFactory.KEY_SITE_URL)));
+        siteUrlLabel.setVisible(usesSiteUrl);
+        siteUrlField.setVisible(usesSiteUrl);
+        final boolean usesSiteKey = defaults.containsKey(CaptchaTestChallengeFactory.KEY_SITE_KEY);
+        siteKeyField.setText(text(defaults.get(CaptchaTestChallengeFactory.KEY_SITE_KEY)));
+        siteKeyLabel.setVisible(usesSiteKey);
+        siteKeyField.setVisible(usesSiteKey);
+        final boolean usesChallengeUrl = defaults.containsKey(CaptchaTestChallengeFactory.KEY_CHALLENGE_URL);
+        challengeUrlField.setText(text(defaults.get(CaptchaTestChallengeFactory.KEY_CHALLENGE_URL)));
+        challengeUrlLabel.setVisible(usesChallengeUrl);
+        challengeUrlField.setVisible(usesChallengeUrl);
+        final boolean usesImage = defaults.containsKey(CaptchaTestChallengeFactory.KEY_IMAGE_FILE);
         imageLabel.setVisible(usesImage);
         imagePanel.setVisible(usesImage);
-        setImageFile(defaults.getImageFile());
-        descriptionLabel.setEnabled(usesImage);
-        descriptionField.setEnabled(usesImage);
-        descriptionField.setText(defaults.getChallengeDescription() == null ? "" : defaults.getChallengeDescription());
-        final boolean usesCaseSensitive = CaptchaTestParameters.usesCaseSensitive(type);
-        caseSensitiveLabel.setEnabled(usesCaseSensitive);
-        caseSensitiveBox.setEnabled(usesCaseSensitive);
-        final Boolean caseSensitive = defaults.getCaseSensitive();
+        setImageFile((File) defaults.get(CaptchaTestChallengeFactory.KEY_IMAGE_FILE));
+        final boolean usesDescription = defaults.containsKey(CaptchaTestChallengeFactory.KEY_DESCRIPTION);
+        descriptionLabel.setVisible(usesDescription);
+        descriptionField.setVisible(usesDescription);
+        descriptionField.setText(text(defaults.get(CaptchaTestChallengeFactory.KEY_DESCRIPTION)));
+        final boolean usesCaseSensitive = defaults.containsKey(CaptchaTestChallengeFactory.KEY_CASE_SENSITIVE);
+        caseSensitiveLabel.setVisible(usesCaseSensitive);
+        caseSensitiveBox.setVisible(usesCaseSensitive);
+        final Boolean caseSensitive = (Boolean) defaults.get(CaptchaTestChallengeFactory.KEY_CASE_SENSITIVE);
         caseSensitiveBox.setSelectedIndex(caseSensitive == null ? 0 : (caseSensitive.booleanValue() ? 1 : 2));
-        actionField.setText(defaults.getAction() == null ? "" : defaults.getAction());
-        expectedResultField.setText(defaults.getExpectedResult() == null ? "" : defaults.getExpectedResult());
-        final boolean usesAction = CaptchaTestParameters.usesAction(type);
-        actionLabel.setEnabled(usesAction);
-        actionField.setEnabled(usesAction);
-        final boolean usesMinScore = CaptchaTestParameters.usesMinScore(type);
-        minScoreLabel.setEnabled(usesMinScore);
+        actionField.setText(text(defaults.get(CaptchaTestChallengeFactory.KEY_ACTION)));
+        expectedResultField.setText(text(defaults.get(CaptchaTestChallengeFactory.KEY_EXPECTED_RESULT)));
+        final boolean usesAction = defaults.containsKey(CaptchaTestChallengeFactory.KEY_ACTION);
+        actionLabel.setVisible(usesAction);
+        actionField.setVisible(usesAction);
+        final boolean usesMinScore = defaults.containsKey(CaptchaTestChallengeFactory.KEY_MIN_SCORE);
+        minScoreLabel.setVisible(usesMinScore);
+        minScorePanel.setVisible(usesMinScore);
         /* Default: no min score is requested, unless the captcha type has a default min score. */
-        final Double defaultMinScore = defaults.getMinScore();
+        final Double defaultMinScore = (Double) defaults.get(CaptchaTestChallengeFactory.KEY_MIN_SCORE);
         minScoreCheckBox.setSelected(usesMinScore && defaultMinScore != null);
-        minScoreCheckBox.setEnabled(usesMinScore);
         minScoreSpinner.setValue(defaultMinScore != null ? defaultMinScore : Double.valueOf(0.5d));
-        minScoreSpinner.setEnabled(usesMinScore && defaultMinScore != null);
-        final boolean usesMinClicks = CaptchaTestParameters.usesMinClicks(type);
-        minClicksLabel.setEnabled(usesMinClicks);
-        minClicksSpinner.setEnabled(usesMinClicks);
-        minClicksSpinner.setValue(defaults.getMinClicks());
+        minScoreSpinner.setEnabled(defaultMinScore != null);
+        final boolean usesMinClicks = defaults.containsKey(CaptchaTestChallengeFactory.KEY_MIN_CLICKS);
+        minClicksLabel.setVisible(usesMinClicks);
+        minClicksSpinner.setVisible(usesMinClicks);
+        final Integer defaultMinClicks = (Integer) defaults.get(CaptchaTestChallengeFactory.KEY_MIN_CLICKS);
+        minClicksSpinner.setValue(defaultMinClicks != null ? defaultMinClicks : Integer.valueOf(1));
+        revalidate();
+        repaint();
         syncMarkers();
     }
 
-    /** Image captcha types cannot be tested without a readable image -> "Start Single Test" is disabled in that case. */
+    /** Text of a test value for a text field, empty if there is none. */
+    private static String text(final Object value) {
+        return value == null ? "" : value.toString();
+    }
+
+    /** Image captchas cannot be tested without a readable image. */
+    private static boolean isTestDataValid(final Map<String, Object> data) {
+        if (!data.containsKey(CaptchaTestChallengeFactory.KEY_IMAGE_FILE)) {
+            return true;
+        }
+        final File image = (File) data.get(CaptchaTestChallengeFactory.KEY_IMAGE_FILE);
+        return image != null && image.isFile();
+    }
+
+    /** Test data which is not valid (e.g. image captchas without a readable image) cannot be tested -> "Start Single Test" is disabled. */
     private void updateStartButtonEnabled() {
         final CAPTCHA_TYPE type = (CAPTCHA_TYPE) typeBox.getSelectedItem();
-        startButton.setEnabled(!batchRunning && (!CaptchaTestParameters.usesImage(type) || (imageFile != null && imageFile.isFile())));
+        startButton.setEnabled(!batchRunning && isTestDataValid(buildFormData(type)));
     }
 
     /** The folder that contains the captcha image, or null if there is no image path or the folder does not exist. */
@@ -755,28 +786,38 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         }
     }
 
-    /** Builds the test parameters from the current form values for the given captcha type. */
-    private CaptchaTestParameters buildFormParameters(final CAPTCHA_TYPE type) {
-        final CaptchaTestParameters parameters = new CaptchaTestParameters(siteKeyField.getText().trim(), siteUrlField.getText().trim(), actionField.getText().trim(), expectedResultField.getText());
-        parameters.setImageFile(imageFile);
-        parameters.setChallengeDescription(descriptionField.getText());
-        parameters.setMinClicks(((Number) minClicksSpinner.getValue()).intValue());
+    /** Puts the value into the test data, but only if the captcha type uses it (= the key is part of its defaults). */
+    private static void putIfUsed(final Map<String, Object> data, final String key, final Object value) {
+        if (data.containsKey(key)) {
+            data.put(key, value);
+        }
+    }
+
+    /** Builds the test data from the current form values for the given captcha type: the defaults of the type with the form values. */
+    private Map<String, Object> buildFormData(final CAPTCHA_TYPE type) {
+        final Map<String, Object> data = CaptchaTestChallengeFactory.getDefaults(type);
+        putIfUsed(data, CaptchaTestChallengeFactory.KEY_SITE_KEY, siteKeyField.getText().trim());
+        putIfUsed(data, CaptchaTestChallengeFactory.KEY_SITE_URL, siteUrlField.getText().trim());
+        putIfUsed(data, CaptchaTestChallengeFactory.KEY_CHALLENGE_URL, challengeUrlField.getText().trim());
+        putIfUsed(data, CaptchaTestChallengeFactory.KEY_ACTION, actionField.getText().trim());
+        putIfUsed(data, CaptchaTestChallengeFactory.KEY_EXPECTED_RESULT, expectedResultField.getText());
+        putIfUsed(data, CaptchaTestChallengeFactory.KEY_IMAGE_FILE, imageFile);
+        putIfUsed(data, CaptchaTestChallengeFactory.KEY_DESCRIPTION, descriptionField.getText());
+        putIfUsed(data, CaptchaTestChallengeFactory.KEY_MIN_CLICKS, Integer.valueOf(((Number) minClicksSpinner.getValue()).intValue()));
         switch (caseSensitiveBox.getSelectedIndex()) {
         case 1:
-            parameters.setCaseSensitive(Boolean.TRUE);
+            putIfUsed(data, CaptchaTestChallengeFactory.KEY_CASE_SENSITIVE, Boolean.TRUE);
             break;
         case 2:
-            parameters.setCaseSensitive(Boolean.FALSE);
+            putIfUsed(data, CaptchaTestChallengeFactory.KEY_CASE_SENSITIVE, Boolean.FALSE);
             break;
         default:
-            parameters.setCaseSensitive(null);
+            putIfUsed(data, CaptchaTestChallengeFactory.KEY_CASE_SENSITIVE, null);
             break;
         }
-        if (CaptchaTestParameters.usesMinScore(type) && minScoreCheckBox.isSelected()) {
-            /* Round to one decimal: the spinner steps in 0.1 and floating point noise must not end up in the request. */
-            parameters.setMinScore(Math.round(((Number) minScoreSpinner.getValue()).doubleValue() * 10d) / 10d);
-        }
-        return parameters;
+        /* Round to one decimal: the spinner steps in 0.1 and floating point noise must not end up in the request. */
+        putIfUsed(data, CaptchaTestChallengeFactory.KEY_MIN_SCORE, minScoreCheckBox.isSelected() ? Double.valueOf(Math.round(((Number) minScoreSpinner.getValue()).doubleValue() * 10d) / 10d) : null);
+        return data;
     }
 
     /**
@@ -889,7 +930,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     private void startSingleTest() {
         final CAPTCHA_TYPE type = (CAPTCHA_TYPE) typeBox.getSelectedItem();
         final List<TestRun> runs = new ArrayList<TestRun>();
-        runs.add(new TestRun(type, (CaptchaRequestType) sourceBox.getSelectedItem(), buildFormParameters(type), null));
+        runs.add(new TestRun(type, (CaptchaRequestType) sourceBox.getSelectedItem(), buildFormData(type), null));
         startBatch(runs, true);
     }
 
@@ -911,7 +952,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         for (int i = 0; i < typeCheckBoxes.size(); i++) {
             if (typeCheckBoxes.get(i).isSelected()) {
                 final CAPTCHA_TYPE type = typeCheckBoxTypes.get(i);
-                runs.add(new TestRun(type, source, type == formType ? buildFormParameters(type) : CaptchaTestParameters.getDefaults(type), service));
+                runs.add(new TestRun(type, source, type == formType ? buildFormData(type) : CaptchaTestChallengeFactory.getDefaults(type), service));
             }
         }
         if (service == null || runs.isEmpty()) {
@@ -1021,19 +1062,25 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         /* Clear an interrupt flag that was meant for the previous test of this pool thread. */
         Thread.interrupted();
         run.thread = Thread.currentThread();
-        @SuppressWarnings("unchecked")
-        final Challenge<Object> newChallenge = (Challenge<Object>) CaptchaTestChallengeFactory.newChallenge(run.type, run.source, run.parameters);
-        if (newChallenge == null) {
-            run.startTime = System.currentTimeMillis();
-            finishRun(run, RunState.FAILED, "Could not build a test challenge for " + run.type.getDisplayName() + " (missing test data/image?)", null);
-            return;
-        }
-        run.challenge = newChallenge;
         run.maxTimeoutMillis = 0;
-        run.statusText = "Waiting for a solver...";
+        run.statusText = "Preparing test data...";
         run.startTime = System.currentTimeMillis();
         run.state = RunState.RUNNING;
         runChanged(run, false);
+        /* Prepared right now (not when the test was queued), e.g. ALTCHA needs a fresh challenge. */
+        final Challenge<Object> newChallenge;
+        try {
+            @SuppressWarnings("unchecked")
+            final Challenge<Object> built = (Challenge<Object>) CaptchaTestChallengeFactory.newChallenge(run.source, run.type, run.data);
+            newChallenge = built;
+        } catch (final Throwable e) {
+            LogController.CL().log(e);
+            run.thread = null;
+            finishRun(run, RunState.FAILED, batchCancelled ? "Cancelled" : (run.aborted ? "Aborted" : "Failed: " + e.getMessage()), null);
+            return;
+        }
+        run.challenge = newChallenge;
+        run.statusText = "Waiting for a solver...";
         try {
             final SolverJob<Object> job = ChallengeResponseController.getInstance().handle(newChallenge, run.service);
             run.finishedJob = job;
@@ -1044,7 +1091,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                 finishRun(run, RunState.FAILED, "Aborted", null);
             } else if (result != null && result.getValue() != null) {
                 final String answer = formatAnswer(result.getValue());
-                final String expected = run.parameters.getExpectedResult();
+                final String expected = (String) run.data.get(CaptchaTestChallengeFactory.KEY_EXPECTED_RESULT);
                 final String solvedBy = "Solved by: " + result.get(0).getSolver();
                 /* The solver that answered decides whether it accepts feedback. */
                 final Object solver = result.get(0).getSolver();
@@ -1549,7 +1596,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     private static class TestRun {
         private final CAPTCHA_TYPE          type;
         private final CaptchaRequestType    source;
-        private final CaptchaTestParameters parameters;
+        private final Map<String, Object>   data;
         /* null = all solvers, otherwise only this one. */
         private final SolverService         service;
         private volatile RunState           state;
@@ -1570,10 +1617,10 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         private volatile SolverJob<Object>  finishedJob;
         private final List<Point>           markers = new ArrayList<Point>();
 
-        private TestRun(final CAPTCHA_TYPE type, final CaptchaRequestType source, final CaptchaTestParameters parameters, final SolverService service) {
+        private TestRun(final CAPTCHA_TYPE type, final CaptchaRequestType source, final Map<String, Object> data, final SolverService service) {
             this.type = type;
             this.source = source;
-            this.parameters = parameters;
+            this.data = data;
             this.service = service;
             reset();
         }

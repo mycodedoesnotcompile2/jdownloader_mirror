@@ -29,6 +29,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.HexFormatter;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
 import org.jdownloader.captcha.v2.challenge.cutcaptcha.CaptchaHelperCrawlerPluginCutCaptcha;
@@ -59,7 +60,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 53705 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53731 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileCryptCc extends PluginForDecrypt {
     public FileCryptCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -80,7 +81,57 @@ public class FileCryptCc extends PluginForDecrypt {
         br.setCookie(getHost(), "lang_v2", "en_US");
         br.addAllowedResponseCodes(500);// submit captcha responds with 500 code
         br.getHeaders().put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36");
+        final HTTPProxy proxy = HTTPProxy.parseHTTPProxy(getConfiguredProxyUrl());
+        if (proxy != null) {
+            /* Use the user defined proxy for all requests. This is important for powCAPTCHA remote solving. */
+            br.setProxy(proxy);
+        }
         return br;
+    }
+
+    /** Does not log the proxy itself because it may contain credentials. */
+    private void logInvalidProxy(final String message) {
+        if (logger != null) {
+            logger.info(message);
+        }
+    }
+
+    /** Returns the proxy URL set by the user or null if the proxy is disabled, not set or invalid. */
+    private String getConfiguredProxyUrl() {
+        final FileCryptConfig cfg = PluginJsonConfig.get(this.getConfigInterface());
+        if (!cfg.isEnableProxy()) {
+            /* User has disabled proxy */
+            return null;
+        }
+        final String proxyString = cfg.getProxyString();
+        if (StringUtils.isEmpty(proxyString)) {
+            return null;
+        }
+        final String proxyUrl = proxyString.trim();
+        final HTTPProxy proxy;
+        try {
+            proxy = HTTPProxy.parseHTTPProxy(proxyUrl);
+        } catch (final NumberFormatException e) {
+            /* Invalid port */
+            logInvalidProxy("Ignoring invalid proxy");
+            return null;
+        }
+        if (proxy == null) {
+            logInvalidProxy("Ignoring invalid proxy");
+            return null;
+        }
+        switch (proxy.getType()) {
+        case HTTP:
+        case HTTPS:
+        case SOCKS4:
+        case SOCKS4A:
+        case SOCKS5:
+            return proxyUrl;
+        default:
+            /* e.g. 'none' or 'direct' are not usable as proxy for the captcha solver. */
+            logInvalidProxy("Ignoring unsupported proxy type");
+            return null;
+        }
     }
 
     public static List<String[]> getPluginDomains() {
@@ -654,9 +705,20 @@ public class FileCryptCc extends PluginForDecrypt {
                 logger.info("Attempting to solve CutCaptcha");
                 final String cutcaptchaToken = new CaptchaHelperCrawlerPluginCutCaptcha(this, br, null).getToken();
                 captchaForm.put("cap_token", Encoding.urlEncode(cutcaptchaToken));
-            } else if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && AbstractPowCaptcha.containsPowCaptchaClass(captchaForm)) {
+            } else if (AbstractPowCaptcha.containsPowCaptchaClass(captchaForm)) {
                 logger.info("Attempting to solve powCAPTCHA");
-                final String powSolution = new CaptchaHelperCrawlerPluginPowCaptcha(this, br).getToken();
+                final String proxyUrl = getConfiguredProxyUrl();
+                /* TODO: Test this, also review it once we got a local (BrowserCaptcha) captcha solver for powCAPTCHA! */
+                if (proxyUrl == null) {
+                    /*
+                     * 2026-10-22: Only supported by 2captcha.com and at least 2captcha requires a proxy (a proxy that we can send to
+                     * 2captcha).
+                     */
+                    throw new DecrypterRetryException(RetryReason.UNSUPPORTED_CAPTCHA, "Unsupported captcha type 'powcaptcha.com' without proxy: Enable and set a proxy in the plugin settings");
+                }
+                final CaptchaHelperCrawlerPluginPowCaptcha powHelper = new CaptchaHelperCrawlerPluginPowCaptcha(this, br);
+                powHelper.setProxyUrl(proxyUrl);
+                final String powSolution = powHelper.getToken();
                 /*
                  * The solution contains the values for the form fields 'pow_id', 'pow_nonce', 'pow_elapsed', 'pow_pauses', 'pow_data' and
                  * 'pow_x'.

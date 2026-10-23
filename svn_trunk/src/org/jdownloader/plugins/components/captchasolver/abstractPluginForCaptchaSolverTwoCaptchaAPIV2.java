@@ -14,6 +14,7 @@ import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
@@ -250,6 +251,34 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
         query_createTask.appendEncoded("pageurl", challenge.getSiteUrl(this));
         query_createTask.appendEncoded("data_session", challenge.getSessionUrl());
         query_createTask.appendEncoded("useragent", challenge.getUserAgent());
+        final HTTPProxy proxy = HTTPProxy.parseHTTPProxy(challenge.getProxyUrl());
+        if (proxy != null) {
+            /* Legacy API format: proxy=login:password@host:port, proxytype=HTTP|HTTPS|SOCKS4|SOCKS5 */
+            final String proxytype;
+            switch (proxy.getType()) {
+            case SOCKS5:
+                proxytype = "SOCKS5";
+                break;
+            case SOCKS4:
+            case SOCKS4A:
+                proxytype = "SOCKS4";
+                break;
+            case HTTPS:
+                proxytype = "HTTPS";
+                break;
+            case HTTP:
+            default:
+                proxytype = "HTTP";
+                break;
+            }
+            String proxyString = proxy.getHost() + ":" + proxy.getPort();
+            if (StringUtils.isNotEmpty(proxy.getUser())) {
+                final String pass = proxy.getPass();
+                proxyString = proxy.getUser() + ":" + (pass != null ? pass : "") + "@" + proxyString;
+            }
+            query_createTask.appendEncoded("proxy", proxyString);
+            query_createTask.appendEncoded("proxytype", proxytype);
+        }
         query_createTask.appendEncoded("json", "1");
         br.getPage(br.createPostRequest("https://" + getHost() + "/in.php", query_createTask));
         Map<String, Object> entries = this.handleLegacyAPIErrors(br, account);

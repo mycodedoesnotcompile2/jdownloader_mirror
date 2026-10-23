@@ -1,6 +1,7 @@
 package org.jdownloader.captcha.v2.challenge.powcaptcha;
 
 import java.io.IOException;
+import java.util.Map;
 
 import jd.http.Browser;
 import jd.parser.html.Form;
@@ -8,6 +9,8 @@ import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.logging2.LogInterface;
@@ -21,6 +24,14 @@ public abstract class AbstractPowCaptcha<T extends Plugin> {
     protected final LogInterface logger;
     protected final Browser      br;
     protected String             sessionUrl;
+    protected String             proxyUrl = null;
+
+    /**
+     * Sets a proxy (e.g. 'socks5://user:password@host:port') which may be sent to the captcha solver service. Null = no proxy.
+     */
+    public void setProxyUrl(final String proxyUrl) {
+        this.proxyUrl = proxyUrl;
+    }
 
     public static boolean containsPowCaptchaClass(final Browser br) {
         return br != null && containsPowCaptchaClass(br.toString());
@@ -96,8 +107,17 @@ public abstract class AbstractPowCaptcha<T extends Plugin> {
     }
 
     public static boolean looksLikeValidToken(final String str) {
-        /* The format of the solution is defined by the captcha solver -> only check that we got something. */
-        return StringUtils.isNotEmpty(str);
+        /* Valid solution: JSON object which contains at least the fields 'pow_id' and 'pow_data'. */
+        if (StringUtils.isEmpty(str)) {
+            return false;
+        }
+        final Map<String, Object> entries;
+        try {
+            entries = JSonStorage.restoreFromString(str, TypeRef.MAP);
+        } catch (final Exception e) {
+            return false;
+        }
+        return entries != null && entries.containsKey("pow_id") && entries.containsKey("pow_data");
     }
 
     /** URL of the page which contains the captcha. */
@@ -122,7 +142,7 @@ public abstract class AbstractPowCaptcha<T extends Plugin> {
         } else if (sessionUrl == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         } else {
-            return new PowCaptchaChallenge(plugin, sessionUrl, br.getHeaders().get("User-Agent")) {
+            final PowCaptchaChallenge challenge = new PowCaptchaChallenge(plugin, sessionUrl, br.getHeaders().get("User-Agent")) {
                 @Override
                 public String getSiteUrl() {
                     return AbstractPowCaptcha.this.getSiteUrl();
@@ -138,6 +158,8 @@ public abstract class AbstractPowCaptcha<T extends Plugin> {
                     return null;
                 }
             };
+            challenge.setProxyUrl(proxyUrl);
+            return challenge;
         }
     }
 

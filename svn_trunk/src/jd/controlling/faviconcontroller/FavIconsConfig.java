@@ -10,9 +10,11 @@ import org.appwork.storage.config.annotations.DefaultJsonObject;
 import org.appwork.storage.config.annotations.DefaultLongValue;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.RequiresRestart;
+import org.appwork.storage.config.annotations.SpinnerValidator;
 
 public interface FavIconsConfig extends ConfigInterface {
     @DefaultIntValue(12)
+    @SpinnerValidator(min = 1, max = 100, step = 1)
     @AboutConfig
     @RequiresRestart("A JDownloader Restart is Required")
     @DescriptionForConfigEntry("max. number of favicon threads")

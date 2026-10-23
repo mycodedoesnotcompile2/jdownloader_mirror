@@ -600,7 +600,7 @@ public class CaptchaType {
 
         /**
          * True if this captcha type has test data available, i.e.
-         * {@link org.jdownloader.captcha.v2.tester.CaptchaTestParameters#getDefaults(CAPTCHA_TYPE)} returns pre-filled values and
+         * {@link org.jdownloader.captcha.v2.tester.CaptchaTestChallengeFactory#getDefaults(CAPTCHA_TYPE)} returns pre-filled values and
          * {@link org.jdownloader.captcha.v2.tester.CaptchaTestChallengeFactory} can build a test challenge for it. Used by the IDE-only
          * "Test &amp; Debug" tab in the captcha settings to decide which types can be selected for testing.
          */

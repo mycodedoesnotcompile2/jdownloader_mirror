@@ -1,6 +1,7 @@
 package org.jdownloader.gui.packagehistorycontroller;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -12,6 +13,7 @@ import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.utils.Lists;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.event.EventSuppressor;
+import org.appwork.utils.os.CrossSystem;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 import org.jdownloader.settings.staticreferences.CFG_LINKGRABBER;
 
@@ -59,6 +61,7 @@ public class DownloadPathHistoryManager extends HistoryManager<DownloadPath> imp
         if (existing != null) {
             existing.setTime(System.currentTimeMillis());
             Collections.sort(packageHistory);
+            requestSave();
             return true;
         }
         return false;
@@ -66,6 +69,15 @@ public class DownloadPathHistoryManager extends HistoryManager<DownloadPath> imp
 
     private void superadd(String packageName) {
         super.add(packageName);
+    }
+
+    @Override
+    protected boolean isSameName(final String name1, final String name2) {
+        /* Paths are only case insensitive on Windows */
+        if (CrossSystem.isWindows()) {
+            return name1.equalsIgnoreCase(name2);
+        }
+        return name1.equals(name2);
     }
 
     @Override
@@ -126,22 +138,15 @@ public class DownloadPathHistoryManager extends HistoryManager<DownloadPath> imp
     @Override
     public void onConfigValueModified(KeyHandler<Object> keyHandler, Object newValue) {
         if (newValue == null) {
-            clear();
+            setEntries(null);
         } else if (newValue instanceof List) {
-            final List<Object> list = (List<Object>) newValue;
-            if (list.size() == 0) {
-                clear();
-            } else {
-                synchronized (this) {
-                    clear();
-                    for (int i = list.size() - 1; i >= 0; i--) {
-                        final Object item = list.get(i);
-                        if (item != null && item instanceof DownloadPath) {
-                            superadd(((DownloadPath) item).getName());
-                        }
-                    }
+            final List<DownloadPath> entries = new ArrayList<DownloadPath>();
+            for (final Object item : (List<?>) newValue) {
+                if (item instanceof DownloadPath) {
+                    entries.add((DownloadPath) item);
                 }
             }
+            setEntries(entries);
         }
     }
 }

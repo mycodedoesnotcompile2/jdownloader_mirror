@@ -65,9 +65,9 @@ import org.appwork.utils.net.CountingInputStream;
 import org.appwork.utils.net.DownloadProgress;
 import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.net.UploadProgress;
+import org.appwork.utils.net.httpconnection.CertificateTrustRecovery;
 import org.appwork.utils.net.httpconnection.HTTPConnection;
 import org.appwork.utils.net.httpconnection.HTTPConnectionFactory;
-import org.appwork.utils.net.httpconnection.CertificateTrustRecovery;
 import org.appwork.utils.net.httpconnection.HTTPOutputStream;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.net.httpconnection.RequestMethod;
@@ -75,17 +75,17 @@ import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
 import org.appwork.utils.net.httpconnection.trust.TrustUtils;
 
 public class BasicHTTP implements Interruptible {
-    protected final static Charset          UTF8           = Charset.forName("UTF-8");
+    protected final static Charset          UTF8                     = Charset.forName("UTF-8");
     protected Set<Integer>                  allowedResponseCodes;
     protected final HashMap<String, String> requestHeader;
     protected volatile HTTPConnection       connection;
-    protected int                           connectTimeout = 15000;
-    protected int                           readTimeout    = 30000;
-    protected HTTPProxy                     proxy          = HTTPProxy.NONE;
+    protected int                           connectTimeout           = 15000;
+    protected int                           readTimeout              = 30000;
+    protected HTTPProxy                     proxy                    = HTTPProxy.NONE;
     protected TrustProviderInterface        trustProvider            = null;
     protected CertificateTrustRecovery      certificateTrustRecovery = null;
-    protected LogInterface                  logger         = null;
-    protected final Object                  lock           = new Object();
+    protected LogInterface                  logger                   = null;
+    protected final Object                  lock                     = new Object();
 
     public BasicHTTP() {
         this.requestHeader = new HashMap<String, String>();
@@ -462,7 +462,7 @@ public class BasicHTTP implements Interruptible {
     }
 
     public TrustProviderInterface getTrustProvider() {
-        TrustProviderInterface tp = trustProvider;
+        final TrustProviderInterface tp = trustProvider;
         if (tp == null) {
             return TrustUtils.getDefaultProvider();
         }
@@ -963,23 +963,27 @@ public class BasicHTTP implements Interruptible {
         this.trustProvider = trustProvider;
     }
 
+    public CertificateTrustRecovery getCertificateTrustRecovery() {
+        return certificateTrustRecovery;
+    }
+
     public void setCertificateTrustRecovery(final CertificateTrustRecovery certificateTrustRecovery) {
         this.certificateTrustRecovery = certificateTrustRecovery;
     }
 
     /**
-     * One extra attempt when a certificate recovery accepts the failure. The dialog, if any, runs here, after the handshake has already failed.
+     * One extra attempt when a certificate recovery accepts the failure. The dialog, if any, runs here, after the handshake has already
+     * failed.
      */
     protected void connectAndRecover(final HTTPConnection connection) throws IOException {
         try {
             connection.connect();
         } catch (final IOException e) {
-            final CertificateTrustRecovery recovery = this.certificateTrustRecovery;
-            if (recovery != null && recovery.recover(connection, e)) {
-                connection.connect();
-                return;
+            final CertificateTrustRecovery recovery = this.getCertificateTrustRecovery();
+            if (recovery == null || !recovery.recover(connection, e)) {
+                throw e;
             }
-            throw e;
+            connection.connect();
         }
     }
 

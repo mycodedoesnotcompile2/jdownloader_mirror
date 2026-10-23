@@ -1,15 +1,12 @@
 package jd.plugins.hoster;
 
-import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.util.EnumSet;
-import java.util.Set;
-import java.util.ArrayList;
 import java.util.Currency;
+import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -18,6 +15,7 @@ import org.appwork.utils.images.IconIO;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
 import org.jdownloader.captcha.v2.SolverStatus;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
@@ -46,7 +44,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 53649 $", interfaceVersion = 3, names = { "cheapcaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53731 $", interfaceVersion = 3, names = { "cheapcaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -61,11 +59,13 @@ public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCapt
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
         br.getHeaders().put("Accept", "application/json");
-        /*
-         * cheapcaptcha.com is a DeathByCaptcha-compatible API (see https://deathbycaptcha.com/api#api_details): 403 = credentials
-         * rejected OR insufficient credits, 400 = malformed request/invalid captcha, 500 = internal error, 503 = service overloaded. All
-         * of these still return a normal JSON body (status + error fields), so they must be allowed here and classified by HTTP code in
-         * callAPI(), not treated as a transport error.
+        /**
+         * cheapcaptcha.com is a DeathByCaptcha-compatible API (see https://deathbycaptcha.com/api#api_details): 403 = credentials rejected
+         * OR insufficient credits, 400 = malformed request/invalid captcha, 500 = internal error, 503 = service overloaded. All of these
+         * still return a normal JSON body (status + error fields), so they must be allowed here and classified by HTTP code in callAPI(),
+         * not treated as a transport error. <br>
+         * 2026-10-23: Their support never answered my (psp) E-Mails so I was unable to get a test account and unable to perform any tests
+         * on this new plugin.
          */
         br.setAllowedResponseCodes(200, 400, 403, 500, 503);
         return br;
@@ -282,8 +282,8 @@ public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCapt
         /*
          * Docs: https://deathbycaptcha.com/api#api_details -- the JSON body alone (status/error) does not distinguish an account problem
          * from a captcha problem, only the HTTP response code does: 403 = credentials rejected or insufficient credits (account,
-         * permanent), 400 = malformed request or invalid captcha image (captcha-level, not account), 503 = service overloaded
-         * (temporary), 500/other = internal server error (not the account's fault).
+         * permanent), 400 = malformed request or invalid captcha image (captcha-level, not account), 503 = service overloaded (temporary),
+         * 500/other = internal server error (not the account's fault).
          */
         final int responseCode = br.getHttpConnection().getResponseCode();
         if (responseCode == 403) {

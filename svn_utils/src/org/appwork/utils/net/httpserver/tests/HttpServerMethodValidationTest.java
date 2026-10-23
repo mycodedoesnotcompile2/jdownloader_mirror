@@ -47,8 +47,6 @@ import org.appwork.testframework.AWTest;
 import org.appwork.utils.net.httpclient.HttpClient;
 import org.appwork.utils.net.httpclient.HttpClient.RequestContext;
 import org.appwork.utils.net.httpclient.HttpClientException;
-import org.appwork.utils.net.httpconnection.HTTPConnection;
-import org.appwork.utils.net.httpconnection.HTTPConnectionImpl;
 import org.appwork.utils.net.httpconnection.RequestMethod;
 import org.appwork.utils.net.httpserver.requests.CopyRequest;
 import org.appwork.utils.net.httpserver.requests.DeleteRequest;
@@ -418,12 +416,24 @@ public class HttpServerMethodValidationTest extends HttpServerTestBase {
                     putRequestHeader(HTTPConstants.X_APPWORK, "1");
                 }
 
-                protected org.appwork.utils.net.httpconnection.HTTPConnection createHTTPConnection(RequestContext context) throws HttpClientException {
+                protected RequestContextHttpConnection createHTTPConnection(final RequestContext context) throws HttpClientException {
                     try {
-                        HTTPConnection ret = new HTTPConnectionImpl(new URL(context.getUrl()), null) {
+                        final HttpClient client = this;
+                        final RequestContextHttpConnection ret = new RequestContextHttpConnectionImpl(new URL(context.getUrl()), null) {
                             protected boolean isRequiresOutputStream() {
                                 return true;
+                            }
+
+                            @Override
+                            public RequestContext getRequestContext() {
+                                return context;
                             };
+
+                            @Override
+                            public HttpClient getHttpClient() {
+                                return client;
+                            }
+
                         };
                         context.setConnection(ret);
                         return ret;

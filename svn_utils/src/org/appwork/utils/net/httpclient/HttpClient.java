@@ -44,7 +44,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
@@ -76,13 +75,17 @@ import org.appwork.utils.net.CountingInputStream;
 import org.appwork.utils.net.DownloadProgress;
 import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.net.httpconnection.CertificateTrustRecovery;
-import org.appwork.utils.net.httpconnection.HTTPConnection;
-import org.appwork.utils.net.httpconnection.HTTPConnectionFactory;
-import org.appwork.utils.net.httpconnection.HTTPConnectionProfilerAdapter;
 import org.appwork.utils.net.httpconnection.DNSResolver;
+import org.appwork.utils.net.httpconnection.HTTPConnection;
+import org.appwork.utils.net.httpconnection.HTTPConnectionImpl;
+import org.appwork.utils.net.httpconnection.HTTPConnectionProfilerAdapter;
 import org.appwork.utils.net.httpconnection.HTTPOutputStream;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
+import org.appwork.utils.net.httpconnection.HTTPProxyHTTPConnectionImpl;
+import org.appwork.utils.net.httpconnection.NativeHTTPConnectionImpl;
 import org.appwork.utils.net.httpconnection.RequestMethod;
+import org.appwork.utils.net.httpconnection.Socks4HTTPConnectionImpl;
+import org.appwork.utils.net.httpconnection.Socks5HTTPConnectionImpl;
 import org.appwork.utils.net.httpconnection.TrustResult;
 import org.appwork.utils.net.httpconnection.trust.CompositeTrustProvider;
 import org.appwork.utils.net.httpconnection.trust.TrustProviderInterface;
@@ -93,26 +96,26 @@ public class HttpClient {
     private static final HttpClient DEFAULT_HTTP_CLIENT = new HttpClient();
 
     public static class RequestContext implements Interruptible {
-        private Boolean                 addedToInterruptible;
-        private HttpClient              client;
-        private HTTPConnection          connection;
-        private DownloadProgress        downloadProgress;
-        private CountingInputStream     inputStream;
-        private RequestMethod           method;
-        private OutputStream            target          = new ByteArrayOutputStream();
-        private int                     postDataLength;
-        private InputStream             postDataStream;
-        private int                     connectTimeout   = -1;
-        private int                     readTimeout     = -1;
-        public URL                      redirectTo;
-        private long                    resumePosition  = -1;
-        private DownloadProgress        uploadProgress;
-        private String                  url;
-        public long                     redirectsStarted;
-        private volatile boolean        executed        = false;
-        private int                     redirectCounter = 0;
-        private HashMap<String, String> requestHeaders;
-        private DNSResolver             dnsResolver;
+        private Boolean                      addedToInterruptible;
+        private HttpClient                   client;
+        private RequestContextHttpConnection connection;
+        private DownloadProgress             downloadProgress;
+        private CountingInputStream          inputStream;
+        private RequestMethod                method;
+        private OutputStream                 target          = new ByteArrayOutputStream();
+        private int                          postDataLength;
+        private InputStream                  postDataStream;
+        private int                          connectTimeout  = -1;
+        private int                          readTimeout     = -1;
+        public URL                           redirectTo;
+        private long                         resumePosition  = -1;
+        private DownloadProgress             uploadProgress;
+        private String                       url;
+        public long                          redirectsStarted;
+        private volatile boolean             executed        = false;
+        private int                          redirectCounter = 0;
+        private HashMap<String, String>      requestHeaders;
+        private DNSResolver                  dnsResolver;
 
         public TrustResult getTrustResult() {
             if (connection == null) {
@@ -166,7 +169,7 @@ public class HttpClient {
         /**
          * @return
          */
-        public HTTPConnection getConnection() {
+        public RequestContextHttpConnection getConnection() {
             return this.connection;
         }
 
@@ -386,7 +389,7 @@ public class HttpClient {
             }
         }
 
-        public void setConnection(final HTTPConnection connection) {
+        public void setConnection(final RequestContextHttpConnection connection) {
             this.connection = connection;
             connection.setProfiler(new HTTPConnectionProfilerAdapter() {
                 @Override
@@ -458,9 +461,8 @@ public class HttpClient {
         }
 
         /**
-         * Set a custom DNS resolver for this request. When set, it is used to resolve the URL host to IPs instead of
-         * default DNS. See {@link HTTPConnection#setDNSResolver(DNSResolver)}. Context resolver overrides client-level
-         * resolver.
+         * Set a custom DNS resolver for this request. When set, it is used to resolve the URL host to IPs instead of default DNS. See
+         * {@link HTTPConnection#setDNSResolver(DNSResolver)}. Context resolver overrides client-level resolver.
          *
          * @param resolver
          *            custom resolver, or null for default
@@ -647,19 +649,19 @@ public class HttpClient {
         }
     }
 
-    protected final static Charset          UTF8                 = Charset.forName("UTF-8");
-    protected Set<Integer>                  allowedResponseCodes = new HashSet<Integer>(Arrays.asList(-1));
-    protected int                           connectTimeout       = 15000;
-    protected LogInterface                  logger               = null;
-    protected HTTPProxy                     proxy                = HTTPProxy.NONE;
-    protected int                           readTimeout          = 30000;
+    protected final static Charset          UTF8                     = Charset.forName("UTF-8");
+    protected Set<Integer>                  allowedResponseCodes     = new HashSet<Integer>(Arrays.asList(-1));
+    protected int                           connectTimeout           = 15000;
+    protected LogInterface                  logger                   = null;
+    protected HTTPProxy                     proxy                    = HTTPProxy.NONE;
+    protected int                           readTimeout              = 30000;
     protected final HashMap<String, String> requestHeader;
-    private final List<RequestContext>      requests             = new CopyOnWriteArrayList<RequestContext>();
-    private boolean                         verboseLog           = false;
+    private final List<RequestContext>      requests                 = new CopyOnWriteArrayList<RequestContext>();
+    private boolean                         verboseLog               = false;
     private TrustProviderInterface          trustProvider            = null;
     private CertificateTrustRecovery        certificateTrustRecovery = null;
-    private KeyManager[]                    keyManagers          = null;
-    private DNSResolver                     dnsResolver         = null;
+    private KeyManager[]                    keyManagers              = null;
+    private DNSResolver                     dnsResolver              = null;
 
     public HttpClient() {
         this.requestHeader = new HashMap<String, String>();
@@ -783,20 +785,21 @@ public class HttpClient {
         }
     }
 
-    protected HTTPConnection createHTTPConnection(final RequestContext context) throws HttpClientException {
-        HTTPConnection connection;
+    protected RequestContextHttpConnection createHTTPConnection(final RequestContext context) throws HttpClientException {
+        final RequestContextHttpConnection connection;
         try {
             if (context.redirectTo != null) {
                 if (isVerboseLog()) {
                     LogV3.fine("HttpClient: Redirect " + context.getUrl() + "->" + context.redirectTo);
                 }
             }
-            connection = createHTTPConnection(context.redirectTo != null ? context.redirectTo : new URL(context.getUrl()), this.getProxy());
-        } catch (final MalformedURLException e) {
+            connection = createHTTPConnection(context, this.getProxy());
+        } catch (final IOException e) {
             throw new HttpClientException(null, e);
         }
         connection.setTrustProvider(getTrustProvider());
-        if (this.keyManagers != null) {
+        final KeyManager[] keyManagers = getKeyManagers();
+        if (keyManagers != null) {
             connection.setKeyManagers(getKeyManagers());
             if (isVerboseLog()) {
                 LogV3.fine("HttpClient.createHTTPConnection: setKeyManagers on connection, length=" + getKeyManagers().length);
@@ -806,17 +809,154 @@ public class HttpClient {
                 LogV3.fine("HttpClient.createHTTPConnection: keyManagers is null, not setting on connection");
             }
         }
-        if (context.getDNSResolver() != null) {
-            connection.setDNSResolver(context.getDNSResolver());
-        } else if (this.getDNSResolver() != null) {
-            connection.setDNSResolver(this.getDNSResolver());
+        DNSResolver resolver = context.getDNSResolver();
+        if (resolver == null) {
+            resolver = this.getDNSResolver();
+        }
+        if (resolver != null) {
+            connection.setDNSResolver(resolver);
         }
         context.setConnection(connection);
         return connection;
     }
 
-    protected HTTPConnection createHTTPConnection(final URL url, final HTTPProxy proxy) {
-        return HTTPConnectionFactory.createHTTPConnection(url, proxy);
+    public static interface RequestContextHttpConnection extends HTTPConnection {
+        public RequestContext getRequestContext();
+
+        public HttpClient getHttpClient();
+    }
+
+    public static abstract class RequestContextHttpConnectionImpl extends HTTPConnectionImpl implements RequestContextHttpConnection {
+
+        protected RequestContextHttpConnectionImpl(URL url, HTTPProxy p) {
+            super(url, p);
+        }
+
+    }
+
+    public static abstract class RequestContextNativeHTTPConnectionImpl extends NativeHTTPConnectionImpl implements RequestContextHttpConnection {
+
+        protected RequestContextNativeHTTPConnectionImpl(URL url, HTTPProxy p) {
+            super(url, p);
+        }
+
+    }
+
+    public static abstract class RequestContextSocks4HTTPConnectionImpl extends Socks4HTTPConnectionImpl implements RequestContextHttpConnection {
+
+        protected RequestContextSocks4HTTPConnectionImpl(URL url, HTTPProxy p) {
+            super(url, p);
+        }
+
+    }
+
+    public static abstract class RequestContextSocks5HTTPConnectionImpl extends Socks5HTTPConnectionImpl implements RequestContextHttpConnection {
+
+        protected RequestContextSocks5HTTPConnectionImpl(URL url, HTTPProxy p) {
+            super(url, p);
+        }
+
+    }
+
+    public static abstract class RequestContextHTTPProxyHTTPConnectionImpl extends HTTPProxyHTTPConnectionImpl implements RequestContextHttpConnection {
+
+        protected RequestContextHTTPProxyHTTPConnectionImpl(URL url, HTTPProxy p) {
+            super(url, p);
+        }
+
+    }
+
+    protected RequestContextHttpConnection createHTTPConnection(final RequestContext request, final HTTPProxy proxy) throws IOException {
+        final URL url = request.redirectTo != null ? request.redirectTo : new URL(request.getUrl());
+        if (proxy == null) {
+            return new RequestContextHttpConnectionImpl(url, null) {
+
+                @Override
+                public RequestContext getRequestContext() {
+                    return request;
+                }
+
+                @Override
+                public HttpClient getHttpClient() {
+                    return HttpClient.this;
+                }
+
+            };
+        } else if (proxy.isPreferNativeImplementation()) {
+            return new RequestContextNativeHTTPConnectionImpl(url, proxy) {
+                @Override
+                public RequestContext getRequestContext() {
+                    return request;
+                }
+
+                @Override
+                public HttpClient getHttpClient() {
+                    return HttpClient.this;
+                }
+            };
+        } else {
+            switch (proxy.getType()) {
+            case NONE:
+            case DIRECT:
+                return new RequestContextHttpConnectionImpl(url, proxy) {
+
+                    @Override
+                    public RequestContext getRequestContext() {
+                        return request;
+                    }
+
+                    @Override
+                    public HttpClient getHttpClient() {
+                        return HttpClient.this;
+                    }
+
+                };
+            case HTTP:
+            case HTTPS:
+                return new RequestContextHTTPProxyHTTPConnectionImpl(url, proxy) {
+                    @Override
+                    public RequestContext getRequestContext() {
+                        return request;
+                    }
+
+                    @Override
+                    public HttpClient getHttpClient() {
+                        return HttpClient.this;
+                    }
+                };
+            case SOCKS4:
+            case SOCKS4A:
+                return new RequestContextSocks4HTTPConnectionImpl(url, proxy) {
+
+                    @Override
+                    public RequestContext getRequestContext() {
+                        return request;
+                    }
+
+                    @Override
+                    public HttpClient getHttpClient() {
+                        return HttpClient.this;
+                    }
+
+                };
+            case SOCKS5:
+                return new RequestContextSocks5HTTPConnectionImpl(url, proxy) {
+
+                    @Override
+                    public RequestContext getRequestContext() {
+                        return request;
+                    }
+
+                    @Override
+                    public HttpClient getHttpClient() {
+                        return HttpClient.this;
+                    }
+
+                };
+            default:
+                throw new RuntimeException("unsupported proxy type: " + proxy.getType());
+            }
+        }
     }
 
     /**
@@ -1366,7 +1506,7 @@ public class HttpClient {
     }
 
     public TrustProviderInterface getTrustProvider() {
-        TrustProviderInterface tp = trustProvider;
+        final TrustProviderInterface tp = trustProvider;
         if (tp == null) {
             return TrustUtils.getDefaultProvider();
         }
@@ -1377,23 +1517,27 @@ public class HttpClient {
         this.trustProvider = sslTrustProvider;
     }
 
+    public CertificateTrustRecovery getCertificateTrustRecovery() {
+        return certificateTrustRecovery;
+    }
+
     public void setCertificateTrustRecovery(final CertificateTrustRecovery certificateTrustRecovery) {
         this.certificateTrustRecovery = certificateTrustRecovery;
     }
 
     /**
-     * One extra attempt when a certificate recovery accepts the failure. The dialog, if any, runs here, after the handshake has already failed.
+     * One extra attempt when a certificate recovery accepts the failure. The dialog, if any, runs here, after the handshake has already
+     * failed.
      */
-    protected void connectAndRecover(final HTTPConnection connection) throws IOException {
+    protected void connectAndRecover(final RequestContextHttpConnection connection) throws IOException {
         try {
             connection.connect();
         } catch (final IOException e) {
-            final CertificateTrustRecovery recovery = this.certificateTrustRecovery;
-            if (recovery != null && recovery.recover(connection, e)) {
-                connection.connect();
-                return;
+            final CertificateTrustRecovery recovery = this.getCertificateTrustRecovery();
+            if (recovery == null || !recovery.recover(connection, e)) {
+                throw e;
             }
-            throw e;
+            connection.connect();
         }
     }
 
@@ -1434,7 +1578,7 @@ public class HttpClient {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.lang.Object#toString()
      */
     @Override

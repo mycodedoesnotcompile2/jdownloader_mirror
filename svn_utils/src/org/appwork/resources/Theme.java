@@ -159,10 +159,11 @@ public class Theme implements MinTimeWeakReferenceCleanup {
     }
 
     public void cache(final Icon ret, final String key) {
-        if (ret != null) {
-            synchronized (this.imageIconCache) {
-                this.imageIconCache.put(key, new MinTimeWeakRefNamed<Icon>(ret, this.getCacheLifetime(), key, this));
-            }
+        if (ret == null) {
+            return;
+        }
+        synchronized (this.imageIconCache) {
+            this.imageIconCache.put(key, new MinTimeWeakRefNamed<Icon>(ret, this.getCacheLifetime(), key, this));
         }
     }
 
@@ -193,10 +194,10 @@ public class Theme implements MinTimeWeakReferenceCleanup {
     public Icon getCached(final String key) {
         synchronized (this.imageIconCache) {
             final MinTimeWeakReference<Icon> cache = this.imageIconCache.get(key);
-            if (cache != null) {
-                return cache.get();
+            if (cache == null) {
+                return null;
             }
-            return null;
+            return cache.get();
         }
     }
 
@@ -240,18 +241,17 @@ public class Theme implements MinTimeWeakReferenceCleanup {
     }
 
     public Icon getDisabledIcon(final JComponent component, final Icon input) {
-        if (input != null) {
-            Icon ret = null;
-            final Theme delegate = getDelegate();
-            if (delegate != null) {
-                ret = delegate.getDisabledIcon(input);
-            }
-            if (ret == null) {
-                ret = FACTORY.getDisabled(component, input);
-            }
-            return ret;
+        if (input == null) {
+            return null;
         }
-        return null;
+        final Theme delegate = getDelegate();
+        if (delegate != null) {
+            final Icon ret = delegate.getDisabledIcon(input);
+            if (ret != null) {
+                return ret;
+            }
+        }
+        return FACTORY.getDisabled(component, input);
     }
 
     public Icon getIcon(final String relativePath, final int size) {
@@ -306,37 +306,35 @@ public class Theme implements MinTimeWeakReferenceCleanup {
     }
 
     public Icon getIcon(final String relativePath, final int width, final int height, ThemeContext context) {
-        Icon ret = null;
         final Theme delegate = getDelegate();
         if (delegate != null) {
-            ret = delegate.getIcon(relativePath, width, height, context);
-            if (ret != null) {
-                return ret;
+            final Icon delegateIcon = delegate.getIcon(relativePath, width, height, context);
+            if (delegateIcon != null) {
+                return delegateIcon;
             }
         }
         String cacheKey = null;
         if (context == null || context.isUsecache()) {
             cacheKey = this.getCacheKey(relativePath, context, width, height);
-            ret = this.getCached(cacheKey);
-            if (ret == null) {
-                // try vector
-                Icon cachedRawIcon = this.getCached(relativePath);
-                if (cachedRawIcon instanceof ScalableIcon) {
-                    // re-use a cached svg
-                    ret = FACTORY.scale(cachedRawIcon, width, height);
-                    cache(ret, cacheKey);
-                    return ret;
-                }
+            final Icon cachedIcon = this.getCached(cacheKey);
+            if (cachedIcon != null) {
+                return cachedIcon;
             }
-        }
-        if (ret != null) {
-            return ret;
+            // try vector
+            final Icon cachedRawIcon = this.getCached(relativePath);
+            if (cachedRawIcon instanceof ScalableIcon) {
+                // re-use a cached svg
+                final Icon scaledIcon = FACTORY.scale(cachedRawIcon, width, height);
+                cache(scaledIcon, cacheKey);
+                return scaledIcon;
+            }
         }
         // ^^^^^^^
         // the context might be null above. we create a default context only if the cache did not hit
         if (context == null) {
             context = createNewDefaultContext();
         }
+        Icon ret = null;
         // jd webinterface
         if (StringUtils.equalsIgnoreCase(relativePath, "disabled") || (Target.ICON.equals(context.getTarget()) && HeadlessCheckboxIconRef.HEADLESS_checkbox_false.path().equals(relativePath))) {
             ret = new CheckBoxIcon(Math.max(width, height), false, true);
@@ -384,22 +382,21 @@ public class Theme implements MinTimeWeakReferenceCleanup {
         }
         if (ret == null) {
             if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                DebugMode.breakIf(ret == null && lookupImageUrl(relativePath, context) != null);
+                DebugMode.breakIf(lookupImageUrl(relativePath, context) != null);
             }
             ret = onIconNotAvailable(relativePath, context, cacheKey, width, height);
             if (ret != null && context.isDebugDrawEnabled() && context.getTarget() == Target.ICON) {
                 ret = new DebugIcon(ret);
             }
             return ret;
-        } else {
-            if (context.isDebugDrawEnabled() && context.getTarget() == Target.ICON) {
-                ret = new DebugIcon(ret);
-            }
-            if (context.isUsecache()) {
-                this.cache(ret, cacheKey);
-            }
-            return ret;
         }
+        if (context.isDebugDrawEnabled() && context.getTarget() == Target.ICON) {
+            ret = new DebugIcon(ret);
+        }
+        if (context.isUsecache()) {
+            this.cache(ret, cacheKey);
+        }
+        return ret;
     }
 
     private static IconFactory FACTORY = createIconFactory();
@@ -418,7 +415,6 @@ public class Theme implements MinTimeWeakReferenceCleanup {
     /**
      * @param relativePath
      * @param context
-     *            TODO
      */
     protected URL lookupImageUrl(String relativePath, ThemeContext context) {
         URL url = context == null ? null : context.getURL(relativePath);
@@ -426,6 +422,10 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             return url;
         }
         for (boolean useStandardPath : new boolean[] { false, true }) {
+            if (useStandardPath && isStandardPathLookupRedundant()) {
+                /* the second pass would check exactly the same paths as the first one (e.g. current theme is "standard") */
+                break;
+            }
             url = this.getURL("images/", relativePath, "", useStandardPath);
             if (url == null && IconIO.getSvgFactory() != null) {
                 url = this.getURL("images/", relativePath, ".svg", useStandardPath);
@@ -547,10 +547,8 @@ public class Theme implements MinTimeWeakReferenceCleanup {
                 debugDrawSizeInImages(context, width, height, baseImage);
                 return baseImage;
             }
-        } else {
-            if (baseImage == null) {
-                baseImage = loadImageFromDisc(key, "", cached, width, height, context);
-            }
+        } else if (baseImage == null) {
+            baseImage = loadImageFromDisc(key, "", cached, width, height, context);
         }
         if (baseImage == null) {
             return onImageNotAvailable(key, context, width, height, cached, finalKey);
@@ -576,13 +574,11 @@ public class Theme implements MinTimeWeakReferenceCleanup {
                 // May happen if the original image got removed from cache
                 highDPIbase = loadImageFromDisc(key, "", cached, highDPIWidth, highDPIHeight, context);
             }
-            if (cachedEntry == null || !cachedEntry.sizeKey.endsWith(ENHANCE_DOUBLE_SIZE_TAG)) {
-                if (highDPIbase == null || !IconIO.isImageCanGetDownscaled(highDPIWidth, highDPIHeight, highDPIbase)) {
-                    // upscale required check x2 option
-                    Image betterImage = loadImageFromDisc(key, ENHANCE_DOUBLE_SIZE_TAG, cached, width, height, context);
-                    if (betterImage != null) {
-                        highDPIbase = betterImage;
-                    }
+            if ((cachedEntry == null || !cachedEntry.sizeKey.endsWith(ENHANCE_DOUBLE_SIZE_TAG)) && (highDPIbase == null || !IconIO.isImageCanGetDownscaled(highDPIWidth, highDPIHeight, highDPIbase))) {
+                // upscale required check x2 option
+                Image betterImage = loadImageFromDisc(key, ENHANCE_DOUBLE_SIZE_TAG, cached, width, height, context);
+                if (betterImage != null) {
+                    highDPIbase = betterImage;
                 }
             }
             if (highDPIbase != null) {
@@ -629,10 +625,8 @@ public class Theme implements MinTimeWeakReferenceCleanup {
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && (baseImageTargetFinal.getWidth(null) % 4 != 0 || baseImageTargetFinal.getHeight(null) % 4 != 0)) {
             LogV3.warning("Image warning: width and height should be dividable by 4 for proper highDPI display!: " + key + ": " + baseImageTargetFinal.getWidth(null) + "x" + baseImageTargetFinal.getHeight(null));
         }
-        if (returnMultiResImage && baseImageHighDPIFinal != null && baseImageTargetFinal != null && baseImageHighDPIFinal != baseImageTargetFinal) {
-            if (baseImageHighDPIFinal.getWidth(null) != baseImageTargetFinal.getWidth(null) && baseImageHighDPIFinal.getHeight(null) != baseImageTargetFinal.getHeight(null)) {
-                baseImageTargetFinal = MultiResolutionImageHelper.create(0, baseImageTargetFinal, baseImageHighDPIFinal);
-            }
+        if (returnMultiResImage && baseImageHighDPIFinal != null && baseImageTargetFinal != null && baseImageHighDPIFinal != baseImageTargetFinal && baseImageHighDPIFinal.getWidth(null) != baseImageTargetFinal.getWidth(null) && baseImageHighDPIFinal.getHeight(null) != baseImageTargetFinal.getHeight(null)) {
+            baseImageTargetFinal = MultiResolutionImageHelper.create(0, baseImageTargetFinal, baseImageHighDPIFinal);
         }
         putFinalCache(key, context, cached, finalKey, baseImageTargetFinal);
         return baseImageTargetFinal;
@@ -642,7 +636,6 @@ public class Theme implements MinTimeWeakReferenceCleanup {
 
     /**
      * @param context
-     *            TODO
      * @param width
      * @param height
      * @param cached
@@ -669,13 +662,12 @@ public class Theme implements MinTimeWeakReferenceCleanup {
         if (ICONDEBUGGER) {
             IconDebugger.show(image, "Image:" + key + " - " + finalKey + "- " + lookupImageUrl(key, context));
         }
-        if (cached != null) {
-            synchronized (cached) {
-                if (cached != null) {
-                    MinTimeWeakReference<Image> ref = new MinTimeWeakRefNamed<Image>(image, this.getCacheLifetime(), finalKey + getSizeKey(image.getWidth(null), image.getHeight(null)), this);
-                    cached.put(finalKey, ref);
-                }
-            }
+        if (cached == null) {
+            return;
+        }
+        synchronized (cached) {
+            MinTimeWeakReference<Image> ref = new MinTimeWeakRefNamed<Image>(image, this.getCacheLifetime(), finalKey + getSizeKey(image.getWidth(null), image.getHeight(null)), this);
+            cached.put(finalKey, ref);
         }
     }
 
@@ -737,15 +729,16 @@ public class Theme implements MinTimeWeakReferenceCleanup {
         DebugMode.breakIf(!(baseImageHighDPIFinal.getWidth(null) == targetWidth || baseImageHighDPIFinal.getHeight(null) == targetHeight));
         DebugMode.breakIf(!((targetWidth <= 0 || baseImageHighDPIFinal.getWidth(null) <= targetWidth) && (targetHeight <= 0 || baseImageHighDPIFinal.getHeight(null) <= targetHeight)));
         debugWriteScaledImagesToDisk(key, targetWidth, targetHeight, input, baseImageHighDPIFinal);
-        if (cached != null) {
-            synchronized (cached) {
-                String actualSizeKey = getSizeKey(baseImageHighDPIFinal.getWidth(null), baseImageHighDPIFinal.getHeight(null));
-                MinTimeWeakReference<Image> ref = new MinTimeWeakRefNamed<Image>(baseImageHighDPIFinal, this.getCacheLifetime(), key + actualSizeKey, this);
-                // we keep ratio. width or height might be different than the actual size;
-                cached.put(getSizeKey(targetWidth, targetHeight), ref);
-                // cached.put(getSizeKey(keepRatioWidth, keepRatioHeight), ref);
-                cached.put(actualSizeKey, ref);
-            }
+        if (cached == null) {
+            return baseImageHighDPIFinal;
+        }
+        synchronized (cached) {
+            String actualSizeKey = getSizeKey(baseImageHighDPIFinal.getWidth(null), baseImageHighDPIFinal.getHeight(null));
+            MinTimeWeakReference<Image> ref = new MinTimeWeakRefNamed<Image>(baseImageHighDPIFinal, this.getCacheLifetime(), key + actualSizeKey, this);
+            // we keep ratio. width or height might be different than the actual size;
+            cached.put(getSizeKey(targetWidth, targetHeight), ref);
+            // cached.put(getSizeKey(keepRatioWidth, keepRatioHeight), ref);
+            cached.put(actualSizeKey, ref);
         }
         return baseImageHighDPIFinal;
     }
@@ -758,17 +751,16 @@ public class Theme implements MinTimeWeakReferenceCleanup {
      * @param baseImageHighDPIFinal
      */
     protected void debugWriteScaledImagesToDisk(String key, int targetWidth, int targetHeight, Image input, Image baseImageHighDPIFinal) {
-        if (baseImageHighDPIFinal != input) {
-            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                File file = Application.getResource("tmp/scaledimage/" + key + "_" + getSizeKey(targetWidth, targetHeight) + ".png");
-                file.delete();
-                file.getParentFile().mkdirs();
-                try {
-                    ImageIO.write(IconIO.toBufferedImage(baseImageHighDPIFinal), "png", file);
-                } catch (IOException e) {
-                    LogV3.log(e);
-                }
-            }
+        if (baseImageHighDPIFinal == input || !DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            return;
+        }
+        File file = Application.getResource("tmp/scaledimage/" + key + "_" + getSizeKey(targetWidth, targetHeight) + ".png");
+        file.delete();
+        file.getParentFile().mkdirs();
+        try {
+            ImageIO.write(IconIO.toBufferedImage(baseImageHighDPIFinal), "png", file);
+        } catch (IOException e) {
+            LogV3.log(e);
         }
     }
 
@@ -822,26 +814,20 @@ public class Theme implements MinTimeWeakReferenceCleanup {
                 return null;
             }
             String sizeKey = getSizeKey(width, height);
-            MinTimeWeakReference<Image> ret = null;
             if (sizeKey == MAX_SIZE_KEY) {
                 // check x2 first
-                ret = cached.get(sizeKey + ENHANCE_DOUBLE_SIZE_TAG);
-                if (ret != null) {
-                    Image img = ret.get();
-                    if (img != null) {
-                        return new ImageMatch(img, sizeKey + ENHANCE_DOUBLE_SIZE_TAG);
-                    }
+                final Image img = getReferent(cached.get(sizeKey + ENHANCE_DOUBLE_SIZE_TAG));
+                if (img != null) {
+                    return new ImageMatch(img, sizeKey + ENHANCE_DOUBLE_SIZE_TAG);
                 }
             }
-            ret = cached.get(sizeKey);
+            MinTimeWeakReference<Image> ret = cached.get(sizeKey);
             if (ret == null) {
                 ret = cached.get(sizeKey + _VECTOR);
             }
-            if (ret != null) {
-                Image img = ret.get();
-                if (img != null) {
-                    return new ImageMatch(img, sizeKey);
-                }
+            final Image exactImage = getReferent(ret);
+            if (exactImage != null) {
+                return new ImageMatch(exactImage, sizeKey);
             }
             if (height <= 0 && width <= 0) {
                 // original is not in cache any more - we won't find it.
@@ -857,33 +843,32 @@ public class Theme implements MinTimeWeakReferenceCleanup {
                 MinTimeWeakReference<Image> ref = es.getValue();
                 // do not update the timer
                 Image img = ref.superget();
-                if (img != null) {
-                    if (IconIO.isImageCanGetDownscaled(width, height, img)) {
-                        if (baseImageTarget == null || (img.getWidth(null) * img.getHeight(null)) < (baseImageTarget.getWidth(null) * baseImageTarget.getHeight(null))) {
-                            // best match to downscale
-                            if (es.getKey().endsWith(_VECTOR)) {
-                                // the source has been a vector icon like svg. either return the exact match, or nothing - deriving new
-                                // images from the cached vector icon will get better results.
-                                if (IconIO.isImageMaxSizeInViewport(width, height, img)) {
-                                    baseImageTarget = img;
-                                    bestKeyTarget = es.getKey();
-                                    // exact match
-                                    ref.get();
-                                    // the image has exact the requested dimensions.
-                                    return new ImageMatch(img, bestKeyTarget);
-                                }
-                            } else {
-                                baseImageTarget = img;
-                                bestKeyTarget = es.getKey();
-                                if (IconIO.isImageMaxSizeInViewport(width, height, img)) {
-                                    // update the mintimeweek timer
-                                    ref.get();
-                                    // the image has exact the requested dimensions.
-                                    return new ImageMatch(img, bestKeyTarget);
-                                }
-                            }
-                        }
+                if (img == null || !IconIO.isImageCanGetDownscaled(width, height, img)) {
+                    continue;
+                }
+                if (baseImageTarget != null && (img.getWidth(null) * img.getHeight(null)) >= (baseImageTarget.getWidth(null) * baseImageTarget.getHeight(null))) {
+                    /* not smaller than the current best match to downscale */
+                    continue;
+                }
+                // best match to downscale
+                if (es.getKey().endsWith(_VECTOR)) {
+                    // the source has been a vector icon like svg. either return the exact match, or nothing - deriving new
+                    // images from the cached vector icon will get better results.
+                    if (!IconIO.isImageMaxSizeInViewport(width, height, img)) {
+                        continue;
                     }
+                    // exact match
+                    ref.get();
+                    // the image has exact the requested dimensions.
+                    return new ImageMatch(img, es.getKey());
+                }
+                baseImageTarget = img;
+                bestKeyTarget = es.getKey();
+                if (IconIO.isImageMaxSizeInViewport(width, height, img)) {
+                    // update the mintimeweek timer
+                    ref.get();
+                    // the image has exact the requested dimensions.
+                    return new ImageMatch(img, bestKeyTarget);
                 }
             }
             if (baseImageTarget != null) {
@@ -894,28 +879,26 @@ public class Theme implements MinTimeWeakReferenceCleanup {
                 return new ImageMatch(baseImageTarget, bestKeyTarget);
             }
             // we did not find an image big enough. check if we have the original version - the biggest available
-            {
-                MinTimeWeakReference<Image> max = cached.get(MAX_SIZE_KEY + ENHANCE_DOUBLE_SIZE_TAG);
-                if (max != null) {
-                    baseImageTarget = max.get();
-                    if (baseImageTarget != null) {
-                        bestKeyTarget = MAX_SIZE_KEY + ENHANCE_DOUBLE_SIZE_TAG;
-                        return new ImageMatch(baseImageTarget, bestKeyTarget);
-                    }
-                }
+            final Image maxDoubleSize = getReferent(cached.get(MAX_SIZE_KEY + ENHANCE_DOUBLE_SIZE_TAG));
+            if (maxDoubleSize != null) {
+                return new ImageMatch(maxDoubleSize, MAX_SIZE_KEY + ENHANCE_DOUBLE_SIZE_TAG);
             }
-            {
-                MinTimeWeakReference<Image> max = cached.get(MAX_SIZE_KEY);
-                if (max != null) {
-                    baseImageTarget = max.get();
-                    if (baseImageTarget != null) {
-                        bestKeyTarget = MAX_SIZE_KEY;
-                        return new ImageMatch(baseImageTarget, bestKeyTarget);
-                    }
-                }
+            final Image max = getReferent(cached.get(MAX_SIZE_KEY));
+            if (max != null) {
+                return new ImageMatch(max, MAX_SIZE_KEY);
             }
+            return null;
         }
-        return null;
+    }
+
+    /**
+     * Returns the referenced image (updates the min time timer) or null if ref is null or the image has been garbage collected.
+     */
+    private static Image getReferent(final MinTimeWeakReference<Image> ref) {
+        if (ref == null) {
+            return null;
+        }
+        return ref.get();
     }
 
     /**
@@ -932,12 +915,9 @@ public class Theme implements MinTimeWeakReferenceCleanup {
         boolean cacheMaxSize = true;
         if (cached != null) {
             synchronized (cached) {
-                if (cached.containsKey(MAX_SIZE_KEY + enhanceTag)) {
-                    MinTimeWeakReference<Image> cachedEntry = cached.get(MAX_SIZE_KEY + enhanceTag);
-                    if (cachedEntry == null) {
-                        // image not available
-                        return null;
-                    }
+                if (cached.containsKey(MAX_SIZE_KEY + enhanceTag) && cached.get(MAX_SIZE_KEY + enhanceTag) == null) {
+                    // image not available
+                    return null;
                 }
             }
         }
@@ -974,58 +954,56 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             enhanceTag += _VECTOR;
         }
         DebugMode.breakIf(baseImage == null && url != null);
+        if (baseImage == null || cached == null) {
+            return baseImage;
+        }
         // FACTORY.urlToImage may return multiRes images e.g. if we read an ico, or icons from a file
-        if (baseImage != null) {
-            if (MultiResolutionImageHelper.isInstanceOf(baseImage)) {
-                if (cached != null) {
-                    synchronized (cached) {
-                        Image largest = null;
-                        // add each image in the cache . this way the cache can clean up unused variants
-                        for (Image img : MultiResolutionImageHelper.getResolutionVariants(baseImage)) {
-                            String actualSizeKey = getSizeKey(img.getWidth(null), img.getHeight(null));
-                            MinTimeWeakReference<Image> ref = new MinTimeWeakRefNamed<Image>(img, this.getCacheLifetime(), key + actualSizeKey, this);
-                            if (largest == null || img.getWidth(null) * img.getHeight(null) > largest.getWidth(null) * largest.getHeight(null)) {
-                                largest = img;
-                            }
-                            cached.put(actualSizeKey + enhanceTag, ref);
-                        }
-                        if (cacheMaxSize && largest != null) {
-                            String actualSizeKey = getSizeKey(largest.getWidth(null), largest.getHeight(null));
-                            MinTimeWeakReference<Image> ref = new MinTimeWeakRefNamed<Image>(largest, this.getCacheLifetime(), key + actualSizeKey, this);
-                            cached.put(MAX_SIZE_KEY + enhanceTag, ref);
-                        }
+        if (MultiResolutionImageHelper.isInstanceOf(baseImage)) {
+            synchronized (cached) {
+                Image largest = null;
+                // add each image in the cache . this way the cache can clean up unused variants
+                for (Image img : MultiResolutionImageHelper.getResolutionVariants(baseImage)) {
+                    String actualSizeKey = getSizeKey(img.getWidth(null), img.getHeight(null));
+                    MinTimeWeakReference<Image> ref = new MinTimeWeakRefNamed<Image>(img, this.getCacheLifetime(), key + actualSizeKey, this);
+                    if (largest == null || img.getWidth(null) * img.getHeight(null) > largest.getWidth(null) * largest.getHeight(null)) {
+                        largest = img;
                     }
+                    cached.put(actualSizeKey + enhanceTag, ref);
                 }
-            } else {
-                if (cached != null) {
-                    synchronized (cached) {
-                        String actualSizeKey = getSizeKey(baseImage.getWidth(null), baseImage.getHeight(null));
-                        MinTimeWeakReference<Image> ref = new MinTimeWeakRefNamed<Image>(baseImage, this.getCacheLifetime(), key + actualSizeKey, this);
-                        if (cacheMaxSize) {
-                            cached.put(MAX_SIZE_KEY + enhanceTag, ref);
-                        }
-                        cached.put(actualSizeKey + enhanceTag, ref);
-                    }
+                if (cacheMaxSize && largest != null) {
+                    String actualSizeKey = getSizeKey(largest.getWidth(null), largest.getHeight(null));
+                    MinTimeWeakReference<Image> ref = new MinTimeWeakRefNamed<Image>(largest, this.getCacheLifetime(), key + actualSizeKey, this);
+                    cached.put(MAX_SIZE_KEY + enhanceTag, ref);
                 }
             }
+            return baseImage;
+        }
+        synchronized (cached) {
+            String actualSizeKey = getSizeKey(baseImage.getWidth(null), baseImage.getHeight(null));
+            MinTimeWeakReference<Image> ref = new MinTimeWeakRefNamed<Image>(baseImage, this.getCacheLifetime(), key + actualSizeKey, this);
+            if (cacheMaxSize) {
+                cached.put(MAX_SIZE_KEY + enhanceTag, ref);
+            }
+            cached.put(actualSizeKey + enhanceTag, ref);
         }
         return baseImage;
     }
 
     protected void debugLogImageLoading(String key, final URL url) {
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            LogV3.warning("Read Icon from Disk: " + url);
-            synchronized (debugLoadingMap) {
-                String debugKey;
-                AtomicInteger ex = debugLoadingMap.get(debugKey = "READ:" + key);
-                if (ex != null) {
-                    ex.incrementAndGet();
-                    // DebugMode.debugger();
-                    LogV3.warning("Read Icon from Disk AGAIN(" + ex + "): " + url);
-                } else {
-                    debugLoadingMap.put(debugKey, new AtomicInteger(1));
-                }
+        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            return;
+        }
+        LogV3.warning("Read Icon from Disk: " + url);
+        synchronized (debugLoadingMap) {
+            final String debugKey = "READ:" + key;
+            AtomicInteger ex = debugLoadingMap.get(debugKey);
+            if (ex == null) {
+                debugLoadingMap.put(debugKey, new AtomicInteger(1));
+                return;
             }
+            ex.incrementAndGet();
+            // DebugMode.debugger();
+            LogV3.warning("Read Icon from Disk AGAIN(" + ex + "): " + url);
         }
     }
 
@@ -1069,38 +1047,38 @@ public class Theme implements MinTimeWeakReferenceCleanup {
 
     protected String buildPath(final String pre, final String path, final String ext, boolean fallback) {
         final Theme delegate = getDelegate();
-        String ret = null;
         if (delegate != null) {
-            ret = delegate.buildPath(pre, path, ext, fallback);
+            final String ret = delegate.buildPath(pre, path, ext, fallback);
+            if (ret != null) {
+                return ret;
+            }
         }
-        if (ret == null) {
-            final StringBuilder sb = new StringBuilder();
-            sb.append(fallback ? defaultPath : this.path);
-            sb.append(pre);
-            sb.append(path);
-            sb.append(ext);
-            ret = sb.toString();
-        }
-        return ret;
+        final StringBuilder sb = new StringBuilder();
+        sb.append(fallback ? defaultPath : this.path);
+        sb.append(pre);
+        sb.append(path);
+        sb.append(ext);
+        return sb.toString();
     }
 
     public String getText(final String string) {
-        String ret = null;
         final Theme delegate = getDelegate();
         if (delegate != null) {
-            ret = delegate.getText(string);
-        }
-        if (ret == null) {
-            try {
-                final URL url = this.getURL("", string, "");
-                if (url != null) {
-                    ret = IO.readURLToString(url);
-                }
-            } catch (final IOException e) {
-                org.appwork.loggingv3.LogV3.log(e);
+            final String ret = delegate.getText(string);
+            if (ret != null) {
+                return ret;
             }
         }
-        return ret;
+        try {
+            final URL url = this.getURL("", string, "");
+            if (url == null) {
+                return null;
+            }
+            return IO.readURLToString(url);
+        } catch (final IOException e) {
+            org.appwork.loggingv3.LogV3.log(e);
+            return null;
+        }
     }
 
     public String getTheme() {
@@ -1120,10 +1098,22 @@ public class Theme implements MinTimeWeakReferenceCleanup {
      */
     public URL getURL(final String pre, final String relativePath, final String ext) {
         URL ret = getURL(pre, relativePath, ext, false);
-        if (ret == null) {
+        if (ret == null && !isStandardPathLookupRedundant()) {
             ret = getURL(pre, relativePath, ext, true);
         }
         return ret;
+    }
+
+    /**
+     * Returns true if a lookup in the standard theme path (useStandardIconPath = true) would check exactly the same files and classpath
+     * resources as the lookup in the current theme path, so it can be skipped. This is the case if the current theme is "standard"
+     * (path equals defaultPath, see updatePath).
+     *
+     * Never true with a delegate: the delegate is asked first in getURL and may use a different theme, so its standard theme path may
+     * differ from its current theme path.
+     */
+    private boolean isStandardPathLookupRedundant() {
+        return getDelegate() == null && StringUtils.equals(this.path, this.defaultPath);
     }
 
     private boolean isNonEmptyStream(URL url) {
@@ -1140,48 +1130,49 @@ public class Theme implements MinTimeWeakReferenceCleanup {
     }
 
     private URL getURL(final String pre, final String relativePath, final String ext, boolean useStandardIconPath) {
-        URL url = null;
         final Theme delegate = getDelegate();
         if (delegate != null) {
-            url = delegate.getURL(pre, relativePath, ext, useStandardIconPath);
+            final URL url = delegate.getURL(pre, relativePath, ext, useStandardIconPath);
+            if (url != null) {
+                return url;
+            }
         }
+        final String path = this.buildPath(pre, relativePath, ext, useStandardIconPath);
+        try {
+            File file = new File(path);
+            if (!file.isAbsolute()) {
+                file = Application.getResource(path);
+            }
+            if (file.isFile() && file.length() > 0) {
+                return file.toURI().toURL();
+            }
+        } catch (final MalformedURLException e) {
+            e.printStackTrace();
+        }
+        // afterwards, we lookup in classpath. jar or bin folders
+        final URL url = Theme.class.getResource((path.startsWith("/") ? "" : "/") + path);
         if (url == null) {
-            final String path = this.buildPath(pre, relativePath, ext, useStandardIconPath);
-            try {
-                File file = new File(path);
-                if (!file.isAbsolute()) {
-                    file = Application.getResource(path);
-                }
-                if (file.isFile() && file.length() > 0) {
-                    url = file.toURI().toURL();
-                }
-            } catch (final MalformedURLException e) {
-                e.printStackTrace();
-            }
-            if (url == null) {
-                // afterwards, we lookup in classpath. jar or bin folders
-                url = Theme.class.getResource((path.startsWith("/") ? "" : "/") + path);
-                if (url != null && url.getPath().endsWith("/")) {
-                    // the resource targets a folder not a file.
-                    url = null;
-                } else if (url != null && !isNonEmptyStream(url)) {
-                    url = null;
-                }
-            }
+            return null;
+        }
+        if (url.getPath().endsWith("/")) {
+            // the resource targets a folder not a file.
+            return null;
+        }
+        if (!isNonEmptyStream(url)) {
+            return null;
         }
         return url;
     }
 
     public File getImagesDirectory() {
-        File ret = null;
         final Theme delegate = getDelegate();
         if (delegate != null) {
-            ret = delegate.getImagesDirectory();
+            final File ret = delegate.getImagesDirectory();
+            if (ret != null) {
+                return ret;
+            }
         }
-        if (ret == null) {
-            ret = Application.getResource(buildPath("images/", "image", ".file", false)).getParentFile();
-        }
-        return ret;
+        return Application.getResource(buildPath("images/", "image", ".file", false)).getParentFile();
     }
 
     public boolean hasIcon(final String key) {
@@ -1189,15 +1180,14 @@ public class Theme implements MinTimeWeakReferenceCleanup {
     }
 
     public URL getIconURL(final String key) {
-        URL url = null;
         final Theme delegate = getDelegate();
         if (delegate != null) {
-            url = delegate.getIconURL(key);
+            final URL url = delegate.getIconURL(key);
+            if (url != null) {
+                return url;
+            }
         }
-        if (url == null) {
-            url = lookupImageUrl(key, null);
-        }
-        return url;
+        return lookupImageUrl(key, null);
     }
 
     /**
@@ -1217,11 +1207,11 @@ public class Theme implements MinTimeWeakReferenceCleanup {
         if (index <= nameIndex) {
             // no . after the last /
             return null;
-        } else if (index < 0) {
-            return "";
-        } else {
-            return path.substring(index + 1);
         }
+        if (index < 0) {
+            return "";
+        }
+        return path.substring(index + 1);
     }
 
     /*
@@ -1242,11 +1232,12 @@ public class Theme implements MinTimeWeakReferenceCleanup {
     }
 
     public void setNameSpace(final String nameSpace) {
-        if (!StringUtils.equals(getNameSpace(), nameSpace) && StringUtils.isNotEmpty(nameSpace)) {
-            this.nameSpace = nameSpace;
-            updatePath();
-            this.clearCache();
+        if (StringUtils.equals(getNameSpace(), nameSpace) || StringUtils.isEmpty(nameSpace)) {
+            return;
         }
+        this.nameSpace = nameSpace;
+        updatePath();
+        this.clearCache();
     }
 
     /**
@@ -1261,10 +1252,11 @@ public class Theme implements MinTimeWeakReferenceCleanup {
      * @param theme
      */
     public void setTheme(final String theme) {
-        if (!StringUtils.equals(getTheme(), theme) && StringUtils.isNotEmpty(theme)) {
-            this.theme = theme;
-            updatePath();
-            this.clearCache();
+        if (StringUtils.equals(getTheme(), theme) || StringUtils.isEmpty(theme)) {
+            return;
         }
+        this.theme = theme;
+        updatePath();
+        this.clearCache();
     }
 }

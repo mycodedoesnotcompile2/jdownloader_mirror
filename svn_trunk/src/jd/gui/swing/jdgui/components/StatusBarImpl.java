@@ -290,7 +290,12 @@ public class StatusBarImpl extends JPanel implements DownloadWatchdogListener {
 
     public void removeProcessIndicator(JComponent icon) {
         if (processIndicators.remove(icon)) {
-            updateDelayer.resetAndStart();
+            if (SwingUtilities.isEventDispatchThread()) {
+                /* Do not wait for the delayer, otherwise the removed indicator stays visible for 1-2 more seconds */
+                redoLayout();
+            } else {
+                updateDelayer.resetAndStart();
+            }
         }
     }
 

@@ -7,7 +7,11 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.swing.Icon;
 import javax.swing.JComponent;
@@ -169,20 +173,29 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
     /** Refreshes the texts of the tooltip. Runs in the EDT. */
     private void updateLiveRows() {
         if (!job.isAlive()) {
-            timer.stop();
+            /* Solved, skipped or timed out: do not wait for the job to be finished completely, hide the indicator now */
+            removeIndicator();
             return;
         }
         for (final LiveRow row : liveRows) {
             row.update();
         }
+        if (solverReorder != null) {
+            solverReorder.run();
+        }
     }
 
-    private JLabel addTooltipRow(final JPanel panel, final String text, final Icon icon, final boolean indent) {
+    private JLabel createTooltipLabel(final String text, final Icon icon) {
         final JLabel label = new JLabel(text);
         label.setForeground(LAFOptions.getInstance().getColorForTooltipForeground());
         if (icon != null) {
             label.setIcon(icon);
         }
+        return label;
+    }
+
+    private JLabel addTooltipRow(final JPanel panel, final String text, final Icon icon, final boolean indent) {
+        final JLabel label = createTooltipLabel(text, icon);
         panel.add(label, indent ? "gapleft 12" : "");
         return label;
     }
@@ -229,7 +242,54 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
         return wait - (System.currentTimeMillis() - job.getCreated());
     }
 
+    /** A solver together with its position in the sorted solver list. */
+    private static final class SolverSortEntry<T> {
+        private final ChallengeSolver<T> solver;
+        private final long              key;
+
+        private SolverSortEntry(final ChallengeSolver<T> solver, final long key) {
+            this.solver = solver;
+            this.key = key;
+        }
+    }
+
+    /**
+     * Returns the solvers in display order: the solvers that are solving first, then the waiting ones with the least remaining wait time
+     * first, finished solvers last. Solvers with an equal position keep their original order.
+     */
+    private <T> List<ChallengeSolver<T>> getSortedSolvers(final SolverJob<T> job) {
+        final List<SolverSortEntry<T>> entries = new ArrayList<SolverSortEntry<T>>();
+        for (final ChallengeSolver<T> solver : job.getSolverList()) {
+            final long key;
+            if (job.isDone(solver)) {
+                key = Long.MAX_VALUE;
+            } else if (job.isSolverSolving(solver)) {
+                key = -1;
+            } else {
+                key = Math.max(0, getRemainingWaitMillis(job, solver));
+            }
+            entries.add(new SolverSortEntry<T>(solver, key));
+        }
+        Collections.sort(entries, new Comparator<SolverSortEntry<T>>() {
+            @Override
+            public int compare(final SolverSortEntry<T> o1, final SolverSortEntry<T> o2) {
+                return o1.key < o2.key ? -1 : (o1.key == o2.key ? 0 : 1);
+            }
+        });
+        final List<ChallengeSolver<T>> ret = new ArrayList<ChallengeSolver<T>>();
+        for (final SolverSortEntry<T> entry : entries) {
+            ret.add(entry.solver);
+        }
+        return ret;
+    }
+
+    /* Re-sorts the solver rows of the most recently created tooltip. Only accessed in the EDT. */
+    private Runnable solverReorder;
+
     private <T> void addSolverRows(final JPanel panel, final List<LiveRow> rows, final SolverJob<T> job) {
+        final MigPanel solverPanel = new MigPanel("ins 0,wrap 1", "[grow,fill]", "[]");
+        solverPanel.setOpaque(false);
+        final Map<ChallengeSolver<T>, LiveRow> solverRows = new HashMap<ChallengeSolver<T>, LiveRow>();
         for (final ChallengeSolver<T> solver : job.getSolverList()) {
             final String name = solver.getService().getName();
             Icon solverIcon = null;
@@ -238,7 +298,7 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
             } catch (final Throwable e) {
                 /* Icon is optional */
             }
-            addLiveRow(panel, rows, solverIcon, true, new TextProvider() {
+            final TextProvider provider = new TextProvider() {
                 @Override
                 public String getText() {
                     if (job.isSolverTimedOut(solver) && job.isDone(solver)) {
@@ -256,8 +316,31 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
                         return _GUI.T.CaptchaIndicator_solver_waiting(name);
                     }
                 }
-            });
+            };
+            final LiveRow row = new LiveRow(createTooltipLabel(provider.getText(), solverIcon), provider);
+            rows.add(row);
+            solverRows.put(solver, row);
         }
+        final List<ChallengeSolver<T>> currentOrder = new ArrayList<ChallengeSolver<T>>();
+        solverReorder = new Runnable() {
+            @Override
+            public void run() {
+                final List<ChallengeSolver<T>> sorted = getSortedSolvers(job);
+                if (sorted.equals(currentOrder)) {
+                    return;
+                }
+                currentOrder.clear();
+                currentOrder.addAll(sorted);
+                solverPanel.removeAll();
+                for (final ChallengeSolver<T> solver : sorted) {
+                    solverPanel.add(solverRows.get(solver).label, "gapleft 12");
+                }
+                solverPanel.revalidate();
+                solverPanel.repaint();
+            }
+        };
+        solverReorder.run();
+        panel.add(solverPanel);
     }
 
     @Override
@@ -367,7 +450,7 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
             }
 
             public void actionPerformed(ActionEvent e) {
-                job.setSkipRequest(SkipRequest.SINGLE);
+                skip(SkipRequest.SINGLE);
             }
         });
         final Plugin plugin = job.getChallenge().getPlugin();
@@ -384,7 +467,7 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
 
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    job.setSkipRequest(SkipRequest.BLOCK_HOSTER);
+                    skip(SkipRequest.BLOCK_HOSTER);
                 }
             });
             popup.add(new AppAction() {
@@ -395,7 +478,7 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
 
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    job.setSkipRequest(SkipRequest.BLOCK_PACKAGE);
+                    skip(SkipRequest.BLOCK_PACKAGE);
                 }
             });
             popup.add(new AppAction() {
@@ -406,7 +489,7 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
 
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    job.setSkipRequest(SkipRequest.BLOCK_ALL_CAPTCHAS);
+                    skip(SkipRequest.BLOCK_ALL_CAPTCHAS);
                 }
             });
             popup.add(new AppAction() {
@@ -417,7 +500,7 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
 
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    job.setSkipRequest(SkipRequest.STOP_CURRENT_ACTION);
+                    skip(SkipRequest.STOP_CURRENT_ACTION);
                 }
             });
         } else {
@@ -429,7 +512,7 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
 
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    job.setSkipRequest(SkipRequest.STOP_CURRENT_ACTION);
+                    skip(SkipRequest.STOP_CURRENT_ACTION);
                 }
             });
             popup.add(new AppAction() {
@@ -440,7 +523,7 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
 
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    job.setSkipRequest(SkipRequest.BLOCK_ALL_CAPTCHAS);
+                    skip(SkipRequest.BLOCK_ALL_CAPTCHAS);
                 }
             });
         }
@@ -465,12 +548,26 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
             new EDTRunner() {
                 @Override
                 protected void runInEDT() {
-                    timer.stop();
-                    setIndeterminate(false);
-                    statusBar.removeProcessIndicator(CaptchaIndicator.this);
+                    removeIndicator();
                 }
             };
         }
+    }
+
+    /** Removes this indicator from the status bar right away. Runs in the EDT. */
+    private void removeIndicator() {
+        timer.stop();
+        setIndeterminate(false);
+        statusBar.removeProcessIndicator(this);
+    }
+
+    /**
+     * Skips the job and hides the indicator immediately instead of waiting for the job to be finished by the
+     * {@link ChallengeResponseController}.
+     */
+    private void skip(final SkipRequest skipRequest) {
+        job.setSkipRequest(skipRequest);
+        removeIndicator();
     }
 
     @Override

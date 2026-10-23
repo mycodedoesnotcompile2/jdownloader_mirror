@@ -69,7 +69,7 @@ public class PackageHistoryManager extends HistoryManager<PackageHistoryEntry> i
         final ArrayList<PackageHistoryEntry> ret = new ArrayList<PackageHistoryEntry>();
         ret.add(packageHistoryEntry);
         for (final PackageHistoryEntry phe : list) {
-            if (!phe.getName().equals(packageHistoryEntry.getName())) {
+            if (!isSameName(phe.getName(), packageHistoryEntry.getName())) {
                 ret.add(phe);
             }
         }
@@ -79,22 +79,15 @@ public class PackageHistoryManager extends HistoryManager<PackageHistoryEntry> i
     @Override
     public void onConfigValueModified(KeyHandler<Object> keyHandler, Object newValue) {
         if (newValue == null) {
-            clear();
+            setEntries(null);
         } else if (newValue instanceof List) {
-            final List<Object> list = (List<Object>) newValue;
-            if (list.size() == 0) {
-                clear();
-            } else {
-                synchronized (this) {
-                    clear();
-                    for (int i = list.size() - 1; i >= 0; i--) {
-                        final Object item = list.get(i);
-                        if (item != null && item instanceof PackageHistoryEntry) {
-                            add(((PackageHistoryEntry) item).getName());
-                        }
-                    }
+            final List<PackageHistoryEntry> entries = new ArrayList<PackageHistoryEntry>();
+            for (final Object item : (List<?>) newValue) {
+                if (item instanceof PackageHistoryEntry) {
+                    entries.add((PackageHistoryEntry) item);
                 }
             }
+            setEntries(entries);
         }
     }
 

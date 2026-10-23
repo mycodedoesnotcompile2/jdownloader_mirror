@@ -15,6 +15,18 @@ import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
 public abstract class PowCaptchaChallenge extends AbstractBrowserChallenge {
     private final String sessionUrl;
     private final String userAgent;
+    private String        proxyUrl = null;
+
+    /**
+     * Optional proxy (e.g. 'socks5://user:password@host:port') which the captcha solver is allowed to use. Null = no proxy.
+     */
+    public String getProxyUrl() {
+        return proxyUrl;
+    }
+
+    public void setProxyUrl(final String proxyUrl) {
+        this.proxyUrl = proxyUrl;
+    }
 
     /** Absolute URL of the captcha session JSON (value of the attribute 'data-session'). */
     public String getSessionUrl() {
