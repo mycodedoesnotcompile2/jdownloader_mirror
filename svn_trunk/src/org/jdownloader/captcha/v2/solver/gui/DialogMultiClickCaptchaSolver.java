@@ -42,13 +42,17 @@ public class DialogMultiClickCaptchaSolver extends AbstractDialogSolver<MultiCli
     }
 
     @Override
-    public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
-        if (c instanceof MultiClickCaptchaChallenge) {
-            /* Looks good -> Let upper handling decide for VetoReason */
-            return super.getChallengeVetoReason(c);
-        } else {
+    public ChallengeVetoReason getUnsupportedReason(Challenge<?> c) {
+        /* Always ask the super class first, then check the solver specific things. */
+        final ChallengeVetoReason superVeto = super.getUnsupportedReason(c);
+        if (superVeto != null) {
+            return superVeto;
+        }
+        if (!(c instanceof MultiClickCaptchaChallenge)) {
             return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
         }
+        /* No veto = Given challenge can be solved by this solver. */
+        return null;
     }
 
     public void requestFocus(Challenge<?> challenge) {

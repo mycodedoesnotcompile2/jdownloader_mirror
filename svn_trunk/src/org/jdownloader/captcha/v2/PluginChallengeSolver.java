@@ -126,8 +126,8 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
     }
 
     @Override
-    public Set<FeedbackType> getSupportedFeedbackTypes() {
-        return plugin.getSupportedFeedbackTypes();
+    public Set<SolverFeature> getSolverFeatures() {
+        return plugin.getSolverFeatures();
     }
 
     @Override
@@ -141,7 +141,33 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
     }
 
     @Override
+    public ChallengeVetoReason getUnsupportedReason(final Challenge<?> c) {
+        /*
+         * Checked before the super class: getSupportedCaptchaTypes() already returns the types of the account, so the super class would
+         * report UNSUPPORTED_BY_SOLVER for a type the plugin supports in general but not for this account.
+         */
+        final Set<CAPTCHA_TYPE> all_supported_captcha_types = this.plugin.getSupportedCaptchaTypes();
+        final Set<CAPTCHA_TYPE> account_supported_captcha_types = this.plugin.getSupportedCaptchaTypes(this.account);
+        final CAPTCHA_TYPE ctype = CAPTCHA_TYPE.getCaptchaTypeForChallenge(c);
+        if (ctype != null && all_supported_captcha_types != null && account_supported_captcha_types != null && all_supported_captcha_types.contains(ctype) && !account_supported_captcha_types.contains(ctype)) {
+            return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER_ACCOUNT;
+        }
+        /* Always ask the super class first, then check the solver specific things. */
+        final ChallengeVetoReason superVeto = super.getUnsupportedReason(c);
+        if (superVeto != null) {
+            return superVeto;
+        }
+        /* Check if plugin provides a veto reason (technical limitations of the solver service). */
+        return plugin.getVetoReason(c, account);
+    }
+
+    @Override
     public ChallengeVetoReason getChallengeVetoReason(final Challenge<?> c) {
+        /* Always ask the super class first, then check the solver specific things. */
+        final ChallengeVetoReason superVeto = super.getChallengeVetoReason(c);
+        if (superVeto != null) {
+            return superVeto;
+        }
         if (!account.isEnabled()) {
             return ChallengeVetoReason.ACCOUNT_DISABLED;
         }
@@ -150,21 +176,6 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
         }
         if (!plugin.enoughBalanceFor(c, account)) {
             return ChallengeVetoReason.ACCOUNT_NOT_ENOUGH_BALANCE;
-        }
-        /* Check if plugin provides a veto reason */
-        final ChallengeVetoReason veto = plugin.getVetoReason(c, account);
-        if (veto != null) {
-            return veto;
-        }
-        final Set<CAPTCHA_TYPE> all_supported_captcha_types = this.plugin.getSupportedCaptchaTypes();
-        final Set<CAPTCHA_TYPE> account_supported_captcha_types = this.plugin.getSupportedCaptchaTypes(this.account);
-        final CAPTCHA_TYPE ctype = CAPTCHA_TYPE.getCaptchaTypeForChallenge(c);
-        if (ctype != null && all_supported_captcha_types != null && account_supported_captcha_types != null && all_supported_captcha_types.contains(ctype) && !account_supported_captcha_types.contains(ctype)) {
-            return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER_ACCOUNT;
-        }
-        final ChallengeVetoReason superVeto = super.getChallengeVetoReason(c);
-        if (superVeto != null) {
-            return superVeto;
         }
         /*
          * Checked last: this solver could solve the challenge, so the only reason left not to use it is that it would exceed one of the
@@ -229,7 +240,7 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
      * Aborts the captcha task on the server side of the solver service if JDownloader no longer waits for its answer, so the service stops
      * working on it and (ideally) does not charge for it: the solver or the whole job ran into a timeout, or the job ended without this
      * solver's answer (skipped/aborted by the user, solved by another solver). Does nothing if the plugin does not support
-     * {@link FeedbackType#ABORT_CAPTCHAS}, the user disabled captcha feedback, no task was submitted or this solver already delivered an
+     * {@link SolverFeature#ABORT_CAPTCHAS}, the user disabled captcha feedback, no task was submitted or this solver already delivered an
      * answer (that one gets {@link #setUnused(AbstractResponse)}/valid/invalid feedback instead).
      */
     private void abortServerSideIfNotNeeded(final SolverJob<T> job, final CESSolverJob<T> cesJob) {
@@ -242,8 +253,8 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
             /* Job still wants an answer: the solver just ended on its own (e.g. unsolved), the task is finished on the server side. */
             return;
         }
-        final Set<FeedbackType> feedbacktypes = this.getSupportedFeedbackTypes();
-        if (feedbacktypes == null || !feedbacktypes.contains(FeedbackType.ABORT_CAPTCHAS) || !plugin.isEnableCaptchaFeedback(account)) {
+        final Set<SolverFeature> feedbacktypes = this.getSolverFeatures();
+        if (feedbacktypes == null || !feedbacktypes.contains(SolverFeature.ABORT_CAPTCHAS) || !plugin.isEnableCaptchaFeedback(account)) {
             return;
         }
         /* Clear a pending interrupt (kill interrupts the solver thread), otherwise the abort request would fail immediately. */

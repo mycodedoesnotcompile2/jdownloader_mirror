@@ -60,7 +60,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 53731 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53733 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileCryptCc extends PluginForDecrypt {
     public FileCryptCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -708,14 +708,6 @@ public class FileCryptCc extends PluginForDecrypt {
             } else if (AbstractPowCaptcha.containsPowCaptchaClass(captchaForm)) {
                 logger.info("Attempting to solve powCAPTCHA");
                 final String proxyUrl = getConfiguredProxyUrl();
-                /* TODO: Test this, also review it once we got a local (BrowserCaptcha) captcha solver for powCAPTCHA! */
-                if (proxyUrl == null) {
-                    /*
-                     * 2026-10-22: Only supported by 2captcha.com and at least 2captcha requires a proxy (a proxy that we can send to
-                     * 2captcha).
-                     */
-                    throw new DecrypterRetryException(RetryReason.UNSUPPORTED_CAPTCHA, "Unsupported captcha type 'powcaptcha.com' without proxy: Enable and set a proxy in the plugin settings");
-                }
                 final CaptchaHelperCrawlerPluginPowCaptcha powHelper = new CaptchaHelperCrawlerPluginPowCaptcha(this, br);
                 powHelper.setProxyUrl(proxyUrl);
                 final String powSolution = powHelper.getToken();

@@ -1,5 +1,7 @@
 package jd.plugins.hoster;
 
+import org.appwork.utils.net.httpconnection.HTTPProxy;
+import org.appwork.utils.StringUtils;
 import java.util.Currency;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -12,7 +14,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.ReflectionUtils;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
-import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverFeature;
 import org.jdownloader.captcha.v2.SolverStatus;
 import org.jdownloader.captcha.v2.challenge.altcha.AltchaChallenge;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
@@ -45,8 +47,21 @@ import jd.plugins.PluginException;
  * - reCAPTCHA v2 uses the task type "NoCaptchaTaskProxyless" and reCAPTCHA v3 Enterprise has its own task type <br>
  * - Negative feedback is only available via the classic API (res.php?action=reportbad), there is no "report correct" method.
  */
-@HostPlugin(revision = "$Revision: 53706 $", interfaceVersion = 3, names = { "azcaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53733 $", interfaceVersion = 3, names = { "azcaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSolver {
+    /**
+     * Task types with proxy of the JSON API, see https://azcaptcha.com/docs: RecaptchaV2Task, RecaptchaV2EnterpriseTask,
+     * RecaptchaV3Task, RecaptchaV3EnterpriseTask and TurnstileTask. The other task types (e.g. Altcha) have no proxy variant documented.
+     */
+    private static final Map<String, String> PROXY_TASK_TYPES = new HashMap<String, String>();
+    static {
+        PROXY_TASK_TYPES.put("NoCaptchaTaskProxyless", "RecaptchaV2Task");
+        PROXY_TASK_TYPES.put("RecaptchaV2EnterpriseTaskProxyless", "RecaptchaV2EnterpriseTask");
+        PROXY_TASK_TYPES.put("RecaptchaV3TaskProxyless", "RecaptchaV3Task");
+        PROXY_TASK_TYPES.put("RecaptchaV3EnterpriseTaskProxyless", "RecaptchaV3EnterpriseTask");
+        PROXY_TASK_TYPES.put("TurnstileTaskProxyless", "TurnstileTask");
+    }
+
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.CAPTCHA_SOLVER, LazyPlugin.FEATURE.BUBBLE_NOTIFICATION, LazyPlugin.FEATURE.API_KEY_LOGIN };
@@ -82,9 +97,9 @@ public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSol
     }
 
     @Override
-    public Set<FeedbackType> getSupportedFeedbackTypes() {
+    public Set<SolverFeature> getSolverFeatures() {
         /* Only reporting incorrectly solved captchas is possible, see sendCaptchaFeedbackInvalid(). */
-        return EnumSet.of(FeedbackType.REPORT_INVALID_CAPTCHAS);
+        return EnumSet.of(SolverFeature.REPORT_INVALID_CAPTCHAS, SolverFeature.PROXY);
     }
 
     @Override
@@ -98,6 +113,44 @@ public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSol
         final AccountInfo ai = new AccountInfo();
         ai.setAccountBalance(balance, Currency.getInstance("USD"));
         return ai;
+    }
+
+    /**
+     * Sends the proxy of the challenge in the format of the AZCaptcha JSON API (task types see PROXY_TASK_TYPES).
+     */
+    private void applyProxy(final Map<String, Object> task, final Challenge<?> challenge) {
+        if (!challenge.hasProxy()) {
+            return;
+        }
+        final HTTPProxy proxy = challenge.getProxy();
+        final String proxyTaskType = PROXY_TASK_TYPES.get(task.get("type"));
+        if (proxyTaskType == null) {
+            logger.info("The service has no task type with proxy for: " + task.get("type"));
+            return;
+        }
+        task.put("type", proxyTaskType);
+        final String proxyType;
+        switch (proxy.getType()) {
+        case SOCKS5:
+            proxyType = "socks5";
+            break;
+        case SOCKS4:
+        case SOCKS4A:
+            proxyType = "socks4";
+            break;
+        case HTTP:
+        case HTTPS:
+        default:
+            proxyType = "http";
+            break;
+        }
+        task.put("proxyType", proxyType);
+        task.put("proxyAddress", proxy.getHost());
+        task.put("proxyPort", proxy.getPort());
+        if (StringUtils.isNotEmpty(proxy.getUser())) {
+            task.put("proxyLogin", proxy.getUser());
+            task.put("proxyPassword", proxy.getPass() != null ? proxy.getPass() : "");
+        }
     }
 
     @Override
@@ -166,6 +219,8 @@ public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSol
         } else {
             throw new IllegalArgumentException("Unexpected captcha challenge type");
         }
+        /* Use the proxy of the challenge (if there is one and if the task type supports it). */
+        applyProxy(task, captchachallenge);
         postdata.put("task", task);
         /* Submit captcha */
         final PostRequest req_createTask = br.createJSonPostRequest(this.getApiBase() + "/createTask", postdata);

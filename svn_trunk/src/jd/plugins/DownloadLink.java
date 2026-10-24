@@ -2685,7 +2685,8 @@ public class DownloadLink extends Property implements AbstractPackageChildrenNod
             if (history == null) {
                 history = new ArrayList<HistoryEntry>();
             }
-            while (history.size() > maxEntries) {
+            /* Make room for the new entry so the list never exceeds maxEntries */
+            while (history.size() >= maxEntries) {
                 history.remove(0);
             }
             history.add(entry);

@@ -18,7 +18,7 @@ import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
-import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverFeature;
 import org.jdownloader.captcha.v2.SolverStatus;
 import org.jdownloader.captcha.v2.challenge.altcha.AltchaChallenge;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
@@ -51,6 +51,20 @@ import jd.plugins.PluginException;
  */
 @HostPlugin(revision = "$Revision: 50799 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
 public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abstractPluginForCaptchaSolver {
+    /**
+     * Task types with proxy. Documented for: reCAPTCHA v2 (https://2captcha.com/api-docs/recaptcha-v2), reCAPTCHA v2 Enterprise,
+     * Cloudflare Turnstile, Altcha and CutCaptcha. reCAPTCHA v3 has no task type with proxy. hCaptcha is not documented (404) -> not
+     * included.
+     */
+    private static final Map<String, String> PROXY_TASK_TYPES = new HashMap<String, String>();
+    static {
+        PROXY_TASK_TYPES.put("RecaptchaV2TaskProxyless", "RecaptchaV2Task");
+        PROXY_TASK_TYPES.put("RecaptchaV2EnterpriseTaskProxyless", "RecaptchaV2EnterpriseTask");
+        PROXY_TASK_TYPES.put("TurnstileTaskProxyless", "TurnstileTask");
+        PROXY_TASK_TYPES.put("AltchaTaskProxyless", "AltchaTask");
+        PROXY_TASK_TYPES.put("CutCaptchaTaskProxyless", "CutCaptchaTask");
+    }
+
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.CAPTCHA_SOLVER, LazyPlugin.FEATURE.BUBBLE_NOTIFICATION, LazyPlugin.FEATURE.API_KEY_LOGIN };
@@ -74,6 +88,44 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
         /* Use USD as default currency since all services which support the 2captcha API I came across were USD based. */
         ai.setAccountBalance(balance, Currency.getInstance("USD"));
         return ai;
+    }
+
+    /**
+     * Used by 2captcha and the solvers based on its API: sends the proxy of the challenge in the format of the 2captcha API (task types see PROXY_TASK_TYPES). Does nothing if the challenge has no proxy or the task type has no proxy variant.
+     */
+    protected void applyProxy(final Map<String, Object> task, final Challenge<?> challenge) {
+        if (!challenge.hasProxy()) {
+            return;
+        }
+        final HTTPProxy proxy = challenge.getProxy();
+        final String proxyTaskType = PROXY_TASK_TYPES.get(task.get("type"));
+        if (proxyTaskType == null) {
+            logger.info("The service has no task type with proxy for: " + task.get("type"));
+            return;
+        }
+        task.put("type", proxyTaskType);
+        final String proxyType;
+        switch (proxy.getType()) {
+        case SOCKS5:
+            proxyType = "socks5";
+            break;
+        case SOCKS4:
+        case SOCKS4A:
+            proxyType = "socks4";
+            break;
+        case HTTP:
+        case HTTPS:
+        default:
+            proxyType = "http";
+            break;
+        }
+        task.put("proxyType", proxyType);
+        task.put("proxyAddress", proxy.getHost());
+        task.put("proxyPort", proxy.getPort());
+        if (StringUtils.isNotEmpty(proxy.getUser())) {
+            task.put("proxyLogin", proxy.getUser());
+            task.put("proxyPassword", proxy.getPass() != null ? proxy.getPass() : "");
+        }
     }
 
     @Override
@@ -180,6 +232,8 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
         if (captchachallenge.getExplain() != null) {
             task.put("comment", captchachallenge.getExplain());
         }
+        /* Use the proxy of the challenge (if there is one and if the task type supports it). */
+        applyProxy(task, captchachallenge);
         postdata.put("task", task);
         /* Submit captcha */
         final PostRequest req_createTask = br.createJSonPostRequest(this.getApiBase() + "/createTask", postdata);
@@ -251,7 +305,7 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
         query_createTask.appendEncoded("pageurl", challenge.getSiteUrl(this));
         query_createTask.appendEncoded("data_session", challenge.getSessionUrl());
         query_createTask.appendEncoded("useragent", challenge.getUserAgent());
-        final HTTPProxy proxy = HTTPProxy.parseHTTPProxy(challenge.getProxyUrl());
+        final HTTPProxy proxy = challenge.hasProxy() ? challenge.getProxy() : null;
         if (proxy != null) {
             /* Legacy API format: proxy=login:password@host:port, proxytype=HTTP|HTTPS|SOCKS4|SOCKS5 */
             final String proxytype;
@@ -343,9 +397,12 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
     }
 
     @Override
-    public Set<FeedbackType> getSupportedFeedbackTypes() {
-        /* https://2captcha.com/api-docs/report-correct and https://2captcha.com/api-docs/report-incorrect */
-        return EnumSet.of(FeedbackType.REPORT_INVALID_CAPTCHAS, FeedbackType.REPORT_VALID_CAPTCHAS);
+    public Set<SolverFeature> getSolverFeatures() {
+        /*
+         * https://2captcha.com/api-docs/report-correct and https://2captcha.com/api-docs/report-incorrect <br>
+         * Proxy: see PROXY_TASK_TYPES and solvePowCaptcha.
+         */
+        return EnumSet.of(SolverFeature.REPORT_INVALID_CAPTCHAS, SolverFeature.REPORT_VALID_CAPTCHAS, SolverFeature.PROXY);
     }
 
     @Override

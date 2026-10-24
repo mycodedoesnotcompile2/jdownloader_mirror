@@ -1,5 +1,6 @@
 package org.jdownloader.plugins.components.captchasolver;
 
+import java.util.Map;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.ArrayList;
@@ -14,7 +15,7 @@ import org.jdownloader.captcha.v2.CaptchaSolverConfigV3;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeSolver;
 import org.jdownloader.captcha.v2.ChallengeSolver.ChallengeVetoReason;
-import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverFeature;
 import org.jdownloader.captcha.v2.JobRunnable;
 import org.jdownloader.captcha.v2.PluginChallengeSolver;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
@@ -113,8 +114,8 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      * Also used so that users can lookup this info in advance, e.g. in a comparison table aka "Does this solver allow for
      * response-feedback"?
      */
-    public Set<FeedbackType> getSupportedFeedbackTypes() {
-        return EnumSet.noneOf(FeedbackType.class);
+    public Set<SolverFeature> getSolverFeatures() {
+        return EnumSet.noneOf(SolverFeature.class);
     }
 
     public abstract String getBuyPremiumUrl();
@@ -168,8 +169,8 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
     /**
      * Aborts a captcha task on the server side of the solver service because JDownloader no longer waits for its answer: JDownloader ran
      * into its own timeout, the user skipped/aborted the captcha, or another solver solved it first. At that point there is no answer
-     * from this solver. The service should stop working on the task and ideally not charge for it. Only called if the plugin declares {@link FeedbackType#ABORT_CAPTCHAS} in
-     * {@link #getSupportedFeedbackTypes()}. Plugins that declare it must override this.
+     * from this solver. The service should stop working on the task and ideally not charge for it. Only called if the plugin declares {@link SolverFeature#ABORT_CAPTCHAS} in
+     * {@link #getSolverFeatures()}. Plugins that declare it must override this.
      *
      * @param response
      *            Placeholder response without a value: it only carries the task ID the solver service assigned to the captcha, see
@@ -308,7 +309,10 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
     }
 
     /**
-     * Checks if this solver can handle a specific challenge.
+     * Checks if this solver can handle a specific challenge. <br>
+     * Only technical limitations of the solver service may be returned here (e.g. a challenge variant the API does not accept). Do not
+     * return reasons that depend on the user's settings or the account state (balance, enabled, ...): Those are checked separately. See
+     * {@link ChallengeSolver#getUnsupportedReason(Challenge)}.
      *
      * @param c
      *            The challenge to check

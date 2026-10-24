@@ -47,7 +47,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 53112 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53732 $", interfaceVersion = 3, names = {}, urls = {})
 public class KatfileCom extends XFileSharingProBasic {
     public KatfileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -105,6 +105,18 @@ public class KatfileCom extends XFileSharingProBasic {
 
     @Override
     protected void fetchAccountInfoWebsiteTraffic(final Browser br, final Account account, final AccountInfo ai) throws Exception {
+        /*
+         * 2026-10-23: New account page layout: <span>Traffic available today</span><small>0.0 / 200 GB today</small> --> "used / max"
+         * (same format as the "Used space" bar)
+         */
+        final String[] trafficUsedAndMax = new Regex(getCorrectBR(br), ">\\s*Traffic available(?:\\s*today)?\\s*</span>\\s*<small>\\s*([0-9\\.]+)\\s*/\\s*([0-9\\.]+)\\s*([TGMKB]+)").getRow(0);
+        if (trafficUsedAndMax != null) {
+            final long trafficUsed = parseSize(Size.TRAFFIC, trafficUsedAndMax[0] + " " + trafficUsedAndMax[2]);
+            final long trafficMax = parseSize(Size.TRAFFIC, trafficUsedAndMax[1] + " " + trafficUsedAndMax[2]);
+            ai.setTrafficMax(trafficMax);
+            ai.setTrafficLeft(Math.max(0, trafficMax - trafficUsed));
+            return;
+        }
         super.fetchAccountInfoWebsiteTraffic(br, account, ai);
         final String premiumPackage = getPremiumPackage(br);
         final String trafficMax = new Regex(premiumPackage, "<b>\\s*([0-9\\.]+\\s*[TGMB]+)\\s*<").getMatch(0);

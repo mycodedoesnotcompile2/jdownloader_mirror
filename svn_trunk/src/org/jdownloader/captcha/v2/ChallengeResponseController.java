@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
@@ -18,6 +19,7 @@ import org.appwork.storage.config.JsonConfig;
 import org.appwork.timetracker.TimeTracker;
 import org.appwork.timetracker.TimeTrackerController;
 import org.appwork.timetracker.TrackerRule;
+import org.appwork.uio.CloseReason;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
@@ -25,9 +27,6 @@ import org.appwork.utils.DebugMode;
 import org.appwork.utils.Time;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.logging2.LogSource;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.appwork.utils.swing.dialog.Dialog;
-import org.appwork.utils.swing.dialog.DialogNoAnswerException;
 import org.jdownloader.api.captcha.CaptchaAPISolver;
 import org.jdownloader.captcha.blacklist.BlacklistEntry;
 import org.jdownloader.captcha.blacklist.CaptchaBlackList;
@@ -48,6 +47,7 @@ import org.jdownloader.captcha.v2.solver.jac.JACSolver;
 import org.jdownloader.captcha.v2.solverjob.ResponseList;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.controlling.UniqueAlltimeID;
+import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSolverService;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
@@ -66,10 +66,22 @@ import jd.controlling.AccountFilter;
 import jd.controlling.captcha.CaptchaSettings;
 import jd.controlling.captcha.SkipException;
 import jd.controlling.captcha.SkipRequest;
+import jd.gui.swing.jdgui.views.settings.panels.anticaptcha.CaptchaConfigPanel;
 import jd.plugins.Account;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
+import java.awt.Cursor;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.SwingConstants;
+import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.appwork.utils.swing.dialog.Dialog;
+import net.miginfocom.swing.MigLayout;
 
 public class ChallengeResponseController {
     private static final ChallengeResponseController INSTANCE         = new ChallengeResponseController();
@@ -444,14 +456,29 @@ public class ChallengeResponseController {
     }
 
     public <T> SolverJob<T> handle(final Challenge<T> c) throws InterruptedException, SkipException {
-        return handle(c, null);
+        final List<ChallengeSolver<T>> solvers = createList(c);
+        applyLoginCaptchaPolicy(c, solvers);
+        reSortByOverThreadsLimit(c, solvers);
+        return handleInternal(c, solvers, true);
     }
 
     /**
-     * Same as {@link #handle(Challenge)} but if onlyService is not null, only solvers of that service are used (e.g. for the captcha test
-     * panel). All other veto checks (disabled solver, unsupported/disabled captcha type, ...) still apply.
+     * Same as {@link #handle(Challenge)} but only solvers of the given service are used (captcha test panel). All other veto checks
+     * (disabled solver, unsupported/disabled captcha type, ...) still apply, but there are no login captcha special handling and no "no
+     * solver available" info dialogs because the user restricts the solvers on purpose.
      */
-    public <T> SolverJob<T> handle(final Challenge<T> c, final SolverService onlyService) throws InterruptedException, SkipException {
+    public <T> SolverJob<T> handleTest(final Challenge<T> c, final SolverService service) throws InterruptedException, SkipException {
+        final List<ChallengeSolver<T>> solvers = createList(c);
+        for (final Iterator<ChallengeSolver<T>> it = solvers.iterator(); it.hasNext();) {
+            if (!service.getID().equals(it.next().getService().getID())) {
+                it.remove();
+            }
+        }
+        reSortByOverThreadsLimit(c, solvers);
+        return handleInternal(c, solvers, false);
+    }
+
+    private final <T> SolverJob<T> handleInternal(final Challenge<T> c, final List<ChallengeSolver<T>> solvers, final boolean showNoSolverDialogs) throws InterruptedException, SkipException {
         if (c instanceof AbstractBrowserChallenge) {
             if (c instanceof RecaptchaV2Challenge) {
                 UpdateController.getInstance().addFeedback("rc");
@@ -468,12 +495,11 @@ public class ChallengeResponseController {
         }
         logger.info("Log to " + logger.getName());
         logger.info("Handle Challenge: " + c);
-        final List<ChallengeSolver<T>> solvers = createList(c, onlyService);
         logger.info("Solver: " + solvers);
         if (solvers == null || solvers.size() == 0) {
             logger.info("No solver available!");
-            if (isExternalSolverRequired(c)) {
-                showNoBrowserSolverInfoDialog(c);
+            if (showNoSolverDialogs) {
+                showNoSolverInfoDialog(c);
             }
             /* See: https://support.jdownloader.org/knowledgebase/article/error-skipped-captcha-is-required */
             throw new SkipException(c, SkipRequest.BLOCK_HOSTER, "No solver available!");
@@ -549,123 +575,273 @@ public class ChallengeResponseController {
     /**
      * True if the given interactive (browser based) challenge cannot be solved by the local {@link BrowserSolver} because it is not
      * supported by it, which means that the user can only solve it with an external captcha solver. Reasons caused by the user's own
-     * settings (solver/captcha type disabled, blacklisted by captcha rules) do not count.
+     * settings (solver/captcha type disabled, blacklisted by captcha rules) do not count, see
+     * {@link ChallengeSolver#getUnsupportedReason(Challenge)}.
      */
     private boolean isExternalSolverRequired(final Challenge<?> c) {
         if (!(c instanceof AbstractBrowserChallenge)) {
             /* Not an interactive captcha (e.g. image captcha) -> No BrowserSolver required */
             return false;
         }
-        final ChallengeVetoReason reason = BrowserSolver.getInstance().getChallengeVetoReason(c);
-        if (reason == null) {
-            /* No veto reason -> BrowserSolver would be able to handle that challenge */
-            return false;
-        }
-        switch (reason) {
-        case UNSUPPORTED_BY_SOLVER:
-        case UNSUPPORTED_FOR_INTERNAL_SPECIAL_REASONS:
-        case UNSUPPORTED_BROWSER_NO_URL_OPEN:
-        case UNSUPPORTED_BROWSER_NOT_FOUND:
-            return true;
-        default:
-            return false;
-        }
+        return BrowserSolver.getInstance().getUnsupportedReason(c) != null;
     }
 
     protected final static Map<String, Long> TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED = new HashMap<String, Long>();
 
-    public <T> Thread showNoBrowserSolverInfoDialog(final Challenge<T> c) {
-        String captcha_challenge_type_title = null;
+    /** Returns the name of the captcha type of the given challenge for display purposes. */
+    private String getCaptchaTypeDisplayName(final Challenge<?> c) {
         final CAPTCHA_TYPE captcha_type = CAPTCHA_TYPE.getCaptchaTypeForChallenge(c);
         if (captcha_type != null) {
-            captcha_challenge_type_title = captcha_type.getDisplayName();
-        } else {
-            logger.warning("captcha_type is null");
-            captcha_challenge_type_title = c.getTypeID();
+            return captcha_type.getDisplayName();
+        }
+        logger.warning("captcha_type is null");
+        return c.getTypeID();
+    }
+
+    /**
+     * Returns true (and remembers the current time) if the dialog with the given key may be displayed now, false if it has been displayed
+     * just recently.
+     */
+    private boolean allowDialogNow(final String key) {
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            return true;
         }
         synchronized (TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED) {
-            final Long lastDisplay = TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED.get(captcha_challenge_type_title);
+            final Long lastDisplay = TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED.get(key);
             if (lastDisplay != null && Time.systemIndependentCurrentJVMTimeMillis() - lastDisplay.longValue() < TimeUnit.HOURS.toMillis(1)) {
                 /* Dialog has been shown already just recently -> Do not display now. */
-                return null;
+                return false;
             }
-            TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED.put(captcha_challenge_type_title, Time.systemIndependentCurrentJVMTimeMillis());
+            TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED.put(key, Time.systemIndependentCurrentJVMTimeMillis());
+            return true;
         }
-        final String captcha_challenge_type_final = captcha_challenge_type_title;
+    }
+
+    /*
+     * Indexes of the texts of the "no solver available" dialog, see NO_SOLVER_DIALOG_TEXTS. "{type}" is a placeholder for the captcha type,
+     * "{disabled}" and "{notReady}" are placeholders for the number of disabled / enabled but not ready solvers. "<br>" is a line break.
+     */
+    private static final int                      TEXT_TITLE_EXTERNAL_REQUIRED = 0;
+    private static final int                      TEXT_TITLE_NO_ENABLED_SOLVER = 1;
+    private static final int                      TEXT_INTRO_EXTERNAL_REQUIRED = 2;
+    private static final int                      TEXT_INTRO_NO_ENABLED_SOLVER = 3;
+    private static final int                      TEXT_ACCOUNTS_DISABLED       = 4;
+    private static final int                      TEXT_SOLVER_PROMPT           = 5;
+    private static final int                      TEXT_HELP_PROMPT             = 6;
+    private static final int                      TEXT_SOLVER_COUNTS_DISABLED  = 7;
+    private static final int                      TEXT_SETTINGS_BUTTON         = 8;
+    private static final int                      TEXT_SOLVER_COUNTS_NOT_READY = 9;    private static final Map<String, String[]>    NO_SOLVER_DIALOG_TEXTS       = new HashMap<String, String[]>();
+    static {
+        NO_SOLVER_DIALOG_TEXTS.put("en", new String[] { "External solver required for this captcha challenge", "No enabled captcha solver available", "The interactive type of captcha challenge '{type}' cannot currently be solved locally in your browser.<br><br>" + "Therefore, in JD your only option is to use a captcha solving service that may require payment and is capable of handling this type of captcha.<br><br>", "No solver is currently available for the captcha challenge '{type}', although there are solvers that could solve this captcha type.<br><br>", "The usage of captcha solver accounts is globally disabled in the settings.<br><br>", "Ensure that at least one of the following {count} solvers is configured and enabled:", "For more detailed information, please read the help article below:<br>", "Disabled captcha solvers: {disabled}", "Go to captcha settings", "Enabled but not ready captcha solvers: {notReady}" });
+        NO_SOLVER_DIALOG_TEXTS.put("de", new String[] { "Externer Solver erforderlich für diese Captcha-Challenge", "Kein aktivierter Captcha-Solver verfügbar", "Die interaktive Art der Captcha-Herausforderung '{type}', die gelöst werden muss, kann derzeit nicht lokal in deinem Browser gelöst werden.<br><br>" + "Daher bleibt dir in JD nur die Möglichkeit, einen möglicherweise kostenpflichtigen Captcha-Lösungsdienst zu nutzen, der diesen Captcha-Typ verarbeiten kann.<br><br>", "Für die Captcha-Challenge '{type}' steht aktuell kein Solver zur Verfügung, obwohl es Solver gibt, die diesen Captcha-Typ lösen könnten.<br><br>", "Die Nutzung von Captcha-Solver-Accounts ist in den Einstellungen global deaktiviert.<br><br>", "Stelle sicher, dass mindestens einer der folgenden {count} Solver konfiguriert und aktiviert ist:", "Für detailliertere Informationen lies bitte den folgenden Hilfe-Artikel:<br>", "Deaktivierte Captcha Solver: {disabled}", "Zu den Captcha-Einstellungen", "Aktivierte, aber nicht bereite Captcha Solver: {notReady}" });
+        NO_SOLVER_DIALOG_TEXTS.put("es", new String[] { "Se requiere un solucionador externo para este desafío de CAPTCHA", "No hay ningún solucionador de CAPTCHA activado", "El tipo interactivo de desafío CAPTCHA '{type}' no puede resolverse actualmente de forma local en tu navegador.<br><br>" + "Por lo tanto, en JD solo tienes la opción de utilizar un servicio de resolución de captchas posiblemente de pago que pueda manejar este tipo de CAPTCHA.<br><br>", "Actualmente no hay ningún solucionador disponible para el desafío CAPTCHA '{type}', aunque existen solucionadores que podrían resolver este tipo de CAPTCHA.<br><br>", "El uso de cuentas de solucionadores de CAPTCHA está desactivado globalmente en los ajustes.<br><br>", "Asegúrate de que al menos uno de los siguientes {count} solucionadores esté configurado y activado:", "Para obtener información más detallada, lee el siguiente artículo de ayuda:<br>", "Solucionadores de CAPTCHA desactivados: {disabled}", "Ir a la configuración de CAPTCHA", "Solucionadores de CAPTCHA activados pero no listos: {notReady}" });
+        NO_SOLVER_DIALOG_TEXTS.put("fr", new String[] { "Solveur externe requis pour ce défi CAPTCHA", "Aucun solveur CAPTCHA activé disponible", "Le type interactif de défi CAPTCHA '{type}' ne peut actuellement pas être résolu localement dans votre navigateur.<br><br>" + "Par conséquent, dans JD, votre seule option est d’utiliser un service de résolution de CAPTCHA potentiellement payant capable de traiter ce type de CAPTCHA.<br><br>", "Aucun solveur n’est actuellement disponible pour le défi CAPTCHA '{type}', bien que des solveurs puissent résoudre ce type de CAPTCHA.<br><br>", "L’utilisation des comptes de solveurs CAPTCHA est désactivée globalement dans les paramètres.<br><br>", "Assurez-vous qu’au moins l’un des {count} solveurs suivants est configuré et activé :", "Pour plus d’informations détaillées, veuillez consulter l’article d’aide ci-dessous :<br>", "Solveurs CAPTCHA désactivés : {disabled}", "Aller aux paramètres CAPTCHA", "Solveurs CAPTCHA activés mais pas prêts : {notReady}" });
+        NO_SOLVER_DIALOG_TEXTS.put("hi", new String[] { "इस CAPTCHA चुनौती के लिए बाहरी सॉल्वर आवश्यक है", "कोई सक्षम CAPTCHA सॉल्वर उपलब्ध नहीं", "CAPTCHA चुनौती '{type}' की इंटरएक्टिव प्रकृति को आपके ब्राउज़र में वर्तमान में स्थानीय रूप से हल नहीं किया जा सकता।<br><br>" + "इसलिए JD में आपका एकमात्र विकल्प एक संभावित सशुल्क CAPTCHA समाधान सेवा का उपयोग करना है जो इस प्रकार के CAPTCHA को संभाल सके।<br><br>", "CAPTCHA चुनौती '{type}' के लिए वर्तमान में कोई सॉल्वर उपलब्ध नहीं है, जबकि ऐसे सॉल्वर मौजूद हैं जो इस प्रकार के CAPTCHA को हल कर सकते हैं।<br><br>", "सेटिंग्स में CAPTCHA सॉल्वर खातों का उपयोग वैश्विक रूप से अक्षम है।<br><br>", "सुनिश्चित करें कि निम्न {count} सॉल्वर में से कम से कम एक कॉन्फ़िगर और सक्षम है:", "अधिक विस्तृत जानकारी के लिए कृपया नीचे दिया गया सहायता लेख पढ़ें:<br>", "अक्षम CAPTCHA सॉल्वर: {disabled}", "CAPTCHA सेटिंग्स पर जाएँ", "सक्षम लेकिन तैयार नहीं CAPTCHA सॉल्वर: {notReady}" });
+        NO_SOLVER_DIALOG_TEXTS.put("zh", new String[] { "此验证码挑战需要外部解答服务", "没有可用的已启用验证码解答服务", "交互式验证码挑战 '{type}' 当前无法在您的浏览器中本地完成。<br><br>" + "因此，在 JD 中，您只能使用能够处理此类验证码的可能需要付费的验证码解答服务。<br><br>", "当前没有可用于验证码挑战 '{type}' 的解答服务，但存在可以解决此类验证码的服务。<br><br>", "验证码解答服务账户的使用已在设置中被全局禁用。<br><br>", "请确保至少配置并启用以下 {count} 个服务中的一个：", "有关更详细的信息，请阅读以下帮助文章：<br>", "已禁用的验证码解答服务：{disabled}", "前往验证码设置", "已启用但未就绪的验证码解答服务：{notReady}" });
+    }
+
+    /** Returns the texts of the "no solver available" dialog in the language of the user (English as fallback). */
+    private String[] getNoSolverDialogTexts() {
+        final String[] texts = NO_SOLVER_DIALOG_TEXTS.get(System.getProperty("user.language").toLowerCase(Locale.ENGLISH));
+        return texts != null ? texts : NO_SOLVER_DIALOG_TEXTS.get("en");
+    }
+
+    /**
+     * Called if no solver at all is available for the given challenge. Informs the user why (if it is something the user can change), lists
+     * the solvers which could solve the challenge and offers a button to the captcha settings.
+     */
+    private <T> void showNoSolverInfoDialog(final Challenge<T> c) {
+        final CAPTCHA_TYPE captcha_type = CAPTCHA_TYPE.getCaptchaTypeForChallenge(c);
+        final boolean externalSolverRequired = isExternalSolverRequired(c);
+        /* Solvers which could solve this captcha type if they were configured and enabled. */
+        final List<SolverService> candidates = new ArrayList<SolverService>();
+        boolean readyAndEnabledExternalSolverExists = false;
+        if (captcha_type != null) {
+            for (final SolverService service : listServices()) {
+                final Set<CAPTCHA_TYPE> supportedTypes = service.getSupportedCaptchaTypes();
+                if (supportedTypes == null || !supportedTypes.contains(captcha_type)) {
+                    continue;
+                }
+                final boolean external = service.getType() == SolverType.EXTERNAL;
+                if (external && service.isReady() && service.getConfigV3().isEnabled()) {
+                    readyAndEnabledExternalSolverExists = true;
+                }
+                if (externalSolverRequired && !external) {
+                    /* The local solvers are no option for this challenge. */
+                    continue;
+                }
+                candidates.add(service);
+            }
+        }
+        /*
+         * Case 1: The challenge cannot be solved locally and the user has no usable external solver -> Explain that one is needed. Case 2:
+         * There are solvers for this captcha type but all of them are disabled/unconfigured/vetoed.
+         */
+        final boolean explainExternalSolverRequired = externalSolverRequired && !readyAndEnabledExternalSolverExists;
+        if (!explainExternalSolverRequired && candidates.size() == 0) {
+            logger.info("No solver supports this captcha type at all: " + captcha_type);
+            return;
+        }
+        /*
+         * The keys of the "external solver required" case are the same as before, so the "do not show again" choice of users stays valid.
+         */
+        final String captchaType = getCaptchaTypeDisplayName(c);
+        final String dialogKey = explainExternalSolverRequired ? "showNoBrowserSolverInfoDialog." + captchaType : "showNoEnabledSolverInfoDialog." + captchaType;
+        if (!allowDialogNow(dialogKey)) {
+            return;
+        }
+        final String[] texts = getNoSolverDialogTexts();
+        final String title = (explainExternalSolverRequired ? texts[TEXT_TITLE_EXTERNAL_REQUIRED] : texts[TEXT_TITLE_NO_ENABLED_SOLVER]) + " (" + captchaType + ")";
+        String intro = (explainExternalSolverRequired ? texts[TEXT_INTRO_EXTERNAL_REQUIRED] : texts[TEXT_INTRO_NO_ENABLED_SOLVER]).replace("{type}", captchaType);
+        if (!CFG_GENERAL.CFG.isUseAvailableCaptchaSolverAccounts()) {
+            intro += texts[TEXT_ACCOUNTS_DISABLED];
+        }
+        int disabledCount = 0;
+        int enabledNotReadyCount = 0;
+        for (final SolverService service : candidates) {
+            if (!service.getConfigV3().isEnabled()) {
+                disabledCount++;
+            } else if (!service.isReady()) {
+                enabledNotReadyCount++;
+            }
+        }
+        /* Only mention the counts that are at least 1. */
+        String summary = null;
+        if (disabledCount >= 1) {
+            summary = texts[TEXT_SOLVER_COUNTS_DISABLED].replace("{disabled}", String.valueOf(disabledCount));
+        }
+        if (enabledNotReadyCount >= 1) {
+            final String notReady = texts[TEXT_SOLVER_COUNTS_NOT_READY].replace("{notReady}", String.valueOf(enabledNotReadyCount));
+            summary = summary == null ? notReady : summary + " | " + notReady;
+        }
+        final String helpURL = explainExternalSolverRequired ? "https://support.jdownloader.org/knowledgebase/article/error-skipped-captcha-is-required" : null;
+        /* The settings are only available in the GUI. */
+        final boolean gui = !Application.isHeadless();
+        final NoSolverAvailableDialog dialog = new NoSolverAvailableDialog(ChallengeResponseController.class.getSimpleName() + "." + dialogKey, title, intro, texts[TEXT_SOLVER_PROMPT].replace("{count}", String.valueOf(candidates.size())), candidates, summary, texts[TEXT_HELP_PROMPT], helpURL, gui ? texts[TEXT_SETTINGS_BUTTON] : null, _GUI.T.lit_close());
+        dialog.setTimeout((int) TimeUnit.MINUTES.toMillis(3));
         final Thread thread = new Thread() {
             public void run() {
                 try {
-                    final String help_article_url = "https://support.jdownloader.org/knowledgebase/article/error-skipped-captcha-is-required";
-                    String message = "<html>";
-                    final String title;
-                    String lang = System.getProperty("user.language").toLowerCase();
-                    if ("de".equals(lang)) {
-                        title = "Externer Solver erforderlich für diese Captcha-Challenge";
-                        message += "Die interaktive Art der Captcha-Herausforderung '" + captcha_challenge_type_final + "', die gelöst werden muss, kann derzeit nicht lokal in deinem Browser gelöst werden.<br><br>";
-                        message += "Daher bleibt dir in JD nur die Möglichkeit, einen möglicherweise kostenpflichtigen Captcha-Lösungsdienst zu nutzen, der diesen Captcha-Typ verarbeiten kann.<br><br>";
-                        message += "JD unterstützt verschiedene Captcha-Lösungsdienste, die im unten verlinkten Artikel aufgeführt werden.<br><br>";
-                        message += "Für detailliertere Informationen lies bitte den folgenden Hilfe-Artikel:<br>";
-                        message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
-                    } else if ("es".equals(lang)) {
-                        title = "Se requiere un solucionador externo para este desafío de CAPTCHA";
-                        message += "El tipo interactivo de desafío CAPTCHA '" + captcha_challenge_type_final + "' no puede resolverse actualmente de forma local en tu navegador.<br><br>";
-                        message += "Por lo tanto, en JD solo tienes la opción de utilizar un servicio de resolución de captchas posiblemente de pago que pueda manejar este tipo de CAPTCHA.<br><br>";
-                        message += "JD es compatible con varios servicios de resolución de CAPTCHA que se enumeran en el artículo enlazado a continuación.<br><br>";
-                        message += "Para obtener información más detallada, lee el siguiente artículo de ayuda:<br>";
-                        message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
-                    } else if ("fr".equals(lang)) {
-                        title = "Solveur externe requis pour ce défi CAPTCHA";
-                        message += "Le type interactif de défi CAPTCHA '" + captcha_challenge_type_final + "' ne peut actuellement pas être résolu localement dans votre navigateur.<br><br>";
-                        message += "Par conséquent, dans JD, votre seule option est d’utiliser un service de résolution de CAPTCHA potentiellement payant capable de traiter ce type de CAPTCHA.<br><br>";
-                        message += "JD prend en charge plusieurs services de résolution de CAPTCHA listés dans l’article ci-dessous.<br><br>";
-                        message += "Pour plus d’informations détaillées, veuillez consulter l’article d’aide ci-dessous :<br>";
-                        message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
-                    } else if ("hi".equals(lang)) {
-                        title = "इस CAPTCHA चुनौती के लिए बाहरी सॉल्वर आवश्यक है";
-                        message += "CAPTCHA चुनौती '" + captcha_challenge_type_final + "' की इंटरएक्टिव प्रकृति को आपके ब्राउज़र में वर्तमान में स्थानीय रूप से हल नहीं किया जा सकता।<br><br>";
-                        message += "इसलिए JD में आपका एकमात्र विकल्प एक संभावित सशुल्क CAPTCHA समाधान सेवा का उपयोग करना है जो इस प्रकार के CAPTCHA को संभाल सके।<br><br>";
-                        message += "JD कई CAPTCHA समाधान सेवाओं का समर्थन करता है, जिन्हें नीचे दिए गए लेख में सूचीबद्ध किया गया है।<br><br>";
-                        message += "अधिक विस्तृत जानकारी के लिए कृपया नीचे दिया गया सहायता लेख पढ़ें:<br>";
-                        message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
-                    } else if ("zh".equals(lang) || "zh-cn".equals(lang)) {
-                        title = "此验证码挑战需要外部解答服务";
-                        message += "交互式验证码挑战 '" + captcha_challenge_type_final + "' 当前无法在您的浏览器中本地完成。<br><br>";
-                        message += "因此，在 JD 中，您只能使用能够处理此类验证码的可能需要付费的验证码解答服务。<br><br>";
-                        message += "JD 支持多个验证码解答服务，具体列表请参阅以下文章。<br><br>";
-                        message += "有关更详细的信息，请阅读以下帮助文章：<br>";
-                        message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
-                    } else {
-                        title = "External solver required for this captcha challenge";
-                        message += "The interactive type of captcha challenge '" + captcha_challenge_type_final + "' cannot currently be solved locally in your browser.<br><br>";
-                        message += "Therefore, in JD your only option is to use a captcha solving service that may require payment and is capable of handling this type of captcha.<br><br>";
-                        message += "JD supports various captcha solving services listed in the help article below.<br><br>";
-                        message += "For more detailed information, please read the help article below:<br>";
-                        message += "<a href=\"" + help_article_url + "\">" + help_article_url + "</a>";
-                    }
-                    message += "</html>";
-                    final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN | UIOManager.BUTTONS_HIDE_CANCEL | Dialog.STYLE_HTML | Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, title, message) {
-                        @Override
-                        public String getDontShowAgainKey() {
-                            return ChallengeResponseController.class.getSimpleName() + ".showNoBrowserSolverInfoDialog." + captcha_challenge_type_final;
-                        }
-                    };
-                    dialog.setTimeout((int) TimeUnit.MINUTES.toMillis(3));
-                    try {
-                        UIOManager.I().show(ConfirmDialogInterface.class, dialog).throwCloseExceptions();
-                    } catch (DialogNoAnswerException ignore) {
+                    if (UIOManager.I().show(ConfirmDialogInterface.class, dialog).getCloseReason() == CloseReason.OK && gui) {
+                        CaptchaConfigPanel.showCaptchaSettings();
                     }
                 } catch (final Throwable e) {
-                    // getLogger().log(e);
+                    logger.log(e);
                 }
             };
         };
         thread.setDaemon(true);
         thread.start();
-        return thread;
+    }
+
+    /**
+     * Info dialog "no (enabled) captcha solver available" with the list of solvers which could solve the challenge. <br>
+     * The same dialog object is shown in the GUI and offered to MyJDownloader (see RemoteAPIIOHandlerWrapper), so it has two variants with
+     * the same texts: MyJDownloader only gets title and plain text message ({@link #getMessage()}), the GUI shows
+     * {@link #layoutDialogContent()}, which also displays the icons of the solvers.
+     */
+    private static class NoSolverAvailableDialog extends ConfirmDialog {
+        private final String              dontShowAgainKey;
+        private final String              introHtml;
+        private final String              solverPrompt;
+        private final List<SolverService> solvers;
+        private final String              summary;
+        private final String              helpPrompt;
+        private final String              helpURL;
+
+        /**
+         * @param introHtml
+         *            Intro text, "&lt;br&gt;" is used for line breaks.
+         * @param solvers
+         *            Solvers to list.
+         * @param summary
+         *            Text below the solver list, may be null.
+         * @param helpPrompt
+         *            Text in front of the help article link, "&lt;br&gt;" is used for line breaks. Only used if helpURL is not null.
+         * @param helpURL
+         *            URL of the help article, may be null.
+         * @param settingsButtonText
+         *            Text of the button which leads to the captcha settings, null for a dialog with just a close button (headless).
+         */
+        public NoSolverAvailableDialog(final String dontShowAgainKey, final String title, final String introHtml, final String solverPrompt, final List<SolverService> solvers, final String summary, final String helpPrompt, final String helpURL, final String settingsButtonText, final String closeButtonText) {
+            super(Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN | (settingsButtonText == null ? UIOManager.BUTTONS_HIDE_CANCEL : 0), title, createPlainMessage(introHtml, solverPrompt, solvers, summary, helpPrompt, helpURL), null, settingsButtonText != null ? settingsButtonText : closeButtonText, closeButtonText);
+            this.dontShowAgainKey = dontShowAgainKey;
+            this.introHtml = introHtml;
+            this.solverPrompt = solverPrompt;
+            this.solvers = solvers;
+            this.summary = summary;
+            this.helpPrompt = helpPrompt;
+            this.helpURL = helpURL;
+        }
+
+        /** Variant for MyJDownloader: plain text without HTML and without icons. */
+        private static String createPlainMessage(final String introHtml, final String solverPrompt, final List<SolverService> solvers, final String summary, final String helpPrompt, final String helpURL) {
+            final StringBuilder sb = new StringBuilder(toPlain(introHtml));
+            if (solvers.size() > 0) {
+                sb.append(solverPrompt);
+                for (final SolverService solver : solvers) {
+                    sb.append("\n- ").append(solver.getName());
+                }
+                if (summary != null) {
+                    sb.append("\n").append(summary);
+                }
+            }
+            if (helpURL != null) {
+                sb.append("\n\n").append(toPlain(helpPrompt)).append(helpURL);
+            }
+            return sb.toString();
+        }
+
+        private static String toPlain(final String html) {
+            return html.replace("<br>", "\n");
+        }
+
+        @Override
+        public String getDontShowAgainKey() {
+            return dontShowAgainKey;
+        }
+
+        /** Variant for the GUI: Same texts as {@link #getMessage()}, but the solvers are listed with their icons. */
+        @Override
+        public JComponent layoutDialogContent() {
+            final JPanel ret = new JPanel(new MigLayout("ins 0, wrap 1", "[grow,fill]", "[]"));
+            ret.add(createTextLabel(introHtml));
+            if (solvers.size() > 0) {
+                ret.add(createTextLabel(solverPrompt));
+                for (final SolverService solver : solvers) {
+                    /* Own panel per row: The cells of the parent layout are "fill", which spreads the labels instead of left aligning them. */
+                final JPanel row = new JPanel(new MigLayout("ins 0, gapx 5", "[][]", "[]"));
+                row.add(new JLabel("•"));
+                row.add(new JLabel(solver.getName(), solver.getIcon(20), SwingConstants.LEADING));
+                ret.add(row, "gapleft 10, alignx left");
+                }
+                if (summary != null) {
+                    ret.add(new JLabel(summary), "gaptop 5");
+                }
+            }
+            if (helpURL != null) {
+                ret.add(createTextLabel(helpPrompt), "gaptop 10");
+                final JLabel link = new JLabel("<html><a href=\"" + helpURL + "\">" + helpURL + "</a></html>");
+                link.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                link.addMouseListener(new MouseAdapter() {
+                    @Override
+                    public void mouseClicked(final MouseEvent e) {
+                        CrossSystem.openURL(helpURL);
+                    }
+                });
+                ret.add(link);
+            }
+            return ret;
+        }
+
+        /** Label with fixed width, so that long texts get wrapped. */
+        private JLabel createTextLabel(final String html) {
+            return new JLabel("<html><body style=\"width: 450px\">" + html + "</body></html>");
+        }
     }
 
     @SuppressWarnings("unchecked")
-    private <T> List<ChallengeSolver<T>> createList(final Challenge<T> c, final SolverService onlyService) {
+    private <T> List<ChallengeSolver<T>> createList(final Challenge<T> c) {
         final List<ChallengeSolver<T>> ret = new ArrayList<ChallengeSolver<T>>();
         final HashSet<ChallengeVetoReason> vetoReasons = new HashSet<ChallengeVetoReason>();
         /* Process our own default/local solvers */
@@ -778,16 +954,16 @@ public class ChallengeResponseController {
                 logger.info("Existing solver accounts that cannot be used for this challenge: " + unavailableSolverDomains + "|vetoReasons=" + unavailableSolverDomainVetoReasons);
             }
         }
-        if (onlyService != null) {
-            /* Restricted to one solver service (test panel) -> remove all others. */
-            for (final Iterator<ChallengeSolver<T>> it = ret.iterator(); it.hasNext();) {
-                if (!onlyService.getID().equals(it.next().getService().getID())) {
-                    it.remove();
-                }
-            }
-        }
+        return ret;
+    }
+
+    /**
+     * Special handling for login captchas: Removes the external (auto) solvers from the list if wished and if at least one other solver is
+     * left.
+     */
+    private <T> void applyLoginCaptchaPolicy(final Challenge<T> c, final List<ChallengeSolver<T>> ret) {
         int avoidedAutoSolversForLoginCaptcha = 0;
-        avoidAutoSolver: if (onlyService == null && c.isAccountLogin() && CAPTCHA_SETTINGS.isAvoidAutoSolverForLoginCaptchas()) {
+        avoidAutoSolver: if (c.isAccountLogin() && CAPTCHA_SETTINGS.isAvoidAutoSolverForLoginCaptchas()) {
             /*
              * Special handling for login captchas: Solve them locally if possible and wished in order to solve them faster since account
              * logins in JDownloader are supposed to happen fast.
@@ -810,30 +986,31 @@ public class ChallengeResponseController {
             ret.clear();
             ret.addAll(manualSolvers);
         }
-        reSortByOverThreadsLimit: {
-            /*
-             * Soft-limit handling for ChallengeSolver#getFinalMaxCaptchaThreads() and #getFinalMaxCaptchaThreadsPerAccount(): a solver
-             * already at/over one of its max-simultaneous-captchas limits is not removed from the list, just moved to the end, so it is
-             * only used if no solver with free capacity is available.
-             */
-            final List<ChallengeSolver<T>> withinCaptchaThreadsLimit = new ArrayList<ChallengeSolver<T>>(ret.size());
-            final List<ChallengeSolver<T>> overCaptchaThreadsLimit = new ArrayList<ChallengeSolver<T>>();
-            for (final ChallengeSolver<T> solver : ret) {
-                if (isOverCaptchaThreadsLimit(solver)) {
-                    overCaptchaThreadsLimit.add(solver);
-                } else {
-                    withinCaptchaThreadsLimit.add(solver);
-                }
-            }
-            if (overCaptchaThreadsLimit.size() > 0) {
-                logger.info("Solvers currently over their max-simultaneous-captchas limit for challenge " + c.getId() + ": " + overCaptchaThreadsLimit);
-                ret.clear();
-                ret.addAll(withinCaptchaThreadsLimit);
-                ret.addAll(overCaptchaThreadsLimit);
+        logger.info("avoidedAutoSolversForLoginCaptcha=" + avoidedAutoSolversForLoginCaptcha + " for challenge " + c.getId());
+    }
+
+    /**
+     * Soft-limit handling for ChallengeSolver#getFinalMaxCaptchaThreads() and #getFinalMaxCaptchaThreadsPerAccount(): a solver already
+     * at/over one of its max-simultaneous-captchas limits is not removed from the list, just moved to the end, so it is only used if no
+     * solver with free capacity is available.
+     */
+    private <T> void reSortByOverThreadsLimit(final Challenge<T> c, final List<ChallengeSolver<T>> ret) {
+        final List<ChallengeSolver<T>> withinCaptchaThreadsLimit = new ArrayList<ChallengeSolver<T>>(ret.size());
+        final List<ChallengeSolver<T>> overCaptchaThreadsLimit = new ArrayList<ChallengeSolver<T>>();
+        for (final ChallengeSolver<T> solver : ret) {
+            if (isOverCaptchaThreadsLimit(solver)) {
+                overCaptchaThreadsLimit.add(solver);
+            } else {
+                withinCaptchaThreadsLimit.add(solver);
             }
         }
-        logger.info("Eligible solvers for challenge " + c.getId() + ": " + ret + "|avoidedAutoSolversForLoginCaptcha=" + avoidedAutoSolversForLoginCaptcha);
-        return ret;
+        if (overCaptchaThreadsLimit.size() > 0) {
+            logger.info("Solvers currently over their max-simultaneous-captchas limit for challenge " + c.getId() + ": " + overCaptchaThreadsLimit);
+            ret.clear();
+            ret.addAll(withinCaptchaThreadsLimit);
+            ret.addAll(overCaptchaThreadsLimit);
+        }
+        logger.info("Eligible solvers for challenge " + c.getId() + ": " + ret);
     }
 
     public SolverJob<?> getJobByChallengeId(long id) {

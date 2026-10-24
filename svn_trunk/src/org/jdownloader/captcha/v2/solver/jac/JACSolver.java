@@ -83,8 +83,8 @@ public class JACSolver extends ChallengeSolver<String> {
      */
     /** JAC learns from the feedback: valid captchas raise and invalid captchas lower the trust of the used method. */
     @Override
-    public Set<FeedbackType> getSupportedFeedbackTypes() {
-        return EnumSet.of(FeedbackType.REPORT_VALID_CAPTCHAS, FeedbackType.REPORT_INVALID_CAPTCHAS);
+    public Set<SolverFeature> getSolverFeatures() {
+        return EnumSet.of(SolverFeature.REPORT_VALID_CAPTCHAS, SolverFeature.REPORT_INVALID_CAPTCHAS);
     }
 
     @Override
@@ -97,7 +97,12 @@ public class JACSolver extends ChallengeSolver<String> {
      * conditions are the ones {@link #solve(SolverJob)} used to check itself (and silently return without an answer on failure).
      */
     @Override
-    public ChallengeVetoReason getChallengeVetoReason(final Challenge<?> c) {
+    public ChallengeVetoReason getUnsupportedReason(final Challenge<?> c) {
+        /* Always ask the super class first, then check the solver specific things. */
+        final ChallengeVetoReason superVeto = super.getUnsupportedReason(c);
+        if (superVeto != null) {
+            return superVeto;
+        }
         if (!(c instanceof BasicCaptchaChallenge)) {
             /* Only plain text image captchas are supported. */
             return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
@@ -106,7 +111,8 @@ public class JACSolver extends ChallengeSolver<String> {
         if (!JACMethod.hasMethod(c.getTypeID())) {
             return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
         }
-        return super.getChallengeVetoReason(c);
+        /* No veto = Given challenge can be solved by this solver. */
+        return null;
     }
 
     @Override

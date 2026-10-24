@@ -5658,16 +5658,19 @@ public interface GuiTranslation extends TranslateInterface {
     String CaptchaSolverComparison_disclaimer();
 
     @Default(lngs = { "en" }, values = { "Feedback: report correct captchas" })
-    String FeedbackType_REPORT_VALID_CAPTCHAS();
+    String SolverFeature_REPORT_VALID_CAPTCHAS();
 
     @Default(lngs = { "en" }, values = { "Feedback: report incorrect captchas" })
-    String FeedbackType_REPORT_INVALID_CAPTCHAS();
+    String SolverFeature_REPORT_INVALID_CAPTCHAS();
 
     @Default(lngs = { "en" }, values = { "Feedback: report unused captchas" })
-    String FeedbackType_REPORT_UNUSED_CAPTCHAS();
+    String SolverFeature_REPORT_UNUSED_CAPTCHAS();
 
     @Default(lngs = { "en" }, values = { "Feedback: abort unsolved captchas" })
-    String FeedbackType_ABORT_CAPTCHAS();
+    String SolverFeature_ABORT_CAPTCHAS();
+
+    @Default(lngs = { "en" }, values = { "Proxy: solve captchas through the proxy of the website requests" })
+    String SolverFeature_PROXY();
 
     @Default(lngs = { "en" }, values = { "Downloads" })
     String CaptchaRequestType_HOSTER();

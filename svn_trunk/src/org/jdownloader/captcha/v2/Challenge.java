@@ -17,6 +17,8 @@ import jd.controlling.accountchecker.AccountCheckerThread;
 import jd.controlling.captcha.SkipRequest;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.LinkCrawler;
+import org.appwork.utils.net.httpconnection.HTTPProxy;
+
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.Plugin;
@@ -384,5 +386,41 @@ public abstract class Challenge<T> {
 
     public boolean isAccountLogin() {
         return this.getCaptchaRequestType() == CaptchaRequestType.HOSTER_LOGIN;
+    }
+
+    private volatile HTTPProxy proxy = null;
+
+    /**
+     * Returns the proxy which was used for the requests of this challenge (the plugin sets it), or null if there was none (direct
+     * connection = the IP address of the user). <br>
+     * Solvers which work from another IP address (external solver services) can only solve challenges which require the same IP address
+     * (see {@link #isSameIPRequired()}) if they use this proxy, see {@link ChallengeSolver.SolverFeature#PROXY}.
+     */
+    public HTTPProxy getProxy() {
+        return proxy;
+    }
+
+    public void setProxy(final HTTPProxy proxy) {
+        this.proxy = proxy;
+    }
+
+    /** True if the challenge has a real proxy (not null, not a direct connection) which a solver could use. */
+    public boolean hasProxy() {
+        final HTTPProxy p = proxy;
+        return p != null && p.isRemote();
+    }
+
+    /**
+     * Returns true if all requests that belong to this challenge (loading the challenge, solving it, sending the result to the website)
+     * have to come from the same IP address as the requests of the user/JDownloader. <br>
+     * Some captchas bind the challenge or the solution to the IP address that requested the challenge, e.g. powCAPTCHA. A solver which
+     * works from another IP address (e.g. external solver services which solve the captcha on their own servers/workers) cannot solve
+     * such a challenge: the website would reject the result. <br>
+     * Default: false. Challenges of captchas that are bound to the IP address have to override this. <br>
+     * See {@link ChallengeSolver#getChallengeVetoReason(Challenge)}: External solvers are only used for such a challenge if the challenge
+     * has a proxy ({@link #getProxy()}) and the solver supports proxies ({@link ChallengeSolver.SolverFeature#PROXY}).
+     */
+    public boolean isSameIPRequired() {
+        return false;
     }
 }

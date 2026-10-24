@@ -21,7 +21,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
-import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverFeature;
 import org.jdownloader.captcha.v2.PluginChallengeSolver;
 import org.jdownloader.captcha.v2.SolverStatus;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
@@ -53,7 +53,7 @@ import jd.plugins.PluginException;
 /**
  * Plugin for 9kw captcha solving service (https://9kw.eu/).
  */
-@HostPlugin(revision = "$Revision: 53649 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53733 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
 public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -93,8 +93,8 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
     }
 
     @Override
-    public Set<FeedbackType> getSupportedFeedbackTypes() {
-        return EnumSet.of(FeedbackType.REPORT_INVALID_CAPTCHAS, FeedbackType.REPORT_VALID_CAPTCHAS, FeedbackType.ABORT_CAPTCHAS);
+    public Set<SolverFeature> getSolverFeatures() {
+        return EnumSet.of(SolverFeature.REPORT_INVALID_CAPTCHAS, SolverFeature.REPORT_VALID_CAPTCHAS, SolverFeature.ABORT_CAPTCHAS);
     }
 
     protected String getApiBaseV2() {

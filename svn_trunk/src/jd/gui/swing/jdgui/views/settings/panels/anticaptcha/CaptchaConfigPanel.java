@@ -121,6 +121,18 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
         });
     }
 
+    /** Opens the captcha settings (can be called from any thread). */
+    public static void showCaptchaSettings() {
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                JsonConfig.create(GraphicalUserInterfaceSettings.class).setConfigViewVisible(true);
+                JDGui.getInstance().setContent(ConfigurationView.getInstance(), true);
+                ConfigurationView.getInstance().setSelectedSubPanel(CaptchaConfigPanel.class);
+            }
+        });
+    }
+
     /**
      * Opens the captcha settings with the solver of the given ID (the host of a captcha solver plugin) preselected. Captcha solver plugins
      * always link here instead of to the plugin settings.

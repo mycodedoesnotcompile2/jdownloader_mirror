@@ -21,7 +21,7 @@ import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
 import org.jdownloader.DomainInfo;
 import org.jdownloader.captcha.v2.CaptchaSolverConfigV3;
-import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverFeature;
 import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
 import org.jdownloader.captcha.v2.solver.service.AbstractSolverService;
 import org.jdownloader.gui.translate._GUI;
@@ -309,11 +309,11 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
     }
 
     /**
-     * Returns the captcha feedback types this service supports (see {@link abstractPluginForCaptchaSolver#getSupportedFeedbackTypes()}),
+     * Returns the captcha feedback types this service supports (see {@link abstractPluginForCaptchaSolver#getSolverFeatures()}),
      * for display purposes. May be null or empty if the service offers no feedback.
      */
-    public Set<FeedbackType> getSupportedFeedbackTypes() {
-        return plugin.getSupportedFeedbackTypes();
+    public Set<SolverFeature> getSolverFeatures() {
+        return plugin.getSolverFeatures();
     }
 
     @Override

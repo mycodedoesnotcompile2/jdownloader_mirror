@@ -1,6 +1,6 @@
 package jd.plugins.hoster;
 
-import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverFeature;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.ArrayList;
@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
  * Docs: https://api.captchas.io/document/#/methods <br>
  * Formerly known as captchasolutions.com
  */
-@HostPlugin(revision = "$Revision: 53648 $", interfaceVersion = 3, names = { "captchas.io" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53733 $", interfaceVersion = 3, names = { "captchas.io" }, urls = { "" })
 public class PluginForCaptchaSolverCaptchasIo extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {

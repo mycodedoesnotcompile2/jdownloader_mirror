@@ -6,7 +6,7 @@ import org.appwork.utils.logging2.LogSource;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeSolver;
-import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverFeature;
 import org.jdownloader.captcha.v2.SolverStatus;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.captcha.v2.solverjob.SolverJob.SolverOutcome;
@@ -31,7 +31,7 @@ public class CESSolverJob<T> {
 
     /**
      * Plugins must call this right after the captcha was submitted to the solver service, so JDownloader is able to abort the task on the
-     * server side (see {@link FeedbackType#ABORT_CAPTCHAS}) if the captcha runs into a timeout.
+     * server side (see {@link SolverFeature#ABORT_CAPTCHAS}) if the captcha runs into a timeout.
      */
     public void setCaptchaSolverTaskID(final String captchaSolverTaskID) {
         this.captchaSolverTaskID = captchaSolverTaskID;

@@ -1,5 +1,7 @@
 package jd.plugins.hoster;
 
+import org.appwork.utils.net.httpconnection.HTTPProxy;
+import org.appwork.utils.StringUtils;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.ArrayList;
@@ -14,7 +16,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.ReflectionUtils;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
-import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverFeature;
 import org.jdownloader.captcha.v2.SolverStatus;
 import org.jdownloader.captcha.v2.challenge.altcha.AltchaChallenge;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
@@ -44,8 +46,20 @@ import jd.plugins.PluginException;
 /**
  * Captcha solver plugin for anti-captcha.com: https://anti-captcha.com/apidoc
  */
-@HostPlugin(revision = "$Revision: 53706 $", interfaceVersion = 3, names = { "anti-captcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53733 $", interfaceVersion = 3, names = { "anti-captcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverAntiCaptchaCom extends abstractPluginForCaptchaSolver {
+    /**
+     * Task types with proxy, see https://anti-captcha.com/apidoc/task-types/RecaptchaV2Task, RecaptchaV2EnterpriseTask, TurnstileTask
+     * and AltchaTask (reCAPTCHA v3 has no task type with proxy).
+     */
+    private static final Map<String, String> PROXY_TASK_TYPES = new HashMap<String, String>();
+    static {
+        PROXY_TASK_TYPES.put("RecaptchaV2TaskProxyless", "RecaptchaV2Task");
+        PROXY_TASK_TYPES.put("RecaptchaV2EnterpriseTaskProxyless", "RecaptchaV2EnterpriseTask");
+        PROXY_TASK_TYPES.put("TurnstileTaskProxyless", "TurnstileTask");
+        PROXY_TASK_TYPES.put("AltchaTaskProxyless", "AltchaTask");
+    }
+
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.CAPTCHA_SOLVER, LazyPlugin.FEATURE.BUBBLE_NOTIFICATION, LazyPlugin.FEATURE.API_KEY_LOGIN };
@@ -100,12 +114,12 @@ public class PluginForCaptchaSolverAntiCaptchaCom extends abstractPluginForCaptc
     }
 
     @Override
-    public Set<FeedbackType> getSupportedFeedbackTypes() {
+    public Set<SolverFeature> getSolverFeatures() {
         /*
          * Invalid: image captchas + reCaptcha. Valid: reCaptcha only. Aborting captchas is not supported by the API. See
          * sendCaptchaFeedback() for details.
          */
-        return EnumSet.of(FeedbackType.REPORT_INVALID_CAPTCHAS, FeedbackType.REPORT_VALID_CAPTCHAS);
+        return EnumSet.of(SolverFeature.REPORT_INVALID_CAPTCHAS, SolverFeature.REPORT_VALID_CAPTCHAS, SolverFeature.PROXY);
     }
 
     @Override
@@ -119,6 +133,48 @@ public class PluginForCaptchaSolverAntiCaptchaCom extends abstractPluginForCaptc
         final AccountInfo ai = new AccountInfo();
         ai.setAccountBalance(balance, Currency.getInstance("USD"));
         return ai;
+    }
+
+    /**
+     * Sends the proxy of the challenge in the format of the Anti-Captcha API (task types see PROXY_TASK_TYPES, the service only accepts IP addresses as proxy host).
+     */
+    private void applyProxy(final Map<String, Object> task, final Challenge<?> challenge) {
+        if (!challenge.hasProxy()) {
+            return;
+        }
+        final HTTPProxy proxy = challenge.getProxy();
+        final String proxyTaskType = PROXY_TASK_TYPES.get(task.get("type"));
+        if (proxyTaskType == null) {
+            logger.info("The service has no task type with proxy for: " + task.get("type"));
+            return;
+        }
+        if (!proxy.getHost().matches("^(\\d{1,3}\\.){3}\\d{1,3}$") && !proxy.getHost().contains(":")) {
+            logger.info("The service only accepts IP addresses as proxy host, not: " + proxy.getHost());
+            return;
+        }
+        task.put("type", proxyTaskType);
+        final String proxyType;
+        switch (proxy.getType()) {
+        case SOCKS5:
+            proxyType = "socks5";
+            break;
+        case SOCKS4:
+        case SOCKS4A:
+            proxyType = "socks4";
+            break;
+        case HTTP:
+        case HTTPS:
+        default:
+            proxyType = "http";
+            break;
+        }
+        task.put("proxyType", proxyType);
+        task.put("proxyAddress", proxy.getHost());
+        task.put("proxyPort", proxy.getPort());
+        if (StringUtils.isNotEmpty(proxy.getUser())) {
+            task.put("proxyLogin", proxy.getUser());
+            task.put("proxyPassword", proxy.getPass() != null ? proxy.getPass() : "");
+        }
     }
 
     @Override
@@ -210,6 +266,8 @@ public class PluginForCaptchaSolverAntiCaptchaCom extends abstractPluginForCaptc
         } else {
             throw new IllegalArgumentException("Unexpected captcha challenge type");
         }
+        /* Use the proxy of the challenge (if there is one and if the task type supports it), the service only accepts IP addresses. */
+        applyProxy(task, captchachallenge);
         postdata.put("task", task);
         /* Submit captcha */
         final PostRequest req_createTask = br.createJSonPostRequest(this.getApiBase() + "/createTask", postdata);

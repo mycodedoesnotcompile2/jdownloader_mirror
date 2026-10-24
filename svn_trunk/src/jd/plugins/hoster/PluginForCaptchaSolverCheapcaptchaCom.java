@@ -15,7 +15,7 @@ import org.appwork.utils.images.IconIO;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
-import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverFeature;
 import org.jdownloader.captcha.v2.SolverStatus;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
@@ -44,7 +44,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 53731 $", interfaceVersion = 3, names = { "cheapcaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53733 $", interfaceVersion = 3, names = { "cheapcaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -233,9 +233,9 @@ public class PluginForCaptchaSolverCheapcaptchaCom extends abstractPluginForCapt
     }
 
     @Override
-    public Set<FeedbackType> getSupportedFeedbackTypes() {
+    public Set<SolverFeature> getSolverFeatures() {
         /* Only reporting incorrectly solved captchas is implemented, see setInvalid(). */
-        return EnumSet.of(FeedbackType.REPORT_INVALID_CAPTCHAS);
+        return EnumSet.of(SolverFeature.REPORT_INVALID_CAPTCHAS);
     }
 
     @Override

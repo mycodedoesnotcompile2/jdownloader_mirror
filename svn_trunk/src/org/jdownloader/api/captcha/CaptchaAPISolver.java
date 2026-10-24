@@ -47,12 +47,18 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
     private final CaptchaAPIEventPublisher eventPublisher;
 
     @Override
-    public ChallengeVetoReason getChallengeVetoReason(final Challenge<?> c) {
+    public ChallengeVetoReason getUnsupportedReason(final Challenge<?> c) {
+        /* Always ask the super class first, then check the solver specific things. */
+        final ChallengeVetoReason superVeto = super.getUnsupportedReason(c);
+        if (superVeto != null) {
+            return superVeto;
+        }
         if (BrowserSolver.isSpecialReCaptchaEnterpriseChallenge(c)) {
             /* Special false case */
             return ChallengeVetoReason.UNSUPPORTED_FOR_INTERNAL_SPECIAL_REASONS;
         }
-        return super.getChallengeVetoReason(c);
+        /* No veto = Given challenge can be solved by this solver. */
+        return null;
     }
 
     @Override

@@ -44,7 +44,12 @@ public class BrowserSolver extends ChallengeSolver<String> {
     }
 
     @Override
-    public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+    public ChallengeVetoReason getUnsupportedReason(Challenge<?> c) {
+        /* Always ask the super class first, then check the solver specific things. */
+        final ChallengeVetoReason superVeto = super.getUnsupportedReason(c);
+        if (superVeto != null) {
+            return superVeto;
+        }
         if (isSpecialReCaptchaEnterpriseChallenge(c)) {
             /* Special return false */
             return ChallengeVetoReason.UNSUPPORTED_FOR_INTERNAL_SPECIAL_REASONS;
@@ -53,9 +58,9 @@ public class BrowserSolver extends ChallengeSolver<String> {
         } else if (BrowserSolverService.getInstance().isCustomBrowserMissing()) {
             /* The user configured a custom browser which does not exist (anymore). Do not silently fall back to the OS default browser. */
             return ChallengeVetoReason.UNSUPPORTED_BROWSER_NOT_FOUND;
-        } else {
-            return super.getChallengeVetoReason(c);
         }
+        /* No veto = Given challenge can be solved by this solver. */
+        return null;
     }
 
     @Override

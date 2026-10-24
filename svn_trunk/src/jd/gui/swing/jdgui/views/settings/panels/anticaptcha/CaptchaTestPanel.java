@@ -73,7 +73,7 @@ import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.Challenge.CaptchaRequestType;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
 import org.jdownloader.captcha.v2.ChallengeSolver;
-import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverFeature;
 import org.jdownloader.captcha.v2.SolverService;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
 import org.jdownloader.captcha.v2.solverjob.ResponseList;
@@ -112,6 +112,8 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     private final JTextField                siteKeyField;
     private final JLabel                    challengeUrlLabel;
     private final JTextField                challengeUrlField;
+    private final JLabel                    proxyLabel;
+    private final JTextField                proxyField;
     private final JLabel                    imageLabel;
     private final MigPanel                  imagePanel;
     private final JLabel                    imagePreview;
@@ -244,6 +246,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         siteUrlField = new JTextField();
         siteKeyField = new JTextField();
         challengeUrlField = new JTextField();
+        proxyField = new JTextField();
         actionField = new JTextField();
         expectedResultField = new JTextField();
         typeBox.addActionListener(new ActionListener() {
@@ -265,6 +268,10 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         challengeUrlLabel = new JLabel("Challenge URL");
         add(challengeUrlLabel, "hidemode 3");
         add(challengeUrlField, "growx, hidemode 3");
+        proxyLabel = new JLabel("Proxy");
+        proxyField.setToolTipText("Optional, e.g. socks5://user:password@host:port or http://host:port. Sent to the solver if it supports proxies (challenges which require the same IP address need one).");
+        add(proxyLabel, "hidemode 3");
+        add(proxyField, "growx, hidemode 3");
         /* Image captcha types: the captcha image can be replaced by an own one. */
         imageLabel = new JLabel("Captcha image");
         imagePanel = new MigPanel("ins 0, wrap 1", "[grow,fill]", "[]");
@@ -618,6 +625,10 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         challengeUrlField.setText(text(defaults.get(CaptchaTestChallengeFactory.KEY_CHALLENGE_URL)));
         challengeUrlLabel.setVisible(usesChallengeUrl);
         challengeUrlField.setVisible(usesChallengeUrl);
+        /* The proxy is not reset when the captcha type changes: it is the same for all interactive captcha types. */
+        final boolean usesProxy = defaults.containsKey(CaptchaTestChallengeFactory.KEY_PROXY);
+        proxyLabel.setVisible(usesProxy);
+        proxyField.setVisible(usesProxy);
         final boolean usesImage = defaults.containsKey(CaptchaTestChallengeFactory.KEY_IMAGE_FILE);
         imageLabel.setVisible(usesImage);
         imagePanel.setVisible(usesImage);
@@ -786,6 +797,13 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         }
     }
 
+    /** The defaults of the captcha type, but with the proxy of the form (it is used for all interactive captcha types). */
+    private Map<String, Object> newDefaultsWithProxy(final CAPTCHA_TYPE type) {
+        final Map<String, Object> data = CaptchaTestChallengeFactory.getDefaults(type);
+        putIfUsed(data, CaptchaTestChallengeFactory.KEY_PROXY, proxyField.getText().trim());
+        return data;
+    }
+
     /** Puts the value into the test data, but only if the captcha type uses it (= the key is part of its defaults). */
     private static void putIfUsed(final Map<String, Object> data, final String key, final Object value) {
         if (data.containsKey(key)) {
@@ -799,6 +817,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         putIfUsed(data, CaptchaTestChallengeFactory.KEY_SITE_KEY, siteKeyField.getText().trim());
         putIfUsed(data, CaptchaTestChallengeFactory.KEY_SITE_URL, siteUrlField.getText().trim());
         putIfUsed(data, CaptchaTestChallengeFactory.KEY_CHALLENGE_URL, challengeUrlField.getText().trim());
+        putIfUsed(data, CaptchaTestChallengeFactory.KEY_PROXY, proxyField.getText().trim());
         putIfUsed(data, CaptchaTestChallengeFactory.KEY_ACTION, actionField.getText().trim());
         putIfUsed(data, CaptchaTestChallengeFactory.KEY_EXPECTED_RESULT, expectedResultField.getText());
         putIfUsed(data, CaptchaTestChallengeFactory.KEY_IMAGE_FILE, imageFile);
@@ -952,7 +971,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         for (int i = 0; i < typeCheckBoxes.size(); i++) {
             if (typeCheckBoxes.get(i).isSelected()) {
                 final CAPTCHA_TYPE type = typeCheckBoxTypes.get(i);
-                runs.add(new TestRun(type, source, type == formType ? buildFormData(type) : CaptchaTestChallengeFactory.getDefaults(type), service));
+                runs.add(new TestRun(type, source, type == formType ? buildFormData(type) : newDefaultsWithProxy(type), service));
             }
         }
         if (service == null || runs.isEmpty()) {
@@ -1082,7 +1101,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         run.challenge = newChallenge;
         run.statusText = "Waiting for a solver...";
         try {
-            final SolverJob<Object> job = ChallengeResponseController.getInstance().handle(newChallenge, run.service);
+            final SolverJob<Object> job = ChallengeResponseController.getInstance().handleTest(newChallenge, run.service);
             run.finishedJob = job;
             final ResponseList<Object> result = newChallenge.getResult();
             if (batchCancelled) {
@@ -1096,10 +1115,10 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                 /* The solver that answered decides whether it accepts feedback. */
                 final Object solver = result.get(0).getSolver();
                 if (solver instanceof ChallengeSolver) {
-                    final Set<FeedbackType> feedbackTypes = ((ChallengeSolver<?>) solver).getSupportedFeedbackTypes();
+                    final Set<SolverFeature> feedbackTypes = ((ChallengeSolver<?>) solver).getSolverFeatures();
                     /* Null or empty = the solver does not support any feedback. */
-                    run.correctUnsupported = feedbackTypes == null || !feedbackTypes.contains(FeedbackType.REPORT_VALID_CAPTCHAS);
-                    run.incorrectUnsupported = feedbackTypes == null || !feedbackTypes.contains(FeedbackType.REPORT_INVALID_CAPTCHAS);
+                    run.correctUnsupported = feedbackTypes == null || !feedbackTypes.contains(SolverFeature.REPORT_VALID_CAPTCHAS);
+                    run.incorrectUnsupported = feedbackTypes == null || !feedbackTypes.contains(SolverFeature.REPORT_INVALID_CAPTCHAS);
                 }
                 if (result.getValue() instanceof MultiClickedPoint) {
                     /* Remember all clicked positions to mark them in the image. */

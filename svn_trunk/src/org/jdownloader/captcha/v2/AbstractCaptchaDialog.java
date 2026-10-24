@@ -420,7 +420,8 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
      */
     protected JToggleButton createSoundToggle() {
         final Icon iconOn = new AbstractIcon(IconKey.ICON_AUDIO, 18);
-        final Icon iconOff = NewTheme.I().getDisabledIcon(iconOn);
+        /* The theme has no mute icon: grayed out note with a red cancel badge */
+        final Icon iconOff = new BadgeIcon(NewTheme.I().getDisabledIcon(iconOn), new AbstractIcon(IconKey.ICON_CANCEL, 11), 0, 0);
         final JToggleButton ret = new JToggleButton(iconOn);
         final Runnable update = new Runnable() {
             @Override

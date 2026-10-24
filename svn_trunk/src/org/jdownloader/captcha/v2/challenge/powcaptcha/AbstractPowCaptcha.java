@@ -1,5 +1,6 @@
 package org.jdownloader.captcha.v2.challenge.powcaptcha;
 
+import org.appwork.utils.net.httpconnection.HTTPProxy;
 import java.io.IOException;
 import java.util.Map;
 
@@ -158,7 +159,7 @@ public abstract class AbstractPowCaptcha<T extends Plugin> {
                     return null;
                 }
             };
-            challenge.setProxyUrl(proxyUrl);
+            challenge.setProxy(HTTPProxy.parseHTTPProxy(proxyUrl));
             return challenge;
         }
     }

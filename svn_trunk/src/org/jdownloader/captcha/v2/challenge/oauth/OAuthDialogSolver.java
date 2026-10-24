@@ -31,12 +31,13 @@ public class OAuthDialogSolver extends ChallengeSolver<Boolean> {
     }
 
     @Override
-    public ChallengeVetoReason getChallengeVetoReason(Challenge<?> c) {
+    public ChallengeVetoReason getUnsupportedReason(Challenge<?> c) {
+        /* Super class is not asked on purpose: It vetoes solvers without supported captcha types, but OAuth challenges are no captchas. */
         if (!(c instanceof OAuthChallenge)) {
             return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
-        } else {
-            return null;
         }
+        /* No veto = Given challenge can be solved by this solver. */
+        return null;
     }
 
     private OAuthDialogSolver() {

@@ -34,7 +34,7 @@ import org.jdownloader.actions.AppAction;
 import org.jdownloader.captcha.v2.CaptchaSolverCaptchaTypesSettingsPanelBuilder;
 import org.jdownloader.captcha.v2.CaptchaSolverCaptchaTypesSettingsPanelBuilder.SolverServiceCaptchaTypeAccessor;
 import org.jdownloader.captcha.v2.CaptchaSolverLimitRule;
-import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverFeature;
 import org.jdownloader.captcha.v2.SolverService;
 import org.jdownloader.captcha.v2.solver.service.BrowserSolverService;
 import org.jdownloader.gui.IconKey;
@@ -263,8 +263,8 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
                         limitsPanel.add(new JLabel("Max concurrent captcha threads per account: " + maxThreadsText, NewTheme.I().getIcon(IconKey.ICON_PARALELL, 16), JLabel.LEADING));
                         limitsPanel.add(new JLabel("Server side max polling time: " + maxPollingText + (maxPollingMillis == Long.MAX_VALUE ? "" : "s"), clockIcon, JLabel.LEADING));
                         limitsPanel.add(new JLabel("Server side min polling interval: " + minPollingIntervalText + (minPollingIntervalMillis <= 0 ? "" : "s"), clockIcon, JLabel.LEADING));
-                        final Set<FeedbackType> feedbackTypes = pluginSolver.getSupportedFeedbackTypes();
-                        for (final FeedbackType type : FeedbackType.values()) {
+                        final Set<SolverFeature> feedbackTypes = pluginSolver.getSolverFeatures();
+                        for (final SolverFeature type : SolverFeature.values()) {
                             final boolean supported = feedbackTypes != null && feedbackTypes.contains(type);
                             limitsPanel.add(new JLabel(type.getLabel(), NewTheme.I().getIcon(supported ? IconKey.ICON_TRUE : IconKey.ICON_FALSE, 16), JLabel.LEADING));
                         }

@@ -1,5 +1,6 @@
 package jd.plugins.hoster;
 
+import org.appwork.utils.net.httpconnection.HTTPProxy;
 import java.awt.Color;
 import java.awt.Container;
 import java.awt.event.ActionEvent;
@@ -35,7 +36,7 @@ import org.appwork.utils.images.IconIO;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
-import org.jdownloader.captcha.v2.ChallengeSolver.FeedbackType;
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverFeature;
 import org.jdownloader.captcha.v2.SolverStatus;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
 import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
@@ -70,7 +71,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 53673 $", interfaceVersion = 3, names = { "deathbycaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53733 $", interfaceVersion = 3, names = { "deathbycaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -134,9 +135,10 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
     }
 
     @Override
-    public Set<FeedbackType> getSupportedFeedbackTypes() {
+    public Set<SolverFeature> getSolverFeatures() {
         /* API only offers reporting incorrectly solved captchas, see https://deathbycaptcha.com/api#api_details_report */
-        return EnumSet.of(FeedbackType.REPORT_INVALID_CAPTCHAS);
+        /* Proxy: Only HTTP proxies are supported by the token API, see https://deathbycaptcha.com/api/newtokenrecaptcha */
+        return EnumSet.of(SolverFeature.REPORT_INVALID_CAPTCHAS, SolverFeature.PROXY);
     }
 
     private String getBaseURL() {
@@ -232,13 +234,22 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
                 final Map<String, Object> token_param = new HashMap<String, Object>();
                 token_param.put("googlekey", rc_challenge.getSiteKey());
                 token_param.put("pageurl", rc_challenge.getSiteUrl(this));
+                /* The proxy of the challenge (the token API only supports HTTP proxies). */
+                final HTTPProxy challengeProxy = rc_challenge.hasProxy() && (rc_challenge.getProxy().getType() == HTTPProxy.TYPE.HTTP || rc_challenge.getProxy().getType() == HTTPProxy.TYPE.HTTPS) ? rc_challenge.getProxy() : null;
+                if (challengeProxy != null) {
+                    /* Format: http://user:password@host:port */
+                    final String userInfo = StringUtils.isNotEmpty(challengeProxy.getUser()) ? challengeProxy.getUser() + ":" + StringUtils.valueOrEmpty(challengeProxy.getPass()) + "@" : "";
+                    token_param.put("proxy", "http://" + userInfo + challengeProxy.getHost() + ":" + challengeProxy.getPort());
+                    token_param.put("proxytype", "HTTP");
+                }
                 final Map<String, Object> v3action = rc_challenge.getV3Action();
                 if (rc_challenge.isEnterprise()) {
                     /* https://deathbycaptcha.com/api/newtokenrecaptcha#reCAPTCHAv2Enterprise */
                     type = "RecaptchaV2Enterprise";
                     r.addFormData(new FormData("type", "25"));
                     final CaptchaSolverPluginConfigDeathbycaptcha cfg = this.get(CaptchaSolverPluginConfigDeathbycaptcha.class);
-                    final String proxy = cfg != null ? cfg.getEnterpriseRecaptchaProxy() : null;
+                    /* Proxy of the challenge if there is one, else the proxy of the settings. */
+                    final String proxy = challengeProxy != null ? (String) token_param.get("proxy") : (cfg != null ? cfg.getEnterpriseRecaptchaProxy() : null);
                     if (StringUtils.isEmpty(proxy)) {
                         throw new PluginException(LinkStatus.ERROR_CAPTCHA, "deathbycaptcha.com requires a proxy to solve reCAPTCHAv2 Enterprise challenges. Please configure one in the DeathByCaptcha settings.");
                     }
@@ -246,9 +257,11 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
                         /* Docs only offer reCAPTCHA v2 Enterprise (type 25), which has no action/min_score parameters. */
                         throw new PluginException(LinkStatus.ERROR_CAPTCHA, "deathbycaptcha.com does not support reCAPTCHA v3 Enterprise");
                     }
-                    token_param.put("proxy", proxy);
-                    /* Docs: proxytype is required whenever a proxy is given, e.g. "HTTP" (upper case). */
-                    token_param.put("proxytype", StringUtils.valueOrEmpty(cfg.getEnterpriseRecaptchaProxyType()).toUpperCase(Locale.ENGLISH));
+                    if (challengeProxy == null) {
+                        token_param.put("proxy", proxy);
+                        /* Docs: proxytype is required whenever a proxy is given, e.g. "HTTP" (upper case). */
+                        token_param.put("proxytype", StringUtils.valueOrEmpty(cfg.getEnterpriseRecaptchaProxyType()).toUpperCase(Locale.ENGLISH));
+                    }
                     r.addFormData(new FormData("token_enterprise_params", JSonStorage.serializeToJson(token_param)));
                 } else if (v3action != null) {
                     type = "RecaptchaV3";

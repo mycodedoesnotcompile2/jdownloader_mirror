@@ -42,31 +42,41 @@ public abstract class ChallengeSolver<T> {
 
     };
 
-    public enum FeedbackType implements LabelInterface {
+    public enum SolverFeature implements LabelInterface {
         REPORT_INVALID_CAPTCHAS {
             @Override
             public String getLabel() {
-                return _GUI.T.FeedbackType_REPORT_INVALID_CAPTCHAS();
+                return _GUI.T.SolverFeature_REPORT_INVALID_CAPTCHAS();
             }
         },
         REPORT_VALID_CAPTCHAS {
             @Override
             public String getLabel() {
-                return _GUI.T.FeedbackType_REPORT_VALID_CAPTCHAS();
+                return _GUI.T.SolverFeature_REPORT_VALID_CAPTCHAS();
             }
         },
         /* Solver delivered an answer but JDownloader did not use it, see setUnused. */
         REPORT_UNUSED_CAPTCHAS {
             @Override
             public String getLabel() {
-                return _GUI.T.FeedbackType_REPORT_UNUSED_CAPTCHAS();
+                return _GUI.T.SolverFeature_REPORT_UNUSED_CAPTCHAS();
             }
         },
         /* Challenge without answer can be aborted on the server side, see abstractPluginForCaptchaSolver#abortCaptcha. */
         ABORT_CAPTCHAS {
             @Override
             public String getLabel() {
-                return _GUI.T.FeedbackType_ABORT_CAPTCHAS();
+                return _GUI.T.SolverFeature_ABORT_CAPTCHAS();
+            }
+        },
+        /**
+         * The solver can send the proxy of a challenge (see Challenge#getProxy) to its service, so the captcha is solved through the
+         * proxy and with the IP address of the proxy. Only needed for solvers which work from another IP address (external solvers).
+         */
+        PROXY {
+            @Override
+            public String getLabel() {
+                return _GUI.T.SolverFeature_PROXY();
             }
         }
     }
@@ -121,6 +131,10 @@ public abstract class ChallengeSolver<T> {
         ACCOUNT_NOT_ENOUGH_BALANCE,
         /** One of the solver's enabled custom limit rules (max captchas per time interval) is currently used up. */
         CUSTOM_LIMIT_REACHED,
+        /** The challenge requires the IP address of the user (see Challenge#isSameIPRequired) but this external solver cannot use proxies. */
+        SAME_IP_REQUIRED_PROXY_UNSUPPORTED,
+        /** The challenge requires the IP address of the user and this external solver needs a proxy for that but the challenge has none. */
+        SAME_IP_REQUIRED_NO_PROXY,
         /**
          * The user globally disabled external (plugin based) captcha solver accounts, see
          * GeneralSettings#isUseAvailableCaptchaSolverAccounts.
@@ -137,16 +151,16 @@ public abstract class ChallengeSolver<T> {
      * those methods do nothing (e.g. the BrowserSolver and the manual dialog solvers cannot receive any feedback). Solvers that really
      * handle feedback have to override this method. Null or an empty set means that no feedback is supported.
      */
-    public Set<FeedbackType> getSupportedFeedbackTypes() {
-        return EnumSet.noneOf(FeedbackType.class);
+    public Set<SolverFeature> getSolverFeatures() {
+        return EnumSet.noneOf(SolverFeature.class);
     }
 
     /**
      * Returns the list of captcha types supported by this solver. <br>
      * Every solver that solves captchas must return a non-empty list: a null or empty list means "supports no captcha type at all" and is
-     * treated as a bug, see {@link #getChallengeVetoReason(Challenge)} which vetoes every captcha challenge for such a solver. The only
-     * solvers which legitimately return an empty list are those that never receive challenges with a {@link CAPTCHA_TYPE}, e.g. the OAuth
-     * solvers. <br>
+     * treated as a bug, see {@link #getUnsupportedReason(Challenge)} which vetoes every challenge for such a solver. The only solvers
+     * which legitimately return an empty list are those that never receive challenges with a {@link CAPTCHA_TYPE}, e.g. the OAuth
+     * solvers: They have to override {@link #getUnsupportedReason(Challenge)} without calling super. <br>
      * Important: If a solver supports all reCaptcha captcha types, return RECAPTCHA_V2, RECAPTCHA_V2_ENTERPRISE AND RECAPTCHA_V2_INVISIBLE
      * !
      *
@@ -167,53 +181,53 @@ public abstract class ChallengeSolver<T> {
         return null;
     }
 
-    /** True if this solver supports the given captcha feedback type, see {@link #getSupportedFeedbackTypes()}. */
-    private boolean isFeedbackSupported(final FeedbackType type) {
-        final Set<FeedbackType> types = getSupportedFeedbackTypes();
-        return types != null && types.contains(type);
+    /** True if this solver supports the given feature, see {@link #getSolverFeatures()}. */
+    public boolean supportsFeature(final SolverFeature feature) {
+        final Set<SolverFeature> features = getSolverFeatures();
+        return features != null && features.contains(feature);
     }
 
     /**
      * Reports to the solver that its answer was not correct. Only calls {@link #onInvalid(AbstractResponse)} if the solver declares
-     * {@link FeedbackType#REPORT_INVALID_CAPTCHAS}.
+     * {@link SolverFeature#REPORT_INVALID_CAPTCHAS}.
      *
      * @return true if the feedback was delivered
      */
     public final boolean setInvalid(final AbstractResponse<?> response) {
-        return isFeedbackSupported(FeedbackType.REPORT_INVALID_CAPTCHAS) && onInvalid(response);
+        return supportsFeature(SolverFeature.REPORT_INVALID_CAPTCHAS) && onInvalid(response);
     }
 
     /**
      * Tells the solver that its answer was not used. Only calls {@link #onUnused(AbstractResponse)} if the solver declares
-     * {@link FeedbackType#REPORT_UNUSED_CAPTCHAS}.
+     * {@link SolverFeature#REPORT_UNUSED_CAPTCHAS}.
      *
      * @return true if the feedback was delivered
      */
     public final boolean setUnused(final AbstractResponse<?> response) {
-        return isFeedbackSupported(FeedbackType.REPORT_UNUSED_CAPTCHAS) && onUnused(response);
+        return supportsFeature(SolverFeature.REPORT_UNUSED_CAPTCHAS) && onUnused(response);
     }
 
     /**
      * Reports to the solver that its answer was correct. Only calls {@link #onValid(AbstractResponse)} if the solver declares
-     * {@link FeedbackType#REPORT_VALID_CAPTCHAS}.
+     * {@link SolverFeature#REPORT_VALID_CAPTCHAS}.
      *
      * @return true if the feedback was delivered
      */
     public final boolean setValid(final AbstractResponse<?> response) {
-        return isFeedbackSupported(FeedbackType.REPORT_VALID_CAPTCHAS) && onValid(response);
+        return supportsFeature(SolverFeature.REPORT_VALID_CAPTCHAS) && onValid(response);
     }
 
-    /** Override to handle "incorrect" feedback. Only called if the solver supports {@link FeedbackType#REPORT_INVALID_CAPTCHAS}. */
+    /** Override to handle "incorrect" feedback. Only called if the solver supports {@link SolverFeature#REPORT_INVALID_CAPTCHAS}. */
     protected boolean onInvalid(final AbstractResponse<?> response) {
         return false;
     }
 
-    /** Override to handle "unused" feedback. Only called if the solver supports {@link FeedbackType#REPORT_UNUSED_CAPTCHAS}. */
+    /** Override to handle "unused" feedback. Only called if the solver supports {@link SolverFeature#REPORT_UNUSED_CAPTCHAS}. */
     protected boolean onUnused(final AbstractResponse<?> response) {
         return false;
     }
 
-    /** Override to handle "correct" feedback. Only called if the solver supports {@link FeedbackType#REPORT_VALID_CAPTCHAS}. */
+    /** Override to handle "correct" feedback. Only called if the solver supports {@link SolverFeature#REPORT_VALID_CAPTCHAS}. */
     protected boolean onValid(final AbstractResponse<?> response) {
         return false;
     }
@@ -336,7 +350,12 @@ public abstract class ChallengeSolver<T> {
 
     /**
      * Returns null if challenge can be handled by ChallengeSolver. <br>
-     * Returns nun null value if challenge cannot be solved by this ChallengeSolver.
+     * Returns nun null value if challenge cannot be solved by this ChallengeSolver. <br>
+     * Checks the user's settings first (solver enabled, captcha type disabled), then {@link #getUnsupportedReason(Challenge)}, then the
+     * captcha rules. <br>
+     * Subclasses that add checks independent of the user's settings must override {@link #getUnsupportedReason(Challenge)} instead.
+     * Subclasses that add checks depending on state or settings (e.g. account state) have to call super first, then check the solver
+     * specific things and return null (= can be handled) if none of them vetoes.
      */
     public ChallengeVetoReason getChallengeVetoReason(final Challenge<?> c) {
         if (!this.isEnabled()) {
@@ -344,25 +363,16 @@ public abstract class ChallengeSolver<T> {
         }
         final Set<CAPTCHA_TYPE> supported_types = this.getSupportedCaptchaTypes();
         final CAPTCHA_TYPE ctype = CAPTCHA_TYPE.getCaptchaTypeForChallenge(c);
-        if (ctype != null) {
-            if (supported_types == null || supported_types.isEmpty()) {
-                /* Solver does not declare any supported captcha type (bug in solver implementation) -> Cannot solve any captcha. */
-                return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
-            }
+        if (ctype != null && supported_types != null) {
             final Set<CAPTCHA_TYPE> disabled_types = this.getUserDisabledCaptchaTypes();
             if (disabled_types != null && supported_types.contains(ctype) && disabled_types.contains(ctype)) {
                 /* Captcha type is supported by plugin but user has disabled this captcha type for this account. */
                 return ChallengeVetoReason.CAPTCHA_TYPE_DISABLED_BY_USER;
             }
-            if (!supported_types.contains(ctype)) {
-                /* Challenge is not supported by solver */
-                return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
-            }
         }
-        if (getResultType() != null && !getResultType().isAssignableFrom(c.getResultType())) {
-            // TODO: fix possible NPE in above condition, getResultType should never return null?
-            // This should never happen?!
-            return ChallengeVetoReason.UNSUITABLE_FOR_SOLVER;
+        final ChallengeVetoReason unsupportedReason = getUnsupportedReason(c);
+        if (unsupportedReason != null) {
+            return unsupportedReason;
         }
         /* Check for filter list entry. */
         final CaptchaChallengeFilterResult filterResult = validateChallengeFilters(c);
@@ -374,6 +384,48 @@ public abstract class ChallengeSolver<T> {
         default:
             return null;
         }
+    }
+
+    /**
+     * Returns null if this solver is technically able to solve the given challenge, no matter whether the user enabled it or not.
+     * Returns a non-null value if it can never solve it, e.g. because it does not support the captcha type. <br>
+     * Only reasons which do not depend on the user's settings (solver enabled, captcha type disabled, captcha rules, ...) may be returned
+     * here. This allows to find out that "the only thing in the way is the user's own configuration", see
+     * {@link #getChallengeVetoReason(Challenge)} which includes this check. <br>
+     * Subclasses that add their own checks have to call super first, then check the solver specific things and return null if none of them
+     * vetoes. Subclasses must not override {@link #getChallengeVetoReason(Challenge)} for such checks.
+     */
+    public ChallengeVetoReason getUnsupportedReason(final Challenge<?> c) {
+        final Set<CAPTCHA_TYPE> supported_types = this.getSupportedCaptchaTypes();
+        final CAPTCHA_TYPE ctype = CAPTCHA_TYPE.getCaptchaTypeForChallenge(c);
+        if (supported_types == null || supported_types.isEmpty()) {
+            /*
+             * Solver does not declare any supported captcha type: An empty list never means "supports everything" -> Cannot solve anything.
+             * Solvers which legitimately support no captcha type (e.g. OAuth) have to override this method without calling super.
+             */
+            return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
+        }
+        if (ctype != null && !supported_types.contains(ctype)) {
+            /* Challenge is not supported by solver */
+            return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
+        }
+        if (getResultType() != null && !getResultType().isAssignableFrom(c.getResultType())) {
+            // TODO: fix possible NPE in above condition, getResultType should never return null?
+            // This should never happen?!
+            return ChallengeVetoReason.UNSUITABLE_FOR_SOLVER;
+        }
+        if (c.isSameIPRequired() && getSolverType() == SolverType.EXTERNAL) {
+            /*
+             * External solvers work from another IP address than the user: They can only solve such a challenge through the proxy that was
+             * used for the requests of the challenge.
+             */
+            if (!supportsFeature(SolverFeature.PROXY)) {
+                return ChallengeVetoReason.SAME_IP_REQUIRED_PROXY_UNSUPPORTED;
+            } else if (!c.hasProxy()) {
+                return ChallengeVetoReason.SAME_IP_REQUIRED_NO_PROXY;
+            }
+        }
+        return null;
     }
 
     /**
