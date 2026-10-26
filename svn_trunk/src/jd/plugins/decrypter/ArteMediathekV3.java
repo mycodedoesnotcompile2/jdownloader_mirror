@@ -59,7 +59,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.ArteTv;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 53356 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53742 $", interfaceVersion = 4, names = {}, urls = {})
 public class ArteMediathekV3 extends PluginForDecrypt {
     public ArteMediathekV3(PluginWrapper wrapper) {
         super(wrapper);
@@ -242,23 +242,30 @@ public class ArteMediathekV3 extends PluginForDecrypt {
          * The APIv3 request cannot be used anymore since 2024-09 since the auth has changed(?) More information:
          * https://board.jdownloader.org/showthread.php?t=96449
          */
-        final boolean allowUseAPIV3 = false;
-        final boolean usingAPIV2;
+        final boolean allowUseAPIV3 = true;
+        final boolean allowUseHbbTV2 = false;
+        final List<Map<String, Object>> videoStreams = new ArrayList<Map<String, Object>>();
         if (!StringUtils.isEmpty(videoStreamsAPIV3URL) && allowUseAPIV3) {
             prepBRAPI(br);
             br.getPage(videoStreamsAPIV3URL);
-            usingAPIV2 = false;
-        } else {
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            List<Map<String, Object>> responseVideoStreams = (List<Map<String, Object>>) entries.get("videoStreams");
+            if (responseVideoStreams == null || responseVideoStreams.isEmpty()) {
+                /* This should never happen */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            videoStreams.addAll(responseVideoStreams);
+        } else if (allowUseHbbTV2) {
             /* APIv2: This gives us only progressive streams and only up to 720p */
             final String videoStreamsAPIV2URL = String.format("https://www.arte.tv/hbbtvv2/services/web/index.php/OPA/v3/streams/%s/%s/%s", programId, kind.toUpperCase(Locale.ENGLISH), language);
             br.getPage(videoStreamsAPIV2URL);
-            usingAPIV2 = true;
-        }
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final List<Map<String, Object>> videoStreams = (List<Map<String, Object>>) entries.get("videoStreams");
-        if (videoStreams == null || videoStreams.isEmpty()) {
-            /* This should never happen */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            List<Map<String, Object>> responseVideoStreams = (List<Map<String, Object>>) entries.get("videoStreams");
+            if (responseVideoStreams == null || responseVideoStreams.isEmpty()) {
+                /* This should never happen */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            videoStreams.addAll(responseVideoStreams);
         }
         final Browser brc = createNewBrowserInstance();
         brc.getHeaders().remove("Authorization");
@@ -394,6 +401,9 @@ public class ArteMediathekV3 extends PluginForDecrypt {
                 }
             }
         }
+        if (streams.size() == 0 && videoStreams.size() == 0) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         /* First put each language + audio version in separate lists. */
         final Map<String, List<Map<String, Object>>> languagePacks = new HashMap<String, List<Map<String, Object>>>();
         for (final Map<String, Object> videoStream : videoStreams) {
@@ -500,22 +510,20 @@ public class ArteMediathekV3 extends PluginForDecrypt {
                 final String videoStreamId = (String) videoStream.get("videoStreamId");
                 final int height = ((Number) videoStream.get("height")).intValue();
                 int bitrate = -1;
-                if (usingAPIV2) {
-                    /* Extract bitrate from URL */
-                    final String bitrateFromURLStr = new Regex(streamURL, "MP4-(\\d+)").getMatch(0);
-                    if (bitrateFromURLStr != null) {
-                        bitrate = Integer.parseInt(bitrateFromURLStr);
-                    }
+                /* Extract bitrate from URL */
+                final String bitrateFromURLStr = new Regex(streamURL, "MP4-(\\d+)").getMatch(0);
+                if (bitrateFromURLStr != null) {
+                    bitrate = Integer.parseInt(bitrateFromURLStr);
                 }
                 if (bitrate == -1 && videoStream.get("bitrate") != null) {
                     bitrate = ((Number) videoStream.get("bitrate")).intValue();
                 }
                 final String audioCode = videoStream.get("audioCode").toString(); // e.g. VF, VF-STA, VA, ...
                 final String originalFilename;
-                if (usingAPIV2) {
-                    originalFilename = Plugin.getFileNameFromURL(new URL(streamURL));
-                } else {
+                if (videoStream.get("filename") != null) {
                     originalFilename = videoStream.get("filename").toString();
+                } else {
+                    originalFilename = Plugin.getFileNameFromURL(new URL(streamURL));
                 }
                 final DownloadLink link = new DownloadLink(hosterplugin, hosterplugin.getHost(), streamURL, true);
                 final HlsContainer hlsRef = (HlsContainer) videoStream.get("hlsRef");

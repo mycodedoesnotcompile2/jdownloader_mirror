@@ -26,7 +26,7 @@
 		<fileset dir="${res}/libs" includes="**/*.jar" />
 		<fileset dir="${res}/libs_ext" includes="**/*.jar" />
 		<!-- Dependencies -->
-		<fileset dir="${dep.awu}/libs" includes="**/*.jar" excludes="**/*jackson*" />
+		<fileset dir="${dep.awu}/libs" includes="**/*.jar" />
 		<fileset dir="${dep.jdc}/libs" includes="**/*.jar" />
 		<fileset dir="${dep.browser}/libs" includes="**/*.jar" />
 		<fileset dir="${dep.updateclient}/libs" includes="**/*.jar" />
@@ -45,46 +45,46 @@
 
 	<!-- Compiles the code -->
 	<target name="compile" depends="clean">
-		<property name="jvm_target" value="1.6" />
-		<property name="jvm_source" value="1.6" />
+		<property name="jvm_target" value="1.8" />
+		<property name="jvm_source" value="1.8" />
 		<mkdir dir="${cls}" />
 
 		<!-- Build dependencies -->
 
-		<javac srcdir="${dep.awu}/src" excludes="**/test/**" verbose="false" debug="${debug}" destdir="${cls}" encoding="UTF-8" source="${jvm_source}" target="${jvm_target}" includeantruntime="false">
+		<javac srcdir="${dep.awu}/src" excludes="**/test/**,**/tests/**,**/ide/**" verbose="false" debug="${debug}" destdir="${cls}" encoding="UTF-8" source="${jvm_source}" target="${jvm_target}" includeantruntime="false">
 			<classpath refid="classpath" />
 
 		</javac>
 
-		<javac srcdir="${dep.myjd}/src" excludes="**/test/**" verbose="false" debug="${debug}" destdir="${cls}" encoding="UTF-8" source="${jvm_source}" target="${jvm_target}" includeantruntime="false">
+		<javac srcdir="${dep.myjd}/src" excludes="**/test/**,**/tests/**,**/ide/**" verbose="false" debug="${debug}" destdir="${cls}" encoding="UTF-8" source="${jvm_source}" target="${jvm_target}" includeantruntime="false">
 			<classpath refid="classpath" />
 
 		</javac>
 
-		<javac srcdir="${dep.browser}/src" excludes="" debug="${debug}" verbose="false" destdir="${cls}" encoding="UTF-8" source="${jvm_source}" target="${jvm_target}" includeantruntime="false">
+		<javac srcdir="${dep.browser}/src" excludes="**/test/**,**/tests/**,**/ide/**" debug="${debug}" verbose="false" destdir="${cls}" encoding="UTF-8" source="${jvm_source}" target="${jvm_target}" includeantruntime="false">
 			<classpath refid="classpath" />
 
 		</javac>
 
 
 
-		<javac srcdir="${dep.updateclient}/src" excludes="" verbose="false" debug="${debug}" destdir="${cls}" encoding="UTF-8" source="${jvm_source}" target="${jvm_target}" includeantruntime="false">
+		<javac srcdir="${dep.updateclient}/src" excludes="**/test/**,**/tests/**,**/ide/**" verbose="false" debug="${debug}" destdir="${cls}" encoding="UTF-8" source="${jvm_source}" target="${jvm_target}" includeantruntime="false">
 			<classpath refid="classpath" />
 
 
 		</javac>
 
-		<javac srcdir="src" debug="${debug}" verbose="false" excludes="jd/utils/dev/*,org/jdownloader/extensions/langfileeditor/**/*,org/jdownloader/extensions/remoteserv/**/*" destdir="${cls}" encoding="UTF-8" source="${jvm_source}" target="${jvm_target}" includeantruntime="false">
+		<javac srcdir="src" debug="${debug}" verbose="false" excludes="jd/utils/dev/*,org/jdownloader/extensions/langfileeditor/**/*,org/jdownloader/extensions/remoteserv/**/*,**/test/**,**/tests/**,**/ide/**" destdir="${cls}" encoding="UTF-8" source="${jvm_source}" target="${jvm_target}" includeantruntime="false">
 			<classpath refid="classpath" />
 			<compilerarg line="-proc:none" />
 
 		</javac>
-		<javac srcdir="${dep.jdupdateclient}/src" excludes="" debug="${debug}" destdir="${cls}" encoding="UTF-8" source="${jvm_source}" target="${jvm_target}" includeantruntime="false">
+		<javac srcdir="${dep.jdupdateclient}/src" excludes="**/test/**,**/tests/**,**/ide/**" debug="${debug}" destdir="${cls}" encoding="UTF-8" source="${jvm_source}" target="${jvm_target}" includeantruntime="false">
 			<classpath refid="classpath" />
 
 		</javac>
 
-		<javac srcdir="${dep.jdc}/src" debug="${debug}" verbose="false" excludes="**/test/**" destdir="${cls}" encoding="UTF-8" source="${jvm_source}" target="${jvm_target}" includeantruntime="false">
+		<javac srcdir="${dep.jdc}/src" debug="${debug}" verbose="false" excludes="**/test/**,**/tests/**,**/ide/**" destdir="${cls}" encoding="UTF-8" source="${jvm_source}" target="${jvm_target}" includeantruntime="false">
 			<classpath refid="classpath" />
 		</javac>
 		<echo message="Finished." />
@@ -110,7 +110,10 @@
 		</copy>
 		<copy todir="${dist}/libs">
 			<fileset dir="${res}/libs" includes="**/*">
+				<!-- embedded into JDownloader.jar -->
 				<exclude name="proxyVole.jar" />
+				<exclude name="jna.jar" />
+				<exclude name="jna_platform.jar" />
 				<exclude name="**/*.info" />
 			</fileset>
 		</copy>
@@ -119,7 +122,6 @@
 				<exclude name="miglayout.jar" />
 				<exclude name="miglayout-core.jar" />
 				<exclude name="**/*.info" />
-				<exclude name="**/*jackson*" />
 			</fileset>
 		</copy>
 		<copy todir="${dist}/libs">
@@ -143,12 +145,17 @@
 		</copy>
 
 		<copy todir="${dist}/licenses">
-			<fileset dir="${dep.awu}/libs/" includes="**/*.info" excludes="**/*jackson*" />
+			<fileset dir="${dep.awu}/libs/" includes="**/*.info" />
 			<fileset dir="${dep.awu}/libs/" includes="**/*.license" />
 			<fileset dir="${dep.jdc}/libs/" includes="**/*.info" />
 			<fileset dir="${dep.browser}/libs/" includes="**/*.info" />
 			<fileset dir="${res}/licenses" includes="**/*" />
 			<fileset dir="${res}/libs/" includes="**/*.info" />
+		</copy>
+		<!-- JNA ships its license only in META-INF, which is dropped when it is embedded into JDownloader.jar -->
+		<copy todir="${dist}/licenses/jna">
+			<zipfileset src="${res}/libs/jna.jar" includes="META-INF/LICENSE,META-INF/AL2.0,META-INF/LGPL2.1" />
+			<mapper type="flatten" />
 		</copy>
 
 		<copy todir="${dist}/tools">
@@ -202,14 +209,6 @@
 				<exclude name="jd/captcha/methods/**" />
 			</fileset>
 		</jar>
-		<jar duplicate="fail" file="${dist}/libs/JDUtils.jar" manifest="${dist}/Manifest.MF">
-			<fileset dir="${cls}">
-				<include name="jd/nutils/**" />
-			</fileset>
-		</jar>
-
-		
-
 		<jar duplicate="fail" file="${dist}/libs/cons.jar" manifest="${dist}/Manifest.MF">
 			<fileset dir="${cls}">
 				<include name="org/jdownloader/container/**/*" />
@@ -266,9 +265,9 @@
 			<mapper type="regexp" from="[\\/]dist[\\/](extensions[\\/].*)" to="\1" />
 		</pathconvert>
 		<echo message="ClassPath ${class-path}  ${class-path-extensions}" />
+		<!-- Core.jar manifest. Core.jar is never started directly, so no Main-Class. -->
 		<manifest file="${dist}/Manifest.MF">
 			<attribute name="Created-By" value="Appwork GmbH and JDownloader Community" />
-			<attribute name="Main-Class" value="jd.Main" />
 			<!-- plugins that serialize own classes have to be put in the classpath -->
 			<!-- <attribute name="Class-Path" value="JDownloader.jar ${class-path} ${class-path-extensions}" /> -->
 
@@ -290,15 +289,12 @@
 				<exclude name="org/jdownloader/launcher/**/*" />
 				<exclude name="org/jdownloader/uninstaller/**/*" />
 				<exclude name="org/jdownloader/installer/**/*" />
-				<exclude name="org/jdownloader/dynamic/**/*" />
-				<exclude name="jd/dynamics/**" />
 				<exclude name="jd/gui/**" />
 				<exclude name="com/fastcgi/**" />
 				<exclude name="org/jdownloader/container/**/*" />
 				<exclude name="org/jdownloader/updatev2/**/*" />
 
 				<exclude name="jd/http/**" />
-				<exclude name="jd/nutils/**" />
 				<exclude name="jd/plugins/hoster/**" />			
 				<exclude name="jd/plugins/decrypter/**" />
 				<exclude name="org/jdownloader/extensions/*/**/*" />
@@ -363,22 +359,51 @@
 			<!-- https://openjdk.java.net/jeps/238-->
 			<attribute name="Add-Exports" value="java.desktop/sun.swing java.desktop/sun.swing.table java.desktop/sun.swing.plaf.synth java.desktop/com.sun.java.swing.plaf.windows java.desktop/sun.awt.shell java.desktop/com.sun.awt java.base/sun.security.action" />
 			<attribute name="Add-Opens" value="java.desktop/javax.swing.plaf.synth java.desktop/javax.swing.plaf.basic java.desktop/javax.swing java.desktop/javax.swing.tree java.desktop/java.awt.event" />
+			<!-- xz.jar is a Multi-Release jar; without this attribute Java 9+ ignores its META-INF/versions classes. Java 8 ignores the attribute. -->
+			<attribute name="Multi-Release" value="true" />
 
 			<!-- plugins that serialize own classes have to be put in the classpath -->
 			<!--<attribute name="Class-Path" value="" />-->
 
 		</manifest>
 		<jar duplicate="fail" file="${dist}/JDownloader.jar" manifest="${dist}/Manifest.MF">
-			<zipfileset src="${dep.awu}/libs/miglayout.jar" excludes="META-INF/*" />
-			<zipfileset src="${dep.awu}/libs/miglayout-core.jar" excludes="META-INF/*" />
-			<zipfileset src="${res}/libs/proxyVole.jar" excludes="META-INF/*" />
-			<zipfileset src="${dep.updateclient}/libs/xz.jar" excludes="META-INF/*" />
+			<!-- Embedded libs: drop MANIFEST.MF, META-INF/** (licenses, maven data, signatures) and module-info.class. -->
+			<!-- JDownloader.jar must start without libs/, and the org/appwork classes in it need JNA. -->
+			<zipfileset src="${dep.awu}/libs/miglayout.jar">
+				<exclude name="**/MANIFEST.MF" />
+				<exclude name="META-INF/**" />
+				<exclude name="module-info.class" />
+			</zipfileset>
+			<zipfileset src="${dep.awu}/libs/miglayout-core.jar">
+				<exclude name="**/MANIFEST.MF" />
+				<exclude name="META-INF/**" />
+				<exclude name="module-info.class" />
+			</zipfileset>
+			<zipfileset src="${res}/libs/proxyVole.jar">
+				<exclude name="**/MANIFEST.MF" />
+				<exclude name="META-INF/**" />
+				<exclude name="module-info.class" />
+			</zipfileset>
+			<zipfileset src="${res}/libs/jna.jar">
+				<exclude name="**/MANIFEST.MF" />
+				<exclude name="META-INF/**" />
+				<exclude name="module-info.class" />
+			</zipfileset>
+			<zipfileset src="${res}/libs/jna_platform.jar">
+				<exclude name="**/MANIFEST.MF" />
+				<exclude name="META-INF/**" />
+				<exclude name="module-info.class" />
+			</zipfileset>
+			<!-- xz.jar is Multi-Release: keep META-INF/versions/** (Java 9+ classes), drop only its manifest and module-info. -->
+			<zipfileset src="${dep.updateclient}/libs/xz.jar">
+				<exclude name="META-INF/MANIFEST.MF" />
+				<exclude name="**/module-info.class" />
+			</zipfileset>
 			<fileset dir="${working}">
 				<include name="version.nfo" />
 				<include name="classpath" />
 			</fileset>
 			<fileset dir="${cls}">
-				<include name="classpath" />
 				<include name="jd/Main.class" />
 				<include name="org/jdownloader/launcher/**/*" />
 				<include name="org/jdownloader/logging/**/*" />
@@ -419,11 +444,36 @@
 		</jar>
 		<delete file="${dist}/Manifest.MF" failonerror="true" />
 
+		<!-- JDownloader.jar must start standalone: fail the build if an embedded lib is missing -->
+		<requireInLauncherJar resource="com/sun/jna/Native.class" />
+		<requireInLauncherJar resource="com/sun/jna/platform/win32/Kernel32.class" />
+		<requireInLauncherJar resource="net/miginfocom/swing/MigLayout.class" />
+		<requireInLauncherJar resource="com/btr/proxy/search/ProxySearch.class" />
+		<requireInLauncherJar resource="org/tukaani/xz/XZInputStream.class" />
+		<requireInLauncherJar resource="META-INF/versions/9/org/tukaani/xz/check/CRC64.class" />
+		<fail message="JDownloader.jar must not contain module-info.class">
+			<condition>
+				<resourcecount when="greater" count="0">
+					<zipfileset src="${dist}/JDownloader.jar" includes="**/module-info.class" />
+				</resourcecount>
+			</condition>
+		</fail>
 	</target>
 
+	<macrodef name="requireInLauncherJar" description="Fails the build if JDownloader.jar does not contain the given resource">
+		<attribute name="resource" />
+		<sequential>
+			<fail message="JDownloader.jar must contain @{resource}">
+				<condition>
+					<not>
+						<available resource="@{resource}" classpath="${dist}/JDownloader.jar" ignoresystemclasses="true" />
+					</not>
+				</condition>
+			</fail>
+		</sequential>
+	</macrodef>
 
-
-	<!-- Copies compiled classes(hoster, decrypter, dynamics -->
+	<!-- Copies compiled classes(hoster, decrypter) -->
 	<target name="copy_compiled">
 		<mkdir dir="${dist}/jd/plugins/hoster/" />
 		<copy todir="${dist}/jd/plugins/hoster/">
@@ -471,7 +521,6 @@
 		<buildAddon package="JDChat" include="chat" />
 		<buildAddon package="infobar" include="infobar" />
 		<buildAddon package="FolderWatch" include="folderwatchV2" />
-		<buildAddon package="infobar" include="infobar" />
 
 		<buildAddon package="JDShutdown" include="shutdown" />
 
@@ -487,33 +536,6 @@
 		<buildAddon package="translator" include="translator" />
 		<delete file="${dist}/Manifest.MF" failonerror="true" />
 	</target>
-
-	<!-- Use this to build an reconnect plugin -->
-	<macrodef name="buildRecPlugin" description="Function for creating an optional router addon">
-		<attribute name="name" />
-
-		<sequential>
-			<echo message="Creating @{name}" />
-			<mkdir dir="${dist}/reconnect/" />
-			<jar duplicate="fail" jarfile="${dist}/reconnect/@{name}.reconnect" manifest="${dist}/Manifest.MF">
-				<fileset dir="${cls}">
-					<include name="jd/controlling/reconnect/plugins/@{name}/**" />
-				</fileset>
-			</jar>
-		</sequential>
-	</macrodef>
-
-	<!-- Build optional reconnect plugins -->
-	<target name="jarReconnectOptionals" depends="compile" description="Creates the Optional Reconnect Addons">
-		<manifest file="${dist}/Manifest.MF">
-			<attribute name="Created-By" value="Appwork GmbH and JDownloader Community" />
-		</manifest>
-
-
-
-		<delete file="${dist}/Manifest.MF" failonerror="true" />
-	</target>
-
 
 
 
@@ -550,10 +572,10 @@
 		</signjar>
 	</target>
 
-	<target name="all" depends="clean,compile,copy_res,jarMain,copy_compiled,jarReconnectOptionals,jarOptionals,sign">
+	<target name="all" depends="clean,compile,copy_res,jarMain,copy_compiled,jarOptionals,sign">
 		<echo message="Finished." />
 	</target>
-	<target name="withoutsign" depends="clean,compile,copy_res,jarReconnectOptionals,jarOptionals,jarMain,copy_compiled">
+	<target name="withoutsign" depends="clean,compile,copy_res,jarOptionals,jarMain,copy_compiled">
 		<echo message="Finished." />
 	</target>
 	<target name="updater" depends="clean,compile,copy_compiled">

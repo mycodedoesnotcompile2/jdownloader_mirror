@@ -93,7 +93,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 53740 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53745 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -4836,7 +4836,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 if (!StringUtils.isEmpty(tmpsec)) {
                     seconds = Integer.parseInt(tmpsec);
                 }
-                expire_milliseconds_precise_to_the_second = ((TimeUnit.DAYS.toSeconds(365 * years)) + (TimeUnit.DAYS.toSeconds(days)) + (TimeUnit.HOURS.toSeconds(hours)) + (TimeUnit.MINUTES.toSeconds(minutes)) + (TimeUnit.SECONDS.toSeconds(seconds)));
+                expire_milliseconds_precise_to_the_second = ((TimeUnit.DAYS.toMillis(365 * years)) + (TimeUnit.DAYS.toMillis(days)) + (TimeUnit.HOURS.toMillis(hours)) + (TimeUnit.MINUTES.toMillis(minutes)) + (TimeUnit.SECONDS.toMillis(seconds)));
                 if (expire_milliseconds_precise_to_the_second <= 0) {
                     logger.info("Failed to find precise expire-date via paymentURL: \"" + paymentURL + "\"");
                     continue;
@@ -5141,13 +5141,20 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
 
     protected String regExTrafficMax(final Browser br) {
         final String src = this.getCorrectBR(br);
-        /** hotlink: <small class="ma-stat-sub">53.7 / 66 GB (81%)</small> **/
-        final String avail_max_traffic[] = new Regex(src, ">\\s*([0-9\\. TGMKB]+)\\s*/\\s*([0-9\\. TGMKB]+)").getRow(0);
-        String trafficMax = avail_max_traffic == null ? null : avail_max_traffic[1];
-        if (avail_max_traffic != null && trafficMax.matches("^[0-9\\. ]+$")) {
-            trafficMax = avail_max_traffic[1] + " " + avail_max_traffic[0].replaceFirst("[0-9\\. ]+", "");
+        /**
+         * HotLink: <span class="ma-stat-v">100 <small><span class="t-en">GB left</span> <small class="ma-stat-sub">0.0 / 100 GB
+         * (0%)</small>
+         **/
+        /** HotLink: <span class="ma-stat-v">9 <small><span class="t-en">GB left <small class="ma-stat-sub">56.3 / 66 GB (85%)</small> **/
+        final String avail_traffic[] = new Regex(src, ">\\s*([0-9\\. TGMKB]+)\\s*/\\s*([0-9\\. TGMKB]+)").getRow(0);
+        if (avail_traffic == null || avail_traffic.length < 2) {
+            return null;
         }
-        if (trafficMax != null && trafficMax.matches("^[0-9\\. ]+$")) {
+        String trafficMax = avail_traffic[1];
+        if (trafficMax.matches("^[0-9\\. ]+$")) {
+            trafficMax = trafficMax + " " + avail_traffic[0].replaceFirst("[0-9\\. ]+", "");
+        }
+        if (trafficMax.matches("^[0-9\\. ]+$")) {
             // fallback, add GB unit
             trafficMax = trafficMax + " GB";
         }
@@ -5211,24 +5218,46 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (!StringUtils.isEmpty(availabletraffic)) {
             return availabletraffic;
         }
-        {
-            /** hotlink: <small class="ma-stat-sub">53.7 / 66 GB (81%)</small> **/
-            /* 2026-10-23: TODO: First value = AVAILABLE traffic(trafficleft), 2nd value = MAX traffic */
-            final String avail_max_traffic[] = new Regex(src, ">\\s*([0-9\\. TGMKB]+)\\s*/\\s*([0-9\\. TGMKB]+)").getRow(0);
-            if (avail_max_traffic == null || avail_max_traffic.length < 2) {
-                return null;
+        new_Used_Max: {
+            /**
+             * HotLink:<span class="ma-stat-v">100 <small><span class="t-en">GB left</span> <small class="ma-stat-sub">0.0 / 100 GB
+             * (0%)</small>
+             **/
+            /**
+             * HotLink: <span class="ma-stat-v">9 <small><span class="t-en">GB left <small class="ma-stat-sub">56.3 / 66 GB (85%)</small>
+             **/
+            final String avail_traffic[] = new Regex(src, ">\\s*([0-9\\. TGMKB]+)\\s*/\\s*([0-9\\. TGMKB]+)").getRow(0);
+            if (avail_traffic == null || avail_traffic.length < 2) {
+                break new_Used_Max;
             }
-            availabletraffic = avail_max_traffic[0];
-            if (availabletraffic != null && availabletraffic.matches("^[0-9\\. ]+$")) {
+            String usedTraffic = avail_traffic[0];
+            String maxTraffic = avail_traffic[1];
+            if (maxTraffic.matches("^[0-9\\. ]+$")) {
+                maxTraffic = maxTraffic + " GB";
+            }
+            if (usedTraffic.matches("^[0-9\\. ]+$")) {
                 // add missing unit, take from max
-                availabletraffic = avail_max_traffic[0] + " " + avail_max_traffic[1].replaceFirst("[0-9\\. ]+", "");
+                usedTraffic = usedTraffic + " " + maxTraffic.replaceFirst("[0-9\\. ]+", "");
             }
-            if (availabletraffic != null && availabletraffic.matches("^[0-9\\. ]+$")) {
-                // fallback, add GB unit
-                availabletraffic = availabletraffic + " GB";
-            }
-            return availabletraffic;
+            final long availableTraffic = parseSize(Size.TRAFFIC, maxTraffic) - parseSize(Size.TRAFFIC, usedTraffic);
+            return availableTraffic + " B";
         }
+        new_Left: {
+            /**
+             * HotLink:<span class="ma-stat-v">100 <small><span class="t-en">GB left</span> <small class="ma-stat-sub">0.0 / 100 GB
+             * (0%)</small>
+             **/
+            /**
+             * HotLink:<span class="ma-stat-v">9 <small><span class="t-en">GB left <small class="ma-stat-sub">56.3 / 66 GB (85%)</small>
+             **/
+            final String trafficLeft[] = new Regex(src, ">\\s*([0-9\\.]+)\\s*(?:<[^>]*>)?<span[^>]*>\\s*([TGMKB]+)\\s*left").getRow(0);
+            if (trafficLeft == null || trafficLeft.length < 2) {
+                break new_Left;
+            }
+            final long availableTraffic = parseSize(Size.TRAFFIC, trafficLeft[0] + " " + trafficLeft[1]);
+            return availableTraffic + " B";
+        }
+        return null;
     }
 
     public boolean isLoggedin(final Browser brc) {

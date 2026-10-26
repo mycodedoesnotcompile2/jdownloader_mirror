@@ -35,7 +35,6 @@ import jd.parser.html.Form;
 import jd.parser.html.InputField;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -44,7 +43,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53740 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53744 $", interfaceVersion = 3, names = {}, urls = {})
 public class HotlinkCc extends XFileSharingProBasic {
     public HotlinkCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -263,44 +262,6 @@ public class HotlinkCc extends XFileSharingProBasic {
             throw new AccountRequiredException();
         }
         super.doFree(link, account);
-    }
-
-    @Override
-    protected void fetchAccountInfoWebsiteTraffic(final Browser br, final Account account, final AccountInfo ai) throws Exception {
-        /*
-         * My Account redesign: <small class="ma-stat-sub">57.8 / 66 GB (87%)</small> -> This is USED / MAX and not left / max! Do not let
-         * the super class pick the first value as traffic left.
-         */
-        final String[] usedMax = new Regex(this.getCorrectBR(br), "class=\"ma-stat-sub\"[^>]*>\\s*([0-9\\.]+(?:\\s*[TGMKB]+)?)\\s*/\\s*([0-9\\.]+\\s*[TGMKB]+)").getRow(0);
-        if (usedMax == null) {
-            logger.warning("Website specific trafficleft handling failed -> Fallback to default");
-            super.fetchAccountInfoWebsiteTraffic(br, account, ai);
-            return;
-        }
-        String usedStr = usedMax[0].trim();
-        if (usedStr.matches("^[0-9\\.]+$")) {
-            /* Unit is only given once -> take it from "max traffic" value and add it to "used traffic" value. */
-            usedStr += " " + usedMax[1].replaceFirst("[0-9\\. ]+", "");
-        }
-        final long max = parseSize(Size.TRAFFIC, usedMax[1]);
-        final long used = parseSize(Size.TRAFFIC, usedStr);
-        ai.setTrafficLeft(Math.max(max - used, 0));
-        ai.setTrafficMax(max);
-    }
-
-    @Override
-    public String regExTrafficLeft(final Browser br) {
-        String trafficleft = super.regExTrafficLeft(br);
-        if (!StringUtils.isEmpty(trafficleft)) {
-            return trafficleft;
-        }
-        final String src = this.getCorrectBR(br);
-        trafficleft = new Regex(src, "(?i)Traffic available today</TD></TR>\\s*?</thead>\\s*?<TR><TD><b>\\s*([^<>\"]+)\\s*</b><").getMatch(0);
-        if (!StringUtils.isEmpty(trafficleft)) {
-            return trafficleft;
-        }
-        trafficleft = new Regex(src, "(?i)Download traffic available\\s*:\\s*</TD></TR>\\s*</thead>\\s*<TR><TD[^>]*><b>([^<]+)</b></TD></TR>").getMatch(0);
-        return trafficleft;
     }
 
     @Override

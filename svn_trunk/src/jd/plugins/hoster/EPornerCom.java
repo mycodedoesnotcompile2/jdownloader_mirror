@@ -60,7 +60,7 @@ import org.jdownloader.plugins.components.config.EpornerComConfig.PreferredVideo
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 52799 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53746 $", interfaceVersion = 3, names = {}, urls = {})
 public class EPornerCom extends PluginForHost {
     public EPornerCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -499,7 +499,11 @@ public class EPornerCom extends PluginForHost {
     }
 
     public static boolean isAgeVerificationBlocked(final Browser br) {
-        if (br.containsHTML("<title>\\s*Eporner Age Verification\\s*</title>|ageVerif/blurred-background")) {
+        if (br.containsHTML("id\\s*=\\s*\"agegate-title\"")) {
+            return true;
+        } else if (br.containsHTML("<title>\\s*Altersverifizierung")) {
+            return true;
+        } else if (br.containsHTML("<title>\\s*Eporner Age Verification")) {
             /* 2025-07-28: French users need to verify. Checking links or downloading is not possible in this state. */
             return true;
         } else {
@@ -661,7 +665,7 @@ public class EPornerCom extends PluginForHost {
                     /* Do not validate cookies. */
                     return false;
                 }
-                br.getPage("https://" + this.getHost() + "/");
+                br.getPage("https://www." + this.getHost() + "/");
                 if (this.isLoggedin()) {
                     logger.info("Cookie login successful");
                     /* Refresh cookie timestamp */

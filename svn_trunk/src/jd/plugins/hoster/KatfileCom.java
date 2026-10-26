@@ -47,7 +47,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 53732 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53743 $", interfaceVersion = 3, names = {}, urls = {})
 public class KatfileCom extends XFileSharingProBasic {
     public KatfileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -64,7 +64,7 @@ public class KatfileCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "katfile.biz", "katfile.space", "katfile.ws", "katfile.vip", "katfile.online", "katfile.cloud", "katfile.com" });
+        ret.add(new String[] { "katfile.co", "katfile.biz", "katfile.space", "katfile.ws", "katfile.vip", "katfile.online", "katfile.cloud", "katfile.com" });
         return ret;
     }
 
@@ -106,8 +106,8 @@ public class KatfileCom extends XFileSharingProBasic {
     @Override
     protected void fetchAccountInfoWebsiteTraffic(final Browser br, final Account account, final AccountInfo ai) throws Exception {
         /*
-         * 2026-10-23: New account page layout: <span>Traffic available today</span><small>0.0 / 200 GB today</small> --> "used / max"
-         * (same format as the "Used space" bar)
+         * 2026-10-23: New account page layout: <span>Traffic available today</span><small>0.0 / 200 GB today</small> --> "used / max" (same
+         * format as the "Used space" bar)
          */
         final String[] trafficUsedAndMax = new Regex(getCorrectBR(br), ">\\s*Traffic available(?:\\s*today)?\\s*</span>\\s*<small>\\s*([0-9\\.]+)\\s*/\\s*([0-9\\.]+)\\s*([TGMKB]+)").getRow(0);
         if (trafficUsedAndMax != null) {
@@ -151,6 +151,7 @@ public class KatfileCom extends XFileSharingProBasic {
         /* 2026-04-13: Main domain changed to katfile.ws */
         /* 2026-05-xx: Main domain changed to katfile.space */
         /* 2026-07-xx: Main domain changed to katfile.biz */
+        /* 2026-19-xx: Main domain changed to katfile.co */
         return this.rewriteHost(getPluginDomains(), host);
     }
 

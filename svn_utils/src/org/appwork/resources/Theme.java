@@ -421,8 +421,9 @@ public class Theme implements MinTimeWeakReferenceCleanup {
         if (url != null) {
             return url;
         }
-        for (boolean useStandardPath : new boolean[] { false, true }) {
-            if (useStandardPath && isStandardPathLookupRedundant()) {
+        final boolean isStandardPathLookupRedundant = isStandardPathLookupRedundant();
+        for (final boolean useStandardPath : new boolean[] { false, true }) {
+            if (useStandardPath && isStandardPathLookupRedundant) {
                 /* the second pass would check exactly the same paths as the first one (e.g. current theme is "standard") */
                 break;
             }
@@ -1106,8 +1107,8 @@ public class Theme implements MinTimeWeakReferenceCleanup {
 
     /**
      * Returns true if a lookup in the standard theme path (useStandardIconPath = true) would check exactly the same files and classpath
-     * resources as the lookup in the current theme path, so it can be skipped. This is the case if the current theme is "standard"
-     * (path equals defaultPath, see updatePath).
+     * resources as the lookup in the current theme path, so it can be skipped. This is the case if the current theme is "standard" (path
+     * equals defaultPath, see updatePath).
      *
      * Never true with a delegate: the delegate is asked first in getURL and may use a different theme, so its standard theme path may
      * differ from its current theme path.
@@ -1116,17 +1117,17 @@ public class Theme implements MinTimeWeakReferenceCleanup {
         return getDelegate() == null && StringUtils.equals(this.path, this.defaultPath);
     }
 
-    private boolean isNonEmptyStream(URL url) {
+    private boolean isEmptyStream(URL url) {
         try {
             final InputStream is = url.openStream();
             try {
-                return is.read() != -1;
+                return is.read() == -1;
             } finally {
                 is.close();
             }
         } catch (IOException e) {
         }
-        return false;
+        return true;
     }
 
     private URL getURL(final String pre, final String relativePath, final String ext, boolean useStandardIconPath) {
@@ -1158,7 +1159,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             // the resource targets a folder not a file.
             return null;
         }
-        if (!isNonEmptyStream(url)) {
+        if (isEmptyStream(url)) {
             return null;
         }
         return url;
