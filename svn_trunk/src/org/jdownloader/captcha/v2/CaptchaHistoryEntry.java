@@ -2,6 +2,8 @@ package org.jdownloader.captcha.v2;
 
 import org.appwork.storage.Storable;
 
+import org.jdownloader.captcha.v2.Challenge.CaptchaRequestType;
+
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 /**
@@ -12,22 +14,20 @@ public class CaptchaHistoryEntry implements Storable {
     private long         timestamp;
     private String       domain;
     private CAPTCHA_TYPE captcha_type;
-    private boolean      isLoginCaptcha;
+    private CaptchaRequestType captchaRequestType;
 
     /**
-     * Default constructor (required for Storable). Sets timestamp to the current system time in milliseconds. Sets isLoginCaptcha to false
-     * by default.
+     * Default constructor (required for Storable). Sets timestamp to the current system time in milliseconds. The request type is not set.
      */
     public CaptchaHistoryEntry() {
         this.timestamp = System.currentTimeMillis();
         this.domain = null;
         this.captcha_type = null;
-        this.isLoginCaptcha = false;
+        this.captchaRequestType = null;
     }
 
     /**
-     * Constructor with parameters. Automatically sets timestamp to the current system time in milliseconds. Sets isLoginCaptcha to false by
-     * default.
+     * Constructor with parameters. Automatically sets timestamp to the current system time in milliseconds. The request type is not set.
      *
      * @param domain
      *            the domain
@@ -38,7 +38,7 @@ public class CaptchaHistoryEntry implements Storable {
         this.timestamp = System.currentTimeMillis();
         this.domain = domain;
         this.captcha_type = captcha_type;
-        this.isLoginCaptcha = false;
+        this.captchaRequestType = null;
     }
 
     public CaptchaHistoryEntry(Challenge<?> challenge) {
@@ -48,7 +48,7 @@ public class CaptchaHistoryEntry implements Storable {
         this.timestamp = System.currentTimeMillis();
         this.domain = challenge.getHost();
         this.captcha_type = CAPTCHA_TYPE.getCaptchaTypeForChallenge(challenge);
-        this.isLoginCaptcha = challenge.isAccountLogin();
+        this.captchaRequestType = challenge.getCaptchaRequestType();
     }
 
     /**
@@ -58,14 +58,14 @@ public class CaptchaHistoryEntry implements Storable {
      *            the domain
      * @param captcha_type
      *            the CAPTCHA type
-     * @param isLoginCaptcha
-     *            whether this is a login captcha
+     * @param captchaRequestType
+     *            the source of the captcha (download, account login, crawler, ...), can be null
      */
-    public CaptchaHistoryEntry(String domain, CAPTCHA_TYPE captcha_type, boolean isLoginCaptcha) {
+    public CaptchaHistoryEntry(String domain, CAPTCHA_TYPE captcha_type, CaptchaRequestType captchaRequestType) {
         this.timestamp = System.currentTimeMillis();
         this.domain = domain;
         this.captcha_type = captcha_type;
-        this.isLoginCaptcha = isLoginCaptcha;
+        this.captchaRequestType = captchaRequestType;
     }
 
     /**
@@ -126,22 +126,16 @@ public class CaptchaHistoryEntry implements Storable {
     }
 
     /**
-     * Returns whether this is a login captcha
+     * Returns the source of the captcha (download, account login, crawler, ...)
      *
-     * @return true if this is a login captcha, false otherwise
+     * @return the request type, null if unknown (e.g. entries of older versions)
      */
-    public boolean isLoginCaptcha() {
-        return isLoginCaptcha;
+    public CaptchaRequestType getCaptchaRequestType() {
+        return captchaRequestType;
     }
 
-    /**
-     * Sets whether this is a login captcha
-     *
-     * @param isLoginCaptcha
-     *            true if this is a login captcha, false otherwise
-     */
-    public void setLoginCaptcha(boolean isLoginCaptcha) {
-        this.isLoginCaptcha = isLoginCaptcha;
+    public void setCaptchaRequestType(CaptchaRequestType captchaRequestType) {
+        this.captchaRequestType = captchaRequestType;
     }
 
     @Override
@@ -153,8 +147,8 @@ public class CaptchaHistoryEntry implements Storable {
         sb.append(domain);
         sb.append(", captcha_type=");
         sb.append(captcha_type);
-        sb.append(", isLoginCaptcha=");
-        sb.append(isLoginCaptcha);
+        sb.append(", captchaRequestType=");
+        sb.append(captchaRequestType);
         sb.append("]");
         return sb.toString();
     }

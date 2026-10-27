@@ -211,6 +211,11 @@ public abstract class AbstractConfigPanel extends SwitchPanel {
 
     public abstract String getTitle();
 
+    /** Tooltip shown for this panel's entry in the settings sidebar, or null for none. */
+    public String getSidebarTooltip() {
+        return null;
+    }
+
     public <T extends SettingsComponent> Pair<T> addPair(String name, BooleanKeyHandler enabled, T comp) {
         String lblConstraints = "gapleft " + getLeftGap() + ",aligny " + (comp.isMultiline() ? "top" : "center");
         return addPair(name, lblConstraints, enabled, comp);

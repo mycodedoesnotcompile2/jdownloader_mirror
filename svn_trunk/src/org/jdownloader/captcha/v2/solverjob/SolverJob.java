@@ -587,10 +587,40 @@ public class SolverJob<T> {
      * solver if it is currently waiting.
      */
     public void forceStart(final ChallengeSolver<?> solver) {
+        /* The user may need some time to choose: the solver can be working or done by now, then there is nothing to force. */
+        if (solvingSet.contains(solver)) {
+            logSolverStatus(solver, "FORCE START ignored (solver is already working on this job)");
+            return;
+        }
+        synchronized (LOCK) {
+            if (doneList.contains(solver)) {
+                logSolverStatus(solver, "FORCE START ignored (solver is already done)");
+                return;
+            }
+        }
         if (forcedStartSet.add(solver)) {
             logSolverStatus(solver, "FORCE START requested (skips all remaining wait times)");
         }
         _notifyAll();
+    }
+
+    /**
+     * Cancels all external solvers of this job which are neither done nor working on it yet, except the given one. Used when the user
+     * chooses one external solver in the captcha dialog: Without this the other waiting external solvers would start as well as soon as
+     * the dialog is closed, because the dialog solver they were waiting for is done then.
+     */
+    public void abortPendingExternalSolversExcept(final ChallengeSolver<?> keep) {
+        final List<ChallengeSolver<T>> abortList = new ArrayList<ChallengeSolver<T>>();
+        for (final ChallengeSolver<T> solver : solverList) {
+            if (solver != keep && solver.getSolverType() == ChallengeSolver.SolverType.EXTERNAL && !isDone(solver) && !isSolverSolving(solver)) {
+                abortList.add(solver);
+            }
+        }
+        for (final ChallengeSolver<T> solver : abortList) {
+            setSolverResult(solver, SolverOutcome.ABORTED, "Another external solver was chosen by the user");
+            logSolverStatus(solver, "KILLED (user chose the external solver " + keep + ")");
+            solver.kill(this);
+        }
     }
 
     public boolean isForcedStart(final ChallengeSolver<?> solver) {

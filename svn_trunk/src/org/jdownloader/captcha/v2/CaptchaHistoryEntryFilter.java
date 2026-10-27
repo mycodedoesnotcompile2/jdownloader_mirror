@@ -1,5 +1,7 @@
 package org.jdownloader.captcha.v2;
 
+import org.jdownloader.captcha.v2.Challenge.CaptchaRequestType;
+
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 /**
@@ -11,7 +13,7 @@ import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 public class CaptchaHistoryEntryFilter {
     private CAPTCHA_TYPE captchaType;
     private String       domain;
-    private Boolean      isLoginCaptcha;
+    private CaptchaRequestType captchaRequestType;
     private Long         minTimestamp;
     private Long         maxTimestamp;
     private Integer      limit;
@@ -47,14 +49,14 @@ public class CaptchaHistoryEntryFilter {
     }
 
     /**
-     * Filters by login/non-login captcha status.
+     * Filters by the source of the captcha (download, account login, crawler, ...).
      *
-     * @param isLoginCaptcha
-     *            true to filter for login captchas only, false for non-login only, or null to disable this filter
+     * @param captchaRequestType
+     *            the request type to filter for, or null to disable this filter
      * @return this filter for method chaining
      */
-    public CaptchaHistoryEntryFilter withLoginCaptcha(Boolean isLoginCaptcha) {
-        this.isLoginCaptcha = isLoginCaptcha;
+    public CaptchaHistoryEntryFilter withCaptchaRequestType(CaptchaRequestType captchaRequestType) {
+        this.captchaRequestType = captchaRequestType;
         return this;
     }
 
@@ -128,12 +130,12 @@ public class CaptchaHistoryEntryFilter {
     }
 
     /**
-     * Returns the login captcha filter.
+     * Returns the captcha request type filter.
      *
-     * @return true to filter for login captchas, false for non-login, or null if not set
+     * @return the request type to filter for, or null if not set
      */
-    public Boolean getIsLoginCaptcha() {
-        return isLoginCaptcha;
+    public CaptchaRequestType getCaptchaRequestType() {
+        return captchaRequestType;
     }
 
     /**
@@ -186,9 +188,9 @@ public class CaptchaHistoryEntryFilter {
                 return false;
             }
         }
-        // Check login captcha filter
-        if (isLoginCaptcha != null) {
-            if (isLoginCaptcha.booleanValue() != entry.isLoginCaptcha()) {
+        // Check captcha request type filter
+        if (captchaRequestType != null) {
+            if (captchaRequestType != entry.getCaptchaRequestType()) {
                 return false;
             }
         }
@@ -226,11 +228,11 @@ public class CaptchaHistoryEntryFilter {
             sb.append("domain=").append(domain);
             first = false;
         }
-        if (isLoginCaptcha != null) {
+        if (captchaRequestType != null) {
             if (!first) {
                 sb.append(", ");
             }
-            sb.append("isLoginCaptcha=").append(isLoginCaptcha);
+            sb.append("captchaRequestType=").append(captchaRequestType);
             first = false;
         }
         if (minTimestamp != null) {

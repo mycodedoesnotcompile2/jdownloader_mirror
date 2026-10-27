@@ -63,9 +63,27 @@ import jd.plugins.AccountInfo;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 public class SolverOrderTableModel extends ExtTableModel<SolverService> {
+    /* Assigned in initColumns() (called by the super constructor), so it must not have an initializer. */
+    private ExtColumn<SolverService> activeJobsColumn;
+
     public SolverOrderTableModel() {
         super("SolverOrderTableModel");
         update();
+        /*
+         * The number of active solver jobs changes all the time: While the column is visible, redraw the rows (without re-sorting) every
+         * second.
+         */
+        final javax.swing.Timer activeJobsTimer = new javax.swing.Timer(1000, new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(final java.awt.event.ActionEvent e) {
+                final javax.swing.JTable table = getTable();
+                if (table != null && table.isShowing() && activeJobsColumn != null && isColumnVisible(activeJobsColumn) && getRowCount() > 0) {
+                    fireTableRowsUpdated(0, getRowCount() - 1);
+                }
+            }
+        });
+        activeJobsTimer.setRepeats(true);
+        activeJobsTimer.start();
         /*
          * Keep the status/balance/configure columns up to date: redraw the rows (without re-sorting) whenever an account is added, updated
          * or removed, or when the MyJDownloader connection status changes. The cell contents are computed live from the solver services, so
@@ -571,6 +589,24 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
                 return false;
             }
         });
+        /* Number of captchas the solver (all accounts of the service together) is working on right now (hidden by default, sortable). */
+        activeJobsColumn = new ExtLongColumn<SolverService>("Number of active solver jobs", this) {
+            @Override
+            protected long getLong(final SolverService value) {
+                return ChallengeResponseController.getInstance().getActiveCaptchaCount(value.getID());
+            }
+
+            @Override
+            public boolean isEnabled(final SolverService obj) {
+                return obj.getConfigV3().isEnabled();
+            }
+
+            @Override
+            public boolean isDefaultVisible() {
+                return false;
+            }
+        };
+        this.addColumn(activeJobsColumn);
         this.addColumn(new ExtComponentColumn<SolverService>(_GUI.T.SolverOrderTableModel_initColumns_timeout()) {
             private JButton            editorBtn;
             private JButton            rendererBtn;

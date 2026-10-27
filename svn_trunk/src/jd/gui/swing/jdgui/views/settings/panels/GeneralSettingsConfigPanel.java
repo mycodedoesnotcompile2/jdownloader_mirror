@@ -106,6 +106,11 @@ public class GeneralSettingsConfigPanel extends AbstractConfigPanel {
         return _JDT.T.gui_settings_general_title();
     }
 
+    @Override
+    public String getSidebarTooltip() {
+        return _GUI.T.SettingsSidebar_tooltip_General();
+    }
+
     public String getIconKey() {
         return "settings";
     }

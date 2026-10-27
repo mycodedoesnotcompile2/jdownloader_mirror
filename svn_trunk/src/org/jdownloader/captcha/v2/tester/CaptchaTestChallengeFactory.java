@@ -2,6 +2,8 @@ package org.jdownloader.captcha.v2.tester;
 
 import java.awt.Rectangle;
 import java.io.File;
+import java.io.InputStream;
+import java.net.URL;
 import java.security.SecureRandom;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -13,10 +15,11 @@ import javax.crypto.spec.SecretKeySpec;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonStorage;
+import org.appwork.utils.Application;
 import org.appwork.utils.Hash;
+import org.appwork.utils.IO;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.HexFormatter;
-import org.appwork.utils.ide.IDEUtils;
 import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
@@ -60,6 +63,7 @@ public class CaptchaTestChallengeFactory {
     public static final String                                  KEY_SITE_URL        = "siteUrl";
     public static final String                                  KEY_ACTION          = "action";
     public static final String                                  KEY_EXPECTED_RESULT = "expectedResult";
+    /* The captcha image: a URL (bundled test image) or a File (own image). */
     public static final String                                  KEY_IMAGE_FILE      = "imageFile";
     public static final String                                  KEY_DESCRIPTION     = "challengeDescription";
     public static final String                                  KEY_CASE_SENSITIVE  = "caseSensitive";
@@ -82,19 +86,13 @@ public class CaptchaTestChallengeFactory {
         addDefaults(CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA, KEY_DESCRIPTION, "Click all open circles.", KEY_MIN_CLICKS, Integer.valueOf(8), KEY_IMAGE_FILE, getDefaultTestImage("test_multi_click_captcha.png"));
         /* Google's officially documented "always passes" reCAPTCHA v2 test site key, paired with their public demo page. */
         addDefaults(CAPTCHA_TYPE.RECAPTCHA_V2, KEY_SITE_KEY, "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI", KEY_SITE_URL, "https://www.google.com/recaptcha/api2/demo");
+        /* Invisible reCAPTCHA v2 demo of ZennoLab. */
+        addDefaults(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE, KEY_SITE_KEY, "6LcyAyQUAAAAAA2cByN4J7qtZDQju-k4HFuYdKo3", KEY_SITE_URL, "https://lessons.zennolab.com/captchas/recaptcha/invisible.php?level=low");
         /*
-         * Taken from an existing plugin that uses this type in production: jd.plugins.hoster.CopyCaseCom (login handling). No official
-         * always-passing invisible test key is publicly documented by Google, so this is a real site key instead - it is bound to
-         * copycase.com's domain by Google, hence the matching site URL.
+         * reCAPTCHA v2 Enterprise demo of CapMonster: A normal (visible, size=normal) checkbox, so the challenge is created as type NORMAL, see
+         * createChallenge. (With type INVISIBLE a challenge is classified as RECAPTCHA_V2_INVISIBLE before isEnterprise() is checked.)
          */
-        addDefaults(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE, KEY_SITE_KEY, "6LcjZ0EgAAAAAAZRgmPrZBH7aVM09gggWOzKNFIp", KEY_SITE_URL, "https://copycase.com/login");
-        /*
-         * Taken from jd.plugins.hoster.MetArtCom (isEnterprise()==true / type INVISIBLE, no v3 action). Note: at runtime,
-         * CAPTCHA_TYPE.getCaptchaTypeForChallenge() classifies invisible challenges as RECAPTCHA_V2_INVISIBLE before it checks
-         * isEnterprise() (declaration order), so a real MetArt challenge is actually handled as RECAPTCHA_V2_INVISIBLE. It is used here
-         * anyway since it is the only in-repo source found for the enterprise flag.
-         */
-        addDefaults(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE, KEY_SITE_KEY, "6Ld3osYaAAAAAAXX89R8I6MFE1m5loKSWfUIfjLd", KEY_SITE_URL, "https://sso.metartnetwork.com/login");
+        addDefaults(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE, KEY_SITE_KEY, "6LfMZJ8sAAAAAGr3oIAwxk8-ShPdN41rEEHUxPSL", KEY_SITE_URL, "https://capmonster.cloud/en/demo/recaptcha-enterprise/");
         /*
          * Taken from 2captcha's public demo page (https://2captcha.com/de/demo/recaptcha-v3) which embeds a real grecaptcha.execute(...)
          * call with this site key and action - no in-repo plugin has a hardcoded v3 key (they fetch it from the page at runtime).
@@ -138,16 +136,41 @@ public class CaptchaTestChallengeFactory {
     }
 
     /**
-     * Returns the bundled test image of the image captcha type. It lies in the project's source folder next to this class, so it is looked
-     * up via the project folder (IDE-only, see IDEUtils) and not via the installation folder. Returns null if it cannot be found.
+     * Returns the bundled test image of the image captcha type. It lies in the package of this class and is loaded via the classpath, so it
+     * also works from a jar. Returns null if it cannot be found.
      */
-    private static File getDefaultTestImage(final String fileName) {
-        final File projectFolder = IDEUtils.getProjectFolder(CaptchaTestChallengeFactory.class);
-        if (projectFolder == null) {
+    private static URL getDefaultTestImage(final String fileName) {
+        return CaptchaTestChallengeFactory.class.getResource(fileName);
+    }
+
+    /**
+     * Returns the file of a test image (the value of KEY_IMAGE_FILE): Files are returned as they are, URLs of files too. A test image that
+     * lies in a jar is copied to the temp folder because the challenges need a file.
+     *
+     * @return the file, or null if there is no image
+     */
+    public static File getImageFile(final Object image) throws Exception {
+        if (image instanceof File) {
+            return (File) image;
+        } else if (!(image instanceof URL)) {
             return null;
         }
-        final File file = new File(projectFolder, "src/" + CaptchaTestChallengeFactory.class.getPackage().getName().replace('.', '/') + "/" + fileName);
-        return file.isFile() ? file : null;
+        final URL url = (URL) image;
+        if ("file".equals(url.getProtocol())) {
+            return new File(url.toURI());
+        }
+        final String path = url.getPath();
+        final File file = Application.getTempResource("captchatest/" + path.substring(path.lastIndexOf('/') + 1));
+        if (!file.isFile()) {
+            final InputStream in = url.openStream();
+            try {
+                file.getParentFile().mkdirs();
+                IO.writeToFile(file, IO.readStream(10 * 1024 * 1024, in));
+            } finally {
+                in.close();
+            }
+        }
+        return file;
     }
 
     /**
@@ -244,9 +267,9 @@ public class CaptchaTestChallengeFactory {
         case IMAGE:
         case IMAGE_SINGLE_CLICK_CAPTCHA:
         case IMAGE_MULTI_CLICK_CAPTCHA:
-            final File imageFile = (File) values.get(KEY_IMAGE_FILE);
+            final File imageFile = getImageFile(values.get(KEY_IMAGE_FILE));
             if (imageFile == null || !imageFile.isFile()) {
-                throw new Exception("Image not found: " + imageFile);
+                throw new Exception("Image not found: " + (imageFile != null ? imageFile : values.get(KEY_IMAGE_FILE)));
             }
             final String description = (String) values.get(KEY_DESCRIPTION);
             switch (type) {
@@ -268,7 +291,7 @@ public class CaptchaTestChallengeFactory {
         case RECAPTCHA_V2_INVISIBLE:
             return newRecaptchaChallenge(plugin, siteKey, siteUrl, domain, false, false, null, null, AbstractRecaptchaV2.TYPE.INVISIBLE);
         case RECAPTCHA_V2_ENTERPRISE:
-            return newRecaptchaChallenge(plugin, siteKey, siteUrl, domain, false, true, null, null, AbstractRecaptchaV2.TYPE.INVISIBLE);
+            return newRecaptchaChallenge(plugin, siteKey, siteUrl, domain, false, true, null, null, AbstractRecaptchaV2.TYPE.NORMAL);
         case RECAPTCHA_V3:
             return newRecaptchaChallenge(plugin, siteKey, siteUrl, domain, true, false, (String) values.get(KEY_ACTION), (Double) values.get(KEY_MIN_SCORE), AbstractRecaptchaV2.TYPE.NORMAL);
         case RECAPTCHA_V3_ENTERPRISE:

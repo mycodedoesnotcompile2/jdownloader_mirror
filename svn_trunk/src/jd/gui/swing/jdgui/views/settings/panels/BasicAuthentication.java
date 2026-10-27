@@ -16,6 +16,7 @@
 
 package jd.gui.swing.jdgui.views.settings.panels;
 
+import org.jdownloader.gui.translate._GUI;
 import javax.swing.Icon;
 
 import org.appwork.utils.event.queue.Queue.QueuePriority;
@@ -35,6 +36,11 @@ public class BasicAuthentication extends AbstractConfigPanel {
 
     public String getTitle() {
         return _JDT.T.gui_settings_basicauth_title();
+    }
+
+    @Override
+    public String getSidebarTooltip() {
+        return _GUI.T.SettingsSidebar_tooltip_BasicAuthentication();
     }
 
     public BasicAuthentication() {

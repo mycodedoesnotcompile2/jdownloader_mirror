@@ -71,6 +71,8 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
     /** Resets all settings of the selected solver. */
     private SettingsButton             resetButton;
     private SolverOrderTable.SelectionListener selectionListener;
+    /** True if the details and settings of {@link #selectedSolver} are currently shown (only done for enabled solvers). */
+    private boolean                    detailsShown         = false;
     /** The config keys of the selected solver which are observed to keep the reset button's enabled state up to date. */
     @SuppressWarnings("rawtypes")
     private final List<KeyHandler>             observedKeys         = new ArrayList<KeyHandler>();
@@ -78,6 +80,7 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
         @Override
         public void onConfigValueModified(final KeyHandler<Object> keyHandler, final Object newValue) {
             updateResetButtonState();
+            onSelectedSolverConfigChanged();
         }
 
         @Override
@@ -101,7 +104,7 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
         sp.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         passMouseWheelToParent(sp);
         SwingUtils.setOpaque(this, false);
-        add(sp, "gapright 40, wrap");
+        add(sp, "wrap");
         /* Header label shown above the detail table; separated from the solver table above by a gap. */
         detailLabel = new JLabel();
         detailLabel.setVisible(false);
@@ -109,7 +112,7 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
         // Optional per-solver description shown above the detail table
         descriptionLabel = new JLabel();
         descriptionLabel.setVisible(false);
-        add(descriptionLabel, "growx, wmin 10, gapright 40, wrap");
+        add(descriptionLabel, "growx, wmin 10, wrap");
         /* "Captcha types to display" switch above the captcha types table: supported captcha types only vs. all captcha types. */
         displayModePanel = new MigPanel("ins 0", "[][][]", "[]");
         SwingUtils.setOpaque(displayModePanel, false);
@@ -144,7 +147,7 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
         detailScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         detailScrollPane.setVisible(false);
         passMouseWheelToParent(detailScrollPane);
-        add(detailScrollPane, "gaptop 6, growx, gapright 40, wrap");
+        add(detailScrollPane, "gaptop 6, growx, wrap");
         /* Server-side limits info line, shown below the captcha-types table for plugin-based (account) solvers only. */
         limitsPanel = new MigPanel("ins 0, wrap 1, gapy 2", "[]", "[]");
         SwingUtils.setOpaque(limitsPanel, false);
@@ -188,7 +191,7 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
         customLimitsContainer = new MigPanel("ins 0", "[grow,fill]", "[]");
         SwingUtils.setOpaque(customLimitsContainer, false);
         customLimitsContainer.setVisible(false);
-        add(customLimitsContainer, "gaptop 6, growx, gapright 40, wrap");
+        add(customLimitsContainer, "gaptop 6, growx, wrap");
         /* Resets all settings of the selected solver (similar to the reset button of the plugin settings). */
         resetButton = new SettingsButton(new AppAction() {
             {
@@ -203,12 +206,15 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
             }
         });
         resetButton.setVisible(false);
-        add(resetButton, "gaptop 12, alignx right, gapright 40");
+        add(resetButton, "gaptop 12, alignx right");
         selectionListener = new SolverOrderTable.SelectionListener() {
             @Override
             public void onSolverSelected(SolverService solver) {
                 selectedSolver = solver;
-                if (solver == null) {
+                /* Details and settings are only shown for enabled solvers. The selection itself is kept for disabled ones, though. */
+                final boolean show = solver != null && solver.getConfigV3().isEnabled();
+                detailsShown = show;
+                if (!show) {
                     detailLabel.setVisible(false);
                     descriptionLabel.setVisible(false);
                     displayModePanel.setVisible(false);
@@ -305,7 +311,7 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
                     configScrollPane.setVisible(true);
                     updateCustomLimits(solver);
                 }
-                resetButton.setVisible(solver != null);
+                resetButton.setVisible(show);
                 observeConfig(solver);
                 refreshLayout();
                 /* Second pass: texts which got wrapped by the first layout pass have a different height now. */
@@ -318,6 +324,22 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
             }
         };
         urlOrder.setSelectionListener(selectionListener);
+    }
+
+    /**
+     * Called when a setting of the selected solver changed: if the solver got enabled or disabled, its details and settings are shown or
+     * hidden accordingly.
+     */
+    private void onSelectedSolverConfigChanged() {
+        new EDTRunner() {
+            @Override
+            protected void runInEDT() {
+                final SolverService solver = selectedSolver;
+                if (solver != null && solver.getConfigV3().isEnabled() != detailsShown) {
+                    selectionListener.onSolverSelected(solver);
+                }
+            }
+        };
     }
 
     /**

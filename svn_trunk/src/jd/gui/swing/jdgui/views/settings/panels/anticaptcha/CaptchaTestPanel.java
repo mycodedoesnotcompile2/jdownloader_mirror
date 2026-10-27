@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -96,8 +97,9 @@ import jd.plugins.CaptchaType.CAPTCHA_TYPE;
  * the captcha type to test, edit the site URL/site key (pre-filled with the known test values, see {@link CaptchaTestChallengeFactory}) and run
  * real throwaway test {@link Challenge}s (see {@link CaptchaTestChallengeFactory}) through the normal solving pipeline
  * ({@link ChallengeResponseController#handle(Challenge)}) on a background thread. <br>
- * Every test (a single test is just a table with one row, a multi test runs all selected captcha types of one solver one after another) is
- * shown as a row of the result table. Clicking a row shows its details below the table: progress, status, elapsed time, result and the
+ * Every test (a single test, or one test per selected captcha type of a multi test) is shown in the result table with one row per solver
+ * that can be used for the test: Each row shows the answer, state and working time of its solver (solvers that were not used are listed
+ * too). Clicking a row shows its details below the table: progress, status, elapsed time, result and the
  * feedback/abort/retry buttons. If an expected result is given, the solver's answer is compared against it and the matching feedback button
  * is disabled (a correct answer cannot be reported as incorrect and vice versa).
  */
@@ -125,10 +127,11 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     private boolean                         previewExpanded    = false;
     /* All captcha images are scaled into a box of this size unless they are expanded by a click. */
     /* Upper limit of the max simultaneous tests spinner, the limit of the solver itself may be lower. */
-    private static final int                MAX_PARALLEL_TESTS = 20;
+    private static final int                MAX_PARALLEL_TESTS = 50;
     private static final int                PREVIEW_WIDTH      = 320;
     private static final int                PREVIEW_HEIGHT     = 200;
-    private File                            imageFile;
+    /* The captcha image: a URL (bundled test image) or a File (own image). */
+    private Object                          imageSource;
     private final JButton                   startButton;
     private final JLabel                    descriptionLabel;
     private final JTextField                descriptionField;
@@ -162,6 +165,8 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     private final JProgressBar                batchBar           = new JProgressBar(0, 1);
     private final JProgressBar                activityBar        = new JProgressBar();
     private volatile List<TestRun>          batchRuns          = new ArrayList<TestRun>();
+    /* The tests (not the rows) of the table, in table order. Every test owns its rows, see TestRun#rows. */
+    private volatile List<TestRun>          tests              = new ArrayList<TestRun>();
     private volatile long                   batchStartTime;
     private final RunTable                 runTable;
     private final JScrollPane               runScroll;
@@ -188,15 +193,16 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     private volatile boolean                batchRunning       = false;
     private volatile boolean                batchCancelled     = false;
     /*
-     * Reads the timeout of a test as soon as its job exists (before the periodic refresh could), so that even very fast tests have a
-     * progress percentage.
+     * Reads the timeouts of the solvers as soon as the job of a test exists (before the periodic refresh could), so that even very fast
+     * tests have a progress percentage.
      */
     private final ChallengeResponseListener jobListener        = new ChallengeResponseListener() {
                                                                    @Override
                                                                    public void onNewJob(final SolverJob<?> job) {
-                                                                       for (final TestRun run : runModel.getRuns()) {
-                                                                           if (run.challenge != null && run.challenge == job.getChallenge()) {
-                                                                               run.maxTimeoutMillis = getMaxTimeoutMillis(job);
+                                                                       for (final TestRun test : tests) {
+                                                                           if (test.challenge != null && test.challenge == job.getChallenge()) {
+                                                                               test.liveJob = job;
+                                                                               syncSolverRows(test, job, false);
                                                                            }
                                                                        }
                                                                    }
@@ -303,7 +309,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
             public void actionPerformed(final ActionEvent e) {
                 if (getImageFolder() != null) {
                     /* Same as the other places that reveal a file: opens its folder and selects the file (or just opens the folder if the file does not exist). */
-                    CrossSystem.showInExplorer(imageFile);
+                    CrossSystem.showInExplorer(getImageAsFile());
                 }
             }
         });
@@ -343,7 +349,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         add(minClicksSpinner, "growx, hidemode 3");
         add(new JLabel("Expected result"));
         add(expectedResultField, "growx");
-        startButton = new JButton("Start Single Test");
+        startButton = new JButton("Start Single Challenge Auto Test");
         startButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(final ActionEvent e) {
@@ -447,7 +453,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         noTypeWarning.setVisible(false);
         add(noTypeWarning, "skip 1, growx, wmin 0");
         /* Max simultaneous tests: up to MAX_PARALLEL_TESTS, but never more than the selected solver accepts at the same time. */
-        parallelSpinner = new JSpinner(new SpinnerNumberModel(1, 1, MAX_PARALLEL_TESTS, 1));
+        parallelSpinner = new JSpinner(new SpinnerNumberModel(5, 1, MAX_PARALLEL_TESTS, 1));
         final MigPanel parallelPanel = new MigPanel("ins 0", "[][grow,fill]", "[]");
         parallelPanel.add(parallelSpinner);
         parallelPanel.add(parallelInfoLabel);
@@ -596,6 +602,29 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         }
     }
 
+    /**
+     * Selects the given solver for the multi test and the given captcha types: the first one (which has a test) is selected in the
+     * captcha type box at the top, all given types in the multi selection (all other types of the solver are deselected).
+     */
+    public void selectMultiTestSolver(final SolverService solver, final java.util.Collection<CAPTCHA_TYPE> types) {
+        selectMultiTestSolver(solver);
+        if (batchRunning || solver == null || !isSelectable(solver) || solver != solverBox.getSelectedItem()) {
+            return;
+        }
+        /* Fresh list (all types selected), then deselect the types which were not chosen. */
+        rebuildTypeList();
+        for (int i = 0; i < typeCheckBoxes.size(); i++) {
+            typeCheckBoxes.get(i).setSelected(types.contains(typeCheckBoxTypes.get(i)));
+        }
+        updateTypesButtonText();
+        for (final CAPTCHA_TYPE type : types) {
+            if (type.hasTestChallenges()) {
+                typeBox.setSelectedItem(type);
+                break;
+            }
+        }
+    }
+
     /** Shows the warning if not a single solver can be selected. */
     private void updateNoSolverWarning() {
         boolean anySelectable = false;
@@ -632,7 +661,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         final boolean usesImage = defaults.containsKey(CaptchaTestChallengeFactory.KEY_IMAGE_FILE);
         imageLabel.setVisible(usesImage);
         imagePanel.setVisible(usesImage);
-        setImageFile((File) defaults.get(CaptchaTestChallengeFactory.KEY_IMAGE_FILE));
+        setImageSource(defaults.get(CaptchaTestChallengeFactory.KEY_IMAGE_FILE));
         final boolean usesDescription = defaults.containsKey(CaptchaTestChallengeFactory.KEY_DESCRIPTION);
         descriptionLabel.setVisible(usesDescription);
         descriptionField.setVisible(usesDescription);
@@ -675,11 +704,11 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         if (!data.containsKey(CaptchaTestChallengeFactory.KEY_IMAGE_FILE)) {
             return true;
         }
-        final File image = (File) data.get(CaptchaTestChallengeFactory.KEY_IMAGE_FILE);
-        return image != null && image.isFile();
+        final Object image = data.get(CaptchaTestChallengeFactory.KEY_IMAGE_FILE);
+        return image instanceof java.net.URL || (image instanceof File && ((File) image).isFile());
     }
 
-    /** Test data which is not valid (e.g. image captchas without a readable image) cannot be tested -> "Start Single Test" is disabled. */
+    /** Test data which is not valid (e.g. image captchas without a readable image) cannot be tested -> "Start Single Challenge Auto Test" is disabled. */
     private void updateStartButtonEnabled() {
         final CAPTCHA_TYPE type = (CAPTCHA_TYPE) typeBox.getSelectedItem();
         startButton.setEnabled(!batchRunning && isTestDataValid(buildFormData(type)));
@@ -687,9 +716,23 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
 
     /** The folder that contains the captcha image, or null if there is no image path or the folder does not exist. */
     private File getImageFolder() {
-        final File file = imageFile;
+        final File file = getImageAsFile();
         final File folder = file == null ? null : file.getParentFile();
         return folder != null && folder.isDirectory() ? folder : null;
+    }
+
+    /** The image as file, or null if there is none or if it lies in a jar (a bundled test image of a standalone version). */
+    private File getImageAsFile() {
+        if (imageSource instanceof File) {
+            return (File) imageSource;
+        } else if (imageSource instanceof java.net.URL && "file".equals(((java.net.URL) imageSource).getProtocol())) {
+            try {
+                return new File(((java.net.URL) imageSource).toURI());
+            } catch (final Exception e) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private void updateOpenFolderButton() {
@@ -697,8 +740,8 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     }
 
     /** Shows the given captcha image (or an error text if it cannot be read) in the preview. */
-    private void setImageFile(final File file) {
-        imageFile = file;
+    private void setImageSource(final Object source) {
+        imageSource = source;
         previewSource = null;
         previewExpanded = false;
         resultMarkers.clear();
@@ -707,14 +750,14 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         imagePreview.setIcon(null);
         imagePreview.setText(null);
         imageResolutionLabel.setText(null);
-        if (file == null || !file.isFile()) {
-            imagePreview.setText(file == null ? "No image" : "Image not found: " + file);
+        if (source == null || (source instanceof File && !((File) source).isFile())) {
+            imagePreview.setText(source == null ? "No image" : "Image not found: " + source);
             return;
         }
         try {
-            final BufferedImage image = ImageIO.read(file);
+            final BufferedImage image = source instanceof java.net.URL ? ImageIO.read((java.net.URL) source) : ImageIO.read((File) source);
             if (image == null) {
-                imagePreview.setText("Not a readable image: " + file);
+                imagePreview.setText("Not a readable image: " + source);
             } else {
                 previewSource = image;
                 imageResolutionLabel.setText("Resolution: " + image.getWidth() + " x " + image.getHeight() + " px");
@@ -768,7 +811,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
             image = scaled;
         }
         imagePreview.setIcon(new ImageIcon(image));
-        imagePreview.setToolTipText(imageFile != null ? imageFile.getAbsolutePath() + " (click to " + (previewExpanded ? "shrink" : "enlarge") + ")" : null);
+        imagePreview.setToolTipText(imageSource != null ? (imageSource instanceof File ? ((File) imageSource).getAbsolutePath() : String.valueOf(imageSource)) + " (click to " + (previewExpanded ? "shrink" : "enlarge") + ")" : null);
         imagePanel.revalidate();
         revalidate();
         repaint();
@@ -789,10 +832,11 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
 
     /** Lets the user pick an own captcha image. The pre-filled expected result belongs to the default image, so it is cleared. */
     private void chooseImage() {
-        final JFileChooser chooser = new JFileChooser(imageFile != null ? imageFile.getParentFile() : null);
+        final File currentFile = getImageAsFile();
+        final JFileChooser chooser = new JFileChooser(currentFile != null ? currentFile.getParentFile() : null);
         chooser.setFileFilter(new FileNameExtensionFilter("Images (png, jpg, gif)", "png", "jpg", "jpeg", "gif"));
         if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-            setImageFile(chooser.getSelectedFile());
+            setImageSource(chooser.getSelectedFile());
             expectedResultField.setText("");
         }
     }
@@ -820,7 +864,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         putIfUsed(data, CaptchaTestChallengeFactory.KEY_PROXY, proxyField.getText().trim());
         putIfUsed(data, CaptchaTestChallengeFactory.KEY_ACTION, actionField.getText().trim());
         putIfUsed(data, CaptchaTestChallengeFactory.KEY_EXPECTED_RESULT, expectedResultField.getText());
-        putIfUsed(data, CaptchaTestChallengeFactory.KEY_IMAGE_FILE, imageFile);
+        putIfUsed(data, CaptchaTestChallengeFactory.KEY_IMAGE_FILE, imageSource);
         putIfUsed(data, CaptchaTestChallengeFactory.KEY_DESCRIPTION, descriptionField.getText());
         putIfUsed(data, CaptchaTestChallengeFactory.KEY_MIN_CLICKS, Integer.valueOf(((Number) minClicksSpinner.getValue()).intValue()));
         switch (caseSensitiveBox.getSelectedIndex()) {
@@ -886,7 +930,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     }
 
     /** A solver can only be tested if it is ready and activated in the "Solver overview" tab. */
-    static boolean isSelectable(final SolverService service) {
+    public static boolean isSelectable(final SolverService service) {
         return service.isReady() && service.getConfigV3().isEnabled();
     }
 
@@ -990,7 +1034,8 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         if (replaceTable) {
             /* A new test starts: the automatic sorting is active again. */
             enableAutoSort();
-            runModel.setRuns(runs);
+            tests = new ArrayList<TestRun>(runs);
+            runModel.setRuns(getAllRows());
         } else {
             runModel.fireRunsChanged();
         }
@@ -1022,12 +1067,12 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                         pool.execute(new Runnable() {
                             @Override
                             public void run() {
-                                if (run.state == RunState.FAILED && run.aborted) {
+                                if (run.finished && run.aborted) {
                                     /* Aborted while it was still waiting for its turn. */
                                     return;
                                 }
                                 if (batchCancelled) {
-                                    finishRun(run, RunState.FAILED, "Cancelled", null);
+                                    finishTest(run, RunState.FAILED, "Cancelled", null);
                                     return;
                                 }
                                 executeRun(run);
@@ -1076,11 +1121,15 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         updateStartButtonEnabled();
     }
 
-    /** Builds a fresh challenge from the snapshot of the test and runs it through the solving pipeline. Runs on the batch thread. */
+    /**
+     * Builds a fresh challenge from the snapshot of the test and runs it through the solving pipeline. Runs on the batch thread. Before the
+     * challenge is handled, one row per usable solver is added to the table, see {@link #createSolverRows(TestRun, List)}.
+     */
     private void executeRun(final TestRun run) {
         /* Clear an interrupt flag that was meant for the previous test of this pool thread. */
         Thread.interrupted();
         run.thread = Thread.currentThread();
+        run.started = true;
         run.maxTimeoutMillis = 0;
         run.statusText = "Preparing test data...";
         run.startTime = System.currentTimeMillis();
@@ -1095,88 +1144,282 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         } catch (final Throwable e) {
             LogController.CL().log(e);
             run.thread = null;
-            finishRun(run, RunState.FAILED, batchCancelled ? "Cancelled" : (run.aborted ? "Aborted" : "Failed: " + e.getMessage()), null);
+            finishTest(run, RunState.FAILED, batchCancelled ? "Cancelled" : (run.aborted ? "Aborted" : "Failed: " + e.getMessage()), null);
             return;
         }
         run.challenge = newChallenge;
         run.statusText = "Waiting for a solver...";
         try {
-            final SolverJob<Object> job = ChallengeResponseController.getInstance().handleTest(newChallenge, run.service);
+            final List<ChallengeSolver<Object>> solvers = ChallengeResponseController.getInstance().getTestSolvers(newChallenge, run.service);
+            createSolverRows(run, solvers);
+            final SolverJob<Object> job = ChallengeResponseController.getInstance().handleTest(newChallenge, solvers);
             run.finishedJob = job;
-            final ResponseList<Object> result = newChallenge.getResult();
             if (batchCancelled) {
-                finishRun(run, RunState.FAILED, "Cancelled", null);
+                finishTest(run, RunState.FAILED, "Cancelled", null);
             } else if (run.aborted) {
-                finishRun(run, RunState.FAILED, "Aborted", null);
-            } else if (result != null && result.getValue() != null) {
-                final String answer = formatAnswer(result.getValue());
-                final String expected = (String) run.data.get(CaptchaTestChallengeFactory.KEY_EXPECTED_RESULT);
-                final String solvedBy = "Solved by: " + result.get(0).getSolver();
-                /* The solver that answered decides whether it accepts feedback. */
-                final Object solver = result.get(0).getSolver();
-                if (solver instanceof ChallengeSolver) {
-                    final Set<SolverFeature> feedbackTypes = ((ChallengeSolver<?>) solver).getSolverFeatures();
-                    /* Null or empty = the solver does not support any feedback. */
-                    run.correctUnsupported = feedbackTypes == null || !feedbackTypes.contains(SolverFeature.REPORT_VALID_CAPTCHAS);
-                    run.incorrectUnsupported = feedbackTypes == null || !feedbackTypes.contains(SolverFeature.REPORT_INVALID_CAPTCHAS);
-                }
-                if (result.getValue() instanceof MultiClickedPoint) {
-                    /* Remember all clicked positions to mark them in the image. */
-                    final MultiClickedPoint points = (MultiClickedPoint) result.getValue();
-                    for (int i = 0; i < points.getX().length; i++) {
-                        run.markers.add(new Point(points.getX()[i], points.getY()[i]));
-                    }
-                }
-                if (StringUtils.isEmpty(expected)) {
-                    run.canCorrect = true;
-                    run.canIncorrect = true;
-                    finishRun(run, RunState.PASSED, answer, solvedBy);
-                } else if (expected.equals(answer)) {
-                    /* A correct answer cannot be reported as incorrect. */
-                    run.canCorrect = true;
-                    finishRun(run, RunState.PASSED, answer, solvedBy + " | matches the expected result");
-                } else {
-                    /* A wrong answer cannot be reported as correct. */
-                    run.canIncorrect = true;
-                    run.expectedText = expected;
-                    finishRun(run, RunState.PASSED_UNEXPECTED_ANSWER, answer, solvedBy + " | does NOT match the expected result");
-                }
+                finishTest(run, RunState.FAILED, "Aborted", null);
             } else {
-                finishRun(run, RunState.FAILED, "No answer received (" + job.getStatusDetail() + ")", null);
+                /* Final state of every solver row (answer, error, not used, ...). */
+                syncSolverRows(run, job, true);
+                finishTest(run, RunState.FAILED, "No answer received (" + job.getStatusDetail() + ")", null);
             }
         } catch (final InterruptedException e) {
-            finishRun(run, RunState.FAILED, batchCancelled ? "Cancelled" : "Aborted", null);
+            finishTest(run, RunState.FAILED, batchCancelled ? "Cancelled" : "Aborted", null);
         } catch (final SkipException e) {
-            finishRun(run, RunState.FAILED, batchCancelled ? "Cancelled" : (run.aborted ? "Aborted" : "Skipped: " + e.getSkipRequest()), null);
+            syncLiveJobBeforeFinish(run);
+            finishTest(run, RunState.FAILED, batchCancelled ? "Cancelled" : (run.aborted ? "Aborted" : "Skipped: " + e.getSkipRequest()), null);
         } catch (final Throwable e) {
             LogController.CL().log(e);
-            finishRun(run, RunState.FAILED, batchCancelled ? "Cancelled" : "Failed: " + e.getClass().getSimpleName() + ": " + e.getMessage(), null);
+            finishTest(run, RunState.FAILED, batchCancelled ? "Cancelled" : "Failed: " + e.getClass().getSimpleName() + ": " + e.getMessage(), null);
         } finally {
             run.thread = null;
             run.challenge = null;
+            run.liveJob = null;
         }
     }
 
-    /** Stores the final result of a test and updates the GUI. */
-    private void finishRun(final TestRun run, final RunState state, final String answer, final String statusText) {
-        run.endTime = System.currentTimeMillis();
-        run.answer = answer;
-        run.statusText = statusText != null ? statusText : (state == RunState.FAILED ? answer : "");
-        run.state = state;
+    /** A job that ended by itself (e.g. timeout) without an exception of the user: the solver rows get the results of their solvers. */
+    private void syncLiveJobBeforeFinish(final TestRun run) {
+        final SolverJob<?> job = run.liveJob;
+        if (job != null && !batchCancelled && !run.aborted) {
+            syncSolverRows(run, job, true);
+        }
+    }
+
+    /**
+     * Ends the test: All rows of the test which are still waiting/running get the given state, answer and status text (rows that already
+     * have their result keep it), then the GUI is updated.
+     */
+    private void finishTest(final TestRun run, final RunState state, final String answer, final String statusText) {
+        synchronized (run) {
+            final long now = System.currentTimeMillis();
+            for (final TestRun row : run.rows) {
+                if (row.state == RunState.PENDING || row.state == RunState.RUNNING) {
+                    row.endTime = now;
+                    row.answer = answer;
+                    row.statusText = statusText != null ? statusText : (state == RunState.FAILED ? answer : "");
+                    row.state = state;
+                }
+            }
+            run.endTime = run.endTime > 0 ? run.endTime : now;
+            run.finished = true;
+        }
         runChanged(run, true);
     }
 
-    /** Updates the table row of the given test and, if it is the selected one, the details. */
+    /**
+     * Adds one row for every solver that can be used for the test (the first one is the row of the test itself). The rows exist from the
+     * start of the test, so solvers which are not used in the end are listed too.
+     */
+    private <X> void createSolverRows(final TestRun run, final List<ChallengeSolver<X>> solvers) {
+        if (solvers.isEmpty()) {
+            /* The test fails with "no solver" -> stays one row. */
+            return;
+        }
+        synchronized (run) {
+            run.rows.clear();
+            for (int i = 0; i < solvers.size(); i++) {
+                final TestRun row = i == 0 ? run : new TestRun(run);
+                row.solver = solvers.get(i);
+                row.solverService = row.solver.getService();
+                row.startTime = run.startTime;
+                row.state = RunState.RUNNING;
+                row.statusText = "Waiting for a solver...";
+                row.maxTimeoutMillis = row.solver.getFinalTimeoutMillis();
+                run.rows.add(row);
+            }
+        }
+        new EDTRunner() {
+            @Override
+            protected void runInEDT() {
+                rebuildTable();
+            }
+        };
+    }
+
+    /** All rows of all tests in table order. */
+    private List<TestRun> getAllRows() {
+        final List<TestRun> rows = new ArrayList<TestRun>();
+        for (final TestRun test : tests) {
+            rows.addAll(test.rows);
+        }
+        return rows;
+    }
+
+    /** Applies the current rows of all tests to the table (new solver rows, or only the one row of a test after a retry). Runs on the EDT. */
+    private void rebuildTable() {
+        final TestRun selected = selectedRun;
+        runModel.setRuns(getAllRows());
+        updateRunScrollHeight();
+        TestRun target = selected;
+        if (target != null && runModel.getRowforObject(target) < 0) {
+            /* The selected row is gone (retry): select the row of the test. */
+            target = target.lead;
+        }
+        final int index = target == null ? -1 : runModel.getRowforObject(target);
+        if (index >= 0) {
+            runTable.setRowSelectionInterval(index, index);
+        }
+    }
+
+    /**
+     * Updates all solver rows of the test from the job: answers are shown as soon as a solver delivered one, solvers that are still working
+     * or waiting are running rows, all others show what happened to them. With finalSync (the job is over) no row stays in a running
+     * state.
+     */
+    private <X> void syncSolverRows(final TestRun run, final SolverJob<X> job, final boolean finalSync) {
+        synchronized (run) {
+            final ResponseList<X> winning = job.getResponse();
+            for (final TestRun row : run.rows) {
+                final ChallengeSolver<?> solver = row.solver;
+                if (solver == null) {
+                    continue;
+                }
+                row.durationMillis = job.getSolverWorkingMillis(solver);
+                row.maxTimeoutMillis = solver.getFinalTimeoutMillis();
+                final AbstractResponse<X> response = findResponse(job, solver);
+                final SolverJob.SolverResult result = job.getSolverResult(solver);
+                if (response != null) {
+                    applyAnswer(run, row, response, finalSync, winning != null && winning.contains(response));
+                } else if (result != null) {
+                    applyOutcome(row, result);
+                } else if (finalSync) {
+                    if (job.isSolved()) {
+                        setRowFinal(row, RunState.NOT_USED, "Aborted (solved by another solver)");
+                    } else {
+                        setRowFinal(row, RunState.FAILED, job.getStatusDetail());
+                    }
+                } else if (job.isSolverSolving(solver)) {
+                    row.state = RunState.RUNNING;
+                    row.statusText = "Solving (timeout: " + formatTimeout(row.maxTimeoutMillis) + ")";
+                } else {
+                    row.state = RunState.RUNNING;
+                    row.statusText = "Waiting for other solvers...";
+                }
+            }
+        }
+    }
+
+    /** The response which the given solver delivered to the job, or null. */
+    private static <X> AbstractResponse<X> findResponse(final SolverJob<X> job, final ChallengeSolver<?> solver) {
+        final List<ResponseList<X>> lists = job.getResponses();
+        if (lists != null) {
+            for (final ResponseList<X> list : lists) {
+                for (final AbstractResponse<X> response : list) {
+                    if (response.getSolver() == solver) {
+                        return response;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private static void setRowFinal(final TestRun row, final RunState state, final String text) {
+        if (row.endTime <= 0) {
+            row.endTime = System.currentTimeMillis();
+        }
+        row.answer = text;
+        row.statusText = text;
+        row.state = state;
+    }
+
+    /** The solver delivered an answer: compared with the expected result (if any). Feedback is only possible for the answer that is used. */
+    private <X> void applyAnswer(final TestRun run, final TestRun row, final AbstractResponse<X> response, final boolean finalSync, final boolean winning) {
+        final X value = response.getValue();
+        if (value == null) {
+            setRowFinal(row, RunState.FAILED, "No answer received");
+            return;
+        }
+        final String answer = formatAnswer(value);
+        final String expected = (String) run.data.get(CaptchaTestChallengeFactory.KEY_EXPECTED_RESULT);
+        final String solvedBy = "Solved by: " + response.getSolver();
+        if (value instanceof MultiClickedPoint && row.markers.isEmpty()) {
+            /* Remember all clicked positions to mark them in the image. */
+            final MultiClickedPoint points = (MultiClickedPoint) value;
+            for (int i = 0; i < points.getX().length; i++) {
+                row.markers.add(new Point(points.getX()[i], points.getY()[i]));
+            }
+        }
+        if (row.endTime <= 0) {
+            row.endTime = System.currentTimeMillis();
+        }
+        row.answer = answer;
+        final boolean hasExpected = !StringUtils.isEmpty(expected);
+        final boolean matches = hasExpected && expected.equals(answer);
+        final boolean unexpected = hasExpected && !matches;
+        if (unexpected) {
+            row.expectedText = expected;
+            row.statusText = solvedBy + " | does NOT match the expected result";
+            row.state = RunState.PASSED_UNEXPECTED_ANSWER;
+        } else {
+            row.statusText = matches ? solvedBy + " | matches the expected result" : solvedBy;
+            row.state = RunState.PASSED;
+        }
+        if (finalSync && winning) {
+            /* A correct answer cannot be reported as incorrect and vice versa. */
+            row.canCorrect = !unexpected;
+            row.canIncorrect = !matches;
+            /* The solver that answered decides whether it accepts feedback. */
+            final Object solver = response.getSolver();
+            if (solver instanceof ChallengeSolver) {
+                final Set<SolverFeature> feedbackTypes = ((ChallengeSolver<?>) solver).getSolverFeatures();
+                /* Null or empty = the solver does not support any feedback. */
+                row.correctUnsupported = feedbackTypes == null || !feedbackTypes.contains(SolverFeature.REPORT_VALID_CAPTCHAS);
+                row.incorrectUnsupported = feedbackTypes == null || !feedbackTypes.contains(SolverFeature.REPORT_INVALID_CAPTCHAS);
+            }
+        }
+    }
+
+    /** The solver did not deliver an answer: shows why. Solvers which were not used are no failure. */
+    private static void applyOutcome(final TestRun row, final SolverJob.SolverResult result) {
+        final String message = result.getMessage();
+        String text;
+        RunState state = RunState.FAILED;
+        switch (result.getOutcome()) {
+        case ABORTED:
+            state = RunState.NOT_USED;
+            text = "Aborted";
+            break;
+        case NOT_STARTED:
+            state = RunState.NOT_USED;
+            text = "Not started";
+            break;
+        case TIMED_OUT:
+            text = "Timeout";
+            break;
+        case ANSWER_REJECTED:
+            text = "Answer rejected";
+            break;
+        case UNSOLVABLE:
+            text = "Unsolvable";
+            break;
+        case SOLVER_ERROR_ACCOUNT:
+            text = "Account error";
+            break;
+        case ANSWERED:
+        case SOLVER_ERROR:
+        default:
+            text = "Error";
+            break;
+        }
+        setRowFinal(row, state, message != null ? text + ": " + message : text);
+    }
+
+    /** Updates the table rows of the given test and, if one of them is the selected one, the details. */
     private void runChanged(final TestRun run, final boolean finished) {
         new EDTRunner() {
             @Override
             protected void runInEDT() {
-                runModel.fireRunChanged(run);
+                for (final TestRun row : run.rows) {
+                    runModel.fireRunChanged(row);
+                }
                 if (finished && !userSorted) {
                     /* Passed first, then failed, running, pending. */
                     runModel.refreshSort();
                 }
-                if (run == selectedRun) {
+                final TestRun selected = selectedRun;
+                if (selected != null && selected.lead == run) {
                     if (finished) {
                         syncMarkers();
                     }
@@ -1191,10 +1434,18 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         refreshTimer = new Timer(100, new ActionListener() {
             @Override
             public void actionPerformed(final ActionEvent e) {
-                for (final TestRun run : runModel.getRuns()) {
-                    if (run.state == RunState.RUNNING) {
-                        updateActiveSolversStatus(run);
-                        runModel.fireRunChanged(run);
+                for (final TestRun test : tests) {
+                    if (test.started && !test.finished) {
+                        final Challenge<Object> current = test.challenge;
+                        if (current != null) {
+                            final SolverJob<?> job = ChallengeResponseController.getInstance().getJobByChallengeId(current.getId().getID());
+                            if (job != null) {
+                                syncSolverRows(test, job, false);
+                            }
+                        }
+                        for (final TestRun row : test.rows) {
+                            runModel.fireRunChanged(row);
+                        }
                     }
                 }
                 updateBatchLabel();
@@ -1241,26 +1492,14 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     /** Progress line above the table of a multi test: "Running test 1/X" while running, the total time when done. */
     private void updateBatchLabel() {
         final List<TestRun> runs = batchRuns;
-        final boolean visible = runModel.getRowCount() > 1;
+        final boolean visible = tests.size() > 1;
         batchBar.setVisible(visible);
         /* The animation shows that at least one test is still running. */
         activityBar.setVisible(visible && batchRunning);
-        int started = 0;
         int finished = 0;
         for (final TestRun run : runs) {
-            switch (run.state) {
-            case PENDING:
-                break;
-            case RUNNING:
-                started++;
-                break;
-            case PASSED:
-            case PASSED_UNEXPECTED_ANSWER:
-            case FAILED:
-            default:
-                started++;
+            if (run.finished) {
                 finished++;
-                break;
             }
         }
         batchBar.setMaximum(Math.max(1, runs.size()));
@@ -1291,16 +1530,19 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     }
 
     /** Runs the given (finished) test again with the same input. */
-    private void retryRun(final TestRun run) {
+    private void retryRun(final TestRun row) {
+        /* The whole test is run again: it is one row again until its solvers are known. */
+        final TestRun run = row.lead;
         run.reset();
+        rebuildTable();
         final List<TestRun> runs = new ArrayList<TestRun>();
         runs.add(run);
         startBatch(runs, false);
     }
 
-    /** True while a test is waiting for its turn or running, i.e. it can still be cancelled. */
+    /** True while a test is waiting for its turn or running, i.e. it can still be cancelled. Cancelling a row cancels the whole test. */
     private static boolean isCancellable(final TestRun run) {
-        return run.state == RunState.PENDING || run.state == RunState.RUNNING;
+        return !run.lead.finished && (run.state == RunState.PENDING || run.state == RunState.RUNNING);
     }
 
     /** Shows the state of the selected test (or hides the details if none is selected). */
@@ -1328,6 +1570,10 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
             resultArea.setForeground(Color.RED);
             resultArea.setText(run.answer);
             break;
+        case NOT_USED:
+            resultArea.setForeground(Color.GRAY);
+            resultArea.setText(run.answer);
+            break;
         case PENDING:
         case RUNNING:
         default:
@@ -1342,7 +1588,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         correctButton.setForeground(run.correctUnsupported ? Color.RED : defaultButtonForeground);
         incorrectButton.setText(run.incorrectUnsupported ? "Incorrect (unsupported)" : "Incorrect");
         incorrectButton.setForeground(run.incorrectUnsupported ? Color.RED : defaultButtonForeground);
-        abortButton.setEnabled(state == RunState.PENDING || state == RunState.RUNNING);
+        abortButton.setEnabled(isCancellable(run));
         retryButton.setEnabled(isRetryable(run));
         runPanel.revalidate();
         revalidate();
@@ -1353,7 +1599,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         if (run == null) {
             return;
         }
-        final SolverJob<Object> job = run.finishedJob;
+        final SolverJob<Object> job = run.lead.finishedJob;
         if (job != null) {
             if (correct) {
                 job.validate();
@@ -1371,6 +1617,10 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
             return "";
         }
         final long elapsedMillis = getDurationMillis(run);
+        if (elapsedMillis < 0) {
+            /* The solver of the row did not start working yet. */
+            return "";
+        }
         final StringBuilder sb = new StringBuilder("Elapsed: ").append(elapsedMillis / 100 / 10d).append("s");
         final long maxMillis = run.maxTimeoutMillis;
         if (maxMillis > 0 && run.state == RunState.RUNNING) {
@@ -1388,6 +1638,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         case PASSED:
         case PASSED_UNEXPECTED_ANSWER:
         case FAILED:
+        case NOT_USED:
             return Math.max(0, getDurationMillis(run));
         case RUNNING:
             return Long.MAX_VALUE - 1;
@@ -1414,69 +1665,18 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text), null);
     }
 
-    /** Duration of a test: until its end, or until now while it is running. */
+    /** Duration of a test (row): until its end, or until now while it is running. */
     private static long getDurationMillis(final TestRun run) {
+        if (run.solver != null) {
+            /* Row of a solver: the time that this solver worked (-1 = did not start). */
+            return run.durationMillis;
+        }
         final long start = run.startTime;
         if (start <= 0) {
             return -1;
         }
         final long end = run.endTime;
         return (end > 0 ? end : System.currentTimeMillis()) - start;
-    }
-
-    /**
-     * Longest timeout of all solvers of the job (done or not), or -1 as soon as one of them has no timeout (-> no percentage shown).
-     */
-    private static <X> long getMaxTimeoutMillis(final SolverJob<X> job) {
-        long maxTimeout = 0;
-        for (final ChallengeSolver<X> solver : job.getSolverList()) {
-            final long solverTimeout = solver.getFinalTimeoutMillis();
-            if (solverTimeout <= 0) {
-                return -1;
-            }
-            maxTimeout = Math.max(maxTimeout, solverTimeout);
-        }
-        return maxTimeout;
-    }
-
-    /**
-     * Shows which solver(s) are still working on the challenge and their {@link ChallengeSolver#getFinalTimeoutMillis()}, while waiting.
-     */
-    private void updateActiveSolversStatus(final TestRun run) {
-        final Challenge<Object> current = run.challenge;
-        if (run.finishedJob != null || current == null) {
-            /* Solving already finished -> finishRun() owns the status from here on. */
-            return;
-        }
-        final SolverJob<?> job = ChallengeResponseController.getInstance().getJobByChallengeId(current.getId().getID());
-        if (job != null) {
-            updateActiveSolversStatus(run, job);
-        }
-    }
-
-    private <X> void updateActiveSolversStatus(final TestRun run, final SolverJob<X> job) {
-        final StringBuilder sb = new StringBuilder();
-        /* Longest timeout of all active solvers; -1 as soon as one of them has no timeout (-> no percentage shown). */
-        long maxTimeout = 0;
-        for (final ChallengeSolver<X> solver : job.getSolverList()) {
-            if (job.isDone(solver)) {
-                continue;
-            }
-            final long solverTimeout = solver.getFinalTimeoutMillis();
-            if (solverTimeout <= 0) {
-                maxTimeout = -1;
-            } else if (maxTimeout >= 0) {
-                maxTimeout = Math.max(maxTimeout, solverTimeout);
-            }
-            if (sb.length() > 0) {
-                sb.append(", ");
-            }
-            sb.append(solver).append(" (timeout: ").append(formatTimeout(solver.getFinalTimeoutMillis())).append(")");
-        }
-        if (sb.length() > 0) {
-            run.maxTimeoutMillis = maxTimeout;
-            run.statusText = "Solving with: " + sb;
-        }
     }
 
     /** {@link ChallengeSolver#getFinalTimeoutMillis()} returns -1 for "no timeout", and a millisecond delay otherwise. */
@@ -1513,31 +1713,30 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     }
 
     /**
-     * Aborts a single test: a running one is killed (the batch continues with the next test), one that did not start yet is marked as
-     * failed right away.
+     * Aborts a test (a row stands for its whole test): a running one is killed (the batch continues with the next test), one that did not
+     * start yet is marked as failed right away.
      */
-    private void abortRun(final TestRun run, final boolean cancelled) {
+    private void abortRun(final TestRun row, final boolean cancelled) {
+        final TestRun run = row.lead;
         run.aborted = true;
-        switch (run.state) {
-        case RUNNING:
+        if (run.finished) {
+            return;
+        }
+        if (run.started) {
             killLiveJob(run);
             final Thread thread = run.thread;
             if (thread != null && thread.isAlive()) {
                 thread.interrupt();
             }
-            break;
-        case PENDING:
-            finishRun(run, RunState.FAILED, cancelled ? "Cancelled" : "Aborted", null);
-            break;
-        default:
-            break;
+        } else {
+            finishTest(run, RunState.FAILED, cancelled ? "Cancelled" : "Aborted", null);
         }
     }
 
     /** Cancels the running test and all tests that did not start yet. */
     private void cancelBatch() {
         batchCancelled = true;
-        for (final TestRun run : runModel.getRuns()) {
+        for (final TestRun run : tests) {
             abortRun(run, true);
         }
     }
@@ -1548,7 +1747,9 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         RUNNING,
         PASSED,
         PASSED_UNEXPECTED_ANSWER,
-        FAILED;
+        FAILED,
+        /* The solver of the row did not work on the test (e.g. aborted because another solver was faster). */
+        NOT_USED;
 
         /** Default table order: passed, failed, running, pending. */
         int getSortRank() {
@@ -1561,8 +1762,10 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
             case RUNNING:
                 return 2;
             case PENDING:
-            default:
                 return 3;
+            case NOT_USED:
+            default:
+                return 4;
             }
         }
 
@@ -1575,6 +1778,8 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                 return "Passed";
             case FAILED:
                 return "Failed";
+            case NOT_USED:
+                return "Not used";
             case PENDING:
             default:
                 return "Pending";
@@ -1587,6 +1792,8 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                 return COLOR_ORANGE;
             case FAILED:
                 return Color.RED;
+            case NOT_USED:
+                return Color.GRAY;
             case PASSED:
             case RUNNING:
             case PENDING:
@@ -1605,50 +1812,95 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                 return NewTheme.I().getIcon(IconKey.ICON_FALSE, 16);
             case RUNNING:
             case PENDING:
+            case NOT_USED:
             default:
                 return null;
             }
         }
     }
 
-    /** One test (= one table row): its input snapshot, state and result. */
+    /**
+     * One table row: a test (captcha type) and one solver of it. A test owns one row per solver that can be used (lead = the first row,
+     * which also executes the test): The state, answer, times and markers belong to the row, everything that belongs to the test
+     * (thread, challenge, job, abort) is only used on the lead.
+     */
     private static class TestRun {
-        private final CAPTCHA_TYPE          type;
-        private final CaptchaRequestType    source;
-        private final Map<String, Object>   data;
+        private final CAPTCHA_TYPE                type;
+        private final CaptchaRequestType          source;
+        private final Map<String, Object>         data;
         /* null = all solvers, otherwise only this one. */
-        private final SolverService         service;
-        private volatile RunState           state;
-        private volatile long               startTime;
-        private volatile long               endTime;
-        private volatile String             answer;
-        private volatile String             statusText;
-        private volatile String             expectedText;
-        private volatile boolean            canCorrect;
-        private volatile boolean            canIncorrect;
-        private volatile boolean            correctUnsupported;
-        private volatile boolean            incorrectUnsupported;
-        private volatile boolean            aborted;
-        private volatile long               maxTimeoutMillis;
-        private volatile Challenge<Object>  challenge;
+        private final SolverService               service;
+        /* The row which executes the test (this for the first row). */
+        private final TestRun                     lead;
+        /* All rows of the test, the lead is the first (only used on the lead). */
+        private final List<TestRun>               rows    = new CopyOnWriteArrayList<TestRun>();
+        /* The solver of this row, null as long as the solvers of the test are not known. */
+        private volatile ChallengeSolver<?>       solver;
+        /* The service shown in the solver column: the chosen one until the solver is known. */
+        private volatile SolverService            solverService;
+        /* How long the solver worked on the test, -1 if it did not start. */
+        private volatile long                     durationMillis;
+        private volatile boolean                  started;
+        private volatile boolean                  finished;
+        private volatile RunState                 state;
+        private volatile long                     startTime;
+        private volatile long                     endTime;
+        private volatile String                   answer;
+        private volatile String                   statusText;
+        private volatile String                   expectedText;
+        private volatile boolean                  canCorrect;
+        private volatile boolean                  canIncorrect;
+        private volatile boolean                  correctUnsupported;
+        private volatile boolean                  incorrectUnsupported;
+        private volatile boolean                  aborted;
+        private volatile long                     maxTimeoutMillis;
+        private volatile Challenge<Object>        challenge;
         /* Pool thread that currently executes this test. */
-        private volatile Thread             thread;
-        private volatile SolverJob<Object>  finishedJob;
-        private final List<Point>           markers = new ArrayList<Point>();
+        private volatile Thread                   thread;
+        private volatile SolverJob<Object>        finishedJob;
+        /* The job while the test is handled. */
+        private volatile SolverJob<?>             liveJob;
+        private final List<Point>                 markers = new CopyOnWriteArrayList<Point>();
 
         private TestRun(final CAPTCHA_TYPE type, final CaptchaRequestType source, final Map<String, Object> data, final SolverService service) {
             this.type = type;
             this.source = source;
             this.data = data;
             this.service = service;
+            this.lead = this;
             reset();
         }
 
-        /** Back to the state before the test was started. */
+        /** Additional row of the test of the given lead row (one more solver). */
+        private TestRun(final TestRun lead) {
+            this.type = lead.type;
+            this.source = lead.source;
+            this.data = lead.data;
+            this.service = lead.service;
+            this.lead = lead;
+            resetRow();
+        }
+
+        /** Back to the state before the test was started: one row (this one) without solver. Only for the lead. */
         private void reset() {
+            resetRow();
+            aborted = false;
+            started = false;
+            finished = false;
+            challenge = null;
+            finishedJob = null;
+            liveJob = null;
+            solver = null;
+            solverService = service;
+            rows.clear();
+            rows.add(this);
+        }
+
+        private void resetRow() {
             state = RunState.PENDING;
             startTime = 0;
             endTime = 0;
+            durationMillis = -1;
             answer = "";
             statusText = "";
             expectedText = null;
@@ -1656,10 +1908,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
             canIncorrect = false;
             correctUnsupported = false;
             incorrectUnsupported = false;
-            aborted = false;
             maxTimeoutMillis = 0;
-            challenge = null;
-            finishedJob = null;
             markers.clear();
         }
     }
@@ -1722,7 +1971,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                 copyRow.addActionListener(new ActionListener() {
                     @Override
                     public void actionPerformed(final ActionEvent event) {
-                        copyToClipboard(contextObject.type.getDisplayName() + "	" + contextObject.state.getText() + "	" + formatDurationText(contextObject) + "	" + contextObject.answer);
+                        copyToClipboard(contextObject.type.getDisplayName() + "\t" + getSolverName(contextObject) + "\t" + contextObject.state.getText() + "\t" + formatDurationText(contextObject) + "\t" + contextObject.answer);
                     }
                 });
                 popup.add(copyRow);
@@ -1741,6 +1990,11 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     }
 
     /** Table model of the tests: one row per test. All columns are sortable. */
+    private static String getSolverName(final TestRun row) {
+        final SolverService service = row.solverService;
+        return service != null ? service.getName() : "";
+    }
+
     private class RunTableModel extends ExtTableModel<TestRun> {
         private static final long serialVersionUID = 1L;
         /* Assigned in initColumns() (called by the super constructor), so it must not have an initializer. */
@@ -1782,6 +2036,26 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
 
         @Override
         protected void initColumns() {
+            /* The solver of the row; as long as it is not known the chosen solver (empty if there is none). */
+            addColumn(new ExtTextColumn<TestRun>("Solver") {
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public String getStringValue(final TestRun value) {
+                    return getSolverName(value);
+                }
+
+                @Override
+                protected javax.swing.Icon getIcon(final TestRun value) {
+                    final SolverService service = value.solverService;
+                    return service != null ? service.getIcon(16) : null;
+                }
+
+                @Override
+                public int getDefaultWidth() {
+                    return 160;
+                }
+            });
             addColumn(new ExtTextColumn<TestRun>("Captcha type") {
                 private static final long serialVersionUID = 1L;
 

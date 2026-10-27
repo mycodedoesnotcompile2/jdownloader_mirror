@@ -49,6 +49,11 @@ public class BubbleNotifyConfigPanel extends AbstractConfigPanel implements Stat
         return _GUI.T.NotifierConfigPanel_getTitle();
     }
 
+    @Override
+    public String getSidebarTooltip() {
+        return _GUI.T.SettingsSidebar_tooltip_Notifications();
+    }
+
     public BubbleNotifyConfigPanel() {
         super();
         layoutComponents();

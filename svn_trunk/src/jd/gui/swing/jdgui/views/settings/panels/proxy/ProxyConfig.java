@@ -1,5 +1,6 @@
 package jd.gui.swing.jdgui.views.settings.panels.proxy;
 
+import org.jdownloader.gui.translate._GUI;
 import java.util.List;
 
 import javax.swing.Box;
@@ -26,6 +27,11 @@ import org.jdownloader.translate._JDT;
 public class ProxyConfig extends AbstractConfigPanel implements DefaultEventListener<ProxyEvent<AbstractProxySelectorImpl>> {
     public String getTitle() {
         return _JDT.T.gui_settings_proxy_title();
+    }
+
+    @Override
+    public String getSidebarTooltip() {
+        return _GUI.T.SettingsSidebar_tooltip_Proxy();
     }
 
     private static final long     serialVersionUID = -521958649780869375L;

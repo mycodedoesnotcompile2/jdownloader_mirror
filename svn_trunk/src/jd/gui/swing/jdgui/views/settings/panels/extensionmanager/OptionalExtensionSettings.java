@@ -28,6 +28,11 @@ public class OptionalExtensionSettings extends AbstractConfigPanel implements Ex
         return _GUI.T.extensionManager_title();
     }
 
+    @Override
+    public String getSidebarTooltip() {
+        return _GUI.T.SettingsSidebar_tooltip_Extensions();
+    }
+
     public OptionalExtensionSettings() {
         super();
         add(new Header(getTitle(), new AbstractIcon(IconKey.ICON_EXTENSIONMANAGER, 32)), "spanx,growx,pushx");

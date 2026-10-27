@@ -80,6 +80,11 @@ public class MyJDownloaderSettingsPanel extends AbstractConfigPanel implements G
         return _GUI.T.MyJDownloaderSettingsPanel_MyJDownloaderSettingsPanel_title_();
     }
 
+    @Override
+    public String getSidebarTooltip() {
+        return _GUI.T.SettingsSidebar_tooltip_MyJDownloader();
+    }
+
     public MyJDownloaderSettingsPanel() {
         super();
         openMyJDownloader = new SettingsButton(new AppAction() {

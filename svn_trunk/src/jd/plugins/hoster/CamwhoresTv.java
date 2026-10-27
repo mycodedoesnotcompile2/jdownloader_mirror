@@ -30,10 +30,11 @@ import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.decrypter.CamwhoresTvCrawler;
 
-@HostPlugin(revision = "$Revision: 53394 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53754 $", interfaceVersion = 3, names = {}, urls = {})
 public class CamwhoresTv extends KernelVideoSharingComV2 {
     public CamwhoresTv(final PluginWrapper wrapper) {
         super(wrapper);
@@ -132,17 +133,30 @@ public class CamwhoresTv extends KernelVideoSharingComV2 {
         if (urltitle == null) {
             return null;
         }
-        if (!StringUtils.isEmpty(urltitle)) {
-            final String removeMe = new Regex(urltitle, "((-[a-f0-9]{8})?-[a-f0-9]{16}-?)$").getMatch(0);
-            if (removeMe != null) {
-                urltitle = urltitle.replace(removeMe, "");
-            }
-            /* Make the url-filenames look better by using spaces instead of '-'. */
-            urltitle = urltitle.replace("-", " ");
-            /* Remove eventually existing spaces at the end */
-            urltitle = urltitle.trim();
+        if (StringUtils.isEmpty(urltitle)) {
+            return null;
         }
+        final String removeMe = new Regex(urltitle, "((-[a-f0-9]{8})?-[a-f0-9]{16}-?)$").getMatch(0);
+        if (removeMe != null) {
+            urltitle = urltitle.replace(removeMe, "");
+        }
+        /* Make the url-filenames look better by using spaces instead of '-'. */
+        urltitle = urltitle.replace("-", " ");
+        /* Remove eventually existing spaces at the end */
+        urltitle = urltitle.trim();
         return urltitle;
+    }
+
+    @Override
+    protected AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
+        if (link.getReferrerUrl() == null && StringUtils.containsIgnoreCase(link.getPluginPatternMatcher(), "camwhores.lol/embed")) {
+            /*
+             * 2026-10-26: Workaround so that we can access embedded camwhores.lol urls. No or wrong referer value = Returns http status
+             * code 404
+             */
+            link.setReferrerUrl("https://www.camvideos.org/");
+        }
+        return super.requestFileInformationWebsite(link, account, isDownload);
     }
 
     @Override

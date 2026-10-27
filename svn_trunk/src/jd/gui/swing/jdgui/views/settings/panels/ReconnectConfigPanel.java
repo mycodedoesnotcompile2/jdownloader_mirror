@@ -39,6 +39,11 @@ public class ReconnectConfigPanel extends AbstractConfigPanel {
         return _JDT.T.gui_settings_reconnect_title();
     }
 
+    @Override
+    public String getSidebarTooltip() {
+        return _GUI.T.SettingsSidebar_tooltip_Reconnect();
+    }
+
     public ReconnectConfigPanel() {
         super();
         this.addHeader(_GUI.T.ReconnectSettings_ReconnectSettings_settings_(), new AbstractIcon(IconKey.ICON_SETTINGS, 32));

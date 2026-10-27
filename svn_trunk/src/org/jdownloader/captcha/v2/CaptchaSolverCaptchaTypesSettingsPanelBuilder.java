@@ -1,5 +1,13 @@
 package org.jdownloader.captcha.v2;
 
+import org.jdownloader.images.AbstractIcon;
+import jd.gui.swing.jdgui.views.settings.panels.anticaptcha.CaptchaTestPanel;
+import jd.gui.swing.jdgui.views.settings.panels.anticaptcha.CaptchaConfigPanel;
+import jd.gui.swing.jdgui.views.settings.components.ToggleEnabledSelectionAction;
+import javax.swing.JPopupMenu;
+import javax.swing.JMenuItem;
+import java.awt.event.ActionListener;
+import java.awt.event.ActionEvent;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.event.MouseEvent;
@@ -104,7 +112,57 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
     public final BasicJDTable<CAPTCHA_TYPE> getCaptchaTypesTable() {
         final ExtTableModel<CAPTCHA_TYPE> tableModel = createTableModel();
         tableModel._fireTableStructureChanged(captchaTypes, false);
-        final BasicJDTable<CAPTCHA_TYPE> table = new BasicJDTable<CAPTCHA_TYPE>(tableModel);
+        final BasicJDTable<CAPTCHA_TYPE> table = new BasicJDTable<CAPTCHA_TYPE>(tableModel) {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            protected JPopupMenu onContextMenu(final JPopupMenu popup, final CAPTCHA_TYPE contextObject, final List<CAPTCHA_TYPE> selection, final ExtColumn<CAPTCHA_TYPE> column, final MouseEvent mouseEvent) {
+                if (selection == null || selection.isEmpty()) {
+                    return null;
+                }
+                /* Enable/disable all selected captcha types at once (only types which JDownloader supports can be switched). */
+                popup.add(new ToggleEnabledSelectionAction<CAPTCHA_TYPE>(contextObject, selection) {
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    protected boolean isEntryEnabled(final CAPTCHA_TYPE entry) {
+                        return accessor.isEnabled(entry);
+                    }
+
+                    @Override
+                    protected void setEntryEnabled(final CAPTCHA_TYPE entry, final boolean enabled) {
+                        if (entry.isJDownloaderSupported()) {
+                            accessor.setEnabled(entry, enabled);
+                        }
+                    }
+
+                    @Override
+                    protected void onFinished() {
+                        getModel().fireTableDataChanged();
+                    }
+                });
+                if (CaptchaConfigPanel.isDebugTabShown()) {
+                    /* Only if the "Test & Debug" tab exists, only for solvers which can be tested and if a selected type has a test. */
+                    final List<CAPTCHA_TYPE> testable = new ArrayList<CAPTCHA_TYPE>();
+                    for (final CAPTCHA_TYPE type : selection) {
+                        if (type.hasTestChallenges()) {
+                            testable.add(type);
+                        }
+                    }
+                    final SolverService solver = accessor.getSolverService();
+                    final JMenuItem testAndDebug = new JMenuItem("Test & Debug", new AbstractIcon(IconKey.ICON_BUG, 18));
+                    testAndDebug.setEnabled(solver != null && CaptchaTestPanel.isSelectable(solver) && !testable.isEmpty());
+                    testAndDebug.addActionListener(new ActionListener() {
+                        @Override
+                        public void actionPerformed(final ActionEvent e) {
+                            CaptchaConfigPanel.showTestAndDebug(solver, testable);
+                        }
+                    });
+                    popup.add(testAndDebug);
+                }
+                return popup;
+            }
+        };
         table.setPreferredScrollableViewportSize(new Dimension(table.getPreferredSize().width, table.getRowHeight() * table.getRowCount()));
         table.setSearchEnabled(true);
         return table;
@@ -311,6 +369,12 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
         };
     }
 
+    /** Second line of the tooltips: the source of the captcha (downloads, account check, ...), empty if unknown. */
+    private static String getSourceLine(final CaptchaHistoryEntry entry) {
+        final Challenge.CaptchaRequestType requestType = entry.getCaptchaRequestType();
+        return requestType == null ? "" : "\r\n" + _GUI.T.CaptchaTypesTable_tooltip_lastUsedSource(requestType.getLabel());
+    }
+
     /** "Ever used by you?" column: yes/no based on whether this captcha type was ever used by this JD instance. */
     private ExtTextColumn<CAPTCHA_TYPE> createEverNeededColumn() {
         final Icon icon_okay = NewTheme.I().getIcon(IconKey.ICON_OK, 16);
@@ -338,7 +402,14 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
                     return _GUI.T.CaptchaTypesTable_tooltip_neverUsedByInstance();
                 }
                 final String elapsed = new ElapsedTimeFormatter().setUseNaturalLanguage(true).formatTimestamp(lastEntry.getTimestamp());
-                return _GUI.T.CaptchaTypesTable_tooltip_lastUsedForService(elapsed, lastEntry.getDomain());
+                return _GUI.T.CaptchaTypesTable_tooltip_lastUsedForService(elapsed, lastEntry.getDomain()) + getSourceLine(lastEntry);
+            }
+
+            /* Hidden by default if the user never needed any captcha type. */
+            @Override
+            public boolean isDefaultVisible() {
+                final List<CaptchaHistoryEntry> all = CaptchaHistoryManager.getInstance().getAllEntries();
+                return all != null && !all.isEmpty();
             }
         };
     }
@@ -381,7 +452,7 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
                 int download = 0;
                 if (entries != null) {
                     for (final CaptchaHistoryEntry entry : entries) {
-                        if (entry.isLoginCaptcha()) {
+                        if (entry.getCaptchaRequestType() == Challenge.CaptchaRequestType.HOSTER_LOGIN) {
                             login++;
                         } else {
                             download++;
@@ -462,7 +533,7 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
                     return _GUI.T.CaptchaTypesTable_tooltip_neverUsed();
                 }
                 final String formattedDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date(lastEntry.getTimestamp()));
-                return _GUI.T.CaptchaTypesTable_tooltip_lastUsedAt(formattedDate, lastEntry.getDomain());
+                return _GUI.T.CaptchaTypesTable_tooltip_lastUsedAt(formattedDate, lastEntry.getDomain()) + getSourceLine(lastEntry);
             }
 
             @Override
@@ -601,6 +672,9 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
         void setEnabled(CAPTCHA_TYPE ctype, boolean enabled);
 
         boolean isSupported(CAPTCHA_TYPE ctype);
+
+        /** The solver service the captcha types belong to, or null if unknown. */
+        SolverService getSolverService();
     }
 
     public static class AccountCaptchaTypeAccessor implements CaptchaTypeAccessor {
@@ -628,6 +702,11 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
         }
 
         @Override
+        public SolverService getSolverService() {
+            return ChallengeResponseController.getInstance().getServiceByID(account.getHoster());
+        }
+
+        @Override
         public boolean isSupported(final CAPTCHA_TYPE ctype) {
             final PluginForHost plg = account.getPlugin();
             if (!(plg instanceof abstractPluginForCaptchaSolver)) {
@@ -646,6 +725,11 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
 
         public SolverServiceCaptchaTypeAccessor(final SolverService solver) {
             this.solver = solver;
+        }
+
+        @Override
+        public SolverService getSolverService() {
+            return solver;
         }
 
         @Override

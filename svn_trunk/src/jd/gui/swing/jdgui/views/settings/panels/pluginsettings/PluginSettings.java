@@ -22,6 +22,11 @@ public class PluginSettings extends AbstractConfigPanel {
         return _GUI.T.PluginSettings_getTitle();
     }
 
+    @Override
+    public String getSidebarTooltip() {
+        return _GUI.T.SettingsSidebar_tooltip_Plugins();
+    }
+
     public PluginSettings() {
         super();
     }

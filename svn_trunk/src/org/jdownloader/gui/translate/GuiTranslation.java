@@ -5555,7 +5555,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Usage of download accounts is globally disabled, click here to enable" })
     String PremiumAccountTableModel_status_enableAccounts();
 
-    @Default(lngs = { "en" }, values = { "Accounts disabled or invalid, go to account manager" })
+    @Default(lngs = { "en" }, values = { "Accounts disabled or invalid, check in account manager" })
     String SolverOrderTableModel_status_accountsUnusable();
 
     @Default(lngs = { "en" }, values = { "Configure" })
@@ -5567,7 +5567,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "In error state, check MyJD config" })
     String CaptchaSolverService_status_myjd_error();
 
-    @Default(lngs = { "en" }, values = { "Open account manager" })
+    @Default(lngs = { "en" }, values = { "Show in Account Manager" })
     String SolverOrderTable_context_openAccountManager();
 
     @Default(lngs = { "en" }, values = { "Select browser" })
@@ -5671,6 +5671,48 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Proxy: solve captchas through the proxy of the website requests" })
     String SolverFeature_PROXY();
+
+    @Default(lngs = { "en" }, values = { "Basic settings: download folder, simultaneous downloads and connections, speed limit and general download behavior" })
+    String SettingsSidebar_tooltip_General();
+
+    @Default(lngs = { "en" }, values = { "Router reconnect settings to automatically get a new IP address" })
+    String SettingsSidebar_tooltip_Reconnect();
+
+    @Default(lngs = { "en" }, values = { "Manage proxies and proxy rules used for downloads and link crawling" })
+    String SettingsSidebar_tooltip_Proxy();
+
+    @Default(lngs = { "en" }, values = { "Manage your accounts for hosters and other services" })
+    String SettingsSidebar_tooltip_AccountManager();
+
+    @Default(lngs = { "en" }, values = { "Stored usernames and passwords for websites that use HTTP basic authentication" })
+    String SettingsSidebar_tooltip_BasicAuthentication();
+
+    @Default(lngs = { "en" }, values = { "Captcha solvers, captcha rules and limits" })
+    String SettingsSidebar_tooltip_Captcha();
+
+    @Default(lngs = { "en" }, values = { "Settings for individual plugins e.g. video quality settings" })
+    String SettingsSidebar_tooltip_Plugins();
+
+    @Default(lngs = { "en" }, values = { "Look & feel, language, theme and behavior of the user interface" })
+    String SettingsSidebar_tooltip_GUI();
+
+    @Default(lngs = { "en" }, values = { "Rules which automatically change package names, download folders and other properties of new links" })
+    String SettingsSidebar_tooltip_Packagizer();
+
+    @Default(lngs = { "en" }, values = { "All internal settings for fine tuning. Only change them if you know what you are doing" })
+    String SettingsSidebar_tooltip_Advanced();
+
+    @Default(lngs = { "en" }, values = { "Linkgrabber behavior and link filters to ignore unwanted links" })
+    String SettingsSidebar_tooltip_Linkgrabber();
+
+    @Default(lngs = { "en" }, values = { "Install, enable and disable optional extensions" })
+    String SettingsSidebar_tooltip_Extensions();
+
+    @Default(lngs = { "en" }, values = { "Remote access to this JDownloader via my.jdownloader.org (web, apps and browser extensions)" })
+    String SettingsSidebar_tooltip_MyJDownloader();
+
+    @Default(lngs = { "en" }, values = { "Notifications and the events they are shown for" })
+    String SettingsSidebar_tooltip_Notifications();
 
     @Default(lngs = { "en" }, values = { "Downloads" })
     String CaptchaRequestType_HOSTER();
@@ -6025,6 +6067,9 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Last used %s1 for service %s2" })
     String CaptchaTypesTable_tooltip_lastUsedForService(String elapsed, String service);
+
+    @Default(lngs = { "en" }, values = { "Source: %s1" })
+    String CaptchaTypesTable_tooltip_lastUsedSource(String source);
 
     @Default(lngs = { "en" }, values = { "<html>Download captchas: %s1<br>Login captchas: %s2</html>" })
     String CaptchaTypesTable_tooltip_captchaCounts(String download, String login);

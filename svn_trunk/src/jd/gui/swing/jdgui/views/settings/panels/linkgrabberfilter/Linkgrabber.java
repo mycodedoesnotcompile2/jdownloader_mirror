@@ -16,6 +16,7 @@
 
 package jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter;
 
+import org.jdownloader.gui.translate._GUI;
 import javax.swing.Icon;
 
 import org.appwork.utils.event.queue.Queue.QueuePriority;
@@ -41,6 +42,11 @@ public class Linkgrabber extends AbstractConfigPanel implements CheckBoxedEntry 
 
     public String getTitle() {
         return _JDT.T.gui_settings_linkgrabber_title();
+    }
+
+    @Override
+    public String getSidebarTooltip() {
+        return _GUI.T.SettingsSidebar_tooltip_Linkgrabber();
     }
 
     public String getName() {

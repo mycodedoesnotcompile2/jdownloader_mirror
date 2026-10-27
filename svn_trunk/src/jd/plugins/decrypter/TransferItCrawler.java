@@ -22,12 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import javax.crypto.Cipher;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
-
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.settings.GeneralSettings;
@@ -36,6 +30,7 @@ import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
+import jd.plugins.DecrypterException;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DecrypterRetryException;
 import jd.plugins.DecrypterRetryException.RetryReason;
@@ -50,13 +45,11 @@ import jd.plugins.hoster.TransferIt;
 /**
  * Most of the work on this plugin was done by Fabio Orlandi.
  */
-@DecrypterPlugin(revision = "$Revision: 53696 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53761 $", interfaceVersion = 3, names = {}, urls = {})
 public class TransferItCrawler extends PluginForDecrypt {
     public TransferItCrawler(PluginWrapper wrapper) {
         super(wrapper);
     }
-
-    private static final String PASSWORD_NOT_SUPPORTED = "Password protected transfer.it transfers are not yet supported.";
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -92,11 +85,10 @@ public class TransferItCrawler extends PluginForDecrypt {
         final String transferID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
         /* Transfer information such as title and password protection */
         final TransferIt hosterplugin = (TransferIt) this.getNewPluginForHostInstance(this.getHost());
-        final Map<String, Object> transferInfo = hosterplugin.callAPI(br, null, "{\"a\":\"xi\",\"xh\":\"" + transferID + "\"}");
-        final Object passwordProtected = transferInfo.get("pw");
-        if (passwordProtected != null && !Boolean.FALSE.equals(passwordProtected) && !"0".equals(passwordProtected.toString()) && !"".equals(passwordProtected.toString())) {
-            throw new DecrypterRetryException(RetryReason.PASSWORD, "PASSWORD_PROTECTED_" + transferID, PASSWORD_NOT_SUPPORTED);
-        }
+        final Map<String, Object> transferInfo = hosterplugin.callAPI(br, null, null, "{\"a\":\"xi\",\"xh\":\"" + transferID + "\"}");
+        /* Optional field: A truthy "pw" value means that the transfer is password protected. */
+        final Object passwordProtectedO = transferInfo.get("pw");
+        boolean passwordRequired = passwordProtectedO != null && !Boolean.FALSE.equals(passwordProtectedO) && !"0".equals(passwordProtectedO.toString()) && !"".equals(passwordProtectedO.toString());
         String transferTitle = null;
         if (transferInfo.get("t") instanceof String) {
             transferTitle = new String(MegaNz.b64decode((String) transferInfo.get("t")), "UTF-8").trim();
@@ -110,15 +102,25 @@ public class TransferItCrawler extends PluginForDecrypt {
             transferDescription = new String(MegaNz.b64decode((String) transferInfo.get("m")), "UTF-8").trim();
         }
         /* Nodes of this transfer: Node keys are plain AES keys, node attributes are encrypted like regular MEGA node attributes. */
-        final Map<String, Object> listing;
-        try {
-            listing = hosterplugin.callAPI(br, transferID, "{\"a\":\"f\",\"c\":1,\"r\":1}");
-        } catch (final PluginException e) {
-            if (e.getLinkStatus() == LinkStatus.ERROR_FATAL) {
+        final String listCommand = "{\"a\":\"f\",\"c\":1,\"r\":1}";
+        String passCode = null;
+        String passwordHash = null;
+        Map<String, Object> listing = null;
+        if (!passwordRequired) {
+            try {
+                listing = hosterplugin.callAPI(br, transferID, null, listCommand);
+            } catch (final PluginException e) {
+                if (e.getLinkStatus() != LinkStatus.ERROR_FATAL) {
+                    throw e;
+                }
                 /* API error -14: password required (in case the "pw" flag above was not set) */
-                throw new DecrypterRetryException(RetryReason.PASSWORD, "PASSWORD_PROTECTED_" + transferID, PASSWORD_NOT_SUPPORTED);
+                passwordRequired = true;
             }
-            throw e;
+        }
+        if (passwordRequired) {
+            passCode = getPassword(param, hosterplugin, transferID);
+            passwordHash = TransferIt.createPasswordHash(transferID, passCode);
+            listing = hosterplugin.callAPI(br, transferID, passwordHash, listCommand);
         }
         @SuppressWarnings("unchecked")
         final List<Map<String, Object>> nodes = (List<Map<String, Object>>) listing.get("f");
@@ -147,7 +149,13 @@ public class TransferItCrawler extends PluginForDecrypt {
             link.setContentUrl(param.getCryptedUrl());
             link.setProperty(TransferIt.PROPERTY_TRANSFER_ID, transferID);
             link.setProperty(TransferIt.PROPERTY_NODE_ID, nodeID);
+            if (passwordHash != null) {
+                /* Password required && user has entered correct password. */
+                link.setProperty(TransferIt.PROPERTY_PASSWORD_HASH, passwordHash);
+                link.setDownloadPassword(passCode);
+            }
             link.setFinalFileName(filename);
+            link.setProperty(TransferIt.PROPERTY_NODE_KEY, node.get("k"));
             link.setVerifiedFileSize(((Number) node.get("s")).longValue());
             if (useOriginalLastModified && attributes != null) {
                 /* Original last modified timestamp is stored in the file fingerprint attribute */
@@ -181,6 +189,25 @@ public class TransferItCrawler extends PluginForDecrypt {
         return ret;
     }
 
+    /** Asks the user for the password of a password protected transfer until it is correct and returns it. */
+    private String getPassword(final CryptedLink param, final TransferIt hosterplugin, final String transferID) throws Exception {
+        String passCode = param.getDecrypterPassword();
+        int counter = 0;
+        do {
+            if (StringUtils.isEmpty(passCode) || counter > 0) {
+                passCode = getUserInput("Password?", param);
+            }
+            final String passwordHash = TransferIt.createPasswordHash(transferID, passCode);
+            if (hosterplugin.verifyPassword(br, transferID, passwordHash)) {
+                return passCode;
+            }
+            logger.info("User entered wrong password: " + passCode);
+            passCode = null;
+            counter++;
+        } while (counter <= 2);
+        throw new DecrypterException(DecrypterException.PASSWORD);
+    }
+
     /** Returns path of all parent folders of given node e.g. "Root/Subfolder" or null if there is no such folder. */
     private String getFolderPath(final Map<String, Map<String, Object>> nodesByID, final Map<String, Object> node) {
         String path = null;
@@ -209,31 +236,8 @@ public class TransferItCrawler extends PluginForDecrypt {
 
     /** Decrypts attributes of given node with its plain node key and returns them or null on failure. */
     private Map<String, Object> decryptNodeAttributes(final Map<String, Object> node) {
-        final String attributes = (String) node.get("a");
-        final String nodeKey = (String) node.get("k");
         try {
-            byte[] key = MegaNz.b64decode(nodeKey);
-            if (key.length == 32) {
-                /* file key: AES key = first half XOR second half */
-                final byte[] fileKey = new byte[16];
-                for (int i = 0; i < 16; i++) {
-                    fileKey[i] = (byte) (key[i] ^ key[i + 16]);
-                }
-                key = fileKey;
-            } else if (key.length != 16) {
-                return null;
-            }
-            final byte[] encrypted = MegaNz.b64decode(attributes);
-            final byte[] padded = new byte[(encrypted.length + 15) / 16 * 16];
-            System.arraycopy(encrypted, 0, padded, 0, encrypted.length);
-            final Cipher cipher = Cipher.getInstance("AES/CBC/NoPadding");
-            cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(new byte[16]));
-            final String decrypted = new String(cipher.doFinal(padded), "UTF-8");
-            final String json = new Regex(decrypted, "^MEGA(\\{.+\\})").getMatch(0);
-            if (json == null) {
-                return null;
-            }
-            return JSonStorage.restoreFromString(json, TypeRef.MAP);
+            return TransferIt.decryptNodeAttributes((String) node.get("a"), (String) node.get("k"));
         } catch (final Exception e) {
             logger.log(e);
             return null;

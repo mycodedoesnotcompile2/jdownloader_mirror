@@ -21,6 +21,7 @@ import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
@@ -45,6 +46,7 @@ import org.appwork.storage.config.events.ConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.utils.swing.EDTRunner;
 import org.appwork.utils.swing.dialog.Dialog;
+import org.jdownloader.gui.settings.AbstractConfigPanel;
 import org.jdownloader.extensions.AbstractExtension;
 import org.jdownloader.extensions.ExtensionConfigPanel;
 import org.jdownloader.extensions.ExtensionController;
@@ -142,30 +144,36 @@ public class ConfigSidebar extends JPanel implements MouseMotionListener, MouseL
         list.addMouseMotionListener(new MouseAdapter() {
             @Override
             public void mouseMoved(MouseEvent e) {
-                int index = list.locationToIndex(e.getPoint());
-                try {
-                    if (list.getModel().getElementAt(index) instanceof CheckBoxedEntry) {
-                        Point point = list.indexToLocation(index);
-                        int x = 0;
-                        int y = 0;
-                        if (point != null) {
-                            x = e.getPoint().x - point.x;
-                            y = e.getPoint().y - point.y;
-                        }
+                /*
+                 * The tooltip belongs to the list as a whole, so it has to be determined again for every mouse move: it must be reset for
+                 * all rows without a tooltip, and for the empty area below the last row (locationToIndex returns the nearest index there).
+                 */
+                String tooltip = null;
+                int cursor = Cursor.DEFAULT_CURSOR;
+                final int index = list.locationToIndex(e.getPoint());
+                final Rectangle bounds = index >= 0 ? list.getCellBounds(index, index) : null;
+                if (bounds != null && bounds.contains(e.getPoint())) {
+                    final Object element = list.getModel().getElementAt(index);
+                    if (element instanceof AbstractConfigPanel) {
+                        tooltip = ((AbstractConfigPanel) element).getSidebarTooltip();
+                    } else if (element instanceof CheckBoxedEntry) {
+                        final int x = e.getPoint().x - bounds.x;
+                        final int y = e.getPoint().y - bounds.y;
                         if (x > 3 && x < 18 && y > 3 && y < 18) {
-                            list.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-                            list.setToolTipText(_JDT.T.settings_sidebar_tooltip_enable_extension());
+                            cursor = Cursor.HAND_CURSOR;
+                            tooltip = _JDT.T.settings_sidebar_tooltip_enable_extension();
                         } else {
-                            list.setCursor(Cursor.getPredefinedCursor(Cursor.DEFAULT_CURSOR));
-                            if (list.getModel().getElementAt(index) instanceof CheckBoxedEntry) {
-                                list.setToolTipText(((CheckBoxedEntry) list.getModel().getElementAt(index)).getDescription());
-                            } else {
-                                list.setToolTipText(null);
-                            }
+                            tooltip = ((CheckBoxedEntry) element).getDescription();
                         }
                     }
-                } catch (final ArrayIndexOutOfBoundsException e2) {
                 }
+                list.setCursor(Cursor.getPredefinedCursor(cursor));
+                list.setToolTipText(tooltip);
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                list.setToolTipText(null);
             }
         });
         setBackground(null);

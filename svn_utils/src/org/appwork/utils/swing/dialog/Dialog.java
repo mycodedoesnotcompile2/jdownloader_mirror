@@ -52,7 +52,6 @@ import org.appwork.uio.UIOConstants;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.BinaryLogic;
 import org.appwork.utils.DebugMode;
-import org.appwork.utils.Exceptions;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.interfaces.ValueConverter;
 import org.appwork.utils.locale._AWU;
@@ -313,12 +312,10 @@ public class Dialog {
 
     public void setHandler(DialogHandler handler) {
         if (handler == null) {
-            handler = defaultHandler;
-            LogV3.info("Set Dialog Handler: " + "Default Handler" + "\r\n" + Exceptions.getStackTrace(new Exception()));
+            this.handler = defaultHandler;
         } else {
-            LogV3.info("Set Dialog Handler: " + handler + "\r\n" + Exceptions.getStackTrace(new Exception()));
+            this.handler = handler;
         }
-        this.handler = handler;
     }
 
     @Deprecated

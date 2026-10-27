@@ -135,3 +135,66 @@ if (account == null) {
 where `errorAccountNeeded()` always throws (e.g. `AccountRequiredException`).
 
 Do not include a Co-Authored-By line or "Generated with Claude Code" footer in any commit message.
+
+## Tables
+
+Applies to every table created in the JDownloader project.
+
+### Structure
+
+- Always extend `jd.gui.swing.jdgui.BasicJDTable<T>` (which extends `ExtTable<T>`) together with an `ExtTableModel<T>` and one `ExtColumn<T>` per column. Never use a raw `JTable` / `DefaultTableModel`. Plain `ExtTable` is only for the AppWorkUtils project.
+- Give every table model a unique table ID (e.g. `new FilterTableModel("PackagizerFilterTable")`). Column visibility, order, widths and sort state are persisted under this ID.
+- Reference implementation: `PackagizerFilterTable`.
+
+### Selection
+
+- Use `ListSelectionModel.MULTIPLE_INTERVAL_SELECTION` (already the `BasicJDTable` default).
+- Selection must always be preserved across model updates (add / remove / refresh): selected objects stay selected as long as they remain in the model.
+
+### Sorting and columns
+
+- All columns are sortable by default (provide a comparator).
+- Exception: interactive columns whose values change live or frequently (counters, countdowns, progress, speed). Do not decide on your own for such columns: **ask the user whether sorting is wanted.**
+- Columns are hideable, reorderable and their widths are persisted (default `ExtTable` behaviour; do not disable it without being asked).
+- Columns that only ever hold short values of a known maximum length (e.g. an "enabled" checkbox column) may use fixed minimum / maximum widths.
+
+### Context menu and actions
+
+- Override `onContextMenu`. Typical entries, as far as they fit the table: New, Remove, Duplicate.
+- If the table has an "enabled" column, the context menu must contain `ToggleEnabledSelectionAction` (see `SolverOrderTable`, `PremiumAccountTable`).
+- `onShortcutDelete`: Delete removes the selection through the same `RemoveAction` as the context menu. Delete asks for confirmation, Shift+Delete (`direct == true`) removes without confirmation.
+- `setSearchEnabled(true)` for new tables.
+- `onDoubleClick` opens the edit dialog, but only if the object has an editor. Otherwise do not override it.
+
+### Threading and updates
+
+- All access to the table and its model happens in the EDT (wrap in `EDTRunner`). Background threads only collect data.
+- Frequently changing values (progress, countdown, speed) are refreshed by a periodic repaint of the affected columns, not by rebuilding the model.
+## Search Suggestions (Autocomplete / History)
+
+Applies to every new text field that offers suggestions based on previous input. Reference implementation: `SearchField` together with `SearchHistoryManager`.
+
+### History storage
+
+- The history data always lives in a subclass of `org.jdownloader.gui.packagehistorycontroller.HistoryManager<T>` (singleton, persisted via config). Do not build ad-hoc history lists inside the GUI component.
+- `HistoryManager` already handles: newest first, case-insensitive duplicate removal, cut to `getMaxLength()`, asynchronous save and save on shutdown. Do not re-implement this.
+- The maximum length comes from a config value (`getMaxLength()`): `0` = history disabled (nothing is stored or suggested), default `25`, maximum `250`.
+- A term is added to the history **only** on Enter or when a history entry is chosen, never while typing and not on focus loss.
+
+### Suggestion behavior
+
+- Matching is case-insensitive.
+  - Inline completion uses **prefix** matching: it appends the rest of the newest matching entry, selected, like a browser address bar. It keeps the spelling the user typed, only runs while the caret is at the end of the text, and is skipped when deleting text (Backspace / Delete).
+  - The suggestion popup uses **contains** matching, newest first. An entry equal to the current text is not listed. An empty field lists all entries.
+- While an inline completion is pending, filtering uses only the typed part. Moving the caret or clicking accepts the completion.
+- The popup opens above the field when the field sits at the bottom of the window. It is non-focusable so focus and key events stay in the text field, shows at most 10 rows, and is ordered with the newest entry next to the field.
+
+### Keyboard and mouse
+
+| Input | Behavior |
+|---|---|
+| Up / Down | Opens the popup if closed and moves the selection. The first selection is the entry next to the field. Moving past the first/last entry clears the selection. |
+| Enter | Accepts a pending inline completion, or applies the selected entry, or adds the typed text to the history. |
+| Delete | With a popup entry selected: removes that entry from the history (instead of deleting text) and selects its neighbor, so several entries can be removed in a row. |
+| ESC | First press closes the popup / removes a pending inline completion. The next press clears the field. |
+| Mouse | Click on an entry applies it. Click on the remove icon at the right edge of a row removes it. Hovering selects a row. |

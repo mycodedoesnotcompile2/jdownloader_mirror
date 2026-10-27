@@ -68,6 +68,10 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
         if (obj instanceof BrowserSolverService) {
             showSelectBrowserDialog((BrowserSolverService) obj);
             return true;
+        } else if (obj instanceof CaptchaAPIManualRemoteSolverService) {
+            /* MyJDownloader remote solver: Opens the MyJDownloader configuration (same as "Configure" in the context menu). */
+            ((CaptchaAPIManualRemoteSolverService) obj).openConfiguration();
+            return true;
         }
         /* Config is shown inline below the table now; no separate properties dialog. */
         return false;
@@ -139,6 +143,27 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
                 }
             });
             popup.add(selectBrowser);
+        }
+        boolean externalSelected = false;
+        if (selection != null) {
+            for (final SolverService selected : selection) {
+                if (selected instanceof PluginForCaptchaSolverSolverService) {
+                    externalSelected = true;
+                    break;
+                }
+            }
+        }
+        if (externalSelected) {
+            /* Shown if at least one external solver is selected, it always refers to the solver that was right clicked (only if external). */
+            final JMenuItem addAccount = new JMenuItem(_GUI.T.lit_add_account(), new AbstractIcon(IconKey.ICON_ADD, 18));
+            addAccount.setEnabled(contextObject instanceof PluginForCaptchaSolverSolverService);
+            addAccount.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(final ActionEvent e) {
+                    ((PluginForCaptchaSolverSolverService) contextObject).addAccount();
+                }
+            });
+            popup.add(addAccount);
         }
         if (selection != null && !selection.isEmpty()) {
             /* Enable/disable all selected solvers at once, same behavior as in the download list. */

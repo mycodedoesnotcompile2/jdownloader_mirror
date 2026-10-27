@@ -271,6 +271,14 @@ public class ChallengeResponseController {
         NO_FREE_SLOT
     }
 
+    /**
+     * Number of captchas that the solvers of the given solver service are working on right now (summed over all accounts of the service).
+     * A solver counts as soon as it got its captcha slot and stops counting when it is done, no matter how it ended.
+     */
+    public int getActiveCaptchaCount(final String serviceID) {
+        return getActiveCaptchas(activeCaptchasByServiceID, serviceID);
+    }
+
     private static <K> int getActiveCaptchas(final ConcurrentHashMap<K, AtomicInteger> counters, final K key) {
         final AtomicInteger counter = counters.get(key);
         return counter == null ? 0 : counter.get();
@@ -463,18 +471,29 @@ public class ChallengeResponseController {
     }
 
     /**
-     * Same as {@link #handle(Challenge)} but only solvers of the given service are used (captcha test panel). All other veto checks
-     * (disabled solver, unsupported/disabled captcha type, ...) still apply, but there are no login captcha special handling and no "no
-     * solver available" info dialogs because the user restricts the solvers on purpose.
+     * Returns the solvers which can be used for the given challenge in the captcha test panel, in the order in which they are used. All
+     * veto checks (disabled solver, unsupported/disabled captcha type, ...) still apply. If a service is given, only solvers of this
+     * service are returned, without service (single test without selected solver) all solvers that passed the veto checks. Pass the
+     * result to {@link #handleTest(Challenge, List)}.
      */
-    public <T> SolverJob<T> handleTest(final Challenge<T> c, final SolverService service) throws InterruptedException, SkipException {
+    public <T> List<ChallengeSolver<T>> getTestSolvers(final Challenge<T> c, final SolverService service) {
         final List<ChallengeSolver<T>> solvers = createList(c);
-        for (final Iterator<ChallengeSolver<T>> it = solvers.iterator(); it.hasNext();) {
-            if (!service.getID().equals(it.next().getService().getID())) {
+        for (final Iterator<ChallengeSolver<T>> it = solvers.iterator(); service != null && it.hasNext();) {
+            final SolverService solverService = it.next().getService();
+            if (solverService == null || !service.getID().equals(solverService.getID())) {
                 it.remove();
             }
         }
         reSortByOverThreadsLimit(c, solvers);
+        return solvers;
+    }
+
+    /**
+     * Same as {@link #handle(Challenge)} but with the solvers of {@link #getTestSolvers(Challenge, SolverService)} (captcha test panel).
+     * There are no login captcha special handling and no "no solver available" info dialogs because the user restricts the solvers on
+     * purpose.
+     */
+    public <T> SolverJob<T> handleTest(final Challenge<T> c, final List<ChallengeSolver<T>> solvers) throws InterruptedException, SkipException {
         return handleInternal(c, solvers, false);
     }
 

@@ -39,6 +39,11 @@ public class AccountManagerSettings extends AbstractConfigPanel {
         return _JDT.T.gui_settings_premium_title();
     }
 
+    @Override
+    public String getSidebarTooltip() {
+        return _GUI.T.SettingsSidebar_tooltip_AccountManager();
+    }
+
     public AccountManagerSettings() {
         super();
 

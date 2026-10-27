@@ -218,8 +218,19 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
         case READY:
         default:
             /* Captcha solver table: restrict the hoster chooser to captcha solver plugins (no other hosters). */
-            AddAccountDialog.showDialog(plugin, null, LazyHostPluginFilter.ALL_CAPTCHA_SOLVERS);
+            addAccount();
             return;
+        }
+    }
+
+    /**
+     * Opens the dialog to add an account for this solver (the hoster chooser is restricted to captcha solver plugins). If an account was
+     * added and the solver was disabled, it gets enabled: the user just added an account because he wants to use it.
+     */
+    public void addAccount() {
+        final Account addedAccount = AddAccountDialog.showDialog(plugin, null, LazyHostPluginFilter.ALL_CAPTCHA_SOLVERS);
+        if (addedAccount != null && !getConfigV3().isEnabled()) {
+            getConfigV3().setEnabled(true);
         }
     }
 

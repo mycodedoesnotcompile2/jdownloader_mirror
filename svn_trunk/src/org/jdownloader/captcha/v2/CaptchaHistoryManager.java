@@ -77,8 +77,7 @@ public class CaptchaHistoryManager {
         }
         final String host = challenge.getHost();
         final CAPTCHA_TYPE captchaType = CAPTCHA_TYPE.getCaptchaTypeForChallenge(challenge);
-        final boolean isLoginCaptcha = challenge.isAccountLogin();
-        return new CaptchaHistoryEntry(host, captchaType, isLoginCaptcha);
+        return new CaptchaHistoryEntry(host, captchaType, challenge.getCaptchaRequestType());
     }
 
     /**

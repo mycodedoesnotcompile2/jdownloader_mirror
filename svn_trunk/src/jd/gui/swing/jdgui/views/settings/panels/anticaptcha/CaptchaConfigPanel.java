@@ -1,5 +1,6 @@
 package jd.gui.swing.jdgui.views.settings.panels.anticaptcha;
 
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import java.awt.Component;
 
 import javax.swing.Icon;
@@ -39,6 +40,11 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
         return _GUI.T.AntiCaptchaConfigPanel_getTitle();
     }
 
+    @Override
+    public String getSidebarTooltip() {
+        return _GUI.T.SettingsSidebar_tooltip_Captcha();
+    }
+
     public CaptchaConfigPanel() {
         super();
         debugTabShown = false;
@@ -52,7 +58,7 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
         final SolverOrderTable table = this.solverOrderTable = new SolverOrderTable();
         final SolverOrderContainer container = new SolverOrderContainer(table);
         /* Width tracking: long texts in the solver settings must not make the panel wider than the visible area. */
-        final MigPanel solversTab = new WidthTrackingPanel("ins 5, wrap 1", "[grow,fill]", "[grow,fill]");
+        final MigPanel solversTab = new WidthTrackingPanel("ins 0, wrap 1", "[grow,fill]", "[grow,fill]");
         solversTab.add(container, "grow");
         final CaptchaSettingsTabbedPane tabs = this.tabs = new CaptchaSettingsTabbedPane();
         final JScrollPane solversScrollPane = this.solversScrollPane = new JScrollPane(solversTab);
@@ -60,6 +66,8 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
         solversScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         solversScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
         solversScrollPane.getVerticalScrollBar().setUnitIncrement(20);
+        /* No frame around the whole tab: the tables inside have their own, a second one would be a double border (like in the rules tab). */
+        solversScrollPane.setBorder(null);
         tabs.addTab(_GUI.T.CaptchaConfigPanel_solverOverviewAndSettings(), solversScrollPane);
         tabs.addTab("Captcha Rules", new CaptchaRulesContainer());
         this.solverComparisonContainer = new SolverComparisonContainer();
@@ -99,16 +107,24 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
 
     /** Opens the captcha settings, shows the "Test & Debug" tab and preselects the given solver for the multi test. */
     public static void showTestAndDebug(final SolverService solver) {
+        showTestAndDebug(solver, null);
+    }
+
+    /**
+     * Opens the captcha settings, shows the "Test & Debug" tab, preselects the given solver and the given captcha types (if not null):
+     * the first one at the top, all of them in the multi test selection.
+     */
+    public static void showTestAndDebug(final SolverService solver, final java.util.Collection<CAPTCHA_TYPE> types) {
         JsonConfig.create(GraphicalUserInterfaceSettings.class).setConfigViewVisible(true);
         JDGui.getInstance().setContent(ConfigurationView.getInstance(), true);
         ConfigurationView.getInstance().setSelectedSubPanel(CaptchaConfigPanel.class);
         final CaptchaConfigPanel captchaConfigPanel = ConfigurationView.getInstance().getSubPanel(CaptchaConfigPanel.class);
         if (captchaConfigPanel != null) {
-            captchaConfigPanel.selectTestAndDebug(solver);
+            captchaConfigPanel.selectTestAndDebug(solver, types);
         }
     }
 
-    private void selectTestAndDebug(final SolverService solver) {
+    private void selectTestAndDebug(final SolverService solver, final java.util.Collection<CAPTCHA_TYPE> types) {
         SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {
@@ -116,7 +132,11 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
                     return;
                 }
                 tabs.setSelectedComponent(testScrollPane);
-                testPanel.selectMultiTestSolver(solver);
+                if (types == null) {
+                    testPanel.selectMultiTestSolver(solver);
+                } else {
+                    testPanel.selectMultiTestSolver(solver, types);
+                }
             }
         });
     }

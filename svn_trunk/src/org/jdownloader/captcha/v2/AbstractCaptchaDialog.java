@@ -909,6 +909,8 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
                 /* Order is important: the solver must be released before this dialog's solver is stopped. */
                 externalSolverToUse = solver;
                 job.forceStart(solver);
+                /* Only the chosen solver is used: the other waiting external solvers would start as soon as this dialog is closed. */
+                job.abortPendingExternalSolversExcept(solver);
                 setReturnmask(false);
                 dispose();
             }

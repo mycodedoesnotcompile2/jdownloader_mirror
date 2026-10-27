@@ -87,8 +87,9 @@ import jd.plugins.PluginForHost;
 import net.miginfocom.swing.MigLayout;
 
 public class AddAccountDialog extends AbstractDialog<Integer> implements InputChangedCallbackInterface {
-    public static void showDialog(PluginForHost preSelectedPlugin, Account preFillAccount) {
-        showDialog(preSelectedPlugin, preFillAccount, null);
+    /** @return The account that was added, or null if no account was added. */
+    public static Account showDialog(PluginForHost preSelectedPlugin, Account preFillAccount) {
+        return showDialog(preSelectedPlugin, preFillAccount, null);
     }
 
     /**
@@ -96,19 +97,20 @@ public class AddAccountDialog extends AbstractDialog<Integer> implements InputCh
      *            when non-null, the hoster chooser only lists plugins matching this filter (on top of the "premium only" base rule),
      *            instead of all premium hoster plugins. Used e.g. when adding an account from the captcha solver table, where the filter
      *            narrows the list down to captcha solver plugins and offering normal hosters would make no sense.
+     * @return The account that was added, or null if no account was added.
      */
-    public static void showDialog(PluginForHost preSelectedPlugin, Account preFillAccount, final LazyHostPluginFilter pluginFilter) {
+    public static Account showDialog(PluginForHost preSelectedPlugin, Account preFillAccount, final LazyHostPluginFilter pluginFilter) {
         try {
             while (true) {
                 final AddAccountDialog dialog = new AddAccountDialog(preSelectedPlugin, preFillAccount, pluginFilter);
                 Dialog.getInstance().showDialog(dialog);
                 if (dialog.getHoster() == null) {
-                    return;
+                    return null;
                 }
                 final Account accountToAdd = dialog.getAccount();
                 accountToAdd.setHoster(dialog.getHoster().getDisplayName());
                 if (addAccount(accountToAdd)) {
-                    return;
+                    return accountToAdd;
                 }
                 preSelectedPlugin = dialog.getHoster().getPrototype(null);
                 preFillAccount = accountToAdd;
@@ -117,6 +119,7 @@ public class AddAccountDialog extends AbstractDialog<Integer> implements InputCh
         } catch (Throwable e) {
             org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);
         }
+        return null;
     }
 
     public static boolean addAccount(final Account ac) throws DialogNoAnswerException {

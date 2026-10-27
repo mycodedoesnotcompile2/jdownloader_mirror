@@ -99,6 +99,11 @@ public class GUISettings extends AbstractConfigPanel implements StateUpdateListe
         return _GUI.T.GUISettings_getTitle();
     }
 
+    @Override
+    public String getSidebarTooltip() {
+        return _GUI.T.SettingsSidebar_tooltip_GUI();
+    }
+
     public GUISettings() {
         super();
         lng = new SettingsButton(new AppAction() {

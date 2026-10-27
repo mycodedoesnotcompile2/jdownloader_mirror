@@ -51,7 +51,7 @@
 
 		<!-- Build dependencies -->
 
-		<javac srcdir="${dep.awu}/src" excludes="**/test/**,**/tests/**,**/ide/**" verbose="false" debug="${debug}" destdir="${cls}" encoding="UTF-8" source="${jvm_source}" target="${jvm_target}" includeantruntime="false">
+		<javac srcdir="${dep.awu}/src" excludes="**/test/**,**/tests/**,**/testframework/**,**/ide/**" verbose="false" debug="${debug}" destdir="${cls}" encoding="UTF-8" source="${jvm_source}" target="${jvm_target}" includeantruntime="false">
 			<classpath refid="classpath" />
 
 		</javac>
@@ -563,16 +563,8 @@
 
 
 
-	<!-- Signs the jars -->
-	<target name="sign">
-		<signjar keystore="${appwork_java_cert}" alias="${appwork_java_cert_alias}" storepass="${appwork_java_cert_pass}">
-			<path>
-				<fileset dir="${dist}" includes="**/*.jar" />
-			</path>
-		</signjar>
-	</target>
 
-	<target name="all" depends="clean,compile,copy_res,jarMain,copy_compiled,jarOptionals,sign">
+	<target name="all" depends="clean,compile,copy_res,jarMain,copy_compiled,jarOptionals">
 		<echo message="Finished." />
 	</target>
 	<target name="withoutsign" depends="clean,compile,copy_res,jarOptionals,jarMain,copy_compiled">

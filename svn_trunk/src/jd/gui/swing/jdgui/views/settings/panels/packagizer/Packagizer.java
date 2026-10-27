@@ -39,6 +39,11 @@ public class Packagizer extends AbstractConfigPanel implements CheckBoxedEntry {
         return _GUI.T.gui_config_linkgrabber_packagizer();
     }
 
+    @Override
+    public String getSidebarTooltip() {
+        return _GUI.T.SettingsSidebar_tooltip_Packagizer();
+    }
+
     public Packagizer() {
         super();
         add(new Header(getTitle(), new AbstractIcon(IconKey.ICON_PACKAGIZER, 32), org.jdownloader.settings.staticreferences.CFG_PACKAGIZER.PACKAGIZER_ENABLED), "spanx,growx,pushx");

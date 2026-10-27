@@ -69,6 +69,11 @@ public class AdvancedSettings extends AbstractConfigPanel implements DocumentLis
         return _GUI.T.gui_settings_advanced_title();
     }
 
+    @Override
+    public String getSidebarTooltip() {
+        return _GUI.T.SettingsSidebar_tooltip_Advanced();
+    }
+
     public AdvancedSettings() {
         super();
         this.addHeader(getTitle(), NewTheme.I().getIcon(IconKey.ICON_ADVANCEDCONFIG, 32));
