@@ -9,7 +9,6 @@ import org.jdownloader.DomainInfo;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.challenge.altcha.AltchaChallenge;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
-import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.powcaptcha.PowCaptchaChallenge;
@@ -319,32 +318,6 @@ public class CaptchaType {
             @Override
             public boolean hasTestChallenges() {
                 return true;
-            }
-        },
-        CUTCAPTCHA {
-            @Override
-            public boolean canHandle(Challenge<?> c) {
-                return c instanceof CutCaptchaChallenge;
-            }
-
-            @Override
-            public String getDisplayName() {
-                return "Cutcaptcha";
-            }
-
-            @Override
-            public String getDemoUrl() {
-                return "https://www.cutcaptcha.com/";
-            }
-
-            @Override
-            public String getDescription() {
-                return "Interactive puzzle-based captcha service. Mostly used for provider 'Filecrypt'.";
-            }
-
-            @Override
-            public String getDomain() {
-                return "cutcaptcha.com";
             }
         },
         POW_CAPTCHA {

@@ -149,6 +149,7 @@ Applies to every table created in the JDownloader project.
 ### Selection
 
 - Use `ListSelectionModel.MULTIPLE_INTERVAL_SELECTION` (already the `BasicJDTable` default).
+- Ctrl+A (select all) must work in every table where anything can be done with the rows: context menu actions that change data or delete rows, or an "enabled" column. `ExtTable` already handles the shortcut (`onShortcutSelectAll()`), so it works as long as the table is focusable (`setFocusable(true)`, clicking a row must give it the focus, see `SolverOrderTable`), uses multiple selection and nothing swallows the key stroke. Do not disable or override it without a reason.
 - Selection must always be preserved across model updates (add / remove / refresh): selected objects stay selected as long as they remain in the model.
 
 ### Sorting and columns
@@ -157,6 +158,13 @@ Applies to every table created in the JDownloader project.
 - Exception: interactive columns whose values change live or frequently (counters, countdowns, progress, speed). Do not decide on your own for such columns: **ask the user whether sorting is wanted.**
 - Columns are hideable, reorderable and their widths are persisted (default `ExtTable` behaviour; do not disable it without being asked).
 - Columns that only ever hold short values of a known maximum length (e.g. an "enabled" checkbox column) may use fixed minimum / maximum widths.
+
+### Display size and scrolling
+
+- Tables are often displayed completely, without any scrollbar. That is the right choice if the table always has a fixed number of rows or never contains "many" rows (rule of thumb: up to about 20).
+- To do so, override `isDisplayFullsizeAlways()` in the table and return `true` (see `SolverOrderTable`), and always put the table into the scroll pane returned by `createScrollPane()` instead of `new JScrollPane(table)`. It disables both scrollbars and forwards mouse wheel events to the next scroll pane above, so the surrounding panel still scrolls while the mouse is over the table. For manual sizing use `getFullDisplayHeight()` (includes the extra pixels that prevent a clipped last row and a scrollbar).
+- Tables that scroll themselves must also use `createScrollPane()`. Once such a table is at its top/bottom and the user keeps scrolling in that direction, the wheel events are forwarded to the surrounding panel.
+- **When in doubt, ask how the table shall be displayed (full size vs. scrollable) before building it. Always ask before building a new table.**
 
 ### Context menu and actions
 
@@ -198,3 +206,9 @@ Applies to every new text field that offers suggestions based on previous input.
 | Delete | With a popup entry selected: removes that entry from the history (instead of deleting text) and selects its neighbor, so several entries can be removed in a row. |
 | ESC | First press closes the popup / removes a pending inline completion. The next press clears the field. |
 | Mouse | Click on an entry applies it. Click on the remove icon at the right edge of a row removes it. Hovering selects a row. |
+
+## Time and Durations
+
+- Write durations with the existing constants, not with manual multiplication: `TimeUnit.MINUTES.toMillis(5)` instead of `5 * 60 * 1000l`.
+- For calculations with time (e.g. elapsed time, timeouts, wait periods) use `Time.systemIndependentCurrentJVMTimeMillis()` (`org.appwork.utils.Time`) instead of `System.currentTimeMillis()`. It is independent of changes of the system clock.
+- `System.currentTimeMillis()` is only for real wall-clock timestamps (e.g. a date that is stored or displayed).

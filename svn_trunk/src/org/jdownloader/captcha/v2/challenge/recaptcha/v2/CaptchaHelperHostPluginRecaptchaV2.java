@@ -24,7 +24,6 @@ public class CaptchaHelperHostPluginRecaptchaV2 extends AbstractRecaptchaV2<Plug
 
     public String getToken() throws PluginException, InterruptedException {
         logger.info((isEnterprise() ? "Enterprise|" : "Free|") + "SiteDomain:" + getSiteDomain() + "|SiteKey:" + getSiteKey() + "|Type:" + getType() + "|V3Action:" + (getV3Action() != null));
-        runDdosPrevention();
         final PluginForHost plugin = getPlugin();
         final DownloadLink link = plugin.getDownloadLink();
         if (siteKey == null) {

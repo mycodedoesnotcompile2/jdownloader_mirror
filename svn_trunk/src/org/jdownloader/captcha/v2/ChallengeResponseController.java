@@ -7,7 +7,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -16,9 +15,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.appwork.storage.config.JsonConfig;
-import org.appwork.timetracker.TimeTracker;
-import org.appwork.timetracker.TimeTrackerController;
-import org.appwork.timetracker.TrackerRule;
 import org.appwork.uio.CloseReason;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
@@ -57,7 +53,6 @@ import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChi
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPluginFilter;
-import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 import org.jdownloader.updatev2.UpdateController;
 
@@ -103,7 +98,6 @@ public class ChallengeResponseController {
     }
 
     private LogSource             logger;
-    private TimeTrackerController trackerCache;
 
     /**
      * Create a new instance of ChallengeResponseController. This is a singleton class. Access the only existing instance by using
@@ -112,38 +106,6 @@ public class ChallengeResponseController {
     private ChallengeResponseController() {
         logger = LogController.getInstance().getLogger(getClass().getName());
         eventSender = new ChallengeResponseEventSender(logger);
-        trackerCache = new TimeTrackerController();
-        HashMap<String, ArrayList<CaptchaQualityEnsuranceRule>> rules = CFG_CAPTCHA.CFG.getQualityEnsuranceRules();
-        if (rules == null) {
-            rules = new HashMap<String, ArrayList<CaptchaQualityEnsuranceRule>>();
-        }
-        boolean save = false;
-        save = addDefaultRules(rules, RecaptchaV2Challenge.RECAPTCHAV2, new CaptchaQualityEnsuranceRule(60, 10 * 60 * 1000), new CaptchaQualityEnsuranceRule(6, 60 * 1000), new CaptchaQualityEnsuranceRule(3, 30 * 1000), new CaptchaQualityEnsuranceRule(2, 10 * 1000)) || save;
-        save = addDefaultRules(rules, HCaptchaChallenge.getChallengeType(), new CaptchaQualityEnsuranceRule(60, 10 * 60 * 1000), new CaptchaQualityEnsuranceRule(6, 60 * 1000), new CaptchaQualityEnsuranceRule(3, 30 * 1000), new CaptchaQualityEnsuranceRule(2, 10 * 1000)) || save;
-        if (save) {
-            CFG_CAPTCHA.CFG.setQualityEnsuranceRules(rules);
-        }
-        for (Entry<String, ArrayList<CaptchaQualityEnsuranceRule>> es : rules.entrySet()) {
-            ArrayList<CaptchaQualityEnsuranceRule> rc = es.getValue();
-            final TimeTracker tracker = trackerCache.getTracker(es.getKey());
-            for (CaptchaQualityEnsuranceRule r : rc) {
-                logger.info("Add Captcha Limit Rule for " + es.getKey() + " " + r.getLimit() + " Reqs in " + TimeFormatter.formatMilliSeconds(r.getInterval(), 0));
-                tracker.addRule(new TrackerRule(r.getLimit(), r.getInterval()));
-            }
-        }
-    }
-
-    private boolean addDefaultRules(HashMap<String, ArrayList<CaptchaQualityEnsuranceRule>> rules, String key, CaptchaQualityEnsuranceRule... defList) {
-        ArrayList<CaptchaQualityEnsuranceRule> rc = rules.get(key);
-        if (rc == null || rc.size() == 0) {
-            rc = new ArrayList<CaptchaQualityEnsuranceRule>();
-            for (CaptchaQualityEnsuranceRule r : defList) {
-                rc.add(r);
-            }
-            rules.put(key, rc);
-            return true;
-        }
-        return false;
     }
 
     private final AtomicBoolean init = new AtomicBoolean(false);
@@ -1059,9 +1021,5 @@ public class ChallengeResponseController {
                 JobRunnable.resetWaitFor(s.getService());
             }
         }
-    }
-
-    public TimeTracker getTracker(String method) {
-        return trackerCache.getTracker(method);
     }
 }

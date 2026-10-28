@@ -23,7 +23,6 @@ public class CaptchaHelperCrawlerPluginRecaptchaV2 extends AbstractRecaptchaV2<P
 
     public String getToken() throws PluginException, InterruptedException, DecrypterException {
         logger.info((isEnterprise() ? "Enterprise|" : "Free|") + "SiteDomain:" + getSiteDomain() + "|SiteKey:" + getSiteKey() + "|Type:" + getType() + "|V3Action:" + (getV3Action() != null));
-        runDdosPrevention();
         if (siteKey == null) {
             siteKey = getSiteKey();
             if (siteKey == null) {

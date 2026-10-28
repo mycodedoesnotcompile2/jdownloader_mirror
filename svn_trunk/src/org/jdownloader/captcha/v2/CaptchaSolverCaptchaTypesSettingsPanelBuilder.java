@@ -105,7 +105,7 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
 
     public void build(final PluginConfigPanelNG panel) {
         final BasicJDTable<CAPTCHA_TYPE> table = this.getCaptchaTypesTable();
-        final JScrollPane scrollPane = new JScrollPane(table);
+        final JScrollPane scrollPane = table.createScrollPane();
         panel.add(scrollPane);
     }
 

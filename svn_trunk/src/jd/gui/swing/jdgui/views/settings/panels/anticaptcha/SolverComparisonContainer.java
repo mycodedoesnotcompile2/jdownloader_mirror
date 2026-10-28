@@ -30,7 +30,9 @@ import org.jdownloader.captcha.v2.CaptchaHistoryEntry;
 import org.jdownloader.captcha.v2.CaptchaHistoryManager;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
 import org.jdownloader.captcha.v2.SolverService;
+import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.images.NewTheme;
 import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSolverService;
 
 import jd.gui.swing.jdgui.BasicJDTable;
@@ -41,18 +43,16 @@ import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 /**
  * "External Solver comparison Table" tab: shows which external captcha solver supports which captcha type (rows = solvers, columns =
- * captcha types). Above the table the user picks which captcha types are shown: a dropdown preselects a set of types (all / manual
- * selection / the types the user ever needed according to the {@link CaptchaHistoryManager}) and a multi-select popup allows changing
+ * captcha types). Above the table the user picks which captcha types are shown: a dropdown preselects a set of types (manual
+ * selection, all types at the start / the types the user ever needed according to the {@link CaptchaHistoryManager}) and a multi-select popup allows changing
  * that selection freely afterwards.
  */
 public class SolverComparisonContainer extends MigPanel implements SettingsComponent {
     /** Sets of captcha types the "preselected captcha types" dropdown can select. */
     private enum Preselect {
-        /** All captcha types. */
-        ALL,
-        /** All captcha types, meant as starting point for a manual selection. */
+        /** The manual selection of the user, all captcha types as long as the user never changed the selection. */
         SELECTION,
-        /** The captcha types the user ever needed (captcha history). Only offered if the history contains any entry. */
+        /** The captcha types the user ever needed (captcha history). Greyed out if the history contains no entry. */
         USED
     }
 
@@ -61,6 +61,14 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
     private final JComboBox                      presetCombo;
     private final JCheckBox                      onlyFullSupportCheckBox;
     private final JLabel                         emptyLabel;
+    /**
+     * Hint below the "only full support" check box, shown while the check box is greyed out: red and bold if the check box is checked
+     * (the filter the user wants cannot be applied), otherwise only an information.
+     */
+    private final JLabel                         fullSupportHintLabel;
+    private final Font                           hintFont;
+    private final Font                           hintBoldFont;
+    private final Color                          hintColor;
     /**
      * Multi-select "[x/y] [Type1, Type2, ...]" control (same widget/label format as the multi-select ENUM columns in the Advanced
      * Settings, see {@code AdvancedValueColumn}), doubling as its own button and popup.
@@ -72,6 +80,8 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
     private final Set<CAPTCHA_TYPE>              selectedTypes = new LinkedHashSet<CAPTCHA_TYPE>();
     /** True while the dropdown/multi-select is modified programmatically so that its listener does not reset the user's selection. */
     private boolean                              adjusting     = false;
+    /** True if the captcha history contains captcha types, i.e. the "Used by you" preset can be selected (otherwise it is greyed out). */
+    private boolean                              usedAvailable = false;
     private final JScrollPane                    scrollPane;
     /**
      * The captcha types of the "Selection" preset, remembered for the running session only (not persisted). null = the user never
@@ -89,13 +99,14 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
         table = new BasicJDTable<SolverService>(model) {
             private static final long serialVersionUID = 1L;
 
-            /* Large red hint inside the table if the "supports all selected types" filter removed every solver. */
+            /* Large red hint inside the table if no captcha type is selected. */
             @Override
             public void paintComponent(final Graphics g) {
                 super.paintComponent(g);
-                if (SolverComparisonContainer.this.model.isEmptyDueToFilter()) {
+                final String hint = SolverComparisonContainer.this.model.isEmptyDueToNoTypes() ? _GUI.T.CaptchaSolverComparison_noTypeSelected() : null;
+                if (hint != null) {
                     final int width = Math.max(100, getWidth() - 40);
-                    emptyLabel.setText("<html><body style='width:" + width + "px;text-align:center'>" + _GUI.T.CaptchaSolverComparison_noSolverSupportsAll() + "</body></html>");
+                    emptyLabel.setText("<html><body style='width:" + width + "px;text-align:center'>" + hint + "</body></html>");
                     final Dimension size = emptyLabel.getPreferredSize();
                     emptyLabel.setSize(size);
                     final Graphics2D g2 = (Graphics2D) g.create();
@@ -126,6 +137,11 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
             private static final long serialVersionUID = 1L;
 
             @Override
+            protected boolean isSelectAllEnabled() {
+                return true;
+            }
+
+            @Override
             protected String getLabel(final CAPTCHA_TYPE type) {
                 return type.getDisplayName();
             }
@@ -150,7 +166,18 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
                 onManualSelectionChange();
             }
         };
-        presetCombo = new JComboBox();
+        presetCombo = new JComboBox() {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public void setSelectedItem(final Object anObject) {
+                if (anObject == Preselect.USED && !usedAvailable) {
+                    /* Greyed out: there are no used captcha types. */
+                    return;
+                }
+                super.setSelectedItem(anObject);
+            }
+        };
         presetCombo.setRenderer(new DefaultListCellRenderer() {
             private static final long serialVersionUID = 1L;
 
@@ -159,6 +186,10 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
                 final JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
                 if (value instanceof Preselect) {
                     label.setText(getPresetName((Preselect) value));
+                    if (value == Preselect.USED && !usedAvailable) {
+                        label.setEnabled(false);
+                        label.setForeground(Color.GRAY);
+                    }
                 }
                 return label;
             }
@@ -183,8 +214,18 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
                 model.setOnlyFullSupport(onlyFullSupportCheckBox.isSelected());
             }
         });
-        add(onlyFullSupportCheckBox, "growx");
-        scrollPane = new JScrollPane(table);
+        fullSupportHintLabel = new JLabel(_GUI.T.CaptchaSolverComparison_fullSupportImpossible());
+        fullSupportHintLabel.setIcon(NewTheme.I().getIcon(IconKey.ICON_WARNING_RED, 18));
+        hintFont = fullSupportHintLabel.getFont();
+        hintBoldFont = hintFont.deriveFont(Font.BOLD);
+        hintColor = fullSupportHintLabel.getForeground();
+        fullSupportHintLabel.setVisible(false);
+        /* The warning is shown below the check box. */
+        final MigPanel fullSupportBar = new MigPanel("ins 0, wrap 1", "[grow,fill]", "[][]");
+        fullSupportBar.add(onlyFullSupportCheckBox);
+        fullSupportBar.add(fullSupportHintLabel, "hidemode 3, wmin 0");
+        add(fullSupportBar, "growx");
+        scrollPane = table.createScrollPane();
         scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         /* Re-evaluate whether the columns fit whenever the available width changes. */
         scrollPane.addComponentListener(new ComponentAdapter() {
@@ -208,9 +249,8 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
             return _GUI.T.CaptchaSolverComparison_preselect_selection();
         case USED:
             return _GUI.T.CaptchaSolverComparison_preselect_used();
-        case ALL:
         default:
-            return _GUI.T.CaptchaSolverComparison_preselect_all();
+            return _GUI.T.CaptchaSolverComparison_preselect_selection();
         }
     }
 
@@ -227,13 +267,14 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
         }
         model.setSolvers(externalSolvers);
         rebuildPresetCombo();
+        updateFullSupportCheckBox();
     }
 
-    /** "Used by you" is only offered if the captcha history contains at least one captcha type. */
+    /** "Used by you" is always listed, but greyed out and not selectable if the captcha history contains no captcha type. */
     private void rebuildPresetCombo() {
         final Object current = presetCombo.getSelectedItem();
-        final boolean usedAvailable = !getUsedTypes().isEmpty();
-        Preselect newSelection = Preselect.ALL;
+        usedAvailable = !getUsedTypes().isEmpty();
+        Preselect newSelection = Preselect.SELECTION;
         boolean presetNotAvailableAnymore = false;
         if (current instanceof Preselect) {
             switch ((Preselect) current) {
@@ -245,7 +286,6 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
                     presetNotAvailableAnymore = true;
                 }
                 break;
-            case ALL:
             case SELECTION:
             default:
                 newSelection = (Preselect) current;
@@ -255,11 +295,8 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
         adjusting = true;
         try {
             presetCombo.removeAllItems();
-            presetCombo.addItem(Preselect.ALL);
             presetCombo.addItem(Preselect.SELECTION);
-            if (usedAvailable) {
-                presetCombo.addItem(Preselect.USED);
-            }
+            presetCombo.addItem(Preselect.USED);
             presetCombo.setSelectedItem(newSelection);
         } finally {
             adjusting = false;
@@ -291,7 +328,6 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
                 return new LinkedHashSet<CAPTCHA_TYPE>(rememberedSelection);
             }
             return new LinkedHashSet<CAPTCHA_TYPE>(allTypes);
-        case ALL:
         default:
             return new LinkedHashSet<CAPTCHA_TYPE>(allTypes);
         }
@@ -317,7 +353,6 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
                 rememberedSelection = new LinkedHashSet<CAPTCHA_TYPE>(selectedTypes);
                 break;
             case USED:
-            case ALL:
             default:
                 if (!selectedTypes.equals(getPresetTypes((Preselect) currentPreset))) {
                     /* Jumping to "Selection" always overwrites the remembered selection, whether there was one before or not. */
@@ -348,7 +383,21 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
     private void onSelectionChanged() {
         /* "Used by you": list solvers first that support the most (ideally all) of the captcha types the user needs. */
         model.setVisibleTypes(selectedTypes, presetCombo.getSelectedItem() == Preselect.USED);
+        updateFullSupportCheckBox();
         updateResizeMode();
+    }
+
+    /**
+     * Greys out the "only full support" check box (and tells why) if no solver supports all selected captcha types: Applying it would
+     * hide every solver. The check box keeps its state, the filter applies again as soon as the selection allows it.
+     */
+    private void updateFullSupportCheckBox() {
+        final boolean impossible = model.isFullSupportImpossible();
+        onlyFullSupportCheckBox.setEnabled(!impossible);
+        fullSupportHintLabel.setVisible(impossible);
+        final boolean warning = impossible && onlyFullSupportCheckBox.isSelected();
+        fullSupportHintLabel.setForeground(warning ? Color.RED : hintColor);
+        fullSupportHintLabel.setFont(warning ? hintBoldFont : hintFont);
     }
 
     /**

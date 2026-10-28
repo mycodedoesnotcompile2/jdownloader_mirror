@@ -1,7 +1,6 @@
 package jd.gui.swing.jdgui.views.settings.panels.accountmanager;
 
 import javax.swing.AbstractAction;
-import javax.swing.JScrollPane;
 
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtButton;
@@ -31,7 +30,7 @@ public class AccountListPanel extends SwitchPanel {
         tb.add(new ExtButton(new BuyAction(table)), "sg 2,height 26!");
         final RefreshAction refreshAction = new RefreshAction();
         tb.add(new ExtButton(refreshAction), "sg 2,height 26!");
-        add(new JScrollPane(table));
+        add(table.createScrollPane());
         add(tb);
     }
 

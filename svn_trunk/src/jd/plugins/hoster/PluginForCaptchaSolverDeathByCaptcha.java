@@ -39,7 +39,6 @@ import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeSolver.SolverFeature;
 import org.jdownloader.captcha.v2.SolverStatus;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
-import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.CaptchaResponse;
@@ -71,7 +70,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 53733 $", interfaceVersion = 3, names = { "deathbycaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53778 $", interfaceVersion = 3, names = { "deathbycaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -119,7 +118,6 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
         types.add(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE);
         types.add(CAPTCHA_TYPE.RECAPTCHA_V3);
         types.add(CAPTCHA_TYPE.CLOUDFLARE_TURNSTILE);
-        types.add(CAPTCHA_TYPE.CUTCAPTCHA);
         /* 2025-02-24: Not supported anymore, see isChallengeSupported and: https://deathbycaptcha.com/api#supported_captchas */
         // types.add(CAPTCHA_TYPE.HCAPTCHA);
         /*
@@ -285,15 +283,6 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
                     }
                     r.addFormData(new FormData("token_params", JSonStorage.serializeToJson(token_param)));
                 }
-            } else if (challenge instanceof CutCaptchaChallenge) {
-                type = "CutCaptcha";
-                final CutCaptchaChallenge cc = (CutCaptchaChallenge) challenge;
-                r.addFormData(new FormData("type", "19"));
-                final Map<String, Object> cutcaptcha_params = new HashMap<String, Object>();
-                cutcaptcha_params.put("apikey", cc.getApiKey());
-                cutcaptcha_params.put("miserykey", cc.getSiteKey());
-                cutcaptcha_params.put("pageurl", cc.getSiteUrl(this));
-                r.addFormData(new FormData("cutcaptcha_params", JSonStorage.serializeToJson(cutcaptcha_params)));
             } else if (challenge instanceof CloudflareTurnstileChallenge) {
                 type = "CloudflareTurnstileCaptcha";
                 final CloudflareTurnstileChallenge cc = (CloudflareTurnstileChallenge) challenge;
@@ -339,7 +328,7 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
             }
             job.getLogger().info("CAPTCHA(" + type + ") solved: " + solution);
             AbstractResponse resp = null;
-            if (challenge instanceof RecaptchaV2Challenge || challenge instanceof HCaptchaChallenge || challenge instanceof CloudflareTurnstileChallenge || challenge instanceof CutCaptchaChallenge) {
+            if (challenge instanceof RecaptchaV2Challenge || challenge instanceof HCaptchaChallenge || challenge instanceof CloudflareTurnstileChallenge) {
                 resp = new TokenCaptchaResponse((Challenge<String>) challenge, job.getSolver(), solution);
             } else {
                 resp = new CaptchaResponse((Challenge<String>) challenge, job.getSolver(), solution);

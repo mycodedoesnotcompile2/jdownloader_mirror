@@ -34,14 +34,14 @@
     ],
     "hashes":{
       "miglayout.jar":"ae384b680242234170de6b939bebf56effa40dd483477e13cd898104ba1e1de1",
-      "miglayout-swing-sources.jar":"2f9fc839ac5cf501127d6128bc4f04e6a0adde960628dca1053dbdff29164ce9"
+      "../dev_libs/miglayout-swing-sources.jar":"2f9fc839ac5cf501127d6128bc4f04e6a0adde960628dca1053dbdff29164ce9"
     },
     "licenses":["BSD "],
     "minJRE":"JVM_1_8",
     "name":"MiGLayout Swing",
     "signatures":{
       "miglayout.jar":"-----BEGIN PGP SIGNATURE-----\r\nVersion: GnuPG v2\r\n\r\niQEcBAABAgAGBQJgfxZ1AAoJENtF06YqGDzitZEH/0uBfMGvduynh96FwtDj08w9\r\n2gj2RY55L5D9hrudP5prCydvXXM8rnKv6Ct2xZYV+KrudH5Q+DJETX6ZDKctBfZg\r\ngRzXEiIANjg1B9GXuriJUIc627G2/PMHqRwfIX0jgHsCPw4G71BMHwCMf66fO9na\r\nR8Z4FYUoOwikiMnJo8dYpuuiU1xebGEgr9NQnS8k78m+k/hMmvEeXl6hCfB8txKc\r\nu6PSvPHycvywVxT+eCXFt1WvWBFkCYxUb1G8iwo/xyhWPCrjIrCSuteFzDhcu6Vt\r\nHoUPCSjixBAdPzfM//tF6RBjYOR1LSg6Y9K5hWLnokfxXTXX7H1xsoK7j+5yoO8=\r\n=/Zbx\r\n-----END PGP SIGNATURE-----\r\n",
-      "miglayout-swing-sources.jar":"-----BEGIN PGP SIGNATURE-----\r\nVersion: GnuPG v2\r\n\r\niQEcBAABAgAGBQJgfxZ1AAoJENtF06YqGDziFwsH/RB+qBcqyFn3itUWASiAF3uc\r\nwWTAE7cZ2FeATPrrLVgQP9wxpsz7EXdgeyq/256QpiVP/0KnhFImfkq4fvZdixU4\r\n9ZC7Pimk02KwagdayxboiQ0NcXWZaIsen7J19pLpgOHlFsGiNPnxeG8XdIjM9l7d\r\nUyZnZgBy4u9eFc7Cg6bQAJRckC/qyEwVC1+paMaukVbDESunoyOBT5HzsKnEXOn1\r\n/w0i/1lCMy8lEdZiPFEaPLYBUFFZw/YvmXxdVOWj2DC8WUWEe0u+dRkbGAVxVhUx\r\n7UIsPWOfaphCGHX/9aWmUH73qUdr/uDlO/Ad5Q0EHtiQvnj7k6bV701/zbuWSr0=\r\n=7gEa\r\n-----END PGP SIGNATURE-----\r\n"
+      "../dev_libs/miglayout-swing-sources.jar":"-----BEGIN PGP SIGNATURE-----\r\nVersion: GnuPG v2\r\n\r\niQEcBAABAgAGBQJgfxZ1AAoJENtF06YqGDziFwsH/RB+qBcqyFn3itUWASiAF3uc\r\nwWTAE7cZ2FeATPrrLVgQP9wxpsz7EXdgeyq/256QpiVP/0KnhFImfkq4fvZdixU4\r\n9ZC7Pimk02KwagdayxboiQ0NcXWZaIsen7J19pLpgOHlFsGiNPnxeG8XdIjM9l7d\r\nUyZnZgBy4u9eFc7Cg6bQAJRckC/qyEwVC1+paMaukVbDESunoyOBT5HzsKnEXOn1\r\n/w0i/1lCMy8lEdZiPFEaPLYBUFFZw/YvmXxdVOWj2DC8WUWEe0u+dRkbGAVxVhUx\r\n7UIsPWOfaphCGHX/9aWmUH73qUdr/uDlO/Ad5Q0EHtiQvnj7k6bV701/zbuWSr0=\r\n=7gEa\r\n-----END PGP SIGNATURE-----\r\n"
     },
     "version":"5.3",
     "vulnerabilities":[]
@@ -49,7 +49,7 @@
   "minJRE":"1.8",
   "minReleasedAgeDays":null,
   "provider":"maven",
-  "renames":null,
+  "renames":{"(.*-sources.*)":"../dev_libs/$1"},
   "requiredBy":[],
   "version":"/.*/",
   "autoRenameEnabled":true,

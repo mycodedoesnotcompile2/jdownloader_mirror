@@ -115,16 +115,24 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
      * the first one at the top, all of them in the multi test selection.
      */
     public static void showTestAndDebug(final SolverService solver, final java.util.Collection<CAPTCHA_TYPE> types) {
+        showTestAndDebug(java.util.Collections.singletonList(solver), types);
+    }
+
+    /**
+     * Opens the captcha settings, shows the "Test & Debug" tab, preselects the given solvers (only the ones which can be tested) and the
+     * given captcha types (if not null): the first one at the top, all of them in the multi test selection.
+     */
+    public static void showTestAndDebug(final java.util.Collection<SolverService> solvers, final java.util.Collection<CAPTCHA_TYPE> types) {
         JsonConfig.create(GraphicalUserInterfaceSettings.class).setConfigViewVisible(true);
         JDGui.getInstance().setContent(ConfigurationView.getInstance(), true);
         ConfigurationView.getInstance().setSelectedSubPanel(CaptchaConfigPanel.class);
         final CaptchaConfigPanel captchaConfigPanel = ConfigurationView.getInstance().getSubPanel(CaptchaConfigPanel.class);
         if (captchaConfigPanel != null) {
-            captchaConfigPanel.selectTestAndDebug(solver, types);
+            captchaConfigPanel.selectTestAndDebug(solvers, types);
         }
     }
 
-    private void selectTestAndDebug(final SolverService solver, final java.util.Collection<CAPTCHA_TYPE> types) {
+    private void selectTestAndDebug(final java.util.Collection<SolverService> solvers, final java.util.Collection<CAPTCHA_TYPE> types) {
         SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {
@@ -132,11 +140,7 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
                     return;
                 }
                 tabs.setSelectedComponent(testScrollPane);
-                if (types == null) {
-                    testPanel.selectMultiTestSolver(solver);
-                } else {
-                    testPanel.selectMultiTestSolver(solver, types);
-                }
+                testPanel.selectMultiTestSolvers(solvers, types);
             }
         });
     }

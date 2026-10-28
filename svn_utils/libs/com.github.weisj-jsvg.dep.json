@@ -158,7 +158,7 @@
   "minJRE":"1.8",
   "minReleasedAgeDays":null,
   "provider":"maven",
-  "renames":null,
+  "renames":{"(.*-sources.*)":"../dev_libs/$1"},
   "requiredBy":[],
   "version":null,
   "autoRenameEnabled":true,

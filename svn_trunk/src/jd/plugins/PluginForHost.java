@@ -54,8 +54,6 @@ import org.appwork.storage.JSonStorage;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.action.BasicAction;
-import org.appwork.timetracker.TimeTracker;
-import org.appwork.timetracker.TrackerJob;
 import org.appwork.uio.CloseReason;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.InputDialogInterface;
@@ -223,28 +221,6 @@ public abstract class PluginForHost extends Plugin {
 
     public LazyHostPlugin getLazyP() {
         return lazyP;
-    }
-
-    public void runCaptchaDDosProtection(final String id) throws InterruptedException {
-        final TimeTracker tracker = ChallengeResponseController.getInstance().getTracker(id);
-        final Thread thread = Thread.currentThread();
-        final TrackerJob trackerJob;
-        if (thread instanceof SingleDownloadController) {
-            trackerJob = new SingleDownloadControllerCaptchaTrackerJob(id, (SingleDownloadController) thread);
-        } else {
-            final DownloadLink downloadLink = getDownloadLink();
-            if (downloadLink != null) {
-                final SingleDownloadController controller = downloadLink.getDownloadLinkController();
-                if (controller != null) {
-                    trackerJob = new SingleDownloadControllerCaptchaTrackerJob(id, controller);
-                } else {
-                    trackerJob = new DownloadLinkCaptchaTracker(id, downloadLink);
-                }
-            } else {
-                trackerJob = new TrackerJob(1);
-            }
-        }
-        tracker.wait(trackerJob);
     }
 
     protected List<LazyCrawlerPlugin> findNextLazyCrawlerPlugins(final String url, final LazyCrawlerPlugin.FEATURE... features) {

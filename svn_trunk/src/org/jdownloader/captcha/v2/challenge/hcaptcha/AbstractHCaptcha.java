@@ -171,12 +171,6 @@ public class AbstractHCaptcha<T extends Plugin> {
         return ret;
     }
 
-    protected void runDdosPrevention() throws InterruptedException {
-        if (plugin != null) {
-            plugin.runCaptchaDDosProtection(HCaptchaChallenge.getChallengeType());
-        }
-    }
-
     public T getPlugin() {
         return plugin;
     }

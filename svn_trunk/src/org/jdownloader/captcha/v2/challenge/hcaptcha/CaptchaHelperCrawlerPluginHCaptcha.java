@@ -19,7 +19,6 @@ public class CaptchaHelperCrawlerPluginHCaptcha extends AbstractHCaptcha<PluginF
 
     public String getToken() throws PluginException, InterruptedException, DecrypterException {
         logger.info("SiteDomain:" + getSiteDomain() + "|SiteKey:" + getSiteKey());
-        runDdosPrevention();
         if (siteKey == null) {
             siteKey = getSiteKey();
             if (siteKey == null) {

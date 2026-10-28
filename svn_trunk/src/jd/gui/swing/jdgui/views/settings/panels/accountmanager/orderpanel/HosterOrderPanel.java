@@ -4,7 +4,6 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
 import javax.swing.AbstractAction;
-import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 
 import org.appwork.swing.MigPanel;
@@ -62,7 +61,7 @@ public class HosterOrderPanel extends SwitchPanel implements ActionListener, Acc
         tb.add(new ExtButton(new BuyAction((PremiumAccountTable) null)), "sg 2,height 26!");
         tb.add(new ExtButton(new RefreshAction()), "sg 2,height 26!");
         add(txt, "gaptop 0,spanx,growx,pushx,gapbottom 5,wmin 10");
-        add(new JScrollPane(table));
+        add(table.createScrollPane());
         add(tb);
     }
 

@@ -123,6 +123,13 @@ public class PseudoMultiCombo<Type> extends ExtButton {
         };
     }
 
+    /**
+     * True: the popup starts with a "Select/Deselect all" entry (checked if every item is selected). Off by default.
+     */
+    protected boolean isSelectAllEnabled() {
+        return false;
+    }
+
     public JScrollPopupMenu getPopup() {
         final JScrollPopupMenu popup = new JScrollPopupMenu() {
             @Override
@@ -136,6 +143,32 @@ public class PseudoMultiCombo<Type> extends ExtButton {
             }
         };
         final AtomicInteger integer = new AtomicInteger(0);
+        final List<ExtRealCheckBoxMenuItem> itemMenus = new ArrayList<ExtRealCheckBoxMenuItem>();
+        final ExtRealCheckBoxMenuItem[] selectAllMenu = new ExtRealCheckBoxMenuItem[1];
+        if (isSelectAllEnabled() && values.size() > 0) {
+            selectAllMenu[0] = new ExtRealCheckBoxMenuItem(new AppAction() {
+                {
+                    setName(_GUI.T.PseudoMultiCombo_selectAll());
+                    setSelected(selectedItems.size() == values.size());
+                }
+
+                public void actionPerformed(ActionEvent e) {
+                    final boolean select = isSelected();
+                    selectedItems.clear();
+                    if (select) {
+                        selectedItems.addAll(values);
+                    }
+                    for (final ExtRealCheckBoxMenuItem menu : itemMenus) {
+                        menu.setSelected(select);
+                    }
+                    updateLabel();
+                    onChanged();
+                }
+            });
+            selectAllMenu[0].setHideOnClick(false);
+            popup.add(selectAllMenu[0]);
+            popup.addSeparator();
+        }
         for (final Type sc : values) {
             final ExtRealCheckBoxMenuItem mi;
             popup.add(mi = createMenuItem(sc, new AppAction() {
@@ -155,9 +188,13 @@ public class PseudoMultiCombo<Type> extends ExtButton {
                 public void actionPerformed(ActionEvent e) {
                     setSelected(isSelected());
                     setItemSelected(value, isSelected());
+                    if (selectAllMenu[0] != null) {
+                        selectAllMenu[0].setSelected(selectedItems.size() == values.size());
+                    }
                 }
             }));
             mi.setHideOnClick(false);
+            itemMenus.add(mi);
         }
         return popup;
     }

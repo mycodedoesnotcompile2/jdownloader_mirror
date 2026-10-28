@@ -1,7 +1,5 @@
 package jd.gui.swing.jdgui.views.settings.panels.anticaptcha;
 
-import java.awt.Dimension;
-
 import javax.swing.AbstractAction;
 
 import jd.gui.swing.jdgui.BasicJDTable;
@@ -17,11 +15,8 @@ public class TimingTable extends BasicJDTable<SolverService> {
     }
 
     @Override
-    public Dimension getPreferredScrollableViewportSize() {
-        Dimension dim = super.getPreferredScrollableViewportSize();
-        // here we return the pref height
-        dim.height = getPreferredSize().height;
-        return dim;
+    protected boolean isDisplayFullsizeAlways() {
+        return true;
     }
 
     public AbstractAction getResetAction() {

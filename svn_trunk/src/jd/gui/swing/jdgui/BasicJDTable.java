@@ -3,6 +3,7 @@ package jd.gui.swing.jdgui;
 import java.awt.AlphaComposite;
 import java.awt.Color;
 import java.awt.Composite;
+import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -11,11 +12,15 @@ import java.awt.Rectangle;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionListener;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
 import java.util.EventObject;
 
 import javax.swing.JComponent;
 import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
+import javax.swing.JScrollBar;
+import javax.swing.JScrollPane;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
 import javax.swing.plaf.TableUI;
@@ -223,6 +228,103 @@ public class BasicJDTable<T> extends ExtTable<T> implements GenericConfigEventLi
         } else {
             return prefHeight + 3;
         }
+    }
+
+    /**
+     * Override and return true for tables that must always be displayed completely, without any scrollbar: tables with a fixed number of
+     * rows or tables that never contain "many" rows. Use {@link #createScrollPane()} to wrap such a table.
+     */
+    protected boolean isDisplayFullsizeAlways() {
+        return false;
+    }
+
+    @Override
+    public Dimension getPreferredScrollableViewportSize() {
+        final Dimension dim = super.getPreferredScrollableViewportSize();
+        if (isDisplayFullsizeAlways()) {
+            /* Viewport as high as all rows -> The scroll pane grows with the table */
+            dim.height = getPreferredSize().height;
+        }
+        return dim;
+    }
+
+    /**
+     * Creates the scroll pane this table has to be put into. If {@link #isDisplayFullsizeAlways()} is true, the scroll pane never shows a
+     * scrollbar and passes mouse wheel events to the next scroll pane above it, so the user can still scroll the surrounding panel while
+     * the mouse is over this table.
+     */
+    public JScrollPane createScrollPane() {
+        final JScrollPane scrollPane = new JScrollPane(this);
+        if (isDisplayFullsizeAlways()) {
+            scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
+            scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+            passMouseWheelToParent(scrollPane);
+        } else {
+            passMouseWheelToParentAtBounds(scrollPane);
+        }
+        return scrollPane;
+    }
+
+    /**
+     * For scroll pane that do scroll themselves: Mouse wheel events scroll the table as usual. As soon as the table is at its top/bottom
+     * and the user keeps scrolling in that direction (or the scroll bar is not needed at all), the event is forwarded to the next scroll
+     * pane above it, so the surrounding panel continues to scroll.
+     */
+    public static void passMouseWheelToParentAtBounds(final JScrollPane scrollPane) {
+        final MouseWheelListener[] originals = scrollPane.getMouseWheelListeners();
+        for (final MouseWheelListener listener : originals) {
+            scrollPane.removeMouseWheelListener(listener);
+        }
+        scrollPane.addMouseWheelListener(new MouseWheelListener() {
+            @Override
+            public void mouseWheelMoved(final MouseWheelEvent e) {
+                final JScrollBar bar = scrollPane.getVerticalScrollBar();
+                final Container parent = SwingUtilities.getAncestorOfClass(JScrollPane.class, scrollPane);
+                if (parent != null && bar != null) {
+                    final boolean scrollable = bar.isVisible() && bar.getMaximum() - bar.getMinimum() > bar.getVisibleAmount();
+                    final boolean atTop = bar.getValue() <= bar.getMinimum();
+                    final boolean atBottom = bar.getValue() + bar.getVisibleAmount() >= bar.getMaximum();
+                    final boolean up = e.getWheelRotation() < 0;
+                    if (!scrollable || (up && atTop) || (!up && atBottom)) {
+                        parent.dispatchEvent(SwingUtilities.convertMouseEvent(scrollPane, e, parent));
+                        return;
+                    }
+                }
+                for (final MouseWheelListener listener : originals) {
+                    listener.mouseWheelMoved(e);
+                }
+            }
+        });
+    }
+
+    /**
+     * Full pixel height of this table (header + all rows) plus a few pixels for the scroll pane border, so the last row is never clipped
+     * and no scrollbar is needed. getPreferredSize() already accounts for row height and inter-cell spacing of all rows. <br>
+     * 2026-09-21: Please don't ask me why but without adding these extra 10px, also e.g. with a value lower than 10px extra, the last table
+     * item will be partly cut and there will be a scrollbar which we don't want.
+     */
+    public int getFullDisplayHeight() {
+        final int headerHeight = getTableHeader() != null ? getTableHeader().getPreferredSize().height : 0;
+        return headerHeight + getPreferredSize().height + 10;
+    }
+
+    /**
+     * A scroll pane without scrollbars still consumes mouse wheel events, so scrolling over such a table would do nothing. Replaces the
+     * scroll pane's own wheel handling by one that forwards the event to the next scroll pane above it (the panel that actually scrolls).
+     */
+    public static void passMouseWheelToParent(final JScrollPane scrollPane) {
+        for (final MouseWheelListener listener : scrollPane.getMouseWheelListeners()) {
+            scrollPane.removeMouseWheelListener(listener);
+        }
+        scrollPane.addMouseWheelListener(new MouseWheelListener() {
+            @Override
+            public void mouseWheelMoved(final MouseWheelEvent e) {
+                final Container parent = SwingUtilities.getAncestorOfClass(JScrollPane.class, scrollPane);
+                if (parent != null) {
+                    parent.dispatchEvent(SwingUtilities.convertMouseEvent(scrollPane, e, parent));
+                }
+            }
+        });
     }
 
     public boolean isOriginalOrder() {

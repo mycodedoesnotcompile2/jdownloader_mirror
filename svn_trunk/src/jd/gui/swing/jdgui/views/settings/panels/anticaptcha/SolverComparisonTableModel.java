@@ -84,9 +84,26 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
         return true;
     }
 
-    /** True if the table is empty only because "only services supporting all selected types" filtered out every solver. */
-    public boolean isEmptyDueToFilter() {
-        return onlyFullSupport && !allSolvers.isEmpty() && getRowCount() == 0;
+    /** True if the table is empty because not a single captcha type is selected. */
+    public boolean isEmptyDueToNoTypes() {
+        final Set<CAPTCHA_TYPE> visible = visibleTypes;
+        return visible != null && visible.isEmpty();
+    }
+
+    /**
+     * True if there are solvers but none of them supports all selected captcha types. Then "only services supporting all selected types"
+     * cannot be applied (it would hide every solver): it is not applied, and the container greys out its check box.
+     */
+    public boolean isFullSupportImpossible() {
+        if (allSolvers.isEmpty() || isEmptyDueToNoTypes()) {
+            return false;
+        }
+        for (final SolverService solver : allSolvers) {
+            if (supportsAllSelected(solver)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** Number of selected (visible) captcha types the solver supports. */
@@ -153,10 +170,11 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
 
     /** Filters (optional) and sorts the solvers and replaces the rows. */
     private void rebuildRows() {
-        final boolean fullSupportOnly = onlyFullSupport;
+        final boolean fullSupportOnly = onlyFullSupport && !isFullSupportImpossible();
         final boolean bySelected = sortBySelectedTypes;
         final List<SolverService> rows = new ArrayList<SolverService>();
-        for (final SolverService solver : allSolvers) {
+        /* No captcha type selected: no rows (the container shows a hint). */
+        for (final SolverService solver : isEmptyDueToNoTypes() ? new ArrayList<SolverService>() : allSolvers) {
             if (!fullSupportOnly || supportsAllSelected(solver)) {
                 rows.add(solver);
             }

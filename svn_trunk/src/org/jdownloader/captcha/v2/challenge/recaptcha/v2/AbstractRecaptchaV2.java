@@ -315,12 +315,6 @@ public abstract class AbstractRecaptchaV2<T extends Plugin> {
         return ret;
     }
 
-    protected void runDdosPrevention() throws InterruptedException {
-        if (plugin != null) {
-            plugin.runCaptchaDDosProtection(RecaptchaV2Challenge.RECAPTCHAV2);
-        }
-    }
-
     public T getPlugin() {
         return plugin;
     }

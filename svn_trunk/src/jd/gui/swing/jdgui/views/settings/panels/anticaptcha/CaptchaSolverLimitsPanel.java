@@ -71,6 +71,11 @@ public class CaptchaSolverLimitsPanel extends MigPanel {
                 new RemoveAction(selectedObjects).actionPerformed(null);
                 return true;
             }
+
+            @Override
+            protected boolean isDisplayFullsizeAlways() {
+                return true;
+            }
         };
         table.getTableHeader().setReorderingAllowed(false);
         table.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
@@ -88,11 +93,8 @@ public class CaptchaSolverLimitsPanel extends MigPanel {
         ((DefaultCaret) hint.getCaret()).setUpdatePolicy(DefaultCaret.NEVER_UPDATE);
         hint.setText(_GUI.T.CaptchaSolverLimits_hint());
         add(hint, "growx, wmin 10, gapbottom 5");
-        scrollPane = new JScrollPane(table);
-        /* Never scroll: the table is always shown at full size (all rows), see updateTableSize(). */
-        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
-        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        SolverOrderContainer.passMouseWheelToParent(scrollPane);
+        /* Never scrolls: the table is always shown at full size (all rows), see updateTableSize(). */
+        scrollPane = table.createScrollPane();
         add(scrollPane, "growx");
         restorePanel = new MigPanel("ins 2 4 2 4", "[]", "[]");
         restorePanel.setOpaque(true);

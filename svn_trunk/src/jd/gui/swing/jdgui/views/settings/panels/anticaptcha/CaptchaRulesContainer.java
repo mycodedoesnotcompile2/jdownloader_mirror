@@ -2,7 +2,6 @@ package jd.gui.swing.jdgui.views.settings.panels.anticaptcha;
 
 import javax.swing.Box;
 import javax.swing.JButton;
-import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.TableModelEvent;
@@ -43,7 +42,7 @@ public class CaptchaRulesContainer extends MigPanel implements SettingsComponent
         hint.setFocusable(false);
         hint.setText(_GUI.T.CaptchaRules_hint());
         add(hint, "gaptop 0,growx,pushx,gapbottom 5,wmin 10");
-        add(new JScrollPane(table), "grow");
+        add(table.createScrollPane(), "grow");
         final MigPanel buttonBar = new MigPanel("ins 0", "[][][grow,fill][][]", "[]");
         addButton = new JButton(new CaptchaRulesAddAction(table));
         final CaptchaRulesRemoveAction removeAction = new CaptchaRulesRemoveAction(table);

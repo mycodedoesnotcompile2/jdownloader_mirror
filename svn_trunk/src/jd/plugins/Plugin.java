@@ -310,8 +310,6 @@ public abstract class Plugin implements ActionListener {
 
     public abstract String getCrawlerLoggerID(CrawledLink link);
 
-    public abstract void runCaptchaDDosProtection(String id) throws InterruptedException;
-
     protected String getBrowserReferrer() {
         final LinkCrawler crawler = getCrawler();
         if (crawler != null) {

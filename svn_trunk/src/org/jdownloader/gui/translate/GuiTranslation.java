@@ -4003,6 +4003,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "No Selection" })
     String PseudoMultiCombo_nothing();
 
+    @Default(lngs = { "en" }, values = { "Select/Deselect all" })
+    String PseudoMultiCombo_selectAll();
+
     @Default(lngs = { "en" }, values = { "Custom Type" })
     String ConditionDialog_getLabel_customtype_();
 
@@ -5627,9 +5630,6 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Preselected captcha types" })
     String CaptchaSolverComparison_preselect_label();
 
-    @Default(lngs = { "en" }, values = { "All" })
-    String CaptchaSolverComparison_preselect_all();
-
     @Default(lngs = { "en" }, values = { "Selection" })
     String CaptchaSolverComparison_preselect_selection();
 
@@ -5726,8 +5726,11 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Display only solvers that support all selected captcha types" })
     String CaptchaSolverComparison_onlyFullSupport();
 
-    @Default(lngs = { "en" }, values = { "There is no external captcha solver that supports all selected captcha types" })
-    String CaptchaSolverComparison_noSolverSupportsAll();
+    @Default(lngs = { "en" }, values = { "Not available: No external captcha solver supports all selected captcha types" })
+    String CaptchaSolverComparison_fullSupportImpossible();
+
+    @Default(lngs = { "en" }, values = { "You have to select at least one captcha type" })
+    String CaptchaSolverComparison_noTypeSelected();
 
     @Default(lngs = { "en" }, values = { "Please enter username and password..." })
     String AskForUserAndPasswordDialog_AskForUserAndPasswordDialog_title_();

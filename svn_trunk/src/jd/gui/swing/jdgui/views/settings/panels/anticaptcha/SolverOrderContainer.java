@@ -1,12 +1,9 @@
 package jd.gui.swing.jdgui.views.settings.panels.anticaptcha;
 
-import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.MouseWheelEvent;
-import java.awt.event.MouseWheelListener;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -99,10 +96,7 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
         super("ins 0, gapy 0", "[grow,fill]", "[][][][][][][][][][][]");
         this.solverOrder = urlOrder;
         /* Main solver order table. Slightly narrower on the right; never shows any scrollbar. */
-        final JScrollPane sp = new JScrollPane(urlOrder);
-        sp.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
-        sp.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        passMouseWheelToParent(sp);
+        final JScrollPane sp = urlOrder.createScrollPane();
         SwingUtils.setOpaque(this, false);
         add(sp, "wrap");
         /* Header label shown above the detail table; separated from the solver table above by a gap. */
@@ -501,37 +495,17 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
         refreshLayout();
     }
 
-    /**
-     * A scroll pane without scrollbars still consumes mouse wheel events, so scrolling over such a table would do nothing. Replaces the
-     * scroll pane's own wheel handling by one that forwards the event to the next scroll pane above it (the panel that actually scrolls).
-     */
+    /** See {@link BasicJDTable#passMouseWheelToParent(JScrollPane)}. */
     static void passMouseWheelToParent(final JScrollPane scrollPane) {
-        for (final MouseWheelListener listener : scrollPane.getMouseWheelListeners()) {
-            scrollPane.removeMouseWheelListener(listener);
-        }
-        scrollPane.addMouseWheelListener(new MouseWheelListener() {
-            @Override
-            public void mouseWheelMoved(final MouseWheelEvent e) {
-                final Container parent = SwingUtilities.getAncestorOfClass(JScrollPane.class, scrollPane);
-                if (parent != null) {
-                    parent.dispatchEvent(SwingUtilities.convertMouseEvent(scrollPane, e, parent));
-                }
-            }
-        });
+        BasicJDTable.passMouseWheelToParent(scrollPane);
     }
 
-    /**
-     * Full pixel height of a table (header + all rows) plus a few pixels for the scroll pane border, so the last row is never clipped and
-     * no scrollbar is needed. getPreferredSize() already accounts for row height and inter-cell spacing of all rows. <br>
-     * 2026-09-21: Please don't ask me why but without adding these extra 10px, also e.g. with a value lower than 10px extra, the last table
-     * item will be partly cut and there will be a scrollbar which we don't want.
-     */
+    /** See {@link BasicJDTable#getFullDisplayHeight()}. */
     static int tableFullHeight(final BasicJDTable<?> table) {
         if (table == null) {
             return 0;
         }
-        final int headerHeight = table.getTableHeader() != null ? table.getTableHeader().getPreferredSize().height : 0;
-        return headerHeight + table.getPreferredSize().height + 10;
+        return table.getFullDisplayHeight();
     }
 
     private int detailTableFullHeight() {

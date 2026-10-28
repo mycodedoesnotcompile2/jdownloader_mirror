@@ -1,9 +1,10 @@
 package jd.gui.swing.jdgui.views.settings.panels.anticaptcha;
 
-import java.awt.Dimension;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import javax.swing.JMenuItem;
@@ -38,7 +39,8 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
         super(new SolverOrderTableModel());
         setShowHorizontalLineBelowLastEntry(false);
         setShowHorizontalLines(true);
-        setFocusable(false);
+        /* Focusable (click on a row): Without focus the table never receives keyboard shortcuts like Ctrl+A (select all). */
+        setFocusable(true);
         getSelectionModel().addListSelectionListener(new ListSelectionListener() {
             @Override
             public void valueChanged(ListSelectionEvent e) {
@@ -187,13 +189,23 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
             });
         }
         if (contextObject != null && CaptchaConfigPanel.isDebugTabShown()) {
-            /* Only shown if the "Test & Debug" tab exists, and only for solvers that can be tested there (ready and enabled). */
+            /*
+             * Only shown if the "Test & Debug" tab exists, and only for solvers that can be tested there (ready and enabled). All selected
+             * solvers are preselected there (only the clicked one if it is not part of the selection).
+             */
+            final List<SolverService> testable = new ArrayList<SolverService>();
+            final List<SolverService> targets = selection != null && selection.contains(contextObject) ? selection : Collections.singletonList(contextObject);
+            for (final SolverService target : targets) {
+                if (CaptchaTestPanel.isSelectable(target)) {
+                    testable.add(target);
+                }
+            }
             final JMenuItem testAndDebug = new JMenuItem("Test & Debug", new AbstractIcon(IconKey.ICON_BUG, 18));
-            testAndDebug.setEnabled(CaptchaTestPanel.isSelectable(contextObject));
+            testAndDebug.setEnabled(!testable.isEmpty());
             testAndDebug.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(final ActionEvent e) {
-                    CaptchaConfigPanel.showTestAndDebug(contextObject);
+                    CaptchaConfigPanel.showTestAndDebug(testable, null);
                 }
             });
             popup.add(testAndDebug);
@@ -206,10 +218,7 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
     }
 
     @Override
-    public Dimension getPreferredScrollableViewportSize() {
-        Dimension dim = super.getPreferredScrollableViewportSize();
-        // here we return the pref height
-        dim.height = getPreferredSize().height;
-        return dim;
+    protected boolean isDisplayFullsizeAlways() {
+        return true;
     }
 }

@@ -19,7 +19,6 @@ public class CaptchaHelperHostPluginHCaptcha extends AbstractHCaptcha<PluginForH
 
     public String getToken() throws PluginException, InterruptedException {
         logger.info("SiteDomain:" + getSiteDomain() + "|SiteKey:" + getSiteKey());
-        runDdosPrevention();
         final PluginForHost plugin = getPlugin();
         final DownloadLink link = plugin.getDownloadLink();
         if (siteKey == null) {

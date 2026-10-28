@@ -25,6 +25,21 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import jd.PluginWrapper;
+import jd.controlling.ProgressController;
+import jd.http.Browser;
+import jd.plugins.Account;
+import jd.plugins.CryptedLink;
+import jd.plugins.DecrypterPlugin;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.ArteTv;
+import jd.plugins.hoster.DirectHTTP;
+
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
@@ -44,22 +59,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer.StreamCodec;
 import org.jdownloader.plugins.components.hls.HlsContainerStorable;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-import jd.PluginWrapper;
-import jd.controlling.ProgressController;
-import jd.http.Browser;
-import jd.plugins.Account;
-import jd.plugins.CryptedLink;
-import jd.plugins.DecrypterPlugin;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForDecrypt;
-import jd.plugins.hoster.ArteTv;
-import jd.plugins.hoster.DirectHTTP;
-
-@DecrypterPlugin(revision = "$Revision: 53742 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53770 $", interfaceVersion = 4, names = {}, urls = {})
 public class ArteMediathekV3 extends PluginForDecrypt {
     public ArteMediathekV3(PluginWrapper wrapper) {
         super(wrapper);
@@ -110,16 +110,19 @@ public class ArteMediathekV3 extends PluginForDecrypt {
     private final String         PROPERTY_DATE                    = "date";
     private final String         PROPERTY_ORIGINAL_FILENAME       = "original_filename";
     private final String         PROPERTY_ORIGINAL_AUDIO_LANGUAGE = "original_audio_language";
-    private final String         PROPERTY_AUDIO_CODE              = "audio_code";                                                                                               // ex
+    private final String         PROPERTY_AUDIO_CODE              = "audio_code";
+    // ex
     // versionCode
     // e.g.
     // VF,
     // VF-STA,
     // VA
-    private final String         PROPERTY_AUDIO_SHORT_LABEL       = "audioShortLabel";                                                                                          // e.g.
+    private final String         PROPERTY_AUDIO_SHORT_LABEL       = "audioShortLabel";
+    // e.g.
     // DE,
     // FR
-    private final String         PROPERTY_AUDIO_LABEL             = "audioLabel";                                                                                               // e.g.
+    private final String         PROPERTY_AUDIO_LABEL             = "audioLabel";
+    // e.g.
     // Deutsch,
     // Französisch
     private final String         PROPERTY_WIDTH                   = "width";
@@ -251,24 +254,23 @@ public class ArteMediathekV3 extends PluginForDecrypt {
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             List<Map<String, Object>> responseVideoStreams = (List<Map<String, Object>>) entries.get("videoStreams");
             if (responseVideoStreams == null || responseVideoStreams.isEmpty()) {
-                /* This should never happen */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             videoStreams.addAll(responseVideoStreams);
         } else if (allowUseHbbTV2) {
             /* APIv2: This gives us only progressive streams and only up to 720p */
+            /* disabled/offline due to php security issue */
             final String videoStreamsAPIV2URL = String.format("https://www.arte.tv/hbbtvv2/services/web/index.php/OPA/v3/streams/%s/%s/%s", programId, kind.toUpperCase(Locale.ENGLISH), language);
             br.getPage(videoStreamsAPIV2URL);
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             List<Map<String, Object>> responseVideoStreams = (List<Map<String, Object>>) entries.get("videoStreams");
             if (responseVideoStreams == null || responseVideoStreams.isEmpty()) {
-                /* This should never happen */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             videoStreams.addAll(responseVideoStreams);
         }
         final Browser brc = createNewBrowserInstance();
-        brc.getHeaders().remove("Authorization");
+        brc.getHeaders().remove(HTTPConstants.HEADER_REQUEST_AUTHORIZATION);
         final String playerConfigURL = String.format("https://api.arte.tv/api/player/v2/config/%s/%s", language, programId);
         brc.getPage(playerConfigURL);
         final Map<String, Object> player = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);

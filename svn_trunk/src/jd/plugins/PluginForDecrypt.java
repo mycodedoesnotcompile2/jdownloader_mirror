@@ -28,8 +28,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.appwork.storage.config.JsonConfig;
-import org.appwork.timetracker.TimeTracker;
-import org.appwork.timetracker.TrackerJob;
 import org.appwork.uio.CloseReason;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
@@ -939,31 +937,5 @@ public abstract class PluginForDecrypt extends Plugin {
             }
         }
         return ret;
-    }
-
-    @Override
-    public void runCaptchaDDosProtection(String id) throws InterruptedException {
-        final TimeTracker tracker = ChallengeResponseController.getInstance().getTracker(id);
-        final TrackerJob trackerJob = new TrackerJob(1) {
-            @Override
-            public void waitForNextSlot(long waitFor) throws InterruptedException {
-                while (waitFor > 0 && !isAbort()) {
-                    synchronized (this) {
-                        if (waitFor <= 0) {
-                            return;
-                        } else if (waitFor > 1000) {
-                            wait(1000);
-                        } else {
-                            this.wait(waitFor);
-                        }
-                        waitFor -= 1000;
-                    }
-                }
-                if (isAbort()) {
-                    throw new InterruptedException("PluginForDecrypt is aborting");
-                }
-            };
-        };
-        tracker.wait(trackerJob);
     }
 }

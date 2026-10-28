@@ -1,7 +1,5 @@
 package jd.gui.swing.jdgui.views.settings.panels.urlordertable;
 
-import java.awt.Dimension;
-
 import javax.swing.DropMode;
 
 import jd.gui.swing.jdgui.BasicJDTable;
@@ -19,10 +17,7 @@ public class UrlOrderTable extends BasicJDTable<UrlDisplayEntry> {
     }
 
     @Override
-    public Dimension getPreferredScrollableViewportSize() {
-        Dimension dim = super.getPreferredScrollableViewportSize();
-        // here we return the pref height
-        dim.height = getPreferredSize().height;
-        return dim;
+    protected boolean isDisplayFullsizeAlways() {
+        return true;
     }
 }

@@ -1,23 +1,27 @@
 package jd.plugins.hoster;
 
-import org.appwork.utils.net.httpconnection.HTTPProxy;
-import org.appwork.utils.StringUtils;
 import java.util.Currency;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeSolver.SolverFeature;
 import org.jdownloader.captcha.v2.SolverStatus;
 import org.jdownloader.captcha.v2.challenge.altcha.AltchaChallenge;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
+import org.jdownloader.captcha.v2.challenge.powcaptcha.PowCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.RecaptchaV2Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.CaptchaResponse;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
@@ -47,11 +51,11 @@ import jd.plugins.PluginException;
  * - reCAPTCHA v2 uses the task type "NoCaptchaTaskProxyless" and reCAPTCHA v3 Enterprise has its own task type <br>
  * - Negative feedback is only available via the classic API (res.php?action=reportbad), there is no "report correct" method.
  */
-@HostPlugin(revision = "$Revision: 53733 $", interfaceVersion = 3, names = { "azcaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53779 $", interfaceVersion = 3, names = { "azcaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSolver {
     /**
-     * Task types with proxy of the JSON API, see https://azcaptcha.com/docs: RecaptchaV2Task, RecaptchaV2EnterpriseTask,
-     * RecaptchaV3Task, RecaptchaV3EnterpriseTask and TurnstileTask. The other task types (e.g. Altcha) have no proxy variant documented.
+     * Task types with proxy of the JSON API, see https://azcaptcha.com/docs: RecaptchaV2Task, RecaptchaV2EnterpriseTask, RecaptchaV3Task,
+     * RecaptchaV3EnterpriseTask, TurnstileTask and FilecryptPowTask. The other task types (e.g. Altcha) have no proxy variant documented.
      */
     private static final Map<String, String> PROXY_TASK_TYPES = new HashMap<String, String>();
     static {
@@ -60,6 +64,8 @@ public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSol
         PROXY_TASK_TYPES.put("RecaptchaV3TaskProxyless", "RecaptchaV3Task");
         PROXY_TASK_TYPES.put("RecaptchaV3EnterpriseTaskProxyless", "RecaptchaV3EnterpriseTask");
         PROXY_TASK_TYPES.put("TurnstileTaskProxyless", "TurnstileTask");
+        /* FilecryptPowTask always needs a proxy and has no separate "Proxyless" variant. */
+        PROXY_TASK_TYPES.put("FilecryptPowTask", "FilecryptPowTask");
     }
 
     @Override
@@ -89,9 +95,11 @@ public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSol
         types.add(CAPTCHA_TYPE.CLOUDFLARE_TURNSTILE);
         /* 2026-10-22: https://azcaptcha.com/docs#altcha */
         types.add(CAPTCHA_TYPE.ALTCHA);
+        /* 2026-10-27: Added after azcaptcha support confirmed it (task FilecryptPowTask, proxy required). */
+        types.add(CAPTCHA_TYPE.POW_CAPTCHA);
         /*
          * hCaptcha is only mentioned in the queue statistics and the classic API (method=hcaptcha) but has no documented V2 task, so it is
-         * not declared. Same for click captchas (only "RecaptchaV2GridTask" exists), CutCaptcha, MTCaptcha, FriendlyCaptcha, ...
+         * not declared. Same for click captchas (only "RecaptchaV2GridTask" exists), MTCaptcha, FriendlyCaptcha, ...
          */
         return types;
     }
@@ -118,11 +126,10 @@ public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSol
     /**
      * Sends the proxy of the challenge in the format of the AZCaptcha JSON API (task types see PROXY_TASK_TYPES).
      */
-    private void applyProxy(final Map<String, Object> task, final Challenge<?> challenge) {
-        if (!challenge.hasProxy()) {
+    private void applyProxy(final Map<String, Object> task, final HTTPProxy proxy) {
+        if (proxy == null) {
             return;
         }
-        final HTTPProxy proxy = challenge.getProxy();
         final String proxyTaskType = PROXY_TASK_TYPES.get(task.get("type"));
         if (proxyTaskType == null) {
             logger.info("The service has no task type with proxy for: " + task.get("type"));
@@ -161,7 +168,19 @@ public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSol
         final String apikey = account.getPass();
         postdata.put("clientKey", apikey);
         final Map<String, Object> task = new HashMap<String, Object>();
-        if (captchachallenge instanceof RecaptchaV2Challenge) {
+        /* Use the proxy of the challenge (if there is one and if the task type supports it). */
+        HTTPProxy proxy = captchachallenge.hasProxy() ? captchachallenge.getProxy() : null;
+        if (captchachallenge instanceof PowCaptchaChallenge) {
+            /*
+             * powCAPTCHA (filecrypt.cc): The token is bound to the IP address which solved it, so a proxy is REQUIRED (the service returns
+             * ERROR_PROXY_REQUIRED without one). The proxy is added by applyProxy().
+             */
+            if (proxy == null) {
+                throw new PluginException(LinkStatus.ERROR_CAPTCHA, "ERROR_PROXY_REQUIRED: powCAPTCHA can only be solved with a proxy");
+            }
+            task.put("type", "FilecryptPowTask");
+            task.put("websiteURL", ((PowCaptchaChallenge) captchachallenge).getSiteUrl(this));
+        } else if (captchachallenge instanceof RecaptchaV2Challenge) {
             final RecaptchaV2Challenge challenge = (RecaptchaV2Challenge) captchachallenge;
             task.put("websiteKey", challenge.getSiteKey());
             task.put("websiteURL", challenge.getSiteUrl(this));
@@ -189,8 +208,8 @@ public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSol
             task.put("websiteKey", challenge.getSiteKey());
         } else if (captchachallenge instanceof AltchaChallenge) {
             /*
-             * https://azcaptcha.com/docs#altcha -> Either challengeURL or challengeJSON. Supports v1 (SHA) and v2 (PBKDF2, Argon2id, Scrypt)
-             * challenges.
+             * https://azcaptcha.com/docs#altcha -> Either challengeURL or challengeJSON. Supports v1 (SHA) and v2 (PBKDF2, Argon2id,
+             * Scrypt) challenges.
              */
             final AltchaChallenge challenge = (AltchaChallenge) captchachallenge;
             task.put("type", "AltchaTaskProxyless");
@@ -219,8 +238,7 @@ public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSol
         } else {
             throw new IllegalArgumentException("Unexpected captcha challenge type");
         }
-        /* Use the proxy of the challenge (if there is one and if the task type supports it). */
-        applyProxy(task, captchachallenge);
+        applyProxy(task, proxy);
         postdata.put("task", task);
         /* Submit captcha */
         final PostRequest req_createTask = br.createJSonPostRequest(this.getApiBase() + "/createTask", postdata);
@@ -249,7 +267,17 @@ public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSol
             }
             final Map<String, Object> solutionmap = (Map<String, Object>) entries.get("solution");
             final AbstractResponse<?> resp;
-            if (captchachallenge instanceof ImageCaptchaChallenge) {
+            if (captchachallenge instanceof PowCaptchaChallenge) {
+                /* The website expects exactly these six fields. */
+                final Map<String, Object> token = new LinkedHashMap<String, Object>();
+                token.put("pow_id", solutionmap.get("pow_id"));
+                token.put("pow_nonce", solutionmap.get("pow_nonce"));
+                token.put("pow_elapsed", solutionmap.get("pow_elapsed"));
+                token.put("pow_pauses", solutionmap.get("pow_pauses"));
+                token.put("pow_data", solutionmap.get("pow_data"));
+                token.put("pow_x", solutionmap.get("pow_x"));
+                resp = new TokenCaptchaResponse((Challenge<String>) captchachallenge, job.getSolver(), JSonStorage.serializeToJson(token));
+            } else if (captchachallenge instanceof ImageCaptchaChallenge) {
                 resp = new CaptchaResponse((Challenge<String>) captchachallenge, job.getSolver(), solutionmap.get("text").toString());
             } else {
                 /* reCAPTCHA returns "gRecaptchaResponse", other token captchas (e.g. Turnstile) are expected to return "token". */
@@ -299,7 +327,7 @@ public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSol
             entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         } catch (final JSonMapperException ignore) {
             /* This should never happen. */
-            throw new AccountUnavailableException("Invalid API response", 1 * 60 * 1000);
+            throw new AccountUnavailableException("Invalid API response", TimeUnit.MINUTES.toMillis(1));
         }
         handleAPIErrors(entries, account);
         return entries;
@@ -329,7 +357,7 @@ public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSol
         if (accountErrorsPermament.contains(errorCode)) {
             throw new AccountInvalidException(errorDescription);
         } else if (accountErrorsTemp.contains(errorCode)) {
-            throw new AccountUnavailableException(errorDescription, 5 * 60 * 1000);
+            throw new AccountUnavailableException(errorDescription, TimeUnit.MINUTES.toMillis(5));
         } else {
             /* Everything else (bad parameters, unsolvable captcha, unsupported task, timeout, ...) is a per-captcha problem. */
             throw new PluginException(LinkStatus.ERROR_CAPTCHA, errorDescription);
@@ -366,6 +394,6 @@ public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSol
     @Override
     public long getServerSideMinPollingIntervalMillis() {
         /* Docs: "Call every 3-5 seconds". */
-        return 3 * 1000L;
+        return TimeUnit.SECONDS.toMillis(3);
     }
 }

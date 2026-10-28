@@ -48,11 +48,34 @@
       },
       "version":"9.10.1",
       "vulnerabilities":[]
+    },
+    {
+      "changes":"",
+      "date":"2026-10-13T12:33:11.131+02:00",
+      "dependencies":null,
+      "description":"ASM, a very small and fast Java bytecode manipulation framework",
+      "files":null,
+      "hashes":{
+        "asm-sources.jar":"7e8b9bdad4f324cf7d968a06c561a31b7d6499439a4ca7456211824b3c8088af",
+        "asm.jar":"5fe3b469b8646e5bc53a897840952d63b712d4923d2a7a26aebc585f1fec7676"
+      },
+      "licenses":[{
+        "name":"BSD-3-Clause",
+        "url":"https://asm.ow2.io/license.html"
+      }],
+      "minJRE":"JVM_1_5",
+      "name":"asm",
+      "signatures":{
+        "asm-sources.jar":"-----BEGIN PGP SIGNATURE-----\n\nwsBcBAABCgAGBYJqwlxYAAoJEF9prQh2ALIsWtsIALL+tT9FCzxlXhDIYLxTp1s5\ntYqbSa7lfJ61S1Z3Ck2bW0MsxpTuuR2KYh3mxVp3Er6+h8UreSaD+uHBW/vJ6gaA\nu0fxye/O/Mk6MMRsDlRUmRJpnph9uOqYATFidLlixBSAf2Ph7AGWI32xT7gH+QpR\ncrW7LWaAZoY5potGUARHbT9VTOw1CNucR89XFj2CIdGDGEN7+hAN1PyTayFN9vBv\nnlP6B3VbMIH550jhIRiXHFtNtGIipWK5ZplgOM3eDkWbuG0+Rcc9OqUUEGZKqbiA\n8h7tLheln3QCDkLqBjGCicgsDbO45/1su0NUnIHzcojdIqWKlLpU85NWEeg682w=\n=nK5C\n-----END PGP SIGNATURE-----\n",
+        "asm.jar":"-----BEGIN PGP SIGNATURE-----\n\nwsBcBAABCgAGBYJqwlxYAAoJEF9prQh2ALIsqyYIAMq/GZ07pOfzC2b6UJ81pB9U\nInoGrPP/TghLpsyIfUo4dk0xCA0PnCRdmwnHN0frKzQ96j6lwQ/8mYFt+kdjzfmw\nzp08FrEC/COAucGYjgVifsBIu2wzS6L5JJHWaHgaeCGp6mtk35HkGiU/deRyrDUn\n2VEOPascJcdPle5czZcpP8ntwQq0JhSCddugtAVVo7WhBy+eVTobSnzr8b+VSjP9\nyhv19f69Xhv9yUVtM8TbhnK8/llnIf5awJPn+4FPgmnSkzqD9gxfC+CuURs1BHb0\neAHzZrLalERILznowalRJhHujvdsykI4u5LbqCVTxkKmMmOQKBll+3GMZHFhceo=\n=GX/N\n-----END PGP SIGNATURE-----\n"
+      },
+      "version":"9.11",
+      "vulnerabilities":[]
     }
   ],
   "installed":{
     "changes":"",
-    "date":"2026-10-13T12:33:11.131+02:00",
+    "date":"2026-10-27T11:59:56.815+01:00",
     "dependencies":null,
     "description":"ASM, a very small and fast Java bytecode manipulation framework",
     "files":[
@@ -103,8 +126,8 @@
       "meta.json"
     ],
     "hashes":{
-      "asm-sources.jar":"7e8b9bdad4f324cf7d968a06c561a31b7d6499439a4ca7456211824b3c8088af",
-      "asm.jar":"5fe3b469b8646e5bc53a897840952d63b712d4923d2a7a26aebc585f1fec7676"
+      "asm-sources.jar":"3cfc56ad047260d8ccff50cd55af8922a9c9e2b0439c6eba801dbfaf0870a3ae",
+      "asm.jar":"ae4e6e10d59d0a1500317764b21881ad883f8550e33c66e6142f7032c6fb566c"
     },
     "licenses":[{
       "name":"BSD-3-Clause",
@@ -113,10 +136,10 @@
     "minJRE":"JVM_1_5",
     "name":"asm",
     "signatures":{
-      "asm-sources.jar":"-----BEGIN PGP SIGNATURE-----\n\nwsBcBAABCgAGBYJqwlxYAAoJEF9prQh2ALIsWtsIALL+tT9FCzxlXhDIYLxTp1s5\ntYqbSa7lfJ61S1Z3Ck2bW0MsxpTuuR2KYh3mxVp3Er6+h8UreSaD+uHBW/vJ6gaA\nu0fxye/O/Mk6MMRsDlRUmRJpnph9uOqYATFidLlixBSAf2Ph7AGWI32xT7gH+QpR\ncrW7LWaAZoY5potGUARHbT9VTOw1CNucR89XFj2CIdGDGEN7+hAN1PyTayFN9vBv\nnlP6B3VbMIH550jhIRiXHFtNtGIipWK5ZplgOM3eDkWbuG0+Rcc9OqUUEGZKqbiA\n8h7tLheln3QCDkLqBjGCicgsDbO45/1su0NUnIHzcojdIqWKlLpU85NWEeg682w=\n=nK5C\n-----END PGP SIGNATURE-----\n",
-      "asm.jar":"-----BEGIN PGP SIGNATURE-----\n\nwsBcBAABCgAGBYJqwlxYAAoJEF9prQh2ALIsqyYIAMq/GZ07pOfzC2b6UJ81pB9U\nInoGrPP/TghLpsyIfUo4dk0xCA0PnCRdmwnHN0frKzQ96j6lwQ/8mYFt+kdjzfmw\nzp08FrEC/COAucGYjgVifsBIu2wzS6L5JJHWaHgaeCGp6mtk35HkGiU/deRyrDUn\n2VEOPascJcdPle5czZcpP8ntwQq0JhSCddugtAVVo7WhBy+eVTobSnzr8b+VSjP9\nyhv19f69Xhv9yUVtM8TbhnK8/llnIf5awJPn+4FPgmnSkzqD9gxfC+CuURs1BHb0\neAHzZrLalERILznowalRJhHujvdsykI4u5LbqCVTxkKmMmOQKBll+3GMZHFhceo=\n=GX/N\n-----END PGP SIGNATURE-----\n"
+      "asm-sources.jar":"-----BEGIN PGP SIGNATURE-----\n\nwsBcBAABCgAGBYJq04BGAAoJEF9prQh2ALIsUwsH/1h4Ci5EI33KSOJvzMCTORjk\n9J0WjJorROhge6kwDH4zWlxFGggeSWgLW8tJDcsWzCOHNqtVb1iQg5Kzg/5zI0H3\niPUHjdJJT9+pVfnqVfC6blSK4upJDcD+uhN2HvV58KvUPJ0Twz1B78spdYTA5puE\ne3BeTBQ2/te92on8dOw7BfXffg2+br/6PsYaZhA6aDhM5g3h65T6eXHuxLupZYv7\nWBnmc+y+OAHc6+8kE7T/oG9aP5LECw1t15Fcz/HwXTzv6wJdcgHgFOs5E26gmTiK\nOc6db0XZ2KcCNhmufangSX76x58jDB+qNh8nK+NQZfyCXVgrfy4WlTrFaj48vKw=\n=voz/\n-----END PGP SIGNATURE-----\n",
+      "asm.jar":"-----BEGIN PGP SIGNATURE-----\n\nwsBcBAABCgAGBYJq04BGAAoJEF9prQh2ALIsKFIH/1h9IgyxtaY7Vrdagwbp5Yn1\nn6nQivT1OXrMQe7hV9e3hAf279ezkH0rtJPed8wem49lRuqSCuEOHyikBN2Ffqx0\n/BWyM11mOzZ1ONoFmpbnpH5i5Ok/0EuEsD1hWmzT8UKDvy313wFjlz2nc/dAk6Cn\nA763I70UuoOTXLXeFTenr9/QOQtFM5/eaAf1F+0C6V8FoTlyFpUzD84K8Et58mcd\nE1FwZ3d6lVZsKXo5B2MINUlgy27h16THWL5chwNvnvKEe9+9LiiAG3QuF+Fuyfsm\ngCvVjgyHgSS9vYNE0I6Dh7jCVgJyRgTCvevDIysC/xCSlqurRc/bUFdUPton75E=\n=m653\n-----END PGP SIGNATURE-----\n"
     },
-    "version":"9.11",
+    "version":"9.11.1",
     "vulnerabilities":[]
   },
   "minJRE":null,

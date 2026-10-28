@@ -146,7 +146,15 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     private final JLabel                    minClicksLabel;
     private final JSpinner                  minClicksSpinner;
     private final JTextField                expectedResultField;
-    private final JComboBox                 solverBox;
+    /* Multi test: the solvers to test. Only enabled and ready solvers are listed. */
+    private final JButton                   solversButton;
+    private final JPopupMenu                solversPopup;
+    /* First entry of the solver popup: selects/deselects all solvers. */
+    private final JCheckBox                 solverSelectAllBox     = new JCheckBox("Select/Deselect all");
+    private final List<JCheckBox>           solverCheckBoxes       = new ArrayList<JCheckBox>();
+    private final List<SolverService>       solverCheckBoxServices = new ArrayList<SolverService>();
+    /* Red warning, shown if solvers are selectable but the user deselected all of them. */
+    private final JLabel                    noSolverSelectedWarning = new JLabel();
     /* Red warning, shown if there is no solver that could be selected. */
     private final JLabel                noSolverWarning = new JLabel();
     /* Red warning, shown if captcha types are selectable but the user deselected all of them. */
@@ -357,46 +365,22 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
             }
         });
         add(startButton, "skip 1, alignx left");
-        /* Multi test: run all selected captcha types of one solver one after another. */
-        /* Solvers that are not ready (no account, disabled, ...) are listed greyed out and cannot be selected. */
-        solverBox = new JComboBox() {
-            private static final long serialVersionUID = 1L;
-
+        /* Multi test: run all selected captcha types with all selected solvers. Solvers that are not enabled/ready cannot be selected. */
+        solversPopup = new JPopupMenu();
+        solverSelectAllBox.addActionListener(new ActionListener() {
             @Override
-            public void setSelectedItem(final Object anObject) {
-                if (anObject instanceof SolverService && !isSelectable((SolverService) anObject)) {
-                    return;
+            public void actionPerformed(final ActionEvent e) {
+                for (final JCheckBox box : solverCheckBoxes) {
+                    box.setSelected(solverSelectAllBox.isSelected());
                 }
-                super.setSelectedItem(anObject);
+                onSolverSelectionChanged();
             }
-        };
-        SolverService firstReadyService = null;
-        for (final SolverService service : ChallengeResponseController.getInstance().listServices()) {
-            solverBox.addItem(service);
-            if (firstReadyService == null && isSelectable(service)) {
-                firstReadyService = service;
-            }
-        }
-        if (firstReadyService != null) {
-            solverBox.setSelectedItem(firstReadyService);
-        }
-        solverBox.setRenderer(new DefaultListCellRenderer() {
-            private static final long serialVersionUID = 1L;
-
+        });
+        solversButton = new JButton();
+        solversButton.addActionListener(new ActionListener() {
             @Override
-            public Component getListCellRendererComponent(final JList list, final Object value, final int index, final boolean isSelected, final boolean cellHasFocus) {
-                final SolverService service = (SolverService) value;
-                final boolean ready = service == null || isSelectable(service);
-                final Component comp = super.getListCellRendererComponent(list, service == null ? "" : service.getName(), index, isSelected && ready, cellHasFocus);
-                if (service != null && comp instanceof JLabel) {
-                    /* Same solver icon as in the other solver lists (see SolverOrderTableModel). */
-                    ((JLabel) comp).setIcon(service.getIcon(18));
-                }
-                if (!ready) {
-                    comp.setEnabled(false);
-                    comp.setForeground(Color.GRAY);
-                }
-                return comp;
+            public void actionPerformed(final ActionEvent e) {
+                solversPopup.show(solversButton, 0, solversButton.getHeight());
             }
         });
         typesPopup = new JPopupMenu();
@@ -431,20 +415,19 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                 cancelBatch();
             }
         });
-        solverBox.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(final ActionEvent e) {
-                rebuildTypeList();
-            }
-        });
-        add(new JLabel("<html>Choose solver to test. You can only choose solvers with status \"Ready\", they must be enabled in the \"Solver overview\" tab and if it is a paid solver, an active and enabled account must be present.</html>"), "span 2, growx, wmin 0");
+        add(new JLabel("<html>Choose the solvers to test. You can only choose solvers with status \"Ready\", they must be enabled in the \"Solver overview\" tab and if it is a paid solver, an active and enabled account must be present.</html>"), "span 2, growx, wmin 0");
         noSolverWarning.setIcon(NewTheme.I().getIcon(IconKey.ICON_WARNING_RED, 18));
         noSolverWarning.setText("!! All Solvers are disabled or not properly configured !!");
         noSolverWarning.setForeground(Color.RED);
         noSolverWarning.setVisible(false);
         add(noSolverWarning, "span 2, growx, wmin 0");
-        add(new JLabel("Multi test: Solver"));
-        add(solverBox, "growx");
+        add(new JLabel("Multi test: Solvers"));
+        add(solversButton, "growx");
+        noSolverSelectedWarning.setIcon(NewTheme.I().getIcon(IconKey.ICON_WARNING_RED, 18));
+        noSolverSelectedWarning.setText("No solver selected: select at least one solver to test");
+        noSolverSelectedWarning.setForeground(Color.RED);
+        noSolverSelectedWarning.setVisible(false);
+        add(noSolverSelectedWarning, "skip 1, growx, wmin 0");
         add(new JLabel("Multi test: Captcha types"));
         add(typesButton, "growx");
         noTypeWarning.setIcon(NewTheme.I().getIcon(IconKey.ICON_WARNING_RED, 18));
@@ -477,11 +460,8 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                 }
             }
         });
-        runScroll = new JScrollPane(runTable);
         /* Always shown at full size (all rows), so it never scrolls itself; the mouse wheel scrolls the surrounding panel instead. */
-        runScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
-        runScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        SolverOrderContainer.passMouseWheelToParent(runScroll);
+        runScroll = runTable.createScrollPane();
         runScroll.setVisible(false);
         batchBar.setStringPainted(true);
         batchBar.setVisible(false);
@@ -550,7 +530,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         runPanel.add(buttonBar, "growx");
         runPanel.setVisible(false);
         add(runPanel, "span 2, growx, pushy, aligny top");
-        rebuildTypeList();
+        rebuildSolverList(false);
         applyDefaults();
         updateNoSolverWarning();
         /* Solvers can be (de)activated in the other tabs meanwhile -> check the selection whenever this panel is shown again. */
@@ -565,54 +545,136 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     }
 
     /**
-     * Makes sure the selected solver can still be tested: if it was deactivated/is no longer ready, the first usable solver is selected, or
-     * nothing if there is none (then no captcha types are listed and "Start Multi Test" is disabled).
+     * Makes sure the selected solvers can still be tested: solvers which were deactivated/are no longer ready are removed from the
+     * selection and solvers which became usable are listed (not selected). If none of the selected solvers is usable any more, the first
+     * usable solver is selected.
      *
-     * @return true if the selection is usable
+     * @return true if there is a solver that can be selected
      */
     private boolean refreshSolverSelection() {
         updateNoSolverWarning();
         if (batchRunning) {
             return true;
         }
-        final SolverService selected = (SolverService) solverBox.getSelectedItem();
-        if (selected != null && isSelectable(selected)) {
-            return true;
-        }
-        SolverService replacement = null;
-        for (int i = 0; i < solverBox.getItemCount(); i++) {
-            final SolverService service = (SolverService) solverBox.getItemAt(i);
-            if (isSelectable(service)) {
-                replacement = service;
-                break;
-            }
-        }
-        /* Fires the combo box listener, which rebuilds the captcha type list. */
-        solverBox.setSelectedItem(replacement);
-        rebuildTypeList();
-        solverBox.repaint();
-        return replacement != null;
+        rebuildSolverList(true);
+        return !solverCheckBoxes.isEmpty();
     }
 
-    /** Selects the given solver for the multi test (only if it can be selected, see isSelectable). */
-    public void selectMultiTestSolver(final SolverService solver) {
-        updateNoSolverWarning();
-        if (!batchRunning && solver != null && isSelectable(solver)) {
-            solverBox.setSelectedItem(solver);
+    /** The solvers which are selected for the multi test. */
+    private List<SolverService> getSelectedSolvers() {
+        final List<SolverService> ret = new ArrayList<SolverService>();
+        for (int i = 0; i < solverCheckBoxes.size(); i++) {
+            if (solverCheckBoxes.get(i).isSelected()) {
+                ret.add(solverCheckBoxServices.get(i));
+            }
         }
+        return ret;
+    }
+
+    /**
+     * Rebuilds the solver check boxes from all solvers which are enabled and ready.
+     *
+     * @param keepSelection
+     *            true: solvers which are still usable stay selected (if none of them is usable any more, the first solver is selected),
+     *            false: only the first usable solver is selected
+     */
+    private void rebuildSolverList(final boolean keepSelection) {
+        final List<SolverService> previous = keepSelection ? getSelectedSolvers() : new ArrayList<SolverService>();
+        solversPopup.removeAll();
+        solverCheckBoxes.clear();
+        solverCheckBoxServices.clear();
+        solversPopup.add(solverSelectAllBox);
+        solversPopup.addSeparator();
+        for (final SolverService service : ChallengeResponseController.getInstance().listServices()) {
+            if (!isSelectable(service)) {
+                continue;
+            }
+            /* The check box itself has no text: the solver icon and name are a separate label (click toggles the check box). */
+            final JCheckBox box = new JCheckBox("", previous.contains(service));
+            final JLabel solverLabel = new JLabel(service.getName(), service.getIcon(18), SwingConstants.LEADING);
+            solverLabel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            solverLabel.addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseClicked(final MouseEvent e) {
+                    box.doClick();
+                }
+            });
+            final MigPanel solverRow = new MigPanel("ins 0", "[][grow,fill]", "[]");
+            solverRow.add(box);
+            solverRow.add(solverLabel);
+            box.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(final ActionEvent e) {
+                    onSolverSelectionChanged();
+                }
+            });
+            solverCheckBoxes.add(box);
+            solverCheckBoxServices.add(service);
+            solversPopup.add(solverRow);
+        }
+        if (!solverCheckBoxes.isEmpty() && (!keepSelection || (!previous.isEmpty() && getSelectedSolvers().isEmpty()))) {
+            solverCheckBoxes.get(0).setSelected(true);
+        }
+        updateSolversButtonText();
+        rebuildTypeList(keepSelection);
+    }
+
+    /** The user (de)selected a solver: the selectable captcha types are the ones of all selected solvers. */
+    private void onSolverSelectionChanged() {
+        updateSolversButtonText();
+        rebuildTypeList(true);
+    }
+
+    private void updateSolversButtonText() {
+        final int selected = getSelectedSolvers().size();
+        solversButton.setText(selected + " of " + solverCheckBoxes.size() + " solvers selected");
+        noSolverSelectedWarning.setVisible(!solverCheckBoxes.isEmpty() && selected == 0);
+        /* Checked only if every solver is selected. */
+        solverSelectAllBox.setSelected(selected > 0 && selected == solverCheckBoxes.size());
+        solverSelectAllBox.setEnabled(!solverCheckBoxes.isEmpty());
+    }
+
+    /** Selects the given solver for the multi test (only if it can be selected, see isSelectable), all other solvers are deselected. */
+    public void selectMultiTestSolver(final SolverService solver) {
+        selectMultiTestSolvers(Collections.singletonList(solver), null);
     }
 
     /**
      * Selects the given solver for the multi test and the given captcha types: the first one (which has a test) is selected in the
-     * captcha type box at the top, all given types in the multi selection (all other types of the solver are deselected).
+     * captcha type box at the top, all given types in the multi selection (all other types are deselected).
      */
     public void selectMultiTestSolver(final SolverService solver, final java.util.Collection<CAPTCHA_TYPE> types) {
-        selectMultiTestSolver(solver);
-        if (batchRunning || solver == null || !isSelectable(solver) || solver != solverBox.getSelectedItem()) {
+        selectMultiTestSolvers(Collections.singletonList(solver), types);
+    }
+
+    /**
+     * Selects the given solvers for the multi test (only the ones which can be selected, see isSelectable, all others are deselected)
+     * and, if not null, the given captcha types: the first one (which has a test) is selected in the captcha type box at the top, all given
+     * types in the multi selection (all other types are deselected). If none of the solvers can be selected, nothing is changed.
+     */
+    public void selectMultiTestSolvers(final java.util.Collection<SolverService> solvers, final java.util.Collection<CAPTCHA_TYPE> types) {
+        updateNoSolverWarning();
+        if (batchRunning || solvers == null) {
             return;
         }
+        /* Solvers can be (de)activated in the other tabs meanwhile -> list the usable solvers first. */
+        rebuildSolverList(true);
+        boolean found = false;
+        for (final SolverService service : solverCheckBoxServices) {
+            found |= solvers.contains(service);
+        }
+        if (!found) {
+            return;
+        }
+        for (int i = 0; i < solverCheckBoxes.size(); i++) {
+            solverCheckBoxes.get(i).setSelected(solvers.contains(solverCheckBoxServices.get(i)));
+        }
+        updateSolversButtonText();
         /* Fresh list (all types selected), then deselect the types which were not chosen. */
-        rebuildTypeList();
+        rebuildTypeList(false);
+        if (types == null) {
+            return;
+        }
         for (int i = 0; i < typeCheckBoxes.size(); i++) {
             typeCheckBoxes.get(i).setSelected(types.contains(typeCheckBoxTypes.get(i)));
         }
@@ -628,8 +690,8 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     /** Shows the warning if not a single solver can be selected. */
     private void updateNoSolverWarning() {
         boolean anySelectable = false;
-        for (int i = 0; i < solverBox.getItemCount(); i++) {
-            if (isSelectable((SolverService) solverBox.getItemAt(i))) {
+        for (final SolverService service : ChallengeResponseController.getInstance().listServices()) {
+            if (isSelectable(service)) {
                 anySelectable = true;
                 break;
             }
@@ -918,15 +980,18 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         return solver.getFinalMaxCaptchaThreadsSingleAccount();
     }
 
-    /** Applies the limit of the selected solver to the max simultaneous tests spinner. */
+    /** Applies the limit of the selected solvers (the smallest one) to the max simultaneous tests spinner. */
     private void updateParallelLimit() {
-        final int limit = getSolverParallelLimit((SolverService) solverBox.getSelectedItem());
+        int limit = MAX_PARALLEL_TESTS;
+        for (final SolverService service : getSelectedSolvers()) {
+            limit = Math.min(limit, getSolverParallelLimit(service));
+        }
         final SpinnerNumberModel model = (SpinnerNumberModel) parallelSpinner.getModel();
         model.setMaximum(Integer.valueOf(limit));
         if (((Number) model.getValue()).intValue() > limit) {
             model.setValue(Integer.valueOf(limit));
         }
-        parallelInfoLabel.setText(limit < MAX_PARALLEL_TESTS ? "(limited to " + limit + " by the selected solver)" : "(max " + MAX_PARALLEL_TESTS + ")");
+        parallelInfoLabel.setText(limit < MAX_PARALLEL_TESTS ? "(limited to " + limit + " by the selected solvers)" : "(max " + MAX_PARALLEL_TESTS + ")");
     }
 
     /** A solver can only be tested if it is ready and activated in the "Solver overview" tab. */
@@ -934,21 +999,37 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         return service.isReady() && service.getConfigV3().isEnabled();
     }
 
-    /** Rebuilds the captcha type check boxes (all selected) from the types the selected solver supports and has test challenges for. */
-    private void rebuildTypeList() {
+    /**
+     * Rebuilds the captcha type check boxes from the types which at least one of the selected solvers supports and which have test
+     * challenges.
+     *
+     * @param keepSelection
+     *            true: types which were deselected stay deselected (new types are selected), false: all types are selected
+     */
+    private void rebuildTypeList(final boolean keepSelection) {
+        final Map<CAPTCHA_TYPE, Boolean> previous = new java.util.EnumMap<CAPTCHA_TYPE, Boolean>(CAPTCHA_TYPE.class);
+        for (int i = 0; i < typeCheckBoxes.size(); i++) {
+            previous.put(typeCheckBoxTypes.get(i), Boolean.valueOf(typeCheckBoxes.get(i).isSelected()));
+        }
         typesPopup.removeAll();
         typeCheckBoxes.clear();
         typeCheckBoxTypes.clear();
         updateParallelLimit();
         typesPopup.add(selectAllBox);
         typesPopup.addSeparator();
-        final SolverService service = (SolverService) solverBox.getSelectedItem();
-        final Set<CAPTCHA_TYPE> supported = service == null || !isSelectable(service) ? null : service.getSupportedCaptchaTypes();
-        if (supported != null) {
+        /* The sum of the captcha types of all selected solvers. */
+        final Set<CAPTCHA_TYPE> supported = new java.util.HashSet<CAPTCHA_TYPE>();
+        for (final SolverService service : getSelectedSolvers()) {
+            if (isSelectable(service)) {
+                supported.addAll(service.getSupportedCaptchaTypes());
+            }
+        }
+        {
             for (final CAPTCHA_TYPE type : CAPTCHA_TYPE.values()) {
                 if (type.hasTestChallenges() && supported.contains(type)) {
                     /* The check box itself has no text: the captcha type icon and name are a separate label (click toggles the check box). */
-                    final JCheckBox box = new JCheckBox("", true);
+                    final Boolean wasSelected = previous.get(type);
+                    final JCheckBox box = new JCheckBox("", !keepSelection || wasSelected == null || wasSelected.booleanValue());
                     final JLabel typeLabel = new JLabel(type.getDisplayName(), type.getIcon(), SwingConstants.LEADING);
                     typeLabel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
                     typeLabel.addMouseListener(new MouseAdapter() {
@@ -998,30 +1079,47 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     }
 
     /**
-     * Runs all selected captcha types of the selected solver one after another. The captcha type selected in the form uses the form values
-     * (which are the defaults unless the user changed them), all other types use their default test values. The captcha source always comes
-     * from the form.
+     * Runs every selected captcha type with every selected solver which supports it (one test per solver and captcha type). The captcha
+     * type selected in the form uses the form values (which are the defaults unless the user changed them), all other types use their
+     * default test values. The captcha source always comes from the form.
      */
     private void startMultiTest() {
-        final SolverService service = (SolverService) solverBox.getSelectedItem();
-        if (service == null || !isSelectable(service)) {
-            /* Deactivated meanwhile: update the selection but do not silently test a different solver than the user picked. */
-            refreshSolverSelection();
-            return;
+        final List<SolverService> services = getSelectedSolvers();
+        for (final SolverService service : services) {
+            if (!isSelectable(service)) {
+                /* Deactivated meanwhile: update the selection but do not silently test different solvers than the user picked. */
+                refreshSolverSelection();
+                return;
+            }
         }
         final CAPTCHA_TYPE formType = (CAPTCHA_TYPE) typeBox.getSelectedItem();
         final CaptchaRequestType source = (CaptchaRequestType) sourceBox.getSelectedItem();
         final List<TestRun> runs = new ArrayList<TestRun>();
-        for (int i = 0; i < typeCheckBoxes.size(); i++) {
-            if (typeCheckBoxes.get(i).isSelected()) {
+        for (final SolverService service : services) {
+            final Set<CAPTCHA_TYPE> supported = service.getSupportedCaptchaTypes();
+            for (int i = 0; i < typeCheckBoxes.size(); i++) {
                 final CAPTCHA_TYPE type = typeCheckBoxTypes.get(i);
-                runs.add(new TestRun(type, source, type == formType ? buildFormData(type) : newDefaultsWithProxy(type), service));
+                if (typeCheckBoxes.get(i).isSelected() && supported.contains(type)) {
+                    runs.add(new TestRun(type, source, type == formType ? buildFormData(type) : newDefaultsWithProxy(type), service));
+                }
             }
         }
-        if (service == null || runs.isEmpty()) {
+        if (runs.isEmpty()) {
             return;
         }
         startBatch(runs, true);
+    }
+
+    /** Max simultaneous tests for the solvers of the given tests: the smallest limit of them. */
+    private static int getParallelLimit(final List<TestRun> runs) {
+        int limit = MAX_PARALLEL_TESTS;
+        final Set<SolverService> services = new java.util.HashSet<SolverService>();
+        for (final TestRun run : runs) {
+            if (run.service != null && services.add(run.service)) {
+                limit = Math.min(limit, getSolverParallelLimit(run.service));
+            }
+        }
+        return limit;
     }
 
     /**
@@ -1050,7 +1148,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         startRefreshTimer();
         ChallengeResponseController.getInstance().getEventSender().addListener(jobListener);
         /* Single tests and retries run alone; a multi test runs as many tests at the same time as chosen (and allowed by the solver). */
-        final int parallel = Math.max(1, Math.min(runs.size(), Math.min(((Number) parallelSpinner.getValue()).intValue(), getSolverParallelLimit(runs.get(0).service))));
+        final int parallel = Math.max(1, Math.min(runs.size(), Math.min(((Number) parallelSpinner.getValue()).intValue(), getParallelLimit(runs))));
         final Thread thread = new Thread("CaptchaTestPanelBatch") {
             @Override
             public void run() {
@@ -1110,7 +1208,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     }
 
     private void setBatchRunningState(final boolean running) {
-        solverBox.setEnabled(!running);
+        solversButton.setEnabled(!running);
         typesButton.setEnabled(!running);
         multiCancelButton.setEnabled(running);
         if (running) {
@@ -1193,8 +1291,10 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     private void finishTest(final TestRun run, final RunState state, final String answer, final String statusText) {
         synchronized (run) {
             final long now = System.currentTimeMillis();
+            final boolean userEnded = run.aborted || batchCancelled;
             for (final TestRun row : run.rows) {
-                if (row.state == RunState.PENDING || row.state == RunState.RUNNING) {
+                /* Rows with an answer keep it. If the user ended the test, "not used" rows are cancelled like all others. */
+                if (row.state == RunState.PENDING || row.state == RunState.RUNNING || (userEnded && row.state == RunState.NOT_USED)) {
                     row.endTime = now;
                     row.answer = answer;
                     row.statusText = statusText != null ? statusText : (state == RunState.FAILED ? answer : "");
@@ -1268,6 +1368,13 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
      * state.
      */
     private <X> void syncSolverRows(final TestRun run, final SolverJob<X> job, final boolean finalSync) {
+        if (run.aborted || batchCancelled) {
+            /*
+             * The user ended the test: finishTest marks all unfinished rows the same way. Without this, the results which the killed solvers
+             * report ("aborted") would turn some rows into "Not used", depending on timing.
+             */
+            return;
+        }
         synchronized (run) {
             final ResponseList<X> winning = job.getResponse();
             for (final TestRun row : run.rows) {
@@ -1443,11 +1550,13 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                                 syncSolverRows(test, job, false);
                             }
                         }
-                        for (final TestRun row : test.rows) {
-                            runModel.fireRunChanged(row);
-                        }
                     }
                 }
+                /*
+                 * Only a repaint, no table model event: A row update every 100 ms cancels the cell editor of the answer column (the cancel
+                 * button) again and again, which makes the column flicker. The values are read from the rows when painting.
+                 */
+                runTable.repaint();
                 updateBatchLabel();
                 refreshDetails();
             }
@@ -1931,6 +2040,11 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         @Override
         public boolean isColumnButtonVisible() {
             return false;
+        }
+
+        @Override
+        protected boolean isDisplayFullsizeAlways() {
+            return true;
         }
 
         @Override

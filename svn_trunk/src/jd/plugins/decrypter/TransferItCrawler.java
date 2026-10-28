@@ -22,10 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.appwork.storage.config.JsonConfig;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.settings.GeneralSettings;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.parser.Regex;
@@ -42,10 +38,14 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.MegaNz;
 import jd.plugins.hoster.TransferIt;
 
+import org.appwork.storage.config.JsonConfig;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.settings.GeneralSettings;
+
 /**
  * Most of the work on this plugin was done by Fabio Orlandi.
  */
-@DecrypterPlugin(revision = "$Revision: 53761 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53771 $", interfaceVersion = 3, names = {}, urls = {})
 public class TransferItCrawler extends PluginForDecrypt {
     public TransferItCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -113,6 +113,7 @@ public class TransferItCrawler extends PluginForDecrypt {
                 if (e.getLinkStatus() != LinkStatus.ERROR_FATAL) {
                     throw e;
                 }
+                logger.log(e);
                 /* API error -14: password required (in case the "pw" flag above was not set) */
                 passwordRequired = true;
             }
@@ -237,7 +238,7 @@ public class TransferItCrawler extends PluginForDecrypt {
     /** Decrypts attributes of given node with its plain node key and returns them or null on failure. */
     private Map<String, Object> decryptNodeAttributes(final Map<String, Object> node) {
         try {
-            return TransferIt.decryptNodeAttributes((String) node.get("a"), (String) node.get("k"));
+            return TransferIt.decryptNodeAttributes(this, (String) node.get("a"), (String) node.get("k"));
         } catch (final Exception e) {
             logger.log(e);
             return null;

@@ -1982,11 +1982,31 @@
       "signatures":{},
       "version":"2026.260.1 329834e40a8543f3ef6265db543b7af6c4185571",
       "vulnerabilities":null
+    },
+    {
+      "changes":"2026.261.0 ff02362b20e273fbcc66405b9b3c21e5dd3e4367\t: Add hosted-by-files.com to the PRIVATE section (#3267)\r\n2026.263.0 645b36c9a51ff0b3718df0ba02f6570aa6921632\t: Add surge.sh (#3287)\r\n2026.264.0 17cb0fe6547bacf263f5f931218885ab89d3dc75\t: Bump golang.org/x/net from 0.58.0 to 0.59.0 in /tools (#3288)\n\nBumps [golang.org/x/net](https://github.com/golang/net) from 0.58.0 to 0.59.0.\n- [Commits](https://github.com/golang/net/compare/v0.58.0...v0.59.0)\n\n---\nupdated-dependencies:\n- dependency-name: golang.org/x/net\n  dependency-version: 0.59.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>\r\n2026.264.1 728555a30ef4d40e42a82d5678e5fbad2ad17b26\t: Add Databricks Apps domains (databricksapps.com) to PRIVATE section (#3255)\r\n2026.266.0 dd4892031edeabb3a356abd4afe7aa549535e1e8\t: Add iqhs.pl (IQHost) to PRIVATE section (#3264)\r\n2026.266.1 8af98195397e1891a32e4ad79fa60c87813fbaf7\t: Add site prefixes to Combell domains (#3282)\r\n2026.267.0 a179a48c465e818cfd8d626691cb317985da87fb\t: Add glideos.app (Glide) (#3200)\r\n2026.273.0 714ac1bf5f2d038161c7419478cc3207431d706d\t: util: gTLD data autopull updates for 2026-09-30T19:51:07 UTC (#3331)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2026.275.0 6cd82aff889e3d64e5e03bc5c1f43da1934a960a\t: util: gTLD data autopull updates for 2026-10-01T20:07:37 UTC (#3338)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2026.279.0 921b51bd89cd3ead90dddfaefef3271210d1300b\t: Use local git history in check-pr (#3358)\r\n2026.279.1 0b22cb88bd43cfc0cde1dbd756274280d033cbae\t: Pass GITHUB_TOKEN to psltool check-pr in CI (#3357)\n\n* Pass GITHUB_TOKEN to psltool check-pr in CI\n\n* Log whether psltool uses GITHUB_TOKEN\r\n2026.279.2 f7f7b5f404fbfbc463a1d802baa2a5e5da4f9e81\t: Add retool.app (Retool) to PRIVATE section (#3283)\r\n2026.279.3 4018bd98001399ebff682f401664d469787ed7eb\t: AWS Submissions to the Public Suffix List Q2 2026 (#2771)\r\n2026.280.0 3929462652695bad04f0a27afb600974014a3c8b\t: Replace explicit replit.dev entries with wildcard rules (#3251)",
+      "date":"2026-10-13T12:33:21.924+02:00",
+      "dependencies":null,
+      "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"2919eb9803c91a3f73a507cc6fedc934de005543c22c4016f72e3343de5dd6e7"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "signatures":{},
+      "version":"2026.280.0 3929462652695bad04f0a27afb600974014a3c8b",
+      "vulnerabilities":null
     }
   ],
   "installed":{
-    "changes":"2026.261.0 ff02362b20e273fbcc66405b9b3c21e5dd3e4367\t: Add hosted-by-files.com to the PRIVATE section (#3267)\r\n2026.263.0 645b36c9a51ff0b3718df0ba02f6570aa6921632\t: Add surge.sh (#3287)\r\n2026.264.0 17cb0fe6547bacf263f5f931218885ab89d3dc75\t: Bump golang.org/x/net from 0.58.0 to 0.59.0 in /tools (#3288)\n\nBumps [golang.org/x/net](https://github.com/golang/net) from 0.58.0 to 0.59.0.\n- [Commits](https://github.com/golang/net/compare/v0.58.0...v0.59.0)\n\n---\nupdated-dependencies:\n- dependency-name: golang.org/x/net\n  dependency-version: 0.59.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>\r\n2026.264.1 728555a30ef4d40e42a82d5678e5fbad2ad17b26\t: Add Databricks Apps domains (databricksapps.com) to PRIVATE section (#3255)\r\n2026.266.0 dd4892031edeabb3a356abd4afe7aa549535e1e8\t: Add iqhs.pl (IQHost) to PRIVATE section (#3264)\r\n2026.266.1 8af98195397e1891a32e4ad79fa60c87813fbaf7\t: Add site prefixes to Combell domains (#3282)\r\n2026.267.0 a179a48c465e818cfd8d626691cb317985da87fb\t: Add glideos.app (Glide) (#3200)\r\n2026.273.0 714ac1bf5f2d038161c7419478cc3207431d706d\t: util: gTLD data autopull updates for 2026-09-30T19:51:07 UTC (#3331)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2026.275.0 6cd82aff889e3d64e5e03bc5c1f43da1934a960a\t: util: gTLD data autopull updates for 2026-10-01T20:07:37 UTC (#3338)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2026.279.0 921b51bd89cd3ead90dddfaefef3271210d1300b\t: Use local git history in check-pr (#3358)\r\n2026.279.1 0b22cb88bd43cfc0cde1dbd756274280d033cbae\t: Pass GITHUB_TOKEN to psltool check-pr in CI (#3357)\n\n* Pass GITHUB_TOKEN to psltool check-pr in CI\n\n* Log whether psltool uses GITHUB_TOKEN\r\n2026.279.2 f7f7b5f404fbfbc463a1d802baa2a5e5da4f9e81\t: Add retool.app (Retool) to PRIVATE section (#3283)\r\n2026.279.3 4018bd98001399ebff682f401664d469787ed7eb\t: AWS Submissions to the Public Suffix List Q2 2026 (#2771)\r\n2026.280.0 3929462652695bad04f0a27afb600974014a3c8b\t: Replace explicit replit.dev entries with wildcard rules (#3251)",
-    "date":"2026-10-13T12:33:21.924+02:00",
+    "changes":"2026.289.0 ad9bde23c51ab2418cc50bc98a85e628654e84f6\t: Bump golang.org/x/net from 0.59.0 to 0.60.0 in /tools (#3406)\n\nBumps [golang.org/x/net](https://github.com/golang/net) from 0.59.0 to 0.60.0.\n- [Commits](https://github.com/golang/net/compare/v0.59.0...v0.60.0)\n\n---\nupdated-dependencies:\n- dependency-name: golang.org/x/net\n  dependency-version: 0.60.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>\r\n2026.289.1 c1c6059c0d471058a804c3e472f0fcbf0db7ce87\t: Bump github.com/creachadair/command from 0.2.11 to 0.2.12 in /tools (#3407)\n\nBumps [github.com/creachadair/command](https://github.com/creachadair/command) from 0.2.11 to 0.2.12.\n- [Commits](https://github.com/creachadair/command/compare/v0.2.11...v0.2.12)\n\n---\nupdated-dependencies:\n- dependency-name: github.com/creachadair/command\n  dependency-version: 0.2.12\n  dependency-type: direct:production\n  update-type: version-update:semver-patch\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>\r\n2026.289.2 389359a9055626c9e574dca4360898ba0a627d01\t: Add NAVER Cloud (Ncloud Storage) domains to the PRIVATE section (#3340)\r\n2026.289.3 47d52938b9272c11cdb0b3a80b486d097deb92fa\t: Remove knightpoint.systems and perspecta.cloud (#3070)\r\n2026.289.4 91b4bd846240a84afb33695d5a51adcbc4cfd9ca\t: AWS Submissions to the Public Suffix List - Q3 2026 (#3044)\n\n* [🤖] Add suffixes for Amazon Managed Workflows for Apache Airflow\n\nThis commit was automatically generated by Amazon.\nQuestions? Contact us at psl-maintainers@amazon.com.\n\n(59276dad-d509-4851-a875-beb1eee41bc6)\n\n* [🤖] Add suffixes for AWS Transfer Family web apps\n\nThis commit was automatically generated by Amazon.\nQuestions? Contact us at psl-maintainers@amazon.com.\n\n(d4c8aa7b-4505-470a-9bc4-052d0a2c4008)\n\n* [🤖] Add suffixes for Amazon Bedrock AgentCore Identity Consent Portal\n\nThis commit was automatically generated by Amazon.\nQuestions? Contact us at psl-maintainers@amazon.com.\n\n(f2a3a636-a203-463f-9bb6-beb8b024fe26)\n\n---------\n\nCo-authored-by: aws-psl-automation[bot] <274108441+aws-psl-automation[bot]@users.noreply.github.com>\r\n2026.290.0 2dbfce14c57bcea83fef2be3bdcb560667d7ef93\t: util: gTLD data autopull updates for 2026-10-16T18:37:24 UTC (#3414)\n\nCo-authored-by: GitHub <noreply@github.com>\r\n2026.290.1 52b71b3c4576ff77450cc7ebcfc7f34a916af3f9\t: Remove gitapp.si form the list (#3421)\r\n2026.293.0 a2633bf7bf74d14290833c1c9b728c45348e847c\t: Remove GCom Internet entries: aliases121.com (#3435)\n\nRemoved entries for GCom Internet and its associated comment.\r\n2026.293.1 5dd321ffe02039e2431382a095cf80e27ff5eb94\t: Remove `oya.to` (domain expired & drop-caught) (#3432)\n\nRemoved entries for KUROKU LTD and oya.to from the public suffix list.\r\n2026.295.0 8437e5262f13305f94087abe699b4fe2be1d1de8\t: Add *.ztna-dingtalk.com to the PRIVATE section (#3196)",
+    "date":"2026-10-27T12:00:07.240+01:00",
     "dependencies":null,
     "description":"The Public Suffix List (publicsuffix/list) is the original list maintained by Mozilla and defines public suffixes such as com or co.uk. It can be used to determine the effective top-level domain for purposes such as HTTP connection keep-alive pooling or correct cookie handling.",
     "files":[
@@ -2095,7 +2115,7 @@
       "tools/psltool",
       "tools/psltool/psltool.go"
     ],
-    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"2919eb9803c91a3f73a507cc6fedc934de005543c22c4016f72e3343de5dd6e7"},
+    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"d3e6243b51695327984abb3e2a5aa7077096867f75121e031e6a5a3840ca8bcd"},
     "licenses":[{
       "name":"Mozilla Public License 2.0",
       "spdx_id":"MPL-2.0",
@@ -2106,7 +2126,7 @@
     "minJRE":null,
     "name":"\"Public Suffix List Library\"",
     "signatures":{},
-    "version":"2026.280.0 3929462652695bad04f0a27afb600974014a3c8b",
+    "version":"2026.295.0 8437e5262f13305f94087abe699b4fe2be1d1de8",
     "vulnerabilities":null
   },
   "minJRE":null,

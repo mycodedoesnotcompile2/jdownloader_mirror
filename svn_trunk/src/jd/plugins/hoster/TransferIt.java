@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.crypto.Cipher;
@@ -26,11 +27,6 @@ import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
-
-import org.appwork.exceptions.WTFException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Time;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -40,15 +36,21 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.TransferItCrawler;
 
+import org.appwork.exceptions.WTFException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Time;
+
 /**
  * Most of the work on this plugin was done by Fabio Orlandi.
  */
-@HostPlugin(revision = "$Revision: 53761 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53773 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TransferItCrawler.class })
 public class TransferIt extends PluginForHost {
     public TransferIt(PluginWrapper wrapper) {
@@ -56,14 +58,14 @@ public class TransferIt extends PluginForHost {
     }
 
     /* transfer.it is a service powered by MEGA and uses the MEGA API with "domain=transferit". */
-    private static final String API_BASE             = "https://bt7.api.mega.co.nz/cs";
-    public static final String  PROPERTY_TRANSFER_ID = "transfer_id";
-    public static final String  PROPERTY_NODE_ID     = "node_id";
-    public static final String  PROPERTY_NODE_KEY    = "node_key";
+    private static final String API_BASE               = "https://bt7.api.mega.co.nz/cs";
+    public static final String  PROPERTY_TRANSFER_ID   = "transfer_id";
+    public static final String  PROPERTY_NODE_ID       = "node_id";
+    public static final String  PROPERTY_NODE_KEY      = "node_key";
     /* Hash of the password of a password protected transfer. Sent as "pw" parameter. */
     public static final String  PROPERTY_PASSWORD_HASH = "password_hash";
-    private final AtomicLong   API_SEQUENCE         = new AtomicLong(Time.systemIndependentCurrentJVMTimeMillis() % 1000000000l);
-    private String              dllink               = null;
+    private final AtomicLong    API_SEQUENCE           = new AtomicLong(Time.systemIndependentCurrentJVMTimeMillis() % 1000000000l);
+    private String              dllink                 = null;
 
     @Override
     public String getAGBLink() {
@@ -128,7 +130,7 @@ public class TransferIt extends PluginForHost {
         /* The node attributes ("at") contain the filename and are encrypted with the node key which was stored by the crawler. */
         final String nodeKey = link.getStringProperty(PROPERTY_NODE_KEY);
         if (nodeKey != null) {
-            final Map<String, Object> attributes = decryptNodeAttributes((String) entries.get("at"), nodeKey);
+            final Map<String, Object> attributes = decryptNodeAttributes(this, (String) entries.get("at"), nodeKey);
             if (attributes != null) {
                 link.setFinalFileName((String) attributes.get("n"));
             }
@@ -146,7 +148,7 @@ public class TransferIt extends PluginForHost {
                 /* MEGA transfer quota exceeded */
                 br.followConnection(true);
                 final String timeLeftString = dl.getConnection().getHeaderField("X-MEGA-Time-Left");
-                long timeLeft = 30 * 60 * 1000l;
+                long timeLeft = TimeUnit.MINUTES.toMillis(30);
                 if (timeLeftString != null && timeLeftString.matches("^\\d+$")) {
                     timeLeft = Math.max(timeLeft, Long.parseLong(timeLeftString) * 1000l);
                 }
@@ -158,9 +160,9 @@ public class TransferIt extends PluginForHost {
     }
 
     /**
-     * Sends one command to the MEGA API in transfer.it context and returns its result object. </br>
-     * transferID: the "x" parameter scoping file related commands to one transfer, null for commands which take it as argument. </br>
-     * passwordHash: the "pw" parameter for password protected transfers, null if not needed.
+     * Sends one command to the MEGA API in transfer.it context and returns its result object. </br> transferID: the "x" parameter scoping
+     * file related commands to one transfer, null for commands which take it as argument. </br> passwordHash: the "pw" parameter for
+     * password protected transfers, null if not needed.
      */
     @SuppressWarnings("unchecked")
     public Map<String, Object> callAPI(final Browser br, final String transferID, final String passwordHash, final String commandJson) throws Exception {
@@ -168,8 +170,8 @@ public class TransferIt extends PluginForHost {
     }
 
     /**
-     * Checks if the given password hash is correct for the given transfer. </br>
-     * Does not work for transfers which are not password protected.
+     * Checks if the given password hash is correct for the given transfer. </br> Does not work for transfers which are not password
+     * protected.
      */
     public boolean verifyPassword(final Browser br, final String transferID, final String passwordHash) throws Exception {
         try {
@@ -186,10 +188,10 @@ public class TransferIt extends PluginForHost {
     }
 
     /**
-     * Decrypts node attributes (e.g. the filename in field "n") with the given plain node key. </br>
-     * Returns null if the key has an unexpected length or the decrypted data is not valid.
+     * Decrypts node attributes (e.g. the filename in field "n") with the given plain node key. </br> Returns null if the key has an
+     * unexpected length or the decrypted data is not valid.
      */
-    public static Map<String, Object> decryptNodeAttributes(final String attributes, final String nodeKey) throws Exception {
+    public static Map<String, Object> decryptNodeAttributes(Plugin plugin, final String attributes, final String nodeKey) throws Exception {
         byte[] key = MegaNz.b64decode(nodeKey);
         if (key.length == 32) {
             /* file key: AES key = first half XOR second half */
@@ -211,12 +213,12 @@ public class TransferIt extends PluginForHost {
         if (json == null) {
             return null;
         }
-        return JSonStorage.restoreFromString(json, TypeRef.MAP);
+        return plugin.restoreFromString(json, TypeRef.MAP);
     }
 
     /**
-     * Creates the password hash which is sent as "pw" parameter: base64url(PBKDF2-HMAC-SHA256(password, salt, 100000, 256 bit)). </br>
-     * The salt is derived from the transfer ID.
+     * Creates the password hash which is sent as "pw" parameter: base64url(PBKDF2-HMAC-SHA256(password, salt, 100000, 256 bit)). </br> The
+     * salt is derived from the transfer ID.
      */
     public static String createPasswordHash(final String transferID, final String password) throws Exception {
         final byte[] idBytes = MegaNz.b64decode(transferID);
@@ -252,7 +254,7 @@ public class TransferIt extends PluginForHost {
         br.postPageRaw(url, "[" + commandJson + "]");
         final String html = br.getRequest().getHtmlCode();
         if (br.getHttpConnection().getResponseCode() != 200 || html == null || html.trim().isEmpty()) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "API unavailable", 5 * 60 * 1000l);
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "API unavailable", TimeUnit.MINUTES.toMillis(5));
         }
         final String response = html.trim();
         /* Errors come as plain number e.g. "-9", as list e.g. "[-9]" or as object e.g. "[{"e":-9}]". */
@@ -288,9 +290,8 @@ public class TransferIt extends PluginForHost {
     }
 
     /**
-     * See MEGA API error codes e.g. in MegaNz plugin. </br>
-     * ERROR_FATAL is only used for -14 (EKEY: transfer.it asks for the password on this error and it also means "wrong password"), the
-     * crawler relies on that.
+     * See MEGA API error codes e.g. in MegaNz plugin. </br> ERROR_FATAL is only used for -14 (EKEY: transfer.it asks for the password on
+     * this error and it also means "wrong password"), the crawler relies on that.
      */
     private static void throwAPIError(final int errorcode) throws PluginException {
         switch (errorcode) {
@@ -302,16 +303,16 @@ public class TransferIt extends PluginForHost {
         case -3:
         case -4:
             /* -3 = try again, -4 = rate limit */
-            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "API error " + errorcode, 5 * 60 * 1000l);
+            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "API error " + errorcode, TimeUnit.MINUTES.toMillis(5));
         case -6:
         case -11:
         case -18:
             /* -6 = too many requests, -11 = access violation, -18 = temporarily unavailable */
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "API error " + errorcode, 5 * 60 * 1000l);
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "API error " + errorcode, TimeUnit.MINUTES.toMillis(5));
         case -14:
             throw new PluginException(LinkStatus.ERROR_FATAL, "Password required or wrong password");
         case -17:
-            throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Request over quota", 60 * 60 * 1000l);
+            throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Request over quota", TimeUnit.HOURS.toMillis(1));
         default:
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "API error " + errorcode);
         }

@@ -93,7 +93,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 53745 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53782 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1302,24 +1302,21 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
              * the full-length filename! <br>
              * 2. Missing filename.
              */
-            if (!StringUtils.isEmpty(fileInfo[0]) && fileInfo[0].trim().endsWith("&#133;") && this.internal_supports_availablecheck_filename_abuse() && !hasCheckedEmbedHandling) {
-                logger.warning("Found filename is crippled by website -> Looking for full length filename");
-                final String betterFilename = this.getFnameViaAbuseLink(altbr, link);
+            if (StringUtils.isEmpty(fileInfo[0])) {
+                final String betterFilename = truncated_or_missing_filename_workaround(altbr, link);
                 if (betterFilename != null) {
-                    logger.info("Found full length filename: " + betterFilename);
+                    logger.info("missing_filename_workaround: Found filename: " + betterFilename);
                     fileInfo[0] = betterFilename;
                 } else {
-                    logger.info("Failed to find full length filename");
+                    logger.info("missing_filename_workaround: Failed to find filename");
                 }
-            } else if (StringUtils.isEmpty(fileInfo[0]) && this.internal_supports_availablecheck_filename_abuse() && !hasCheckedEmbedHandling) {
-                /* We failed to find the filename via html --> Try getFnameViaAbuseLink as workaround */
-                logger.info("Failed to find any filename, trying to obtain filename via getFnameViaAbuseLink");
-                final String betterFilename = this.getFnameViaAbuseLink(altbr, link);
+            } else if (StringUtils.isEmpty(fileInfo[0]) || (fileInfo[0] != null && fileInfo[0].trim().endsWith("&#133;"))) {
+                final String betterFilename = truncated_or_missing_filename_workaround(altbr, link);
                 if (betterFilename != null) {
-                    logger.info("Found filename: " + betterFilename);
+                    logger.info("truncated_filename_workaround: Found full length filename: " + betterFilename);
                     fileInfo[0] = betterFilename;
                 } else {
-                    logger.info("Failed to find any filename -> Fallback will be used");
+                    logger.info("truncated_filename_workaround: Failed to find full length filename");
                 }
             }
             /* Filesize fallback */
@@ -1348,6 +1345,26 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             link.setMD5Hash(fileInfo[2].trim());
         }
         return AvailableStatus.TRUE;
+    }
+
+    /** Call this if filename is missing or truncated (detected filename ends with "&#133;"). */
+    protected String truncated_or_missing_filename_workaround(final Browser br, final DownloadLink link) throws Exception {
+        logger.warning("Found filename is crippled by website -> Looking for full length filename");
+        if (hasCheckedEmbedHandling) {
+            logger.info("Not allowed because hasCheckedEmbedHandling == true");
+            return null;
+        }
+        if (!this.internal_supports_availablecheck_filename_abuse()) {
+            logger.info("Not allowed because availablecheck_filename_abuse is disabled");
+            return null;
+        }
+        final String betterFilename = this.getFnameViaAbuseLink(br, link);
+        if (betterFilename != null) {
+            logger.info("Found full length filename: " + betterFilename);
+            return betterFilename;
+        }
+        logger.info("Failed to find full length filename");
+        return null;
     }
 
     /**
@@ -1600,11 +1617,26 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
 
     /**
      * Wrapper. <br>
-     * Does some corrections on given name string and sets it as filename on given DownloadLink.
+     * Does some corrections on given name string and sets it as filename on given DownloadLink. <br>
+     * Provide the unmodified detected file name to this method, don't html-decode it before!
      */
     protected void setFilename(String name, final DownloadLink link, final Browser br) {
         if (StringUtils.isEmpty(name)) {
             return;
+        }
+        name = name.trim();
+        final String html_entity_truncated_ending = "&#133;";
+        if (name.endsWith(html_entity_truncated_ending)) {
+            /*
+             * Special fallback: Filename provided by website is truncated and we were unable to find a better one -> Prefer filename from
+             * URL if that is given && longer than truncated filename.
+             */
+            final String filenameFromURL = getFilenameFromURL(link);
+            if (filenameFromURL != null && filenameFromURL.length() > name.length() - html_entity_truncated_ending.length()) {
+                logger.info("Prefer filename from url over truncated filename from html code");
+                link.setName(filenameFromURL);
+                return;
+            }
         }
         /* Correct- and set filename */
         if (Encoding.isHtmlEntityCoded(name)) {
@@ -2313,7 +2345,12 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             return filename;
         }
         /* 2021-05-12: New XFS style e.g. userupload.net */
-        filename = br.getRegex("<label>\\s*Filename\\s*</label>\\s*<input[^>]*class=\"form-control form-control-plaintext\"[^>]*value=\"([^\"]+)\"").getMatch(0);
+        filename = br.getRegex("<label[^>]*>\\s*Filename\\s*</label>\\s*<input[^>]*class=\"form-control form-control-plaintext\"[^>]*value=\"([^\"]+)\"").getMatch(0);
+        if (filename != null) {
+            return filename;
+        }
+        /* 2026-10-28: terabytez.org */
+        filename = br.getRegex("<label[^>]*>Filename</label>([^<]+)</div>").getMatch(0);
         return filename;
     }
 
@@ -4238,15 +4275,16 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             final String contentURL = getPluginContentURL(link);
             if (contentURL != null) {
                 result = new Regex(new URL(contentURL).getPath(), url_name_pattern).getMatch(0);
+                if (result != null) {
+                    return result;
+                }
             }
-            if (result == null) {
-                result = new Regex(new URL(link.getPluginPatternMatcher()).getPath(), url_name_pattern).getMatch(0);
-            }
+            result = new Regex(new URL(link.getPluginPatternMatcher()).getPath(), url_name_pattern).getMatch(0);
             return result;
-        } catch (MalformedURLException e) {
+        } catch (final MalformedURLException e) {
             logger.log(e);
+            return null;
         }
-        return null;
     }
 
     protected String getFallbackFilename(final DownloadLink link, final Browser br) {

@@ -1,7 +1,5 @@
 package jd.controlling.captcha;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.appwork.storage.config.ConfigInterface;
@@ -15,7 +13,6 @@ import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.LookUpKeys;
 import org.appwork.storage.config.annotations.SpinnerValidator;
 import org.jdownloader.captcha.v2.CaptchaHistoryEntry;
-import org.jdownloader.captcha.v2.CaptchaQualityEnsuranceRule;
 
 public interface CaptchaSettings extends ConfigInterface {
     public static enum MODE {
@@ -130,12 +127,6 @@ public interface CaptchaSettings extends ConfigInterface {
     boolean isCancelDialogCountdownOnMouseClick();
 
     void setCancelDialogCountdownOnMouseClick(boolean b);
-
-    @AboutConfig
-    @DescriptionForConfigEntry("If you change these rules, Captchas might become very hard or even impossible to solve over time. Do NEVER ever change these rules without knowing what you are doing")
-    HashMap<String, ArrayList<CaptchaQualityEnsuranceRule>> getQualityEnsuranceRules();
-
-    void setQualityEnsuranceRules(HashMap<String, ArrayList<CaptchaQualityEnsuranceRule>> map);
 
     @AboutConfig
     @DescriptionForConfigEntry("List of last used captcha type/domain. This information is used in JDownloader GUI for example for captcha solver recommendations or as a cache to know in beforehand, which plugin will request which type of captcha.")
