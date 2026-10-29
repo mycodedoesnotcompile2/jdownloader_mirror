@@ -54,7 +54,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 51818 $", interfaceVersion = 1, names = { "pluralsight.com" }, urls = { "https://app\\.pluralsight\\.com/course-player\\?clipId=[a-f0-9\\-]+" })
+@HostPlugin(revision = "$Revision: 53803 $", interfaceVersion = 1, names = { "pluralsight.com" }, urls = { "https://app\\.pluralsight\\.com/course-player\\?clipId=[a-f0-9\\-]+" })
 public class PluralsightCom extends antiDDoSForHost {
     private static final boolean                    cookieLoginOnly                          = true;
     private static WeakHashMap<Account, List<Long>> map100PerHour                            = new WeakHashMap<Account, List<Long>>();
@@ -77,8 +77,8 @@ public class PluralsightCom extends antiDDoSForHost {
     public static final String                      PROPERTY_MODULE_CLIP_TITLE               = "module_clip_title";
     private final String                            PROPERTY_ACCOUNT_COOKIE_LOGIN_HINT_SHOWN = "cookie_login_hint_shown";
     public static final String                      WEBSITE_BASE_APP                         = "https://app.pluralsight.com";
-    private static final AtomicLong                 timestampLastDownloadStarted             = new AtomicLong(0);
-    private static final AtomicInteger              durationSecondsOfLastDownloadedClip      = new AtomicInteger(0);
+    private static AtomicLong                       timestampLastDownloadStarted             = new AtomicLong(0);
+    private static AtomicInteger                    durationSecondsOfLastDownloadedClip      = new AtomicInteger(0);
 
     public PluralsightCom(PluginWrapper wrapper) {
         super(wrapper);

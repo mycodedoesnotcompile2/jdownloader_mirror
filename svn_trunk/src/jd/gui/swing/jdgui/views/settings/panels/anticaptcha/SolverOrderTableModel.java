@@ -149,27 +149,27 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
     }
 
     /**
-     * Runs a reload of the rows (EDT only) and keeps the selected solver selected afterwards. Reloading clears the selection, which would
+     * Runs a reload of the rows (EDT only) and keeps all selected solvers selected afterwards. Reloading clears the selection, which would
      * make the detail panels below the table disappear. The selection events fired in between are suppressed (see {@link #isReloading()}).
      * Only if the selected solver is gone afterwards, the listeners are informed about the lost selection.
      */
     private void reloadPreservingSelection(final Runnable reload) {
         final ExtTable<SolverService> table = getTable();
-        final int selectedRow = table == null ? -1 : table.getSelectedRow();
-        final SolverService selected = selectedRow >= 0 ? getObjectbyRow(selectedRow) : null;
+        /* All selected solvers, not only the first one: The user can select several solvers (e.g. for the context menu). */
+        final List<SolverService> selectedSolvers = table == null ? new ArrayList<SolverService>() : getSelectedObjects();
         reloading = true;
         try {
             reload.run();
-            if (selected != null) {
-                final int row = getRowforObject(selected);
+            for (final SolverService selectedSolver : selectedSolvers) {
+                final int row = getRowforObject(selectedSolver);
                 if (row >= 0) {
-                    table.getSelectionModel().setSelectionInterval(row, row);
+                    table.getSelectionModel().addSelectionInterval(row, row);
                 }
             }
         } finally {
             reloading = false;
         }
-        if (selected != null && table.getSelectedRow() < 0 && table instanceof SolverOrderTable) {
+        if (!selectedSolvers.isEmpty() && table.getSelectedRow() < 0 && table instanceof SolverOrderTable) {
             ((SolverOrderTable) table).fireSelectionChanged();
         }
     }
@@ -324,6 +324,12 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
             @Override
             public int getDefaultWidth() {
                 return 300;
+            }
+
+            /* Same icon as in the solver type selection of the solver comparison table. */
+            @Override
+            protected Icon getIcon(SolverService value) {
+                return value.getType().getIcon(18);
             }
 
             @Override
@@ -680,11 +686,6 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
             }
 
             @Override
-            public boolean isHidable() {
-                return false;
-            }
-
-            @Override
             public int getDefaultWidth() {
                 return 3;
             }
@@ -790,11 +791,6 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
             @Override
             public boolean isSortable(final SolverService obj) {
                 return true;
-            }
-
-            @Override
-            public boolean isHidable() {
-                return false;
             }
 
             @Override

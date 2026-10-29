@@ -47,7 +47,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52137 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53803 $", interfaceVersion = 3, names = {}, urls = {})
 public class MySpassDe extends PluginForHost {
     public MySpassDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -55,10 +55,10 @@ public class MySpassDe extends PluginForHost {
     }
 
     private String                               dllink                  = null;
-    private static final AtomicReference<String> token                   = new AtomicReference<String>(null);
-    private static final AtomicReference<String> cdn                     = new AtomicReference<String>(null);
-    private static final AtomicLong              timestampTokenRefreshed = new AtomicLong(0);
-    private static final AtomicLong              timestampCDNRefreshed   = new AtomicLong(0);
+    private static AtomicReference<String>       token                   = new AtomicReference<String>(null);
+    private static AtomicReference<String>       cdn                     = new AtomicReference<String>(null);
+    private static AtomicLong                    timestampTokenRefreshed = new AtomicLong(0);
+    private static AtomicLong                    timestampCDNRefreshed   = new AtomicLong(0);
     private static final Pattern                 PATH_OLD                = Pattern.compile("/player\\?video=(\\d+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern                 PATH_NEW                = Pattern.compile("/player/.*?([a-z0-9-]+)/(\\d+)(\\?|$)", Pattern.CASE_INSENSITIVE); // 2025-04-10
 

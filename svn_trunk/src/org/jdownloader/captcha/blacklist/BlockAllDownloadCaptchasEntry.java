@@ -1,8 +1,6 @@
 package org.jdownloader.captcha.blacklist;
 
 import jd.controlling.captcha.SkipRequest;
-import jd.plugins.Plugin;
-import jd.plugins.PluginForDecrypt;
 
 import org.jdownloader.captcha.v2.Challenge;
 
@@ -22,12 +20,7 @@ public class BlockAllDownloadCaptchasEntry implements SessionBlackListEntry {
 
     @Override
     public boolean matches(Challenge c) {
-        final Plugin plugin = c.getPlugin();
-        if (plugin instanceof PluginForDecrypt) {
-            return false;
-        } else {
-            return true;
-        }
+        return c.getCaptchaRequestType() != Challenge.CaptchaRequestType.DECRYPTER;
     }
 
     @Override

@@ -37,10 +37,10 @@ package org.appwork.utils;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URLDecoder;
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 
+import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.net.Base64InputStream;
 import org.appwork.utils.net.CharSequenceInputStream;
 
@@ -89,7 +89,7 @@ public abstract class DataURLInputStream extends FilterInputStream {
         }
         final String mimeType = header;
         String data = dataURL.substring(dataIndex + 1);
-        data = URLDecoder.decode(data, StandardCharsets.UTF_8.name());
+        data = URLEncode.decodeURIComponent(data);
         final CharBuffer cb = CharBuffer.wrap(data);
         InputStream is = new CharSequenceInputStream(cb, StandardCharsets.UTF_8);
         if (isBase64) {

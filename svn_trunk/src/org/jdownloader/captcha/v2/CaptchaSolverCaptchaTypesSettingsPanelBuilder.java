@@ -155,7 +155,7 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
                     testAndDebug.addActionListener(new ActionListener() {
                         @Override
                         public void actionPerformed(final ActionEvent e) {
-                            CaptchaConfigPanel.showTestAndDebug(solver, testable);
+                            CaptchaConfigPanel.showTestAndDebugWithSelectedSolvers(solver, testable);
                         }
                     });
                     popup.add(testAndDebug);
@@ -375,7 +375,7 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
         return requestType == null ? "" : "\r\n" + _GUI.T.CaptchaTypesTable_tooltip_lastUsedSource(requestType.getLabel());
     }
 
-    /** "Ever used by you?" column: yes/no based on whether this captcha type was ever used by this JD instance. */
+    /** "Ever used by me?" column: yes/no based on whether this captcha type was ever used by this JD instance. */
     private ExtTextColumn<CAPTCHA_TYPE> createEverNeededColumn() {
         final Icon icon_okay = NewTheme.I().getIcon(IconKey.ICON_OK, 16);
         final Icon icon_error = NewTheme.I().getIcon(IconKey.ICON_ERROR, 16);

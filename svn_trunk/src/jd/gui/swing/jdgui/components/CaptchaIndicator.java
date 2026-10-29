@@ -1,7 +1,6 @@
 package jd.gui.swing.jdgui.components;
 
 import java.awt.Color;
-import java.awt.Dimension;
 import java.awt.Point;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -21,13 +20,16 @@ import javax.swing.JPopupMenu;
 import javax.swing.Timer;
 
 import jd.controlling.captcha.SkipRequest;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
 import jd.controlling.downloadcontroller.FileNameField;
 import jd.controlling.downloadcontroller.PackageNameField;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
 import jd.plugins.Plugin;
 import jd.plugins.PluginForHost;
 
+import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtMergedIcon;
 import org.appwork.swing.components.tooltips.ExtTooltip;
@@ -69,7 +71,6 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
         setTitle(_GUI.T.StatusBarImpl_initGUI_captcha());
         final Icon icon = new ExtMergedIcon(getDomainInfo()).add(ocr, 6, 6);
         updatePainter(icon, Color.WHITE, Color.GRAY, Color.WHITE, Color.GREEN, Color.LIGHT_GRAY, Color.GREEN);
-        setDescription(_GUI.T.gui_captchaWindow_waitForInput(job.getChallenge().getHost()));
         setEnabled(true);
         ChallengeResponseController.getInstance().getEventSender().addListener(this, true);
         timer = new Timer(500, new ActionListener() {
@@ -87,20 +88,6 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
     }
 
     /**
-     * Returns the solvers of the given job which are not done yet. Generic helper because {@link SolverJob#isDone(ChallengeSolver)} needs
-     * the type parameter of the job.
-     */
-    private static <T> List<ChallengeSolver<?>> getUnfinishedSolvers(final SolverJob<T> job) {
-        final List<ChallengeSolver<?>> ret = new ArrayList<ChallengeSolver<?>>();
-        for (final ChallengeSolver<T> solver : job.getSolverList()) {
-            if (!job.isDone(solver)) {
-                ret.add(solver);
-            }
-        }
-        return ret;
-    }
-
-    /**
      * Returns the point in time when the job is going to run into a timeout, or -1 if there is no timeout. This is the smaller of the
      * challenge timeout and the latest solver timeout: the job ends as soon as one of them is reached. Solvers are assumed to start their
      * timeout together with the job.
@@ -111,7 +98,7 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
         if (challengeEnd > 0) {
             end = challengeEnd;
         }
-        final List<ChallengeSolver<?>> solvers = getUnfinishedSolvers(job);
+        final List<? extends ChallengeSolver<?>> solvers = job.getUnfinishedSolvers();
         long solverEnd = -1;
         boolean solverWithoutTimeout = solvers.isEmpty();
         for (final ChallengeSolver<?> solver : solvers) {
@@ -198,6 +185,15 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
         final JLabel label = createTooltipLabel(text, icon);
         panel.add(label, indent ? "gapleft 12" : "");
         return label;
+    }
+
+    /** Adds a row with a caption followed by a value, which gets the given icon in front of it. */
+    private void addIconValueRow(final JPanel panel, final String caption, final String value, final Icon icon) {
+        final MigPanel row = new MigPanel("ins 0", "[][]", "[]");
+        row.setOpaque(false);
+        row.add(createTooltipLabel(caption, null));
+        row.add(createTooltipLabel(value, icon));
+        panel.add(row);
     }
 
     /**
@@ -322,9 +318,29 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
             solverRows.put(solver, row);
         }
         final List<ChallengeSolver<T>> currentOrder = new ArrayList<ChallengeSolver<T>>();
+        final List<Integer> lastStates = new ArrayList<Integer>();
         solverReorder = new Runnable() {
             @Override
             public void run() {
+                /*
+                 * Only sort again if the state of a solver changed (waiting -> solving -> done). The countdowns of the waiting solvers change
+                 * all the time and would make the rows jump around.
+                 */
+                final List<Integer> states = new ArrayList<Integer>();
+                for (final ChallengeSolver<T> solver : job.getSolverList()) {
+                    if (job.isDone(solver)) {
+                        states.add(2);
+                    } else if (job.isSolverSolving(solver)) {
+                        states.add(0);
+                    } else {
+                        states.add(1);
+                    }
+                }
+                if (!currentOrder.isEmpty() && states.equals(lastStates)) {
+                    return;
+                }
+                lastStates.clear();
+                lastStates.addAll(states);
                 final List<ChallengeSolver<T>> sorted = getSortedSolvers(job);
                 if (sorted.equals(currentOrder)) {
                     return;
@@ -345,23 +361,21 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
 
     @Override
     public ExtTooltip createExtTooltip(final Point mousePosition) {
-        final IconedProcessIndicator comp = new IconedProcessIndicator();
-        comp.valuePainter = valuePainter;
-        comp.nonValuePainter = nonValuePainter;
-        comp.activeValuePainter = activeValuePainter;
-        comp.activeNonValuePainter = activeNonValuePainter;
-        comp.setEnabled(isEnabled());
-        comp.setIndeterminate(isIndeterminate());
-        comp.setActive(isActive());
-        comp.setPreferredSize(new Dimension(32, 32));
-        comp.setOpaque(false);
-        final TooltipPanel panel = new TooltipPanel("ins 0", "[][grow,fill]", "[grow,fill]");
         final TooltipPanel rows = new TooltipPanel("ins 0,wrap 1", "[grow,fill]", "[]");
         final JLabel title = new JLabel(getTitle());
         title.setForeground(LAFOptions.getInstance().getColorForTooltipForeground());
         SwingUtils.toBold(title);
         rows.add(title);
-        addTooltipRow(rows, getDescription(), null, false);
+        final String host = getHost();
+        if (host != null) {
+            Icon hostIcon = null;
+            try {
+                hostIcon = getDomainInfo().getIcon(16);
+            } catch (final Throwable e) {
+                /* Icon is optional */
+            }
+            addIconValueRow(rows, _GUI.T.CaptchaIndicator_plugin(), host, hostIcon);
+        }
         final Challenge<?> challenge = job.getChallenge();
         final CAPTCHA_TYPE type = CAPTCHA_TYPE.getCaptchaTypeForChallenge(challenge);
         final String typeName;
@@ -378,7 +392,8 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
         } else {
             typeName = challenge.getClass().getSimpleName();
         }
-        addTooltipRow(rows, _GUI.T.CaptchaIndicator_type(typeName), typeIcon, false);
+        addIconValueRow(rows, _GUI.T.CaptchaIndicator_type(), typeName, typeIcon);
+        addTooltipRow(rows, _GUI.T.CaptchaIndicator_origin(getContext().getLabel()), null, false);
         final String fileName = getFileName();
         if (fileName != null) {
             addNameFieldRow(rows, _GUI.T.CaptchaIndicator_filename(), new FileNameField(fileName, false));
@@ -411,9 +426,7 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
         addTooltipRow(rows, _GUI.T.CaptchaIndicator_solvers(), null, false);
         addSolverRows(rows, newLiveRows, job);
         liveRows = newLiveRows;
-        panel.add(comp, "aligny top");
-        panel.add(rows);
-        return new PanelToolTip(panel);
+        return new PanelToolTip(rows);
     }
 
     protected String getHost() {
@@ -433,99 +446,98 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
         final Plugin plugin = job.getChallenge().getPlugin();
         if (plugin instanceof PluginForHost) {
             final DownloadLink link = ((PluginForHost) plugin).getDownloadLink();
-            if (link != null) {
+            if (link != null && !FilePackage.isDefaultFilePackage(link.getFilePackage())) {
                 return link.getFilePackage().getName();
             }
         }
         return null;
     }
 
-    protected JPopupMenu createPopup() {
-        final JPopupMenu popup = new JPopupMenu();
+    /** The kind of action that asked for the captcha. It decides which skip actions make sense. */
+    private enum CaptchaContext implements LabelInterface {
+        DOWNLOAD {
+            @Override
+            public String getLabel() {
+                return _GUI.T.CaptchaIndicator_origin_download();
+            }
+        },
+        CRAWLER {
+            @Override
+            public String getLabel() {
+                return _GUI.T.CaptchaIndicator_origin_crawler();
+            }
+        },
+        ACCOUNT_CHECK {
+            @Override
+            public String getLabel() {
+                return _GUI.T.CaptchaIndicator_origin_accountcheck();
+            }
+        }
+    }
+
+    private CaptchaContext getContext() {
+        final Challenge<?> challenge = job.getChallenge();
+        if (challenge.isCreatedInsideAccountChecker()) {
+            return CaptchaContext.ACCOUNT_CHECK;
+        }
+        if (challenge.getPlugin() instanceof PluginForHost) {
+            return CaptchaContext.DOWNLOAD;
+        }
+        return CaptchaContext.CRAWLER;
+    }
+
+    private void addSkipAction(final JPopupMenu popup, final String name, final Icon icon, final SkipRequest skipRequest) {
         popup.add(new AppAction() {
-            private static final long serialVersionUID = -968768342263254431L;
+            private static final long serialVersionUID = 1L;
             {
-                this.setIconKey(IconKey.ICON_CANCEL);
-                this.setName(_GUI.T.AbstractCaptchaDialog_AbstractCaptchaDialog_cancel());
+                setName(name);
+                setSmallIcon(icon);
             }
 
-            public void actionPerformed(ActionEvent e) {
-                skip(SkipRequest.SINGLE);
+            @Override
+            public void actionPerformed(final ActionEvent e) {
+                skip(skipRequest);
             }
         });
-        final Plugin plugin = job.getChallenge().getPlugin();
-        if (plugin instanceof PluginForHost) {
-            popup.add(new AppAction() {
-                {
-                    setName(_GUI.T.AbstractCaptchaDialog_createPopup_skip_and_disable_all_downloads_from(getHost()));
-                    try {
-                        setSmallIcon(getDomainInfo().getIcon(16));
-                    } catch (final Throwable e) {
-                        this.setIconKey(IconKey.ICON_CANCEL);
-                    }
-                }
+    }
 
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    skip(SkipRequest.BLOCK_HOSTER);
-                }
-            });
-            popup.add(new AppAction() {
-                {
-                    setName(_GUI.T.AbstractCaptchaDialog_createPopup_skip_and_disable_package(getPackageName()));
-                    setSmallIcon(new BadgeIcon(IconKey.ICON_PACKAGE_OPEN, IconKey.ICON_SKIPPED, 16));
-                }
+    private void addSkipHostAction(final JPopupMenu popup) {
+        Icon icon;
+        try {
+            icon = getDomainInfo().getIcon(16);
+        } catch (final Throwable e) {
+            icon = new AbstractIcon(IconKey.ICON_CANCEL, 16);
+        }
+        addSkipAction(popup, _GUI.T.AbstractCaptchaDialog_createPopup_skip_and_disable_all_downloads_from(getHost()), icon, SkipRequest.BLOCK_HOSTER);
+    }
 
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    skip(SkipRequest.BLOCK_PACKAGE);
-                }
-            });
-            popup.add(new AppAction() {
-                {
-                    setName(_GUI.T.AbstractCaptchaDialog_createPopup_skip_and_hide_all_captchas_download());
-                    setSmallIcon(NewTheme.I().getIcon(IconKey.ICON_CLEAR, 16));
-                }
-
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    skip(SkipRequest.BLOCK_ALL_CAPTCHAS);
-                }
-            });
-            popup.add(new AppAction() {
-                {
-                    setName(_GUI.T.AbstractCaptchaDialog_createPopup_skip_and_stop_all_downloads());
-                    setSmallIcon(new AbstractIcon(IconKey.ICON_STOP, 16));
-                }
-
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    skip(SkipRequest.STOP_CURRENT_ACTION);
-                }
-            });
-        } else {
-            popup.add(new AppAction() {
-                {
-                    setName(_GUI.T.AbstractCaptchaDialog_createPopup_cancel_linkgrabbing());
-                    setSmallIcon(new AbstractIcon(IconKey.ICON_STOP, 16));
-                }
-
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    skip(SkipRequest.STOP_CURRENT_ACTION);
-                }
-            });
-            popup.add(new AppAction() {
-                {
-                    setName(_GUI.T.AbstractCaptchaDialog_createPopup_cancel_stop_showing_crawlercaptchs());
-                    setSmallIcon(new AbstractIcon(IconKey.ICON_FIND, 16));
-                }
-
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    skip(SkipRequest.BLOCK_ALL_CAPTCHAS);
-                }
-            });
+    protected JPopupMenu createPopup() {
+        final JPopupMenu popup = new JPopupMenu();
+        switch (getContext()) {
+        case ACCOUNT_CHECK:
+            /* Skipping the captcha already aborts the account check, so there is nothing else to offer. */
+            addSkipAction(popup, _GUI.T.AbstractCaptchaDialog_createPopup_skip_account_check(), new AbstractIcon(IconKey.ICON_SKIPPED, 16), SkipRequest.SINGLE);
+            break;
+        case CRAWLER:
+            addSkipAction(popup, _GUI.T.AbstractCaptchaDialog_AbstractCaptchaDialog_cancel(), new AbstractIcon(IconKey.ICON_SKIPPED, 16), SkipRequest.SINGLE);
+            addSkipHostAction(popup);
+            /* There are no packages while crawling: BLOCK_PACKAGE affects all captchas of the same crawl job (origin link). */
+            addSkipAction(popup, _GUI.T.AbstractCaptchaDialog_createPopup_skip_crawl_job(), new BadgeIcon(IconKey.ICON_LINKGRABBER, IconKey.ICON_SKIPPED, 16), SkipRequest.BLOCK_PACKAGE);
+            addSkipAction(popup, _GUI.T.AbstractCaptchaDialog_createPopup_cancel_linkgrabbing(), new AbstractIcon(IconKey.ICON_STOP, 16), SkipRequest.STOP_CURRENT_ACTION);
+            break;
+        case DOWNLOAD:
+        default:
+            addSkipAction(popup, _GUI.T.AbstractCaptchaDialog_AbstractCaptchaDialog_cancel(), new AbstractIcon(IconKey.ICON_SKIPPED, 16), SkipRequest.SINGLE);
+            addSkipHostAction(popup);
+            final String packageName = getPackageName();
+            if (packageName != null) {
+                addSkipAction(popup, _GUI.T.AbstractCaptchaDialog_createPopup_skip_and_disable_package(packageName), new BadgeIcon(IconKey.ICON_PACKAGE_OPEN, IconKey.ICON_SKIPPED, 16), SkipRequest.BLOCK_PACKAGE);
+            }
+            addSkipAction(popup, _GUI.T.AbstractCaptchaDialog_createPopup_skip_and_hide_all_captchas_download(), NewTheme.I().getIcon(IconKey.ICON_CLEAR, 16), SkipRequest.BLOCK_ALL_CAPTCHAS);
+            if (DownloadWatchDog.getInstance().isRunning()) {
+                addSkipAction(popup, _GUI.T.AbstractCaptchaDialog_createPopup_skip_and_stop_all_downloads(), new AbstractIcon(IconKey.ICON_STOP, 16), SkipRequest.STOP_CURRENT_ACTION);
+            }
+            break;
         }
         return popup;
     }

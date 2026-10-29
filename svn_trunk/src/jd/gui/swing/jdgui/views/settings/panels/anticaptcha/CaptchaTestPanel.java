@@ -93,7 +93,7 @@ import jd.plugins.Account;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 /**
- * IDE-only "Test &amp; Debug" tab of the captcha settings: lets the developer pick the captcha source (download/login/crawler captcha) and
+ * IDE-only "Test &amp; Debug" tab of the captcha settings: lets the developer pick the captcha origin (download/login/crawler captcha) and
  * the captcha type to test, edit the site URL/site key (pre-filled with the known test values, see {@link CaptchaTestChallengeFactory}) and run
  * real throwaway test {@link Challenge}s (see {@link CaptchaTestChallengeFactory}) through the normal solving pipeline
  * ({@link ChallengeResponseController#handle(Challenge)}) on a background thread. <br>
@@ -190,13 +190,20 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     private final JButton                   retryButton;
     private Timer                           refreshTimer;
     private final Color                     defaultButtonForeground;
-    /* True once the user clicked a column header: the automatic sorting is off until the next test is started. */
-    private boolean                     userSorted         = false;
+    /*
+     * Live sort: finished tests are moved to the top after every finished test. Switched off as soon as the user sorts a column while tests
+     * are running, the user can switch it on again. A new test (Start buttons) switches it on.
+     */
+    private final JCheckBox             liveSortBox        = new JCheckBox("Enable live sort: Move finished tests to top", true);
     /* True while the sort order is changed by the panel itself (not by a click of the user on a column header). */
     private boolean                     internalSortChange = false;
     private volatile TestRun                selectedRun;
     /* The tests of the current/last batch are executed one after another by this thread. */
     private final JSpinner                  parallelSpinner;
+    /* True once the user changed the max simultaneous tests himself: The spinner does not follow the solver selection any more. */
+    private boolean                         parallelUserChanged = false;
+    /* True while the panel changes the spinner (limit, default value), which is no change of the user. */
+    private boolean                         parallelAdjusting   = false;
     private final JLabel                    parallelInfoLabel  = new JLabel();
     private volatile boolean                batchRunning       = false;
     private volatile boolean                batchCancelled     = false;
@@ -269,7 +276,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                 applyDefaults();
             }
         });
-        add(new JLabel("Captcha source"));
+        add(new JLabel("Captcha Origin"));
         add(sourceBox, "growx");
         add(new JLabel("Captcha type"));
         add(typeBox, "growx");
@@ -437,6 +444,14 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         add(noTypeWarning, "skip 1, growx, wmin 0");
         /* Max simultaneous tests: up to MAX_PARALLEL_TESTS, but never more than the selected solver accepts at the same time. */
         parallelSpinner = new JSpinner(new SpinnerNumberModel(5, 1, MAX_PARALLEL_TESTS, 1));
+        parallelSpinner.addChangeListener(new javax.swing.event.ChangeListener() {
+            @Override
+            public void stateChanged(final javax.swing.event.ChangeEvent e) {
+                if (!parallelAdjusting) {
+                    parallelUserChanged = true;
+                }
+            }
+        });
         final MigPanel parallelPanel = new MigPanel("ins 0", "[][grow,fill]", "[]");
         parallelPanel.add(parallelSpinner);
         parallelPanel.add(parallelInfoLabel);
@@ -470,6 +485,17 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         activityBar.setVisible(false);
         add(batchBar, "span 2, growx");
         add(activityBar, "span 2, growx, gaptop 2");
+        liveSortBox.setVisible(false);
+        liveSortBox.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(final ActionEvent e) {
+                if (liveSortBox.isSelected()) {
+                    /* Switched on again by the user: sort right now. */
+                    applyLiveSort();
+                }
+            }
+        });
+        add(liveSortBox, "span 2, hidemode 3");
         add(runScroll, "span 2, growx, wmin 0");
         /* Details of the selected test (the former test dialog): hidden until a test is selected. */
         runPanel = new MigPanel("ins 0, wrap 1", "[grow,fill]", "[][][][grow,fill][][]");
@@ -980,18 +1006,56 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         return solver.getFinalMaxCaptchaThreadsSingleAccount();
     }
 
-    /** Applies the limit of the selected solvers (the smallest one) to the max simultaneous tests spinner. */
+    /**
+     * Max simultaneous tests of the given solvers: Every solver accepts a number of captchas at the same time, so together they accept the
+     * sum of it (at least one test per solver). Never more than MAX_PARALLEL_TESTS.
+     */
+    private static int getSummedParallelLimit(final java.util.Collection<SolverService> services) {
+        if (services.isEmpty()) {
+            return MAX_PARALLEL_TESTS;
+        }
+        int limit = 0;
+        for (final SolverService service : services) {
+            limit += Math.max(1, getSolverParallelLimit(service));
+        }
+        return Math.min(MAX_PARALLEL_TESTS, limit);
+    }
+
+    /**
+     * Default of the max simultaneous tests spinner: the higher one of the number of selected solvers and the lowest limit of a selected
+     * solver (5 if no solver is selected).
+     */
+    private static int getDefaultParallelTests(final List<SolverService> services) {
+        if (services.isEmpty()) {
+            return 5;
+        }
+        int lowestLimit = MAX_PARALLEL_TESTS;
+        for (final SolverService service : services) {
+            lowestLimit = Math.min(lowestLimit, Math.max(1, getSolverParallelLimit(service)));
+        }
+        return Math.max(services.size(), lowestLimit);
+    }
+
+    /**
+     * Applies the limit of the selected solvers (the sum of their limits) to the max simultaneous tests spinner. As long as the user did not
+     * change the spinner himself, it is also set to its default, see {@link #getDefaultParallelTests(List)}.
+     */
     private void updateParallelLimit() {
-        int limit = MAX_PARALLEL_TESTS;
-        for (final SolverService service : getSelectedSolvers()) {
-            limit = Math.min(limit, getSolverParallelLimit(service));
-        }
+        final List<SolverService> selected = getSelectedSolvers();
+        final int limit = getSummedParallelLimit(selected);
         final SpinnerNumberModel model = (SpinnerNumberModel) parallelSpinner.getModel();
-        model.setMaximum(Integer.valueOf(limit));
-        if (((Number) model.getValue()).intValue() > limit) {
-            model.setValue(Integer.valueOf(limit));
+        parallelAdjusting = true;
+        try {
+            model.setMaximum(Integer.valueOf(limit));
+            if (!parallelUserChanged) {
+                model.setValue(Integer.valueOf(Math.min(limit, getDefaultParallelTests(selected))));
+            } else if (((Number) model.getValue()).intValue() > limit) {
+                model.setValue(Integer.valueOf(limit));
+            }
+        } finally {
+            parallelAdjusting = false;
         }
-        parallelInfoLabel.setText(limit < MAX_PARALLEL_TESTS ? "(limited to " + limit + " by the selected solvers)" : "(max " + MAX_PARALLEL_TESTS + ")");
+        parallelInfoLabel.setText(limit < MAX_PARALLEL_TESTS ? "(limited to " + limit + " by the limits of the selected solvers)" : "(max " + MAX_PARALLEL_TESTS + ")");
     }
 
     /** A solver can only be tested if it is ready and activated in the "Solver overview" tab. */
@@ -1081,7 +1145,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     /**
      * Runs every selected captcha type with every selected solver which supports it (one test per solver and captcha type). The captcha
      * type selected in the form uses the form values (which are the defaults unless the user changed them), all other types use their
-     * default test values. The captcha source always comes from the form.
+     * default test values. The captcha origin always comes from the form.
      */
     private void startMultiTest() {
         final List<SolverService> services = getSelectedSolvers();
@@ -1110,16 +1174,17 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         startBatch(runs, true);
     }
 
-    /** Max simultaneous tests for the solvers of the given tests: the smallest limit of them. */
+    /** Max simultaneous tests for the solvers of the given tests: the sum of their limits. */
     private static int getParallelLimit(final List<TestRun> runs) {
-        int limit = MAX_PARALLEL_TESTS;
-        final Set<SolverService> services = new java.util.HashSet<SolverService>();
+        final Set<SolverService> services = new java.util.LinkedHashSet<SolverService>();
         for (final TestRun run : runs) {
-            if (run.service != null && services.add(run.service)) {
-                limit = Math.min(limit, getSolverParallelLimit(run.service));
+            if (run.service == null) {
+                /* All solvers: no limit by a single solver. */
+                return MAX_PARALLEL_TESTS;
             }
+            services.add(run.service);
         }
-        return limit;
+        return getSummedParallelLimit(services);
     }
 
     /**
@@ -1139,6 +1204,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         }
         updateRunScrollHeight();
         runScroll.setVisible(true);
+        liveSortBox.setVisible(true);
         batchCancelled = false;
         batchRunning = true;
         batchRuns = runs;
@@ -1147,12 +1213,12 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         setBatchRunningState(true);
         startRefreshTimer();
         ChallengeResponseController.getInstance().getEventSender().addListener(jobListener);
-        /* Single tests and retries run alone; a multi test runs as many tests at the same time as chosen (and allowed by the solver). */
+        /* Single tests and retries run alone; a multi test runs as many tests at the same time as chosen (and allowed by the solvers). */
         final int parallel = Math.max(1, Math.min(runs.size(), Math.min(((Number) parallelSpinner.getValue()).intValue(), getParallelLimit(runs))));
         final Thread thread = new Thread("CaptchaTestPanelBatch") {
             @Override
             public void run() {
-                final ExecutorService pool = Executors.newFixedThreadPool(parallel, new ThreadFactory() {
+                final ExecutorService pool = Executors.newCachedThreadPool(new ThreadFactory() {
                     @Override
                     public Thread newThread(final Runnable r) {
                         final Thread t = new Thread(r, "CaptchaTestPanelTest");
@@ -1161,21 +1227,73 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                     }
                 });
                 try {
+                    /*
+                     * At most "parallel" tests run at the same time and never more than a solver accepts at the same time (tests of
+                     * solvers which are at their limit wait, the next test of another solver is started instead).
+                     */
+                    final Object lock = new Object();
+                    final Map<SolverService, Integer> limitPerSolver = new java.util.HashMap<SolverService, Integer>();
+                    final Map<SolverService, Integer> runningPerSolver = new java.util.HashMap<SolverService, Integer>();
                     for (final TestRun run : runs) {
-                        pool.execute(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (run.finished && run.aborted) {
+                        if (run.service != null && !limitPerSolver.containsKey(run.service)) {
+                            limitPerSolver.put(run.service, Integer.valueOf(Math.max(1, getSolverParallelLimit(run.service))));
+                        }
+                    }
+                    final List<TestRun> pending = new ArrayList<TestRun>(runs);
+                    final int[] running = new int[1];
+                    synchronized (lock) {
+                        while (!pending.isEmpty()) {
+                            TestRun next = null;
+                            for (final java.util.Iterator<TestRun> it = pending.iterator(); it.hasNext();) {
+                                final TestRun candidate = it.next();
+                                if (candidate.finished) {
                                     /* Aborted while it was still waiting for its turn. */
-                                    return;
+                                    it.remove();
+                                } else if (next == null && running[0] < parallel) {
+                                    final Integer solverLimit = candidate.service == null ? null : limitPerSolver.get(candidate.service);
+                                    final Integer solverRunning = candidate.service == null ? null : runningPerSolver.get(candidate.service);
+                                    if (solverLimit == null || (solverRunning == null ? 0 : solverRunning.intValue()) < solverLimit.intValue()) {
+                                        next = candidate;
+                                    }
                                 }
-                                if (batchCancelled) {
-                                    finishTest(run, RunState.FAILED, "Cancelled", null);
-                                    return;
-                                }
-                                executeRun(run);
                             }
-                        });
+                            if (next == null) {
+                                /* Woken up whenever a test ends; the timeout covers tests which are aborted while waiting. */
+                                lock.wait(1000);
+                                continue;
+                            }
+                            pending.remove(next);
+                            running[0]++;
+                            if (next.service != null) {
+                                final Integer solverRunning = runningPerSolver.get(next.service);
+                                runningPerSolver.put(next.service, Integer.valueOf(solverRunning == null ? 1 : solverRunning.intValue() + 1));
+                            }
+                            final TestRun run = next;
+                            pool.execute(new Runnable() {
+                                @Override
+                                public void run() {
+                                    try {
+                                        if (run.finished && run.aborted) {
+                                            /* Aborted while it was still waiting for its turn. */
+                                            return;
+                                        }
+                                        if (batchCancelled) {
+                                            finishTest(run, RunState.FAILED, "Cancelled", null);
+                                            return;
+                                        }
+                                        executeRun(run);
+                                    } finally {
+                                        synchronized (lock) {
+                                            running[0]--;
+                                            if (run.service != null) {
+                                                runningPerSolver.put(run.service, Integer.valueOf(runningPerSolver.get(run.service).intValue() - 1));
+                                            }
+                                            lock.notifyAll();
+                                        }
+                                    }
+                                }
+                            });
+                        }
                     }
                     pool.shutdown();
                     while (!pool.awaitTermination(1, TimeUnit.HOURS)) {
@@ -1521,7 +1639,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                 for (final TestRun row : run.rows) {
                     runModel.fireRunChanged(row);
                 }
-                if (finished && !userSorted) {
+                if (finished && liveSortBox.isSelected()) {
                     /* Passed first, then failed, running, pending. */
                     runModel.refreshSort();
                 }
@@ -1621,8 +1739,14 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         }
     }
 
-    /** Automatic sorting: passed, failed, running, pending, applied again after every finished test (until the user sorts by himself). */
+    /** Live sorting is active again and applied: passed, failed, running, pending (applied again after every finished test). */
     private void enableAutoSort() {
+        liveSortBox.setSelected(true);
+        applyLiveSort();
+    }
+
+    /** Sorts the table by the state of the tests (passed first), without counting as sorting by the user. */
+    private void applyLiveSort() {
         internalSortChange = true;
         try {
             runModel.passedColumn.setSortOrderIdentifier(ExtColumn.SORT_ASC);
@@ -1630,7 +1754,6 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         } finally {
             internalSortChange = false;
         }
-        userSorted = false;
     }
 
     /** A finished test can be run again, but not while another test is running. */
@@ -2120,9 +2243,9 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
 
         @Override
         public void setSortColumn(final ExtColumn<TestRun> e) {
-            if (!internalSortChange) {
-                /* Click of the user on a column header: automatic sorting off until the next test is started. */
-                userSorted = true;
+            if (!internalSortChange && batchRunning && liveSortBox != null) {
+                /* The user sorts a column while tests are running: live sorting off (it would change his sorting after every test). */
+                liveSortBox.setSelected(false);
             }
             super.setSortColumn(e);
         }

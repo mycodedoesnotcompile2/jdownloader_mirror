@@ -43,7 +43,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 51695 $", interfaceVersion = 3, names = { "downl.ink" }, urls = { "https?://(?:www\\.)?downl\\.ink/(?-i)[a-f0-9]{6,}" })
+@DecrypterPlugin(revision = "$Revision: 53803 $", interfaceVersion = 3, names = { "downl.ink" }, urls = { "https?://(?:www\\.)?downl\\.ink/(?-i)[a-f0-9]{6,}" })
 @SuppressWarnings("deprecation")
 public class DownlInk extends antiDDoSForDecrypt {
     public DownlInk(PluginWrapper wrapper) {
@@ -58,7 +58,7 @@ public class DownlInk extends antiDDoSForDecrypt {
     }
 
     private String                  contenturl                         = null;
-    private static final AtomicLong timestampLastCrawlProcessCompleted = new AtomicLong(0);
+    private static AtomicLong timestampLastCrawlProcessCompleted = new AtomicLong(0);
 
     public static String atob(String input) {
         final String ret = Encoding.Base64Decode(input);

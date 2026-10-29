@@ -23,6 +23,7 @@ import org.jdownloader.captcha.v2.CaptchaChallengeFilterController;
 import org.jdownloader.logging.LogController;
 
 import jd.gui.swing.jdgui.BasicJDTable;
+import jd.gui.swing.jdgui.views.settings.components.ToggleEnabledSelectionAction;
 
 /**
  * Table for {@link CaptchaChallengeFilter} rules. Behaves like
@@ -53,6 +54,28 @@ public class CaptchaRulesTable extends BasicJDTable<CaptchaChallengeFilter> {
     @Override
     protected JPopupMenu onContextMenu(final JPopupMenu popup, final CaptchaChallengeFilter contextObject, final List<CaptchaChallengeFilter> selection, final ExtColumn<CaptchaChallengeFilter> column, final MouseEvent ev) {
         popup.add(new JMenuItem(new CaptchaRulesAddAction(this)));
+        if (selection != null && !selection.isEmpty()) {
+            /* Enable/disable all selected rules at once. */
+            popup.add(new JMenuItem(new ToggleEnabledSelectionAction<CaptchaChallengeFilter>(contextObject, selection) {
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                protected boolean isEntryEnabled(final CaptchaChallengeFilter entry) {
+                    return entry.isEnabled();
+                }
+
+                @Override
+                protected void setEntryEnabled(final CaptchaChallengeFilter entry, final boolean enabled) {
+                    entry.setEnabled(enabled);
+                }
+
+                @Override
+                protected void onFinished() {
+                    CaptchaChallengeFilterController.getInstance().persist();
+                    CaptchaRulesTable.this.repaint();
+                }
+            }));
+        }
         popup.add(new JMenuItem(new CaptchaRulesRemoveAction(this, selection, false)));
         popup.add(new JMenuItem(new CaptchaRulesDuplicateAction(contextObject, this)));
         popup.addSeparator();

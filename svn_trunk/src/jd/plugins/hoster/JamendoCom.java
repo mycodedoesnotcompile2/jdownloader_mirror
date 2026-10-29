@@ -38,10 +38,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51050 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53802 $", interfaceVersion = 2, names = {}, urls = {})
 public class JamendoCom extends PluginForHost {
     public static final String                                API_BASE          = "https://www.jamendo.com/api";
-    private static LinkedHashMap<String, Map<String, Object>> ARTIST_INFO_CACHE = new LinkedHashMap<String, Map<String, Object>>() {
+    private static LinkedHashMap<String, Map<String, Object>>       ARTIST_INFO_CACHE = new LinkedHashMap<String, Map<String, Object>>() {
                                                                                     protected boolean removeEldestEntry(Map.Entry<String, Map<String, Object>> eldest) {
                                                                                         return size() > 100;
                                                                                     };

@@ -25,7 +25,6 @@ public class CaptchaHistoryManager {
     private static final int                                   MAX_ENTRIES        = 1500;
     private static final long                                  ONE_YEAR_IN_MILLIS = TimeUnit.DAYS.toMillis(365);
     protected static final CaptchaSettings                     CAPTCHA_SETTINGS   = JsonConfig.create(CaptchaSettings.class);
-    private volatile CopyOnWriteArrayList<CaptchaHistoryEntry> entries            = null;
 
     /**
      * Private constructor for singleton pattern.
@@ -33,20 +32,19 @@ public class CaptchaHistoryManager {
     private CaptchaHistoryManager() {
     }
 
+    /**
+     * Always reads the list from the config instead of caching it in this class: it can also be changed from outside, e.g. when the user
+     * deletes the entries in the advanced settings, and that must take effect immediately.
+     */
     protected CopyOnWriteArrayList<CaptchaHistoryEntry> getEntries() {
-        CopyOnWriteArrayList<CaptchaHistoryEntry> entries = this.entries;
-        loadEntries: if (entries == null) {
+        CopyOnWriteArrayList<CaptchaHistoryEntry> entries = CAPTCHA_SETTINGS.getCaptchaHistoryEntries();
+        if (entries == null) {
             synchronized (this) {
-                entries = this.entries;
-                if (entries != null) {
-                    break loadEntries;
-                }
                 entries = CAPTCHA_SETTINGS.getCaptchaHistoryEntries();
                 if (entries == null) {
                     entries = new CopyOnWriteArrayList<CaptchaHistoryEntry>();
                     CAPTCHA_SETTINGS.setCaptchaHistoryEntries(entries);
                 }
-                this.entries = entries;
             }
         }
         return entries;

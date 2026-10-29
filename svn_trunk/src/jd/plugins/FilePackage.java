@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.swing.exttable.columns.ExtProgressColumn;
@@ -223,17 +224,18 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
         return FP == fp;
     }
 
-    private String                                       name                 = null;
-    private long                                         created              = -1l;
-    private long                                         modified             = -1l;
-    private Boolean                                      isExpanded           = null;
-    private PackageController<FilePackage, DownloadLink> controlledby         = null;
-    private UniqueAlltimeID                              uniqueID             = null;
-    private ModifyLock                                   lock                 = null;
-    public static final String                           PROPERTY_EXPANDED    = "EXPANDED";
-    private static final String                          PROPERTY_COMMENT     = "COMMENT";
-    private static final String                          PROPERTY_PRIORITY    = "PRIORITY";
-    public static final String                           PROPERTY_PACKAGE_KEY = "PACKAGE_KEY";
+    private String                                                            name                 = null;
+    private long                                                              created              = -1l;
+    private long                                                              modified             = -1l;
+    private Boolean                                                           isExpanded           = null;
+    private PackageController<FilePackage, DownloadLink>                      controlledby         = null;
+    private UniqueAlltimeID                                                   uniqueID             = null;
+    private final static AtomicReferenceFieldUpdater<FilePackage, ModifyLock> MODIFYLOCK_UPDATER   = AtomicReferenceFieldUpdater.newUpdater(FilePackage.class, ModifyLock.class, "lock");
+    private volatile ModifyLock                                               lock                 = null;
+    public static final String                                                PROPERTY_EXPANDED    = "EXPANDED";
+    private static final String                                               PROPERTY_COMMENT     = "COMMENT";
+    private static final String                                               PROPERTY_PRIORITY    = "PRIORITY";
+    public static final String                                                PROPERTY_PACKAGE_KEY = "PACKAGE_KEY";
 
     /**
      * @return the uniqueID
@@ -773,14 +775,15 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
 
     @Override
     public ModifyLock getModifyLock() {
-        if (lock == null) {
-            synchronized (this) {
-                if (lock == null) {
-                    lock = new ModifyLock();
-                }
+        while (true) {
+            ModifyLock ret = MODIFYLOCK_UPDATER.get(this);
+            if (ret != null) {
+                return ret;
+            }
+            if (MODIFYLOCK_UPDATER.compareAndSet(this, null, ret = new ModifyLock())) {
+                return ret;
             }
         }
-        return lock;
     }
 
     public void copyPropertiesTo(FilePackage dest) {

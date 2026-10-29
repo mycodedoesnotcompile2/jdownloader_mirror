@@ -42,7 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.JamendoCom;
 
-@DecrypterPlugin(revision = "$Revision: 48194 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53802 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { JamendoCom.class })
 public class JamendoComCrawler extends PluginForDecrypt {
     public JamendoComCrawler(PluginWrapper wrapper) {
@@ -79,7 +79,7 @@ public class JamendoComCrawler extends PluginForDecrypt {
         return ret.toArray(new String[0]);
     }
 
-    private static LinkedHashMap<String, Map<String, Object>> USER_INFO_CACHE     = new LinkedHashMap<String, Map<String, Object>>() {
+    private static LinkedHashMap<String, Map<String, Object>>       USER_INFO_CACHE     = new LinkedHashMap<String, Map<String, Object>>() {
                                                                                       protected boolean removeEldestEntry(Map.Entry<String, Map<String, Object>> eldest) {
                                                                                           return size() > 100;
                                                                                       };

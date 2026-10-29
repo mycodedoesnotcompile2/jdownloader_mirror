@@ -51,7 +51,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53655 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53797 $", interfaceVersion = 3, names = {}, urls = {})
 public class CivitaiCom extends PluginForHost {
     public CivitaiCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -375,11 +375,14 @@ public class CivitaiCom extends PluginForHost {
             if (dllink == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
             }
-            /* Important! Clear authorization header else we will run into http error 400 on download attempt! */
-            br.getHeaders().remove(HTTPConstants.HEADER_REQUEST_AUTHORIZATION);
             /* Allow subsequent redirects. */
             br.setFollowRedirects(true);
         }
+        /*
+         * Important! Clear authorization header in case browser instance was used for API requests before else we will run into http error
+         * "401 Unauthorized" on download attempt!
+         */
+        br.getHeaders().remove(HTTPConstants.HEADER_REQUEST_AUTHORIZATION);
         final String widthValue = new Regex(dllink, "(/width=\\d+[^/]*/)").getMatch(0);
         if (widthValue != null) {
             /*

@@ -11,8 +11,6 @@ import jd.gui.swing.dialog.CaptchaDialog;
 import jd.gui.swing.dialog.DialogType;
 import jd.gui.swing.jdgui.JDGui;
 import jd.plugins.Plugin;
-import jd.plugins.PluginForDecrypt;
-import jd.plugins.PluginForHost;
 
 import org.appwork.exceptions.ThrowUncheckedException;
 import org.appwork.exceptions.WTFException;
@@ -304,11 +302,7 @@ public abstract class ChallengeDialogHandler<D extends AbstractCaptchaDialog<Res
         LogInterface logger = null;
         final Plugin plg = captchaChallenge.getPlugin();
         if (plg != null) {
-            if (plg instanceof PluginForHost) {
-                logger = plg.getLogger();
-            } else if (plg instanceof PluginForDecrypt) {
-                logger = plg.getLogger();
-            }
+            logger = plg.getLogger();
         }
         if (logger == null) {
             logger = org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger();
@@ -321,13 +315,22 @@ public abstract class ChallengeDialogHandler<D extends AbstractCaptchaDialog<Res
         try {
             int f = 0;
             int countdown = getTimeoutInMS();
-            if (captchaChallenge.isAccountLogin()) {
-                // dialogType = DialogType.ACCOUNT; //TODO
-                dialogType = DialogType.HOSTER;
-            } else if (captchaChallenge.getPlugin() instanceof PluginForHost) {
-                dialogType = DialogType.HOSTER;
-            } else if (captchaChallenge.getPlugin() instanceof PluginForDecrypt) {
-                dialogType = DialogType.CRAWLER;
+            final Challenge.CaptchaRequestType requestType = captchaChallenge.getCaptchaRequestType();
+            if (requestType != null) {
+                switch (requestType) {
+                case HOSTER_LOGIN:
+                    // dialogType = DialogType.ACCOUNT; //TODO
+                    dialogType = DialogType.HOSTER;
+                    break;
+                case HOSTER:
+                    dialogType = DialogType.HOSTER;
+                    break;
+                case DECRYPTER:
+                    dialogType = DialogType.CRAWLER;
+                    break;
+                default:
+                    break;
+                }
             }
             if (countdown > 0) {
                 f = f | UIOManager.LOGIC_COUNTDOWN;

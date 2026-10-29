@@ -45,7 +45,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 53400 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53802 $", interfaceVersion = 2, names = {}, urls = {})
 public class OrfAt extends PluginForDecrypt {
     public OrfAt(PluginWrapper wrapper) {
         super(wrapper);
@@ -109,7 +109,7 @@ public class OrfAt extends PluginForDecrypt {
     private final String                            API_BASE                          = "https://audioapi.orf.at";
     private final String                            PROPERTY_SLUG                     = "slug";
     /* E.g. https://radiothek.orf.at/ooe --> "ooe" --> Channel == "oe2o" */
-    private static Map<String, Map<String, Object>> CHANNEL_CACHE                     = new LinkedHashMap<String, Map<String, Object>>() {
+    private static Map<String, Map<String, Object>>       CHANNEL_CACHE                     = new LinkedHashMap<String, Map<String, Object>>() {
                                                                                           protected boolean removeEldestEntry(Map.Entry<String, Map<String, Object>> eldest) {
                                                                                               return size() > 50;
                                                                                           };

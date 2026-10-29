@@ -68,9 +68,9 @@ abstract public class ZeveraCore extends UseNet {
     /* Connection limits */
     private final String                   API_STATUS_FOR_QUEUE_DEFERRED_HANDLING = "deferred";
     private static final String            PROPERTY_ACCOUNT_AUTH_TOKEN            = "access_token";
-    private static HashSet<String>         global_cache_hosts                     = new HashSet<String>();
+    private static HashSet<String>               global_cache_hosts                     = new HashSet<String>();
     /* Map of timestamps of cache only items that are not in cache and thus shouldn't be retried. */
-    private static Map<DownloadLink, Long> cache_unavailable_timestamps           = new WeakHashMap<DownloadLink, Long>();
+    private static Map<DownloadLink, Long>       cache_unavailable_timestamps           = new WeakHashMap<DownloadLink, Long>();
     private final boolean                  USE_SLOT_BLOCKING_QUEUE_HANDLING       = true;
     private final Pattern                  PATTERN_SELFHOSTED                     = Pattern.compile("/file\\?id=.+", Pattern.CASE_INSENSITIVE);
 

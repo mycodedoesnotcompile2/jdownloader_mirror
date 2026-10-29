@@ -67,7 +67,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52785 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53803 $", interfaceVersion = 2, names = {}, urls = {})
 public class FreeDiscPl extends PluginForHost {
     public FreeDiscPl(PluginWrapper wrapper) {
         super(wrapper);
@@ -121,7 +121,7 @@ public class FreeDiscPl extends PluginForHost {
 
     private static final boolean    PREFER_AVAILABLECHECK_VIA_AJAX_REQUEST = true;
     protected static Cookies        botSafeCookies                         = new Cookies();
-    private static final AtomicLong timestampLastFreeDownloadStarted       = new AtomicLong(0);
+    private static AtomicLong timestampLastFreeDownloadStarted       = new AtomicLong(0);
     /* Don't touch the following! */
     private static AtomicInteger    freeRunning                            = new AtomicInteger(0);
     private static final String     TYPE_FILE                              = "https?://[^/]+/(?:#(?:!|%21))?([A-Za-z0-9\\-_]+,f-(\\d+)(,([\\w\\-]+))?)";

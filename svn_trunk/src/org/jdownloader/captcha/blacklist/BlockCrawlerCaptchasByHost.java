@@ -4,7 +4,6 @@ import java.lang.ref.WeakReference;
 
 import jd.controlling.captcha.SkipRequest;
 import jd.controlling.linkcrawler.LinkCrawler;
-import jd.plugins.Plugin;
 import jd.plugins.PluginForDecrypt;
 
 import org.jdownloader.captcha.v2.Challenge;
@@ -46,9 +45,8 @@ public class BlockCrawlerCaptchasByHost implements BlacklistEntry {
     public boolean matches(Challenge c) {
         final LinkCrawler lcrawler = getCrawler();
         if (lcrawler != null && lcrawler.isRunning()) {
-            final Plugin plugin = c.getPlugin();
-            if (plugin instanceof PluginForDecrypt) {
-                final PluginForDecrypt decrypt = (PluginForDecrypt) plugin;
+            if (c.getCaptchaRequestType() == Challenge.CaptchaRequestType.DECRYPTER) {
+                final PluginForDecrypt decrypt = (PluginForDecrypt) c.getPlugin();
                 return decrypt.getCrawler() == lcrawler && decrypt.getHost().equalsIgnoreCase(getHost());
             }
         }

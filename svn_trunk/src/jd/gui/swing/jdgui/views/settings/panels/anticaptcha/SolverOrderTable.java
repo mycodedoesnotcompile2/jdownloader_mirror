@@ -115,15 +115,20 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
             popup.add(configure);
         } else if (contextObject instanceof PluginForCaptchaSolverSolverService) {
             final PluginForCaptchaSolverSolverService external = (PluginForCaptchaSolverSolverService) contextObject;
-            /* Account manager icon in front of the text (same icon the Account Manager settings panel uses). */
-            final JMenuItem openAccountManager = new JMenuItem(_GUI.T.SolverOrderTable_context_openAccountManager(), new AbstractIcon(IconKey.ICON_PREMIUM, 18));
-            openAccountManager.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(final ActionEvent e) {
-                    external.openAccountManagerSelectingFirstMatchingAccount();
-                }
-            });
-            popup.add(openAccountManager);
+            /*
+             * Account manager icon in front of the text (same icon the Account Manager settings panel uses). Only offered if the solver
+             * has an account the account manager could show.
+             */
+            if (external.hasAccount()) {
+                final JMenuItem openAccountManager = new JMenuItem(_GUI.T.SolverOrderTable_context_openAccountManager(), new AbstractIcon(IconKey.ICON_PREMIUM, 18));
+                openAccountManager.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(final ActionEvent e) {
+                        external.openAccountManagerSelectingFirstMatchingAccount();
+                    }
+                });
+                popup.add(openAccountManager);
+            }
             if (external.getBuyURL() != null) {
                 /* Paid solver: same "Buy" icon and affiliate/redirect link logic as the account manager. */
                 final JMenuItem buyCredits = new JMenuItem(_GUI.T.SolverOrderTable_context_buyCredits(), new AbstractIcon(IconKey.ICON_BUY, 18));

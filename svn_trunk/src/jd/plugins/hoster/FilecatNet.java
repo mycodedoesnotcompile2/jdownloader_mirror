@@ -31,6 +31,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.Cookie;
 import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
 import jd.http.requests.PostRequest;
@@ -48,7 +49,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53440 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53798 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilecatNet extends PluginForHost {
     public FilecatNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -380,9 +381,9 @@ public class FilecatNet extends PluginForHost {
                 /* Full login */
                 logger.info("Performing full login");
                 initSessionWebsite(this.br);
-                final PostRequest preWaitReq = br.createJSonPostRequest("/user/signin", "{\"email\":\"" + account.getUser() + "\",\"password\":\"" + account.getPass() + "\"}");
-                br.openRequestConnection(preWaitReq);
-                br.loadConnection(null);
+                final PostRequest loginReq = br.createJSonPostRequest("/user/signin", "{\"email\":\"" + account.getUser() + "\",\"password\":\"" + account.getPass() + "\"}");
+                br.getPage(loginReq);
+                restoreSessionCookie(br);
                 br.getPage(WEBSITE_API_BASE + "/user/get");
                 if (!this.isLoggedinCookies(br)) {
                     /* Not logged in -> Their WebAPI will not return json! */
@@ -397,6 +398,29 @@ public class FilecatNet extends PluginForHost {
             }
             account.saveCookies(br.getCookies(br.getHost()), "");
             return entries;
+        }
+    }
+
+    /**
+     * The login response sets "SESS" twice: first with a valid value (host-only cookie) and then with an empty value plus Domain=filecat.net
+     * (only meant to delete a legacy domain cookie). Our cookie handling does not distinguish between those two cookies, so the empty one
+     * overwrites the valid one. This restores the valid value from the raw Set-Cookie headers.
+     */
+    private void restoreSessionCookie(final Browser br) {
+        final List<String> setCookieHeaders = br.getRequest().getResponseHeaders("Set-Cookie");
+        if (setCookieHeaders == null) {
+            return;
+        }
+        final String host = br.getHost();
+        for (final String setCookieHeader : setCookieHeaders) {
+            final Cookies parsed = Cookies.parseCookies(setCookieHeader, host, null, true);
+            for (final Cookie cookie : parsed.getCookies()) {
+                if (!"SESS".equals(cookie.getKey()) || StringUtils.isEmpty(cookie.getValue())) {
+                    continue;
+                }
+                br.setCookie(host, cookie.getKey(), cookie.getValue());
+                return;
+            }
         }
     }
 
@@ -458,5 +482,4 @@ public class FilecatNet extends PluginForHost {
             return false;
         }
     }
-
 }

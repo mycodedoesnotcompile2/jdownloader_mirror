@@ -242,6 +242,11 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
         openAccountManager(getFirstAccountOrNull());
     }
 
+    /** True if at least one account (valid or not) exists for this solver. */
+    public boolean hasAccount() {
+        return getFirstAccountOrNull() != null;
+    }
+
     private Account getFirstAccountOrNull() {
         final List<Account> allAccounts = AccountController.getInstance().list(plugin.getHost());
         if (allAccounts == null || allAccounts.isEmpty()) {

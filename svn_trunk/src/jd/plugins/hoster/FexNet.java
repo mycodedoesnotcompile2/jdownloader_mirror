@@ -37,7 +37,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50615 $", interfaceVersion = 3, names = { "fex.net" }, urls = { "https?://(?:www\\.)?fex\\.net/folder/([a-z0-9]+)/file/(\\d+)" })
+@HostPlugin(revision = "$Revision: 53802 $", interfaceVersion = 3, names = { "fex.net" }, urls = { "https?://(?:www\\.)?fex\\.net/folder/([a-z0-9]+)/file/(\\d+)" })
 public class FexNet extends PluginForHost {
     public FexNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -53,9 +53,9 @@ public class FexNet extends PluginForHost {
     private String                         dllink               = null;
     public static final String             PROPERTY_directurl   = "directurl";
     public static final String             PROPERTY_token       = "authtoken";
-    private static AtomicReference<String> cachedToken          = new AtomicReference<String>(null);
-    private static AtomicLong              cachedTokenTimestamp = new AtomicLong(0);
-    public static final String             API_BASE             = "https://api.fex.net/api";
+    private static AtomicReference<String>       cachedToken          = new AtomicReference<String>(null);
+    private static AtomicLong                    cachedTokenTimestamp = new AtomicLong(0);
+    public static final String                   API_BASE             = "https://api.fex.net/api";
 
     @Override
     public String getAGBLink() {

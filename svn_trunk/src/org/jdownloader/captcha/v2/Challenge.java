@@ -66,16 +66,19 @@ public abstract class Challenge<T> {
 
     public boolean canBeSkippedBy(SkipRequest skipRequest, ChallengeSolver<?> solver, Challenge<?> challenge) {
         final Plugin plg = getPlugin();
-        if (plg == null) {
+        final CaptchaRequestType requestType = getCaptchaRequestType();
+        if (plg == null || requestType == null) {
             return false;
         }
-        if (plg instanceof PluginForHost) {
+        switch (requestType) {
+        case HOSTER:
+        case HOSTER_LOGIN:
             return canBeSkippedByPluginforHost(skipRequest, solver, challenge, plg);
-        }
-        if (plg instanceof PluginForDecrypt) {
+        case DECRYPTER:
             return canBeSkippedByPluginforDecrypt(skipRequest, solver, challenge, plg);
+        default:
+            return false;
         }
-        return false;
     }
 
     /**
@@ -92,7 +95,7 @@ public abstract class Challenge<T> {
 
     private boolean canBeSkippedByPluginforDecrypt(final SkipRequest skipRequest, final ChallengeSolver<?> solver, final Challenge<?> challenge, final Plugin plugin) {
         final Plugin challengePlugin = challenge.getPlugin();
-        if (challengePlugin == null || !(challengePlugin instanceof PluginForDecrypt)) {
+        if (challengePlugin == null || challenge.getCaptchaRequestType() != CaptchaRequestType.DECRYPTER) {
             /* we only want block PluginForDecrypt captcha here */
             return false;
         }
@@ -132,7 +135,7 @@ public abstract class Challenge<T> {
             return false;
         }
         final Plugin challengePlugin = challenge.getPlugin();
-        if (challengePlugin != null && !(challengePlugin instanceof PluginForHost)) {
+        if (challengePlugin != null && challenge.getCaptchaRequestType() == CaptchaRequestType.DECRYPTER) {
             /* we only want block PluginForHost captcha here */
             return false;
         }

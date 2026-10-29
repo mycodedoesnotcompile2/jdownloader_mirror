@@ -2,7 +2,12 @@ package org.jdownloader.settings;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+
+import jd.controlling.downloadcontroller.DownloadLinkCandidateSelector;
+import jd.controlling.downloadcontroller.IfFilenameTooLongDialog.IfFilenameTooLongAction;
+import jd.controlling.linkcollector.LinknameCleaner.ReplaceMapValidator;
 
 import org.appwork.storage.config.ConfigInterface;
 import org.appwork.storage.config.annotations.AboutConfig;
@@ -21,6 +26,7 @@ import org.appwork.storage.config.annotations.RequiresRestart;
 import org.appwork.storage.config.annotations.SpinnerValidator;
 import org.appwork.storage.config.annotations.ValidatorFactory;
 import org.appwork.storage.config.defaults.AbstractDefaultFactory;
+import org.appwork.storage.config.handler.AbstractDynamicPseudoEnum;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.os.CrossSystem;
@@ -31,10 +37,6 @@ import org.jdownloader.controlling.domainrules.DomainRule;
 import org.jdownloader.gui.translate._GUI;
 
 import com.sun.jna.platform.win32.KnownFolders;
-
-import jd.controlling.downloadcontroller.DownloadLinkCandidateSelector;
-import jd.controlling.downloadcontroller.IfFilenameTooLongDialog.IfFilenameTooLongAction;
-import jd.controlling.linkcollector.LinknameCleaner.ReplaceMapValidator;
 
 public interface GeneralSettings extends ConfigInterface {
     class DefaultDownloadFolder extends AbstractDefaultFactory<String> {
@@ -53,25 +55,20 @@ public interface GeneralSettings extends ConfigInterface {
             } else if (CrossSystem.isLinux()) {
                 try {
                     /**
-                     * 2021-10-06: Comment by pspzockerscene </br>
-                     * Try to find a nice default download folder for Synology. </br>
-                     * Main issue here: The Synology DSM system does not have any kind of base download folder which is visible to the user.
-                     * The folders below are only trail and error/assumptions. </br>
+                     * 2021-10-06: Comment by pspzockerscene </br> Try to find a nice default download folder for Synology. </br> Main issue
+                     * here: The Synology DSM system does not have any kind of base download folder which is visible to the user. The
+                     * folders below are only trail and error/assumptions. </br>
                      *
                      * \@download = old temp download directory of "DownloadStation" Synology application RE:
-                     * https://www.synology-forum.de/threads/wo-ist-der-temporaere-speicherort.50969/ </br>
-                     * DownloadStation never created any user visible download folders but instead upon first start it asks the user to
-                     * choose a default download folder. </br>
-                     * public = No idea what folder that should be. </br>
-                     * Folders which are definitely always accessible/visible to the Synology users are e.g. paths to reemovable media such
-                     * as: </br>
-                     * /volumeUSB1/usbshare or /volumeUSB2/usbshare </br>
-                     * --> Just keep in mind that using those might be a bad idea too because typically users use the Synology USB port for
-                     * small USB stick or backup HDDs so they do not expect an application to just writefiles on them. </br>
+                     * https://www.synology-forum.de/threads/wo-ist-der-temporaere-speicherort.50969/ </br> DownloadStation never created
+                     * any user visible download folders but instead upon first start it asks the user to choose a default download folder.
+                     * </br> public = No idea what folder that should be. </br> Folders which are definitely always accessible/visible to
+                     * the Synology users are e.g. paths to reemovable media such as: </br> /volumeUSB1/usbshare or /volumeUSB2/usbshare
+                     * </br> --> Just keep in mind that using those might be a bad idea too because typically users use the Synology USB
+                     * port for small USB stick or backup HDDs so they do not expect an application to just writefiles on them. </br>
                      * Ultimately the best solution would be to have a path selector built in myjdownloader which is simply limited to all
-                     * the folders that the user can see -> Problem solved. </br>
-                     * Conclusion: It is not possible to get a good default download folder for Synology users! The code below is not really
-                     * helpful.
+                     * the folders that the user can see -> Problem solved. </br> Conclusion: It is not possible to get a good default
+                     * download folder for Synology users! The code below is not really helpful.
                      */
                     final HardwareTypeInterface hardwareType = HardwareType.getHardware();
                     if (hardwareType != null && HardwareTypeInterface.ID.SYNOLOGY.equals(hardwareType.getHardwareType())) {
@@ -150,6 +147,68 @@ public interface GeneralSettings extends ConfigInterface {
     @AboutConfig
     @DefaultEnumValue("AUTO")
     MirrorDetectionDecision getMirrorDetectionDecision();
+
+    public static class TestDynamic extends AbstractDynamicPseudoEnum<TestDynamic> {
+
+        private final static List<TestDynamic> values = new ArrayList<TestDynamic>();
+        static {
+            values.add(new TestDynamic() {
+                @Override
+                public String name() {
+                    return "1";
+                }
+            });
+            values.add(new TestDynamic() {
+                @Override
+                public String name() {
+                    return "2";
+                }
+            });
+            values.add(new TestDynamic() {
+                @Override
+                public String name() {
+                    return "3";
+                }
+            });
+            values.add(new TestDynamic() {
+                @Override
+                public String name() {
+                    return "4";
+                }
+            });
+        }
+
+        @Override
+        public TestDynamic[] values() {
+            return values.toArray(new TestDynamic[0]);
+        }
+
+        @Override
+        public String name() {
+            return null;
+        }
+
+        @Override
+        public TestDynamic valueOf(String name) {
+            for (TestDynamic value : values()) {
+                if (name != null && name.equals(value.name())) {
+                    return value;
+                }
+            }
+            throw new IllegalArgumentException("no instance for" + name);
+        }
+
+        @Override
+        public int ordinal() {
+            return values.indexOf(this);
+        }
+
+    }
+
+    @AboutConfig
+    TestDynamic getTestDynamic();
+
+    public void setTestDynamic(TestDynamic value);
 
     @AboutConfig
     @DefaultBooleanValue(true)

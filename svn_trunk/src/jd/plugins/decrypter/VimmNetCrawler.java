@@ -39,14 +39,14 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.VimmNet;
 
-@DecrypterPlugin(revision = "$Revision: 53269 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53802 $", interfaceVersion = 3, names = {}, urls = {})
 public class VimmNetCrawler extends PluginForDecrypt {
     public VimmNetCrawler(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     /** Global cookie cache shared across plugin instances to avoid solving a captcha for every crawl process. */
-    private final AtomicReference<Cookies> CACHED_COOKIES = new AtomicReference<Cookies>();
+    private static AtomicReference<Cookies> CACHED_COOKIES = new AtomicReference<Cookies>();
 
     @Override
     public Browser createNewBrowserInstance() {

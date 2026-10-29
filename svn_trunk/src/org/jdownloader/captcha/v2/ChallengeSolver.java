@@ -12,11 +12,16 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import javax.swing.Icon;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
+import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 
 import jd.controlling.captcha.SkipException;
@@ -88,6 +93,11 @@ public abstract class ChallengeSolver<T> {
             public String getLabel() {
                 return _GUI.T.JACSolver_getName_();
             }
+
+            @Override
+            public Icon getIcon(final int size) {
+                return NewTheme.I().getIcon(IconKey.ICON_OCR, size);
+            }
         },
         /** Local dialog solver: a human solves the captcha in a JDownloader dialog. */
         JD_LOCAL_DIALOG {
@@ -95,11 +105,21 @@ public abstract class ChallengeSolver<T> {
             public String getLabel() {
                 return _GUI.T.DialogBasicCaptchaSolver_getName();
             }
+
+            @Override
+            public Icon getIcon(final int size) {
+                return NewTheme.I().getIcon(IconKey.ICON_EDIT, size);
+            }
         },
         JD_LOCAL_BROWSER {
             @Override
             public String getLabel() {
                 return _GUI.T.BrowserSolverService_getName();
+            }
+
+            @Override
+            public Icon getIcon(final int size) {
+                return NewTheme.I().getIcon(IconKey.ICON_BROWSE, size);
             }
         },
         JD_REMOTE_API {
@@ -107,13 +127,26 @@ public abstract class ChallengeSolver<T> {
             public String getLabel() {
                 return _GUI.T.CaptchaAPISolver_getName();
             }
+
+            @Override
+            public Icon getIcon(final int size) {
+                return new AbstractIcon(IconKey.ICON_LOGO_MYJDOWNLOADER, size);
+            }
         },
         EXTERNAL {
             @Override
             public String getLabel() {
                 return _GUI.T.CaptchaSolverService_type();
             }
-        }
+
+            @Override
+            public Icon getIcon(final int size) {
+                return NewTheme.I().getIcon(IconKey.ICON_PREMIUM, size);
+            }
+        };
+
+        /** Icon of this solver type, e.g. for the solver type selection of the solver comparison table. */
+        public abstract Icon getIcon(int size);
     }
 
     public enum ChallengeVetoReason {

@@ -498,7 +498,9 @@ public class StorageHandler<T extends ConfigInterface> implements InvocationHand
      * @return
      */
     protected KeyHandler<?> createKeyHandler(final String key, final Type type) {
-        if (Clazz.isBoolean(type)) {
+        if (type instanceof Class && AbstractDynamicPseudoEnum.class.isAssignableFrom((Class) type)) {
+            return new DynamicPseudoEnumKeyHandler(this, key);
+        } else if (Clazz.isBoolean(type)) {
             return new BooleanKeyHandler(this, key);
         } else if (Clazz.isByte(type)) {
             return new ByteKeyHandler(this, key);

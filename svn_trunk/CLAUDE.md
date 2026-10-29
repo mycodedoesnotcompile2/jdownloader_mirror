@@ -102,21 +102,33 @@ if (description != null) {
 
 ## Shared Plugin State (Cross-Instance Variables)
 
-Fields intended to be shared across plugin instances must **not** use `static`. Instead, they must be `final` and use thread-safe atomic types:
+**Scope:** this rule applies **only to plugin classes** — a class that *is* a plugin or *extends* a plugin class (`PluginForHost` / `PluginForDecrypt`, or a base that extends one, e.g. `antiDDoSForHost`, `antiDDoSForDecrypt`, `UseNet`). It does **not** apply to:
 
-| Type | Use |
+- core/framework classes in `jd.plugins.*` that are not plugins (e.g. `DownloadLink`, `LinkInfo`, `DownloadInterface`) — they are loaded by the normal class loader, so their `static` fields are already shared and stay `static final`;
+- helper or UI classes that merely *reference* or *use* a plugin but neither are a plugin nor extend a plugin class (e.g. a `jd.plugins.components.*` `AbstractToolBarAction`) — the same applies, keep `static final`.
+
+Plugins are loaded through JDownloader's `PluginClassLoader`. For a field to be shared across plugin instances it must be:
+
+- **`static`** — the value lives on the class, not the instance, and
+- **not `final`** — so the class loader can carry the value across plugin (re)loads, and
+- a **container type** — a class that is itself only a holder whose shared content lives *inside* it: `Map` / `Set` / `List`, or an `Atomic*` wrapper (`AtomicReference` / `AtomicLong` / `AtomicInteger` / `AtomicBoolean`).
+
+A `static final` container is **not** reliably shared across instances loaded by different class loaders, so shared caches, tokens and counters must drop `final`.
+
+| Shared state | Declare as |
 |---|---|
-| `long` / `int` | `final AtomicLong` / `final AtomicInteger` |
-| `String` | `final AtomicReference<String>` |
-| Objects | `final AtomicReference<T>` |
+| `long` / `int` counter | `static AtomicLong` / `static AtomicInteger` |
+| `boolean` flag | `static AtomicBoolean` |
+| `String` / object slot | `static AtomicReference<T>` |
+| cache / lookup table | `static Map<...>` / `static Set<...>` / `static List<...>` |
 
 **Example** (from `RedditComCrawler`):
 ```java
-private final AtomicReference<String> CACHED_LOID           = new AtomicReference<String>();
-private final AtomicLong              CACHED_LOID_TIMESTAMP = new AtomicLong(-1);
+private static AtomicReference<String> CACHED_LOID           = new AtomicReference<String>();
+private static AtomicLong              CACHED_LOID_TIMESTAMP = new AtomicLong(-1);
 ```
 
-Never use `static` for such fields — `final` + atomic wrapper is the correct JDownloader convention.
+This applies only to container classes that hold shared **state**. An immutable constant — even one whose type is a container, such as a fixed `Arrays.asList(...)` of config values, or a `Pattern` — stays `static final`: it is a per-class constant, not shared cross-instance state.
 
 ## Throw After a Method That Only Ever Throws
 
@@ -212,3 +224,9 @@ Applies to every new text field that offers suggestions based on previous input.
 - Write durations with the existing constants, not with manual multiplication: `TimeUnit.MINUTES.toMillis(5)` instead of `5 * 60 * 1000l`.
 - For calculations with time (e.g. elapsed time, timeouts, wait periods) use `Time.systemIndependentCurrentJVMTimeMillis()` (`org.appwork.utils.Time`) instead of `System.currentTimeMillis()`. It is independent of changes of the system clock.
 - `System.currentTimeMillis()` is only for real wall-clock timestamps (e.g. a date that is stored or displayed).
+
+## File Names and Package Names in the GUI
+
+File names and package names can be very long. To display them safely in the GUI, prefer the existing components `jd.controlling.downloadcontroller.FileNameField` and `jd.controlling.downloadcontroller.PackageNameField` over plain labels / text fields.
+
+**Do not convert existing code to these components on your own. Ask first.**

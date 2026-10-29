@@ -52,7 +52,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TeraboxCom;
 
-@DecrypterPlugin(revision = "$Revision: 52714 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53803 $", interfaceVersion = 3, names = {}, urls = {})
 public class TeraboxComFolder extends PluginForDecrypt {
     public TeraboxComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -125,7 +125,7 @@ public class TeraboxComFolder extends PluginForDecrypt {
     private static final Pattern           TYPE_SHORT_NEW            = Pattern.compile("/(?:[a-z0-9]+/)?sharing/link\\?surl=([A-Za-z0-9\\-_]+).*", Pattern.CASE_INSENSITIVE);
     /* For such URLs leading to single files we'll crawl all items of the folder that file is in -> Makes it easier */
     private static final Pattern           TYPE_SINGLE_VIDEO         = Pattern.compile("/web/share/videoPlay\\?surl=([A-Za-z0-9\\-_]+)\\&dir=([^\\&]+)", Pattern.CASE_INSENSITIVE);
-    private static final AtomicLong        anonymousJstokenTimestamp = new AtomicLong(-1);
+    private static AtomicLong              anonymousJstokenTimestamp = new AtomicLong(-1);
     private static AtomicReference<String> anonymousJstoken          = new AtomicReference<String>(null);
 
     private String getContentURL(final String originalurl) {

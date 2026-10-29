@@ -25,21 +25,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import jd.PluginWrapper;
-import jd.controlling.ProgressController;
-import jd.http.Browser;
-import jd.plugins.Account;
-import jd.plugins.CryptedLink;
-import jd.plugins.DecrypterPlugin;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForDecrypt;
-import jd.plugins.hoster.ArteTv;
-import jd.plugins.hoster.DirectHTTP;
-
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
@@ -59,7 +44,22 @@ import org.jdownloader.plugins.components.hls.HlsContainer.StreamCodec;
 import org.jdownloader.plugins.components.hls.HlsContainerStorable;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 53770 $", interfaceVersion = 4, names = {}, urls = {})
+import jd.PluginWrapper;
+import jd.controlling.ProgressController;
+import jd.http.Browser;
+import jd.plugins.Account;
+import jd.plugins.CryptedLink;
+import jd.plugins.DecrypterPlugin;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.ArteTv;
+import jd.plugins.hoster.DirectHTTP;
+
+@DecrypterPlugin(revision = "$Revision: 53796 $", interfaceVersion = 4, names = {}, urls = {})
 public class ArteMediathekV3 extends PluginForDecrypt {
     public ArteMediathekV3(PluginWrapper wrapper) {
         super(wrapper);
@@ -350,7 +350,7 @@ public class ArteMediathekV3 extends PluginForDecrypt {
                         videoStream.put("quality", "XQ");
                     } else {
                         // TODO
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unknown quality:" + url);
                     }
                     // TODO: no subtitles yet
                     String audioCode = null;
@@ -358,32 +358,54 @@ public class ArteMediathekV3 extends PluginForDecrypt {
                     for (String characteristic : media.getCharacteristics()) {
                         if (characteristic.startsWith("tv.arte.audio.version.")) {
                             final String version = characteristic.substring("tv.arte.audio.version.".length());
-                            if ("vof-fra".equalsIgnoreCase(version)) {
+                            if ("VOF-FRA".equalsIgnoreCase(version)) {
+                                // VOF = Version Originale Française (Originalton einer französischen Produktion)
+                                // FRA = Französisch (Sprachcode)
                                 // Die Sendung wurde ursprünglich auf Französisch gedreht/produziert. Es handelt sich um den nativen O-Ton.
                                 audioCode = "VOF";
                                 audioShortLabel = "FR";
                             } else if ("VOEU-MUL".equalsIgnoreCase(version)) {
+                                // VOEU = Version Originale Européenne (Originalton der Produktion)
+                                // MUL = Multilingual / Mehrsprachig
                                 audioCode = "VOEU";
                                 audioShortLabel = "Mul";
                             } else if ("VF-FRA".equalsIgnoreCase(version)) {
+                                // VF = Version Française (Französische Sprachfassung / Synchronisation)
+                                // FRA = Französisch (ISO-639-2 Sprachcode)
                                 // (Version Française): Eine nachträglich ins Französische synchronisierte Fassung (z. B. bei einem
                                 // deutschen oder englischen Film).
                                 audioCode = "VF";
                                 audioShortLabel = "FR";
                             } else if ("VFAUD-FRA".equalsIgnoreCase(version)) {
+                                // VF = Version Française (Französische Sprachfassung)
+                                // AUD = Audiodescription (Ein gesprochener Kommentar beschreibt visuelle Elemente wie Gestik, Mimik oder
+                                // Schauplätze in den Sprechpausen)
+                                // FRA = Französisch (ISO-639-2 Sprachcode)
                                 audioCode = "VFAUD";
                                 audioShortLabel = "AD (frz.)";
                             } else if ("VA-DEU".equalsIgnoreCase(version)) {
+                                // VA = Version Allemande (Deutsche Sprachfassung / Synchronisation)
                                 audioCode = "VA";
                                 audioShortLabel = "DE";
                             } else if ("VAAUD-DEU".equalsIgnoreCase(version)) {
                                 audioCode = "VAAUD";
                                 audioShortLabel = "AD (frz.)";
                             } else if ("VO-ENG".equalsIgnoreCase(version)) {
+                                // VO = Version Originale (Originalton)
                                 audioCode = "VOEU";
                                 audioShortLabel = "O";
+                            } else if ("VO-UND".equalsIgnoreCase(version)) {
+                                // VO = Version Originale (Originalton)
+                                // UND = Undetermined (ISO-639-2 Sprachcode und für unbestimmte/undefinierte Sprache)
+                                audioCode = "VO";
+                                audioShortLabel = "O";
+                            } else if ("VOA-DEU".equalsIgnoreCase(version)) {
+                                // VOA = Version Originale AlleMande (Deutsche Originalfassung / O-Ton)
+                                // DEU = Deutsch (ISO-639-2 Sprachcode)
+                                audioCode = "VOA";
+                                audioShortLabel = "O";
                             } else if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported:" + characteristic);
+                                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported:" + version);
                             }
                             break;
                         }

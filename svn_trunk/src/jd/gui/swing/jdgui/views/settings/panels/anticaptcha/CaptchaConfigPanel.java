@@ -119,6 +119,23 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
     }
 
     /**
+     * Like {@link #showTestAndDebug(SolverService, java.util.Collection)} for the captcha types table of one solver: If that solver is part
+     * of the selection in the solver table (several solvers can be selected there), all selected solvers are preselected, otherwise only
+     * the given one (e.g. if the captcha types table is not shown below the solver table). The captcha types are the ones given.
+     */
+    public static void showTestAndDebugWithSelectedSolvers(final SolverService solver, final java.util.Collection<CAPTCHA_TYPE> types) {
+        java.util.List<SolverService> solvers = java.util.Collections.singletonList(solver);
+        final CaptchaConfigPanel captchaConfigPanel = ConfigurationView.getInstance().getSubPanel(CaptchaConfigPanel.class);
+        if (captchaConfigPanel != null && captchaConfigPanel.solverOrderTable != null) {
+            final java.util.List<SolverService> selected = captchaConfigPanel.solverOrderTable.getModel().getSelectedObjects();
+            if (selected.contains(solver)) {
+                solvers = selected;
+            }
+        }
+        showTestAndDebug(solvers, types);
+    }
+
+    /**
      * Opens the captcha settings, shows the "Test & Debug" tab, preselects the given solvers (only the ones which can be tested) and the
      * given captcha types (if not null): the first one at the top, all of them in the multi test selection.
      */

@@ -54,7 +54,7 @@ import org.appwork.utils.Time;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 
-@HostPlugin(revision = "$Revision: 53386 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53803 $", interfaceVersion = 3, names = {}, urls = {})
 public class OtrDatenkellerNet extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -117,7 +117,7 @@ public class OtrDatenkellerNet extends PluginForHost {
 
     private final String            API_BASE_URL                 = "https://otr.datenkeller.net/api.php";
     private final String            APIVERSION                   = "1";
-    private static final AtomicLong timestampLastDownloadStarted = new AtomicLong(0);
+    private static AtomicLong timestampLastDownloadStarted = new AtomicLong(0);
     /* Don't touch the following! */
     private static AtomicInteger    freeRunning                  = new AtomicInteger(0);
     private static AtomicInteger    accountRunning               = new AtomicInteger(0);

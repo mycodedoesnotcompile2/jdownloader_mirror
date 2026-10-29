@@ -28,7 +28,7 @@ import jd.plugins.CaptchaType;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 /**
- * Table model of the "External Solver comparison Table": one row per external captcha solver and one column per captcha type. Each cell
+ * Table model of the "Solver comparison table": one row per captcha solver and one column per captcha type. Each cell
  * shows whether the solver supports the captcha type (check mark) or not (red X). The columns are always created for every captcha type
  * JDownloader can process (see {@link CaptchaType#getProcessableCaptchaTypes()}); which of them are actually shown is controlled via
  * {@link #setVisibleTypes(Set)}.
@@ -42,8 +42,10 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
     public static final int            SOLVER_COLUMN_WIDTH  = 170;
     /* null = all columns visible. Only read after the constructor has finished (columns are created inside the super constructor). */
     private volatile Set<CAPTCHA_TYPE> visibleTypes         = null;
-    /* All external solvers, before filtering. */
+    /* All solvers of the selected solver types, before filtering. */
     private volatile List<SolverService> allSolvers          = new ArrayList<SolverService>();
+    /* null = all solvers are shown. Otherwise only these solvers are shown (the solver selection above the table). */
+    private volatile Set<SolverService>  visibleSolvers      = null;
     /**
      * Default width of the solver column: at most as wide as the longest solver name currently loaded (plus its icon). Updated in
      * {@link #setSolvers(List)}.
@@ -90,15 +92,45 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
         return visible != null && visible.isEmpty();
     }
 
+    /** True if the table is empty because not a single solver is selected. */
+    public boolean isEmptyDueToNoSolvers() {
+        final Set<SolverService> visible = visibleSolvers;
+        return visible != null && visible.isEmpty();
+    }
+
+    /** The solvers the table can show: all solvers, or only the selected ones, before the "only full support" filter. */
+    private List<SolverService> getCandidateSolvers() {
+        final Set<SolverService> visible = visibleSolvers;
+        final List<SolverService> ret = new ArrayList<SolverService>();
+        for (final SolverService solver : allSolvers) {
+            if (visible == null || visible.contains(solver)) {
+                ret.add(solver);
+            }
+        }
+        return ret;
+    }
+
+    /** Selects the solvers that are shown as rows. */
+    public void setVisibleSolvers(final Set<SolverService> solvers) {
+        this.visibleSolvers = new HashSet<SolverService>(solvers);
+        new EDTRunner() {
+            @Override
+            protected void runInEDT() {
+                rebuildRows();
+            }
+        };
+    }
+
     /**
      * True if there are solvers but none of them supports all selected captcha types. Then "only services supporting all selected types"
      * cannot be applied (it would hide every solver): it is not applied, and the container greys out its check box.
      */
     public boolean isFullSupportImpossible() {
-        if (allSolvers.isEmpty() || isEmptyDueToNoTypes()) {
+        final List<SolverService> candidates = getCandidateSolvers();
+        if (candidates.isEmpty() || isEmptyDueToNoTypes()) {
             return false;
         }
-        for (final SolverService solver : allSolvers) {
+        for (final SolverService solver : candidates) {
             if (supportsAllSelected(solver)) {
                 return false;
             }
@@ -174,7 +206,7 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
         final boolean bySelected = sortBySelectedTypes;
         final List<SolverService> rows = new ArrayList<SolverService>();
         /* No captcha type selected: no rows (the container shows a hint). */
-        for (final SolverService solver : isEmptyDueToNoTypes() ? new ArrayList<SolverService>() : allSolvers) {
+        for (final SolverService solver : isEmptyDueToNoTypes() ? new ArrayList<SolverService>() : getCandidateSolvers()) {
             if (!fullSupportOnly || supportsAllSelected(solver)) {
                 rows.add(solver);
             }

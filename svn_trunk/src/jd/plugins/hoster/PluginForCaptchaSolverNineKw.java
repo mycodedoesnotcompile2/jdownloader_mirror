@@ -53,7 +53,7 @@ import jd.plugins.PluginException;
 /**
  * Plugin for 9kw captcha solving service (https://9kw.eu/).
  */
-@HostPlugin(revision = "$Revision: 53733 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53783 $", interfaceVersion = 3, names = { "9kw.eu" }, urls = { "" })
 public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -393,6 +393,8 @@ public class PluginForCaptchaSolverNineKw extends abstractPluginForCaptchaSolver
             upload_query.appendEncoded("pageurl", challenge.getSiteUrl(this));
             if (v3action != null) {
                 upload_query.appendEncoded("actionname", (String) v3action.get("action"));
+            }
+            if (v3action != null || challenge.isV3()) {
                 /* Minimal score: requested by the challenge or 0.3 by default. */
                 final Double minScore = challenge.getMinScore();
                 upload_query.appendEncoded("min_score", String.valueOf(minScore != null ? minScore : 0.3d));

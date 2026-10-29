@@ -627,6 +627,17 @@ public class SolverJob<T> {
         return forcedStartSet.contains(solver);
     }
 
+    /** Returns all solvers of this job which are not done yet, i.e. which are still waiting or working on it. */
+    public List<ChallengeSolver<T>> getUnfinishedSolvers() {
+        final List<ChallengeSolver<T>> ret = new ArrayList<ChallengeSolver<T>>();
+        for (final ChallengeSolver<T> solver : getSolverList()) {
+            if (!isDone(solver)) {
+                ret.add(solver);
+            }
+        }
+        return ret;
+    }
+
     /**
      * Returns all external solvers of this job which are neither done nor working on it yet, i.e. which would still be used later if the
      * captcha is not solved by the currently running (manual) solvers.

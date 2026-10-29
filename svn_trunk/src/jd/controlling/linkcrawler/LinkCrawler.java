@@ -32,30 +32,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import jd.controlling.linkcollector.LinkCollectingJob;
-import jd.controlling.linkcollector.LinkCollector.JobLinkCrawler;
-import jd.controlling.linkcollector.LinkOrigin;
-import jd.controlling.linkcollector.LinkOriginDetails;
-import jd.controlling.linkcrawler.LinkCrawlerConfig.DirectHTTPPermission;
-import jd.controlling.linkcrawler.LinkCrawlerRule.RULE;
-import jd.http.AuthenticationFactory;
-import jd.http.Browser;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.PostRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.parser.html.HTMLParser;
-import jd.parser.html.HTMLParser.HtmlParserCharSequence;
-import jd.parser.html.HTMLParser.HtmlParserResultSet;
-import jd.plugins.CryptedLink;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import jd.plugins.Plugin;
-import jd.plugins.PluginForDecrypt;
-import jd.plugins.PluginForHost;
-import jd.plugins.PluginsC;
-
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.storage.config.JsonConfig;
@@ -92,6 +68,30 @@ import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.settings.GeneralSettings;
+
+import jd.controlling.linkcollector.LinkCollectingJob;
+import jd.controlling.linkcollector.LinkCollector.JobLinkCrawler;
+import jd.controlling.linkcollector.LinkOrigin;
+import jd.controlling.linkcollector.LinkOriginDetails;
+import jd.controlling.linkcrawler.LinkCrawlerConfig.DirectHTTPPermission;
+import jd.controlling.linkcrawler.LinkCrawlerRule.RULE;
+import jd.http.AuthenticationFactory;
+import jd.http.Browser;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.PostRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.parser.html.HTMLParser;
+import jd.parser.html.HTMLParser.HtmlParserCharSequence;
+import jd.parser.html.HTMLParser.HtmlParserResultSet;
+import jd.plugins.CryptedLink;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import jd.plugins.Plugin;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.PluginForHost;
+import jd.plugins.PluginsC;
 
 public class LinkCrawler {
     private static enum DISTRIBUTE {
@@ -3379,10 +3379,15 @@ public class LinkCrawler {
             destDownloadLink.setUrlProtection(sourceDownloadLink.getUrlProtection());
         }
         if (Boolean.TRUE.equals(singleDestDownloadLink)) {
-            if (!destDownloadLink.isNameSet()) {
+            setFilename: if (!destDownloadLink.isNameSet()) {
                 if (sourceDownloadLink.isNameSet()) {
                     destDownloadLink.setName(sourceDownloadLink.getName());
                 } else {
+                    final PluginForHost plugin = destDownloadLink.getDefaultPlugin();
+                    if (plugin != null && !StringUtils.equals(destDownloadLink.getDefaultFileName(null), destDownloadLink.getDefaultFileName(plugin))) {
+                        // DownloadLink.isNameSet is false, we must have a custom PluginForHost.getDefaultFileName when names are different
+                        break setFilename;
+                    }
                     final String name = getUnsafeName(sourceDownloadLink.getName(), destDownloadLink.getName());
                     if (name != null) {
                         destDownloadLink.setName(name);

@@ -58,7 +58,7 @@ import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 53400 $", interfaceVersion = 3, names = { "flickr.com" }, urls = { "https?://(?:secure\\.|www\\.)?flickr\\.com/(?:photos|groups)/.+" })
+@DecrypterPlugin(revision = "$Revision: 53802 $", interfaceVersion = 3, names = { "flickr.com" }, urls = { "https?://(?:secure\\.|www\\.)?flickr\\.com/(?:photos|groups)/.+" })
 public class FlickrComCrawler extends PluginForDecrypt {
     public FlickrComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -79,12 +79,12 @@ public class FlickrComCrawler extends PluginForDecrypt {
     private static final String                  INVALIDLINKS             = "^https?://[^/]+/(photos/(me|upload|tags.*?)|groups/[^<>\"/]+/rules|groups/[^<>\"/]+/discuss.*?)";
     public static final String                   API_BASE                 = "https://api.flickr.com/";
     private static final int                     api_max_entries_per_page = 500;
-    private static LinkedHashMap<String, String> INTERNAL_USERNAME_CACHE  = new LinkedHashMap<String, String>() {
+    private static LinkedHashMap<String, String>       INTERNAL_USERNAME_CACHE = new LinkedHashMap<String, String>() {
         protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
             return size() > 200;
         };
     };
-    private static LinkedHashMap<String, String> INTERNAL_GROUPNAME_CACHE = new LinkedHashMap<String, String>() {
+    private static LinkedHashMap<String, String>       INTERNAL_GROUPNAME_CACHE = new LinkedHashMap<String, String>() {
         protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
             return size() > 200;
         };

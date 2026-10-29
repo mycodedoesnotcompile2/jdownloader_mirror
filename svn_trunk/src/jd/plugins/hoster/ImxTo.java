@@ -35,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51342 $", interfaceVersion = 2, names = { "imx.to" }, urls = { "https?://(?:\\w+\\.)?imx\\.to/((?:u/)?(?:i|t)/\\d+/\\d+/\\d+/([a-z0-9]+)\\.[a-z]+|(?:i/|img\\-)[a-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 53792 $", interfaceVersion = 2, names = { "imx.to" }, urls = { "https?://(?:\\w+\\.)?imx\\.to/((?:u/)?(?:i|t)/\\d+/\\d+/\\d+/([a-z0-9]+)\\.[a-z]+|(?:i/|img\\-)[a-z0-9]+)" })
 public class ImxTo extends PluginForHost {
     private static final String PROPERTY_DIRECTURL = "directurl";
     private static final String EXT_DEFAULT        = ".jpg";
@@ -82,11 +82,16 @@ public class ImxTo extends PluginForHost {
     }
 
     @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        final String fid = this.getFID(link);
-        if (!link.isNameSet()) {
-            link.setName(fid + EXT_DEFAULT);
+    protected String getDefaultFileName(DownloadLink link) {
+        final String fid = getFID(link);
+        if (fid == null) {
+            return super.getDefaultFileName(link);
         }
+        return fid + EXT_DEFAULT;
+    }
+
+    @Override
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         final String added_url = link.getPluginPatternMatcher();
         this.setBrowserExclusive();
         final boolean isDownload = PluginEnvironment.DOWNLOAD.equals(this.getPluginEnvironment());
@@ -102,6 +107,7 @@ public class ImxTo extends PluginForHost {
                 link.removeProperty(PROPERTY_DIRECTURL);
             }
         }
+        final String fid = this.getFID(link);
         br.getPage("https://" + this.getHost() + "/i/" + fid);
         if (br.getHttpConnection().getResponseCode() == 404 || !br.getURL().contains(fid)) {
             logger.info("Image looks to be offline");

@@ -50,7 +50,7 @@ import org.appwork.utils.Time;
 /**
  * Most of the work on this plugin was done by Fabio Orlandi.
  */
-@HostPlugin(revision = "$Revision: 53773 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53788 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TransferItCrawler.class })
 public class TransferIt extends PluginForHost {
     public TransferIt(PluginWrapper wrapper) {
@@ -58,14 +58,14 @@ public class TransferIt extends PluginForHost {
     }
 
     /* transfer.it is a service powered by MEGA and uses the MEGA API with "domain=transferit". */
-    private static final String API_BASE               = "https://bt7.api.mega.co.nz/cs";
-    public static final String  PROPERTY_TRANSFER_ID   = "transfer_id";
-    public static final String  PROPERTY_NODE_ID       = "node_id";
-    public static final String  PROPERTY_NODE_KEY      = "node_key";
+    private static final String     API_BASE               = "https://bt7.api.mega.co.nz/cs";
+    public static final String      PROPERTY_TRANSFER_ID   = "transfer_id";
+    public static final String      PROPERTY_NODE_ID       = "node_id";
+    public static final String      PROPERTY_NODE_KEY      = "node_key";
     /* Hash of the password of a password protected transfer. Sent as "pw" parameter. */
-    public static final String  PROPERTY_PASSWORD_HASH = "password_hash";
-    private final AtomicLong    API_SEQUENCE           = new AtomicLong(Time.systemIndependentCurrentJVMTimeMillis() % 1000000000l);
-    private String              dllink                 = null;
+    public static final String      PROPERTY_PASSWORD_HASH = "password_hash";
+    private static final AtomicLong API_SEQUENCE           = new AtomicLong(Time.systemIndependentCurrentJVMTimeMillis() % 1000000000l);
+    private String                  dllink                 = null;
 
     @Override
     public String getAGBLink() {
@@ -131,7 +131,7 @@ public class TransferIt extends PluginForHost {
         final String nodeKey = link.getStringProperty(PROPERTY_NODE_KEY);
         if (nodeKey != null) {
             final Map<String, Object> attributes = decryptNodeAttributes(this, (String) entries.get("at"), nodeKey);
-            if (attributes != null) {
+            if (attributes != null && attributes.get("n") != null) {
                 link.setFinalFileName((String) attributes.get("n"));
             }
         }

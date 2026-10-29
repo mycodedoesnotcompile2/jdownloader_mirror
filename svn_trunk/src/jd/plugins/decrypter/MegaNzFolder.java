@@ -61,7 +61,7 @@ import org.jdownloader.plugins.components.config.MegaNzFolderConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 52268 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53802 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { MegaNz.class })
 public class MegaNzFolder extends PluginForDecrypt {
     private static AtomicLong CS = new AtomicLong(System.currentTimeMillis());
@@ -199,7 +199,7 @@ public class MegaNzFolder extends PluginForDecrypt {
         }
     }
 
-    private static HashMap<String, Reference<List<Map<String, Object>>>> GLOBAL_CACHE = new HashMap<String, Reference<List<Map<String, Object>>>>();
+    private static HashMap<String, Reference<List<Map<String, Object>>>>       GLOBAL_CACHE = new HashMap<String, Reference<List<Map<String, Object>>>>();
     private final Charset                                                UTF8         = Charset.forName("UTF-8");
 
     protected Object toObject(final Object object) {

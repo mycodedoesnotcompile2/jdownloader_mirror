@@ -1,7 +1,5 @@
 package jd.plugins.hoster;
 
-import org.appwork.utils.net.httpconnection.HTTPProxy;
-import org.appwork.utils.StringUtils;
 import java.util.Currency;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -12,6 +10,8 @@ import java.util.Set;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeSolver.ChallengeVetoReason;
@@ -47,12 +47,13 @@ import jd.plugins.PluginException;
  * The API is similar to the one of anti-captcha.com/2captcha.com (createTask/getTaskResult) but has its own task types and feedback
  * methods.
  */
-@HostPlugin(revision = "$Revision: 53733 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53783 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
 public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCaptchaSolver {
     /**
-     * Task types which accept the proxy parameters (proxyType, proxyAddress, proxyPort, proxyLogin, proxyPassword). reCAPTCHA v2 (docs: no-captcha-task),
-     * reCAPTCHA v2 Enterprise and Turnstile have separate types with/without proxy, the Altcha CustomTask just takes the parameters.
-     * reCAPTCHA v3 only exists without proxy (https://docs.capmonster.cloud/docs/captchas/recaptcha-v3-task/), hCaptcha is not documented.
+     * Task types which accept the proxy parameters (proxyType, proxyAddress, proxyPort, proxyLogin, proxyPassword). reCAPTCHA v2 (docs:
+     * no-captcha-task), reCAPTCHA v2 Enterprise and Turnstile have separate types with/without proxy, the Altcha CustomTask just takes the
+     * parameters. reCAPTCHA v3 only exists without proxy (https://docs.capmonster.cloud/docs/captchas/recaptcha-v3-task/), hCaptcha is not
+     * documented.
      */
     private static final Map<String, String> PROXY_TASK_TYPES = new HashMap<String, String>();
     static {
@@ -116,7 +117,9 @@ public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCapt
         if (reason != null) {
             return reason;
         } else if (c instanceof AltchaChallenge && ((AltchaChallenge) c).getChallengeV1() == null) {
-            /* The ALTCHA task expects the fields of a v1 challenge (challenge, maxnumber, salt, signature), v2 challenges cannot be sent. */
+            /*
+             * The ALTCHA task expects the fields of a v1 challenge (challenge, maxnumber, salt, signature), v2 challenges cannot be sent.
+             */
             return ChallengeVetoReason.UNSUITABLE_FOR_SOLVER;
         } else {
             return null;
@@ -146,7 +149,8 @@ public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCapt
     }
 
     /**
-     * Sends the proxy of the challenge in the format of the CapMonster Cloud API (task types see PROXY_TASK_TYPES, the service only accepts IP addresses as proxy host).
+     * Sends the proxy of the challenge in the format of the CapMonster Cloud API (task types see PROXY_TASK_TYPES, the service only accepts
+     * IP addresses as proxy host).
      */
     private void applyProxy(final Map<String, Object> task, final Challenge<?> challenge) {
         if (!challenge.hasProxy()) {
@@ -205,10 +209,6 @@ public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCapt
                 /* https://docs.capmonster.cloud/docs/captchas/recaptcha-v3-task/ (isEnterprise is supported by this task type) */
                 task.put("type", "RecaptchaV3TaskProxyless");
                 task.put("isEnterprise", challenge.isEnterprise());
-                final Double minScore = challenge.getMinScore();
-                if (minScore != null) {
-                    task.put("minScore", minScore);
-                }
                 if (action != null) {
                     task.put("pageAction", action.get("action"));
                 }
@@ -218,6 +218,10 @@ public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCapt
                     task.put("type", "RecaptchaV2EnterpriseTaskProxyless");
                 }
                 task.put("isInvisible", challenge.isInvisible());
+            }
+            final Double minScore = challenge.getMinScore();
+            if (minScore != null) {
+                task.put("minScore", minScore);
             }
         } else if (captchachallenge instanceof HCaptchaChallenge) {
             final HCaptchaChallenge challenge = (HCaptchaChallenge) captchachallenge;

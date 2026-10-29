@@ -294,9 +294,28 @@ public class PseudoMultiCombo<Type> extends ExtButton {
         }
     }
 
+    /**
+     * getText() clips the text to the current width. As long as the component has no size yet (width 0), the clipped text is empty and
+     * the size calculated by the UI collapses. Therefore the height is always at least the height of one text line plus insets.
+     */
+    private int getMinTextHeight() {
+        final Insets insets = getInsets();
+        final int lineHeight = getFontMetrics(getFont()).getHeight();
+        final Icon icon = getPopIcon(true);
+        return Math.max(lineHeight, icon.getIconHeight()) + insets.top + insets.bottom;
+    }
+
+    @Override
+    public Dimension getPreferredSize() {
+        final Dimension ret = super.getPreferredSize();
+        ret.height = Math.max(ret.height, getMinTextHeight());
+        return ret;
+    }
+
     @Override
     public Dimension getMinimumSize() {
-        Dimension ret = super.getMinimumSize();
+        final Dimension ret = super.getMinimumSize();
+        ret.height = Math.max(ret.height, getMinTextHeight());
         ret.width = ret.height;
         return ret;
     }

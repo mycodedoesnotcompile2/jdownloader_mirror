@@ -29,6 +29,8 @@ import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.annotations.EnumLabel;
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.storage.config.events.GenericConfigEventListener;
+import org.appwork.storage.config.handler.AbstractDynamicPseudoEnum;
+import org.appwork.storage.config.handler.DynamicPseudoEnumKeyHandler;
 import org.appwork.storage.config.handler.EnumSetKeyHandler;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.swing.components.CheckBoxIcon;
@@ -61,6 +63,7 @@ public class AdvancedValueColumn extends ExtCompoundColumn<AdvancedConfigEntry> 
     private java.util.List<ExtColumn<AdvancedConfigEntry>> columns;
     private ExtSpinnerColumn<AdvancedConfigEntry>          numberColumn;
     private ExtTextColumn<AdvancedConfigEntry>             enumColumn;
+    private ExtTextColumn<AdvancedConfigEntry>             pseudoEnumColumn;
     private ExtTextColumn<AdvancedConfigEntry>             enumSetColumn;
     private ExtTextColumn<AdvancedConfigEntry>             colorColumn;
 
@@ -236,92 +239,207 @@ public class AdvancedValueColumn extends ExtCompoundColumn<AdvancedConfigEntry> 
             }
         };
         register(defaultColumn);
-        booleanColumn = new ExtCheckColumn<AdvancedConfigEntry>(getName()) {
-            private static final long serialVersionUID = 1L;
+        {
+            booleanColumn = new ExtCheckColumn<AdvancedConfigEntry>(getName()) {
+                private static final long serialVersionUID = 1L;
 
-            @Override
-            protected boolean getBooleanValue(AdvancedConfigEntry value) {
-                return (Boolean) value.getValue();
-            }
+                @Override
+                protected boolean getBooleanValue(AdvancedConfigEntry value) {
+                    return (Boolean) value.getValue();
+                }
 
-            @Override
-            public boolean isEditable(final AdvancedConfigEntry obj) {
-                return obj.isEditable();
-            }
+                @Override
+                public boolean isEditable(final AdvancedConfigEntry obj) {
+                    return obj.isEditable();
+                }
 
-            {
-                this.renderer.setHorizontalAlignment(SwingConstants.RIGHT);
-                renderer.setHorizontalTextPosition(SwingConstants.LEFT);
-                this.editor.setHorizontalAlignment(SwingConstants.RIGHT);
-            }
+                {
+                    this.renderer.setHorizontalAlignment(SwingConstants.RIGHT);
+                    renderer.setHorizontalTextPosition(SwingConstants.LEFT);
+                    this.editor.setHorizontalAlignment(SwingConstants.RIGHT);
+                }
 
-            @Override
-            protected void setBooleanValue(boolean value, AdvancedConfigEntry object) {
-                object.setValue(value);
-                AdvancedValueColumn.this.getModel().getTable().repaint();
-            }
-        };
-        register(booleanColumn);
-        numberColumn = new ExtSpinnerColumn<AdvancedConfigEntry>(getName()) {
-            private static final long serialVersionUID = 1L;
+                @Override
+                protected void setBooleanValue(boolean value, AdvancedConfigEntry object) {
+                    object.setValue(value);
+                    AdvancedValueColumn.this.getModel().getTable().repaint();
+                }
+            };
+            register(booleanColumn);
+        }
+        {
+            numberColumn = new ExtSpinnerColumn<AdvancedConfigEntry>(getName()) {
+                private static final long serialVersionUID = 1L;
 
-            @Override
-            public boolean isEditable(final AdvancedConfigEntry obj) {
-                return obj.isEditable();
-            }
+                @Override
+                public boolean isEditable(final AdvancedConfigEntry obj) {
+                    return obj.isEditable();
+                }
 
-            @Override
-            protected SpinnerNumberModel getModel(AdvancedConfigEntry value, Number n) {
-                final SpinnerNumberModel ret = super.getModel(value, n);
-                if (value.getValidator() != null) {
-                    if (value.getValidator() instanceof RangeValidator) {
-                        if (Clazz.isDouble(n.getClass())) {
-                            ret.setMaximum(((RangeValidator) value.getValidator()).getMax().doubleValue());
-                            ret.setMinimum(((RangeValidator) value.getValidator()).getMin().doubleValue());
-                            ret.setStepSize(((RangeValidator) value.getValidator()).getSteps().doubleValue());
-                        } else if (Clazz.isFloat(n.getClass())) {
-                            ret.setMaximum(((RangeValidator) value.getValidator()).getMax().floatValue());
-                            ret.setMinimum(((RangeValidator) value.getValidator()).getMin().floatValue());
-                            ret.setStepSize(((RangeValidator) value.getValidator()).getSteps().floatValue());
-                        } else if (Clazz.isLong(n.getClass())) {
-                            ret.setMaximum(((RangeValidator) value.getValidator()).getMax().longValue());
-                            ret.setMinimum(((RangeValidator) value.getValidator()).getMin().longValue());
-                            ret.setStepSize(((RangeValidator) value.getValidator()).getSteps().longValue());
-                        } else if (Clazz.isInteger(n.getClass())) {
-                            ret.setMaximum(((RangeValidator) value.getValidator()).getMax().intValue());
-                            ret.setMinimum(((RangeValidator) value.getValidator()).getMin().intValue());
-                            ret.setStepSize(((RangeValidator) value.getValidator()).getSteps().intValue());
-                        } else if (Clazz.isShort(n.getClass())) {
-                            ret.setMaximum(((RangeValidator) value.getValidator()).getMax().shortValue());
-                            ret.setMinimum(((RangeValidator) value.getValidator()).getMin().shortValue());
-                            ret.setStepSize(((RangeValidator) value.getValidator()).getSteps().shortValue());
-                        } else if (Clazz.isByte(n.getClass())) {
-                            ret.setMaximum(((RangeValidator) value.getValidator()).getMax().byteValue());
-                            ret.setMinimum(((RangeValidator) value.getValidator()).getMin().byteValue());
-                            ret.setStepSize(((RangeValidator) value.getValidator()).getSteps().byteValue());
+                @Override
+                protected SpinnerNumberModel getModel(AdvancedConfigEntry value, Number n) {
+                    final SpinnerNumberModel ret = super.getModel(value, n);
+                    if (value.getValidator() != null) {
+                        if (value.getValidator() instanceof RangeValidator) {
+                            if (Clazz.isDouble(n.getClass())) {
+                                ret.setMaximum(((RangeValidator) value.getValidator()).getMax().doubleValue());
+                                ret.setMinimum(((RangeValidator) value.getValidator()).getMin().doubleValue());
+                                ret.setStepSize(((RangeValidator) value.getValidator()).getSteps().doubleValue());
+                            } else if (Clazz.isFloat(n.getClass())) {
+                                ret.setMaximum(((RangeValidator) value.getValidator()).getMax().floatValue());
+                                ret.setMinimum(((RangeValidator) value.getValidator()).getMin().floatValue());
+                                ret.setStepSize(((RangeValidator) value.getValidator()).getSteps().floatValue());
+                            } else if (Clazz.isLong(n.getClass())) {
+                                ret.setMaximum(((RangeValidator) value.getValidator()).getMax().longValue());
+                                ret.setMinimum(((RangeValidator) value.getValidator()).getMin().longValue());
+                                ret.setStepSize(((RangeValidator) value.getValidator()).getSteps().longValue());
+                            } else if (Clazz.isInteger(n.getClass())) {
+                                ret.setMaximum(((RangeValidator) value.getValidator()).getMax().intValue());
+                                ret.setMinimum(((RangeValidator) value.getValidator()).getMin().intValue());
+                                ret.setStepSize(((RangeValidator) value.getValidator()).getSteps().intValue());
+                            } else if (Clazz.isShort(n.getClass())) {
+                                ret.setMaximum(((RangeValidator) value.getValidator()).getMax().shortValue());
+                                ret.setMinimum(((RangeValidator) value.getValidator()).getMin().shortValue());
+                                ret.setStepSize(((RangeValidator) value.getValidator()).getSteps().shortValue());
+                            } else if (Clazz.isByte(n.getClass())) {
+                                ret.setMaximum(((RangeValidator) value.getValidator()).getMax().byteValue());
+                                ret.setMinimum(((RangeValidator) value.getValidator()).getMin().byteValue());
+                                ret.setStepSize(((RangeValidator) value.getValidator()).getSteps().byteValue());
+                            }
                         }
                     }
+                    return ret;
                 }
-                return ret;
-            }
 
-            @Override
-            protected Number getNumber(AdvancedConfigEntry value) {
-                return (Number) value.getValue();
-            }
+                @Override
+                protected Number getNumber(AdvancedConfigEntry value) {
+                    return (Number) value.getValue();
+                }
 
-            @Override
-            protected void setNumberValue(Number value, AdvancedConfigEntry object) {
-                object.setValue(value);
-                AdvancedValueColumn.this.getModel().getTable().repaint();
-            }
+                @Override
+                protected void setNumberValue(Number value, AdvancedConfigEntry object) {
+                    object.setValue(value);
+                    AdvancedValueColumn.this.getModel().getTable().repaint();
+                }
 
-            @Override
-            public String getStringValue(AdvancedConfigEntry value) {
-                return value.getValue() + "";
-            }
-        };
-        register(numberColumn);
+                @Override
+                public String getStringValue(AdvancedConfigEntry value) {
+                    return value.getValue() + "";
+                }
+            };
+            register(numberColumn);
+        }
+        {
+            pseudoEnumColumn = new ExtTextColumn<AdvancedConfigEntry>(getName(), null) {
+                private static final long serialVersionUID = 1L;
+                {
+                    renderer.removeAll();
+                    renderer.setLayout(new MigLayout("ins 0", "[grow,fill]0[12]5", "[grow,fill]"));
+                    renderer.add(rendererField);
+                    renderer.add(rendererIcon);
+                }
+
+                @Override
+                public void configureRendererComponent(final AdvancedConfigEntry value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
+                    Icon icon;
+                    this.rendererIcon.setIcon(icon = this.getIcon(value));
+                    String str = this.getStringValue(value);
+                    if (str == null) {
+                        // under substance, setting setText(null) somehow sets the label
+                        // opaque.
+                        str = "";
+                    }
+                    if (this.getTableColumn() != null) {
+                        try {
+                            this.rendererField.setText(org.appwork.sunwrapper.sun.swing.SwingUtilities2Wrapper.clipStringIfNecessary(this.rendererField, this.rendererField.getFontMetrics(this.rendererField.getFont()), str, this.getTableColumn().getWidth() - 18 - (icon != null ? icon.getIconWidth() : 0)));
+                        } catch (Throwable e) {
+                            // fallback if org.appwork.swing.sunwrapper.SwingUtilities2 disappears someday
+                            e.printStackTrace();
+                            this.rendererField.setText(str);
+                        }
+                    } else {
+                        this.rendererField.setText(str);
+                    }
+                }
+
+                public boolean onSingleClick(final MouseEvent e, final AdvancedConfigEntry value) {
+                    ExtPopupMenu popup = new ExtPopupMenu();
+                    try {
+                        Object[] values = ((DynamicPseudoEnumKeyHandler) value.getKeyHandler()).values();
+                        for (final Object o : values) {
+                            popup.add(new JMenuItem(new AppAction() {
+                                {
+
+                                    if (o instanceof LabelInterface) {
+                                        setName(((LabelInterface) o).getLabel());
+                                    } else {
+                                        setName(o.toString());
+                                    }
+
+                                    if (value.getValue() == o) {
+                                        setSmallIcon(CheckBoxIcon.TRUE);
+                                    } else {
+                                        setSmallIcon(CheckBoxIcon.FALSE);
+                                    }
+                                }
+
+                                @Override
+                                public void actionPerformed(ActionEvent e) {
+                                    value.setValue(o);
+                                    AdvancedValueColumn.this.getModel().getTable().repaint();
+                                }
+                            }));
+                        }
+                        Rectangle bounds = getModel().getTable().getCellRect(getModel().getTable().rowAtPoint(new Point(e.getX(), e.getY())), getModel().getTable().columnAtPoint(new Point(e.getX(), e.getY())), true);
+                        Dimension pref = popup.getPreferredSize();
+                        popup.setPreferredSize(new Dimension(Math.max(pref.width, bounds.width), pref.height));
+                        popup.show(getModel().getTable(), bounds.x, bounds.y + bounds.height);
+                        return true;
+                    } catch (Exception e1) {
+                        e1.printStackTrace();
+                    }
+                    return false;
+                }
+
+                protected int getSelectedIndex(AdvancedConfigEntry value) {
+                    return ((AbstractDynamicPseudoEnum<?>) value.getValue()).ordinal();
+                }
+
+                protected void setSelectedIndex(int value, AdvancedConfigEntry object) {
+                    Object[] values;
+                    try {
+                        values = ((DynamicPseudoEnumKeyHandler) object.getKeyHandler()).values();
+                        object.setValue(values[value]);
+                        AdvancedValueColumn.this.getModel().getTable().repaint();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                protected Icon getIcon(final AdvancedConfigEntry value) {
+                    return NewTheme.I().getIcon(IconKey.ICON_POPDOWNLARGE, -1);
+                }
+
+                @Override
+                public String getStringValue(AdvancedConfigEntry entry) {
+                    final Object value = entry.getValue();
+                    try {
+                        if (value instanceof LabelInterface) {
+                            return ((LabelInterface) value).getLabel();
+                        }
+                        if (entry instanceof LabelInterface) {
+                            return ((LabelInterface) entry).getLabel();
+                        }
+                    } catch (Exception e) {
+                    }
+                    if (value == null) {
+                        return null;
+                    }
+                    return ((AbstractDynamicPseudoEnum<?>) value).name();
+                }
+            };
+            register(pseudoEnumColumn);
+        }
         {
             enumColumn = new ExtTextColumn<AdvancedConfigEntry>(getName(), null) {
                 private static final long serialVersionUID = 1L;
@@ -445,6 +563,7 @@ public class AdvancedValueColumn extends ExtCompoundColumn<AdvancedConfigEntry> 
             };
             register(enumColumn);
         }
+
         {
             enumSetColumn = new ExtTextColumn<AdvancedConfigEntry>(getName(), null) {
                 private static final long serialVersionUID = 1L;
@@ -610,7 +729,9 @@ public class AdvancedValueColumn extends ExtCompoundColumn<AdvancedConfigEntry> 
         // if (object.getKeyHandler().getAnnotation(ActionClass.class) != null) {
         // return actionColumn;
         // } else
-        if (Clazz.isBoolean(object.getType())) {
+        if (object.getKeyHandler() instanceof DynamicPseudoEnumKeyHandler) {
+            return pseudoEnumColumn;
+        } else if (Clazz.isBoolean(object.getType())) {
             return booleanColumn;
         } else if (object.getType() == String.class) {
             if (object.hasHexColorString()) {

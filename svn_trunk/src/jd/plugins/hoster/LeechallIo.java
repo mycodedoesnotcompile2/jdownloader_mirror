@@ -55,7 +55,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50526 $", interfaceVersion = 3, names = { "leechall.io" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53803 $", interfaceVersion = 3, names = { "leechall.io" }, urls = { "" })
 public class LeechallIo extends PluginForHost {
     /* Connection limits */
     private final boolean                ACCOUNT_PREMIUM_RESUME             = true;
@@ -67,7 +67,7 @@ public class LeechallIo extends PluginForHost {
     private final String                 RECAPTCHA_SITEKEY_STATIC           = "6LdqV7AiAAAAAK50kHwrESPTEwVuBpAX0MCrVI0e"; /* 2023-06-27 */
     private final String                 H_CAPTCHA_SITEKEY_STATIC           = "b858042e-5b84-454c-8eda-5b3e670486d4";     /* 2024-09-12 */
     /* Don't touch the following! */
-    private static final AtomicInteger   runningDls                         = new AtomicInteger(0);
+    private static AtomicInteger         runningDls                         = new AtomicInteger(0);
 
     public LeechallIo(PluginWrapper wrapper) {
         super(wrapper);

@@ -70,7 +70,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 53778 $", interfaceVersion = 3, names = { "deathbycaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53783 $", interfaceVersion = 3, names = { "deathbycaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -274,6 +274,10 @@ public class PluginForCaptchaSolverDeathByCaptcha extends abstractPluginForCaptc
                     if (rc_challenge.isV3()) {
                         type = "RecaptchaV3";
                         r.addFormData(new FormData("type", "5"));
+                        final Double minScore = rc_challenge.getMinScore();
+                        if (minScore != null) {
+                            token_param.put("min_score", minScore);
+                        }
                     } else if (rc_challenge.isInvisible()) {
                         type = "RecaptchaV2 invisible";
                         r.addFormData(new FormData("type", "4"));

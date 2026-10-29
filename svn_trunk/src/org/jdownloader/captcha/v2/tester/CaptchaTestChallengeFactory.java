@@ -9,6 +9,7 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -37,19 +38,23 @@ import org.jdownloader.captcha.v2.solver.browser.BrowserWindow;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.controller.PluginClassLoader;
 import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChild;
+import org.jdownloader.plugins.controller.crawler.CrawlerPluginController;
+import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.controlling.linkcrawler.LinkCrawler;
 import jd.http.Browser;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
 /**
- * Builds throwaway {@link Challenge}s used by the IDE-only "Test &amp; Debug" tab in the captcha settings (see
- * {@code CaptchaTestPanel}) to manually trigger a real solve attempt for a given {@link CAPTCHA_TYPE} without a real download/login/crawl in
- * progress. <br>
+ * Builds throwaway {@link Challenge}s used by the IDE-only "Test &amp; Debug" tab in the captcha settings (see {@code CaptchaTestPanel}) to
+ * manually trigger a real solve attempt for a given {@link CAPTCHA_TYPE} without a real download/login/crawl in progress. <br>
  * The test values of a captcha type are a simple untyped map (see the KEY_ constants), pre-filled by {@link #getDefaults(CAPTCHA_TYPE)}
  * with each captcha provider's own publicly documented test values where one exists. A key which is part of the defaults of a type is a
  * value this type uses (its value can be null), the GUI only offers these. Shortly before a challenge is used,
@@ -89,10 +94,10 @@ public class CaptchaTestChallengeFactory {
         /* Invisible reCAPTCHA v2 demo of ZennoLab. */
         addDefaults(CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE, KEY_SITE_KEY, "6LcyAyQUAAAAAA2cByN4J7qtZDQju-k4HFuYdKo3", KEY_SITE_URL, "https://lessons.zennolab.com/captchas/recaptcha/invisible.php?level=low");
         /*
-         * reCAPTCHA v2 Enterprise demo of CapMonster: A normal (visible, size=normal) checkbox, so the challenge is created as type NORMAL, see
-         * createChallenge. (With type INVISIBLE a challenge is classified as RECAPTCHA_V2_INVISIBLE before isEnterprise() is checked.)
+         * reCAPTCHA v2 Enterprise demo of CapMonster: A normal (visible, size=normal) checkbox, so the challenge is created as type NORMAL,
+         * see createChallenge. (With type INVISIBLE a challenge is classified as RECAPTCHA_V2_INVISIBLE before isEnterprise() is checked.)
          */
-        addDefaults(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE, KEY_SITE_KEY, "6LfMZJ8sAAAAAGr3oIAwxk8-ShPdN41rEEHUxPSL", KEY_SITE_URL, "https://capmonster.cloud/en/demo/recaptcha-enterprise/");
+        addDefaults(CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE, KEY_SITE_KEY, "6Lf26sUnAAAAAIKLuWNYgRsFUfmI-3Lex3xT5N-s", KEY_SITE_URL, "https://2captcha.com/", KEY_MIN_SCORE, 0.3);
         /*
          * Taken from 2captcha's public demo page (https://2captcha.com/de/demo/recaptcha-v3) which embeds a real grecaptcha.execute(...)
          * call with this site key and action - no in-repo plugin has a hardcoded v3 key (they fetch it from the page at runtime).
@@ -182,8 +187,63 @@ public class CaptchaTestChallengeFactory {
         return defaults == null ? null : new LinkedHashMap<String, Object>(defaults);
     }
 
+    /**
+     * A throwaway plugin instance used purely as the technical Plugin owner of test challenges. Parts of the captcha handling decide by
+     * the class of the plugin where a challenge comes from (e.g. the dialog type: download or link crawling), so a link crawling test
+     * needs a crawler plugin, the other sources a host plugin.
+     */
+    private static Plugin newCarrierPlugin(final CaptchaRequestType requestType) {
+        switch (requestType) {
+        case DECRYPTER:
+            return newCrawlerCarrierPlugin();
+        case HOSTER:
+        case HOSTER_LOGIN:
+        default:
+            return newHostCarrierPlugin();
+        }
+    }
+
+    /** The logger of the real plugins is wired up by the pipeline of downloads/crawler, throwaway plugins need one for the solvers. */
+    private static void setCarrierLogger(final Plugin plugin) {
+        /*
+         * A freshly created Plugin instance defaults to LogController.TRASH (a no-op logger, see Plugin#logger) until something
+         * explicitly calls setLogger() -- real downloads get that wired up by the download pipeline, this throwaway carrier never goes
+         * through it. Without this, abstractPluginForCaptchaSolver#getPluginChallengeSolver() (which prefers the challenge's own plugin
+         * logger for both the solver and its Browser instance) would silently discard all solver/browser logging for test challenges.
+         * Instant flush so the log shows up in the console right away instead of only after the periodic flush timeout.
+         */
+        final LogSource logger = LogController.getInstance().getLogger(plugin.getClass().getName());
+        logger.setInstantFlush(true);
+        plugin.setLogger(logger);
+    }
+
+    /** A throwaway crawler plugin instance (link crawling tests), the first crawler plugin which can be created. */
+    private static PluginForDecrypt newCrawlerCarrierPlugin() {
+        final PluginClassLoaderChild classLoader = PluginClassLoader.getThreadPluginClassLoaderChild();
+        for (final LazyCrawlerPlugin lazyPlugin : CrawlerPluginController.getInstance().list()) {
+            try {
+                final PluginForDecrypt plugin = Plugin.getNewPluginInstance(null, lazyPlugin, classLoader);
+                if (plugin == null) {
+                    continue;
+                }
+                if (plugin.getCrawler() == null) {
+                    plugin.setCrawler(new LinkCrawler(false, true));
+                }
+                if (plugin.getBrowser() == null) {
+                    plugin.setBrowser(new Browser());
+                }
+                setCarrierLogger(plugin);
+                return plugin;
+            } catch (final PluginException e) {
+                /* Try the next crawler plugin. */
+                LogController.CL().log(e);
+            }
+        }
+        return null;
+    }
+
     /** A throwaway, always-available host plugin instance used purely as the technical Plugin owner of test challenges. */
-    private static PluginForHost newCarrierPlugin() {
+    private static PluginForHost newHostCarrierPlugin() {
         final LazyHostPlugin lazyPlugin = HostPluginController.getInstance().get("DirectHTTP");
         if (lazyPlugin == null) {
             return null;
@@ -191,16 +251,7 @@ public class CaptchaTestChallengeFactory {
         final PluginClassLoaderChild classLoader = PluginClassLoader.getThreadPluginClassLoaderChild();
         try {
             final PluginForHost plugin = Plugin.getNewPluginInstance(null, lazyPlugin, classLoader);
-            /*
-             * A freshly created Plugin instance defaults to LogController.TRASH (a no-op logger, see Plugin#logger) until something
-             * explicitly calls setLogger() -- real downloads get that wired up by the download pipeline, this throwaway carrier never goes
-             * through it. Without this, abstractPluginForCaptchaSolver#getPluginChallengeSolver() (which prefers the challenge's own
-             * plugin logger for both the solver and its Browser instance) would silently discard all solver/browser logging for test
-             * challenges. Instant flush so the log shows up in the console right away instead of only after the periodic flush timeout.
-             */
-            final LogSource logger = LogController.getInstance().getLogger(plugin.getClass().getName());
-            logger.setInstantFlush(true);
-            plugin.setLogger(logger);
+            setCarrierLogger(plugin);
             return plugin;
         } catch (final PluginException e) {
             return null;
@@ -227,8 +278,8 @@ public class CaptchaTestChallengeFactory {
     }
 
     /**
-     * Builds a fresh test challenge: prepares the values right now (see {@link #prepareTestChallenge(CAPTCHA_TYPE, Map)}) and creates
-     * the challenge. Call it from a background thread, preparing may need http requests.
+     * Builds a fresh test challenge: prepares the values right now (see {@link #prepareTestChallenge(CAPTCHA_TYPE, Map)}) and creates the
+     * challenge. Call it from a background thread, preparing may need http requests.
      *
      * @throws Exception
      *             with a readable message if the challenge cannot be built
@@ -242,7 +293,7 @@ public class CaptchaTestChallengeFactory {
                 throw new Exception("Invalid proxy: " + proxyString);
             }
         }
-        final PluginForHost plugin = newCarrierPlugin();
+        final Plugin plugin = newCarrierPlugin(requestType);
         if (plugin == null) {
             throw new Exception("No carrier plugin available for the test challenge");
         }
@@ -252,14 +303,55 @@ public class CaptchaTestChallengeFactory {
         } catch (final Exception e) {
             throw new Exception("Could not prepare test data: " + e.getMessage(), e);
         }
-        final Challenge<?> challenge = createChallenge(type, prepared, plugin);
+        final Challenge<?> challenge;
+        switch (requestType) {
+        case HOSTER_LOGIN:
+            /* A challenge knows if it was created inside an account check by the thread that creates it, see Challenge#isCreatedInsideAccountChecker. */
+            challenge = createChallengeInAccountChecker(type, prepared, plugin);
+            break;
+        case HOSTER:
+        case DECRYPTER:
+        default:
+            challenge = createChallenge(type, prepared, plugin);
+            break;
+        }
         challenge.setProxy(proxy);
         challenge.setCaptchaRequestType(requestType);
         return challenge;
     }
 
+    /**
+     * Creates the challenge in a thread of the account checker, like the plugin of a real account check does. <br>
+     * Note: The variables have their own names, because AccountCheckerThread has a field "plugin" which would hide the parameter inside of
+     * the thread.
+     */
+    private static Challenge<?> createChallengeInAccountChecker(final CAPTCHA_TYPE captchaType, final Map<String, Object> testValues, final Plugin carrierPlugin) throws Exception {
+        final AtomicReference<Challenge<?>> createdChallenge = new AtomicReference<Challenge<?>>();
+        final AtomicReference<Throwable> creationError = new AtomicReference<Throwable>();
+        final Thread thread = new AccountCheckerThread() {
+            @Override
+            public void run() {
+                try {
+                    createdChallenge.set(createChallenge(captchaType, testValues, carrierPlugin));
+                } catch (final Throwable e) {
+                    creationError.set(e);
+                }
+            }
+        };
+        thread.setDaemon(true);
+        thread.start();
+        thread.join();
+        final Throwable e = creationError.get();
+        if (e instanceof Exception) {
+            throw (Exception) e;
+        } else if (e != null) {
+            throw new Exception(e);
+        }
+        return createdChallenge.get();
+    }
+
     /** Creates the challenge of the given captcha type from the (prepared) values. */
-    private static Challenge<?> createChallenge(final CAPTCHA_TYPE type, final Map<String, Object> values, final PluginForHost plugin) throws Exception {
+    private static Challenge<?> createChallenge(final CAPTCHA_TYPE type, final Map<String, Object> values, final Plugin plugin) throws Exception {
         final String siteKey = (String) values.get(KEY_SITE_KEY);
         final String siteUrl = (String) values.get(KEY_SITE_URL);
         final String domain = Browser.getHost(siteUrl, false);
@@ -291,7 +383,7 @@ public class CaptchaTestChallengeFactory {
         case RECAPTCHA_V2_INVISIBLE:
             return newRecaptchaChallenge(plugin, siteKey, siteUrl, domain, false, false, null, null, AbstractRecaptchaV2.TYPE.INVISIBLE);
         case RECAPTCHA_V2_ENTERPRISE:
-            return newRecaptchaChallenge(plugin, siteKey, siteUrl, domain, false, true, null, null, AbstractRecaptchaV2.TYPE.NORMAL);
+            return newRecaptchaChallenge(plugin, siteKey, siteUrl, domain, false, true, null, (Double) values.get(KEY_MIN_SCORE), AbstractRecaptchaV2.TYPE.NORMAL);
         case RECAPTCHA_V3:
             return newRecaptchaChallenge(plugin, siteKey, siteUrl, domain, true, false, (String) values.get(KEY_ACTION), (Double) values.get(KEY_MIN_SCORE), AbstractRecaptchaV2.TYPE.NORMAL);
         case RECAPTCHA_V3_ENTERPRISE:
@@ -380,7 +472,7 @@ public class CaptchaTestChallengeFactory {
      *            Only used if isV3 is true. {@code isEnterprise=true} together with a non-null v3 action makes
      *            {@link RecaptchaV2Challenge#isV3()} effectively true too (see {@code AbstractRecaptchaV2#getVersion(String)}).
      */
-    private static Challenge<String> newRecaptchaChallenge(final PluginForHost plugin, final String siteKey, final String siteUrl, final String domain, final boolean isV3, final boolean isEnterprise, final String v3Action, final Double minScore, final AbstractRecaptchaV2.TYPE recaptchaType) throws PluginException {
+    private static Challenge<String> newRecaptchaChallenge(final Plugin plugin, final String siteKey, final String siteUrl, final String domain, final boolean isV3, final boolean isEnterprise, final String v3Action, final Double minScore, final AbstractRecaptchaV2.TYPE recaptchaType) throws PluginException {
         return new RecaptchaV2Challenge(siteKey, null, plugin, plugin.getBrowser(), domain) {
             @Override
             public Double getMinScore() {

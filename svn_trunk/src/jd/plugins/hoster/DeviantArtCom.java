@@ -60,7 +60,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 53624 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53803 $", interfaceVersion = 3, names = {}, urls = {})
 public class DeviantArtCom extends PluginForHost {
     private final String               TYPE_DOWNLOADALLOWED_HTML                   = "class=\"text\">\\s*HTML download\\s*</span>";
     private final String               TYPE_DOWNLOADFORBIDDEN_HTML                 = "<div class=\"grf\\-indent\"";
@@ -86,8 +86,8 @@ public class DeviantArtCom extends PluginForHost {
     public static final String         PROPERTY_IMAGE_TOKEN                        = "image_token";
     private static final boolean       LOGIN_ALWAYS_REQUIRED_FOR_OFFICIAL_DOWNLOAD = true;
     /* Don't touch the following! */
-    private static final AtomicInteger freeDownloadsRunning                        = new AtomicInteger(0);
-    private static final AtomicInteger accountDownloadsRunning                     = new AtomicInteger(0);
+    private static AtomicInteger freeDownloadsRunning                        = new AtomicInteger(0);
+    private static AtomicInteger accountDownloadsRunning                     = new AtomicInteger(0);
 
     /**
      * Finds a JS string literal that follows the given marker e.g. "window.__INITIAL_STATE__ = JSON.parse(\"" and returns its still
