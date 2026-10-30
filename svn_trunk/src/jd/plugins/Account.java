@@ -51,6 +51,7 @@ import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.Cookie;
 import jd.http.Cookies;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 public class Account extends Property {
     private static final String VALID_UNTIL              = "VALID_UNTIL";
@@ -90,14 +91,14 @@ public class Account extends Property {
 
     public synchronized <T> T restoreObject(final String storageID, final TypeRef<T> type) {
         final boolean containsObject = hasProperty(OBJECT_STORAGE + ".object." + storageID);
-        if (containsObject) {
-            if (StringUtils.equals(getStringProperty(OBJECT_STORAGE + ".validation." + storageID), getAccountFootprintString())) {
-                return JSonStorage.restoreFromString(getStringProperty(OBJECT_STORAGE + ".object." + storageID), type, null);
-            } else {
-                clearObject(storageID);
-            }
+        if (!containsObject) {
+            return null;
         }
-        return null;
+        if (!StringUtils.equals(getStringProperty(OBJECT_STORAGE + ".validation." + storageID), getAccountFootprintString())) {
+            clearObject(storageID);
+            return null;
+        }
+        return JSonStorage.restoreFromString(getStringProperty(OBJECT_STORAGE + ".object." + storageID), type, null);
     }
 
     @Deprecated
@@ -105,10 +106,10 @@ public class Account extends Property {
     public void setTempDisabled(final boolean tempDisabled) {
         if (tempDisabled) {
             setError(AccountError.TEMP_DISABLED, -1, null);
-        } else {
-            if (AccountError.TEMP_DISABLED.equals(getError())) {
-                setError(null, -1, null);
-            }
+            return;
+        }
+        if (AccountError.TEMP_DISABLED.equals(getError())) {
+            setError(null, -1, null);
         }
     }
 
@@ -125,16 +126,10 @@ public class Account extends Property {
 
     public final AccountTrafficView getAccountTrafficView() {
         final PluginForHost plugin = getPlugin();
-        if (plugin == null) {
-            final AccountInfo accountInfo = getAccountInfo();
-            if (accountInfo != null) {
-                return accountInfo;
-            } else {
-                return null;
-            }
-        } else {
+        if (plugin != null) {
             return plugin.getAccountTrafficView(this);
         }
+        return getAccountInfo();
     }
 
     public synchronized long getObjectTimeStamp(final String storageID) {
@@ -274,11 +269,11 @@ public class Account extends Property {
     }
 
     public void setHosterHistory(List<String> hosterHistory) {
-        if (hosterHistory != null && hosterHistory.size() > 0) {
-            this.hosterHistory = new CopyOnWriteArrayList<String>(hosterHistory);
-        } else {
+        if (hosterHistory == null || hosterHistory.size() == 0) {
             this.hosterHistory = null;
+            return;
         }
+        this.hosterHistory = new CopyOnWriteArrayList<String>(hosterHistory);
     }
 
     private AccountInfo                     accinfo               = null;
@@ -298,12 +293,12 @@ public class Account extends Property {
 
     public void setPlugin(final PluginForHost plugin) {
         this.plugin = plugin;
-        if (plugin != null) {
-            isMultiPlugin = plugin.isHandlingMultipleHosts();
-            isCaptchaSolverPlugin = plugin.hasFeature(FEATURE.CAPTCHA_SOLVER);
-        } else {
+        if (plugin == null) {
             isMultiPlugin = false;
+            return;
         }
+        isMultiPlugin = plugin.isHandlingMultipleHosts();
+        isCaptchaSolverPlugin = plugin.hasFeature(FEATURE.CAPTCHA_SOLVER);
     }
 
     public boolean isMultiPlugin() {
@@ -413,9 +408,9 @@ public class Account extends Property {
     public void setMaxSimultanDownloads(int max) {
         if (max < 0) {
             maxDownloads = -1;
-        } else {
-            maxDownloads = max;
+            return;
         }
+        maxDownloads = max;
     }
 
     public String getPass() {
@@ -424,11 +419,10 @@ public class Account extends Property {
 
     protected String updateAccountPassword(final String password) {
         final PluginForHost plugin = getPlugin();
-        if (plugin != null && password != null) {
-            return plugin.updateAccountPassword(this, password);
-        } else {
+        if (plugin == null || password == null) {
             return password;
         }
+        return plugin.updateAccountPassword(this, password);
     }
 
     /** Returns false if account is in error state. */
@@ -447,12 +441,12 @@ public class Account extends Property {
      */
     @Deprecated
     public void setValid(final boolean b) {
-        if (b) {
-            if (getError() == AccountError.INVALID) {
-                setError(null, -1, null);
-            }
-        } else {
+        if (!b) {
             setError(AccountError.INVALID, -1, null);
+            return;
+        }
+        if (getError() == AccountError.INVALID) {
+            setError(null, -1, null);
         }
     }
 
@@ -496,6 +490,20 @@ public class Account extends Property {
 
     public boolean isChecking() {
         return checking.get();
+    }
+
+    private transient volatile CAPTCHA_TYPE solvingCaptchaType = null;
+
+    /**
+     * Returns the type of the captcha which is being solved right now because of this account's check/login, or null if there is none. Only
+     * shown in the account manager's status.
+     */
+    public CAPTCHA_TYPE getSolvingCaptchaType() {
+        return solvingCaptchaType;
+    }
+
+    public void setSolvingCaptchaType(final CAPTCHA_TYPE solvingCaptchaType) {
+        this.solvingCaptchaType = solvingCaptchaType;
     }
 
     public AccountInfo getAccountInfo() {
@@ -600,23 +608,25 @@ public class Account extends Property {
         if (error == null) {
             errorString = null;
         }
-        if (getError() != error || !StringUtils.equals(this.getErrorString(), errorString)) {
-            if (AccountError.TEMP_DISABLED.equals(error)) {
-                final long timeout;
-                if (setTimeout <= 0) {
-                    timeout = System.currentTimeMillis() + CFG_GENERAL.CFG.getAccountTemporarilyDisabledDefaultTimeout();
-                } else {
-                    timeout = System.currentTimeMillis() + setTimeout;
-                }
-                setTmpDisabledTimeout(timeout);
+        if (getError() == error && StringUtils.equals(this.getErrorString(), errorString)) {
+            /* Nothing changed */
+            return;
+        }
+        if (AccountError.TEMP_DISABLED.equals(error)) {
+            final long timeout;
+            if (setTimeout <= 0) {
+                timeout = System.currentTimeMillis() + CFG_GENERAL.CFG.getAccountTemporarilyDisabledDefaultTimeout();
             } else {
-                setTmpDisabledTimeout(-1);
+                timeout = System.currentTimeMillis() + setTimeout;
             }
-            this.error = error;
-            this.errorString = errorString;
-            if (forceAccountCheckOnChange) {
-                notifyUpdate(AccountProperty.Property.ERROR, error);
-            }
+            setTmpDisabledTimeout(timeout);
+        } else {
+            setTmpDisabledTimeout(-1);
+        }
+        this.error = error;
+        this.errorString = errorString;
+        if (forceAccountCheckOnChange) {
+            notifyUpdate(AccountProperty.Property.ERROR, error);
         }
     }
 
@@ -711,27 +721,30 @@ public class Account extends Property {
 
     public AccountError getError() {
         final AccountError error = this.error;
-        if (AccountError.TEMP_DISABLED.equals(error)) {
-            final Long disabledTimeStamp = getTmpDisabledTimeout();
-            if (disabledTimeStamp.longValue() < 0) {
-                return null;
-            } else if (System.currentTimeMillis() >= disabledTimeStamp.longValue()) {
-                if (tmpDisabledTimeout.compareAndSet(disabledTimeStamp, -1)) {
-                    // workaround to avoid deadlock, get method should not cause change of internal state
-                    new Thread("notifyUpdate:" + getUser()) {
-                        {
-                            setDaemon(true);
-                        }
-
-                        public void run() {
-                            notifyUpdate(AccountProperty.Property.ERROR, null);
-                        };
-                    }.start();
-                }
-                return null;
-            }
+        if (!AccountError.TEMP_DISABLED.equals(error)) {
+            return error;
         }
-        return error;
+        /* Special handling for AccountError.TEMP_DISABLED */
+        final Long disabledTimeStamp = getTmpDisabledTimeout();
+        if (disabledTimeStamp.longValue() < 0) {
+            return null;
+        }
+        if (System.currentTimeMillis() < disabledTimeStamp.longValue()) {
+            return error;
+        }
+        if (tmpDisabledTimeout.compareAndSet(disabledTimeStamp, -1)) {
+            /* Workaround to avoid deadlock, get method should not cause change of internal state */
+            new Thread("notifyUpdate:" + getUser()) {
+                {
+                    setDaemon(true);
+                }
+
+                public void run() {
+                    notifyUpdate(AccountProperty.Property.ERROR, null);
+                };
+            }.start();
+        }
+        return null;
     }
 
     public String getErrorString() {
@@ -744,11 +757,13 @@ public class Account extends Property {
     }
 
     public void setEnabled(final boolean enabled, final boolean allowAccountCheckOnChange) {
-        if (this.enabled != enabled) {
-            this.enabled = enabled;
-            if (allowAccountCheckOnChange) {
-                notifyUpdate(AccountProperty.Property.ENABLED, enabled);
-            }
+        if (this.enabled == enabled) {
+            /* State hasn't changed. */
+            return;
+        }
+        this.enabled = enabled;
+        if (allowAccountCheckOnChange) {
+            notifyUpdate(AccountProperty.Property.ENABLED, enabled);
         }
     }
 
@@ -829,20 +844,22 @@ public class Account extends Property {
 
     public void setPass(String newPass, final boolean allowAccountCheckOnChange) {
         newPass = updateAccountPassword(trim(newPass));
-        if (!StringUtils.equals(this.pass, newPass)) {
-            this.pass = newPass;
-            if (allowAccountCheckOnChange) {
-                notifyUpdate(AccountProperty.Property.PASSWORD, newPass);
-            }
+        if (StringUtils.equals(this.pass, newPass)) {
+            return;
+        }
+        this.pass = newPass;
+        if (allowAccountCheckOnChange) {
+            notifyUpdate(AccountProperty.Property.PASSWORD, newPass);
         }
     }
 
     public void setUser(String newUser) {
         newUser = trim(newUser);
-        if (!StringUtils.equals(this.user, newUser)) {
-            this.user = newUser;
-            notifyUpdate(AccountProperty.Property.USERNAME, newUser);
+        if (StringUtils.equals(this.user, newUser)) {
+            return;
         }
+        this.user = newUser;
+        notifyUpdate(AccountProperty.Property.USERNAME, newUser);
     }
 
     public String toString() {
@@ -862,20 +879,19 @@ public class Account extends Property {
         }
         final Account account = (Account) o;
         if (!StringUtils.equals(getHoster(), account.getHoster())) {
-            // different hoster
+            /* Different hoster */
             return false;
-        } else if (!StringUtils.equals(getUser(), account.getUser())) {
-            // different user names
+        }
+        if (!StringUtils.equals(getUser(), account.getUser())) {
+            /* Different user names */
             return false;
-        } else if (StringUtils.isNotEmpty(getUser())) {
-            // same none null username
-            return true;
-        } else if (!StringUtils.equals(getPass(), account.getPass())) {
-            // different passwords
-            return false;
-        } else {
+        }
+        if (StringUtils.isNotEmpty(getUser())) {
+            /* Same non-empty username */
             return true;
         }
+        /* Same hoster and empty username: compare passwords */
+        return StringUtils.equals(getPass(), account.getPass());
     }
 
     public boolean isMultiHost() {
@@ -884,11 +900,7 @@ public class Account extends Property {
 
     /** Returns true if this account was ever checked before without errors. */
     public boolean hasEverBeenValid() {
-        if (this.getLastValidTimestamp() == -1) {
-            return false;
-        } else {
-            return true;
-        }
+        return this.getLastValidTimestamp() != -1;
     }
 
     public void setLastValidTimestamp(long currentTimeMillis) {
@@ -944,9 +956,9 @@ public class Account extends Property {
     public void setType(AccountType type) {
         if (type == null) {
             removeProperty(ACCOUNT_TYPE);
-        } else {
-            super.setProperty(ACCOUNT_TYPE, type.name());
+            return;
         }
+        super.setProperty(ACCOUNT_TYPE, type.name());
     }
 
     @Override
@@ -966,9 +978,9 @@ public class Account extends Property {
     public void setRegisterTimeStamp(long ts) {
         if (ts < 0) {
             removeProperty(REGTS);
-        } else {
-            setProperty(REGTS, ts);
+            return;
         }
+        setProperty(REGTS, ts);
     }
 
     public AccountType getType() {
@@ -981,6 +993,7 @@ public class Account extends Property {
                 e.printStackTrace();
             }
         }
+        /* Account type is not set (or invalid) -> Derive it from the AccountInfo */
         final AccountInfo info = getAccountInfo();
         if (info != null && !info.isExpired() && info.getValidUntil() > 0) {
             DebugMode.debugger();
@@ -999,9 +1012,8 @@ public class Account extends Property {
         final DateFormat sd = SimpleDateFormat.getDateTimeInstance();
         if (sd instanceof SimpleDateFormat) {
             return ((SimpleDateFormat) sd).toPattern();
-        } else {
-            /* Localized default format */
-            return _GUI.T.PremiumAccountTableModel_getDateFormatString_();
         }
+        /* Localized default format */
+        return _GUI.T.PremiumAccountTableModel_getDateFormatString_();
     }
 }

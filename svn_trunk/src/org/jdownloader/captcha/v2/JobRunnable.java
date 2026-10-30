@@ -238,7 +238,7 @@ public class JobRunnable<T> implements Runnable {
 
     /**
      * Rank of a solver type, defining the default auto-handling order: JD_LOCAL, then JD_LOCAL_DIALOG, then JD_LOCAL_BROWSER, then
-     * JD_REMOTE_API, and EXTERNAL last. A solver waits by default only for solvers with a lower rank, so the default timings can never form
+     * JD_REMOTE_MYJD, and EXTERNAL last. A solver waits by default only for solvers with a lower rank, so the default timings can never form
      * a wait loop.
      */
     private static int getRank(final ChallengeSolver.SolverType type) {
@@ -249,7 +249,7 @@ public class JobRunnable<T> implements Runnable {
             return 1;
         case JD_LOCAL_BROWSER:
             return 2;
-        case JD_REMOTE_API:
+        case JD_REMOTE_MYJD:
             return 3;
         case EXTERNAL:
             return 4;
@@ -307,7 +307,7 @@ public class JobRunnable<T> implements Runnable {
             return ownerIsExternal ? DEFAULT_WAIT_EXTERNAL_FOR_LOCAL_AUTO : DEFAULT_WAIT_FOR_LOCAL_AUTO;
         case JD_LOCAL_DIALOG:
         case JD_LOCAL_BROWSER:
-        case JD_REMOTE_API:
+        case JD_REMOTE_MYJD:
             return ownerIsExternal ? DEFAULT_WAIT_EXTERNAL_FOR_MANUAL : DEFAULT_WAIT_FOR_LOCAL_MANUAL;
         case EXTERNAL:
         default:

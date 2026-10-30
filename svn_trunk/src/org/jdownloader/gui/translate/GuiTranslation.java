@@ -877,6 +877,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Plugin:" })
     String CaptchaIndicator_plugin();
 
+    @Default(lngs = { "en" }, values = { "Account:" })
+    String CaptchaIndicator_account();
+
     @Default(lngs = { "en" }, values = { "Origin: %s1" })
     String CaptchaIndicator_origin(String origin);
 
@@ -5600,12 +5603,6 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Choose browser..." })
     String SolverOrderContainer_chooseBrowser();
 
-    @Default(lngs = { "en" }, values = { "Double click to select browser" })
-    String SolverOrderTable_tooltip_selectBrowser();
-
-    @Default(lngs = { "en" }, values = { "Double click opens buy credits page" })
-    String SolverOrderTable_tooltip_buyPage();
-
     @Default(lngs = { "en" }, values = { "Select browser" })
     String SelectBrowserDialog_title();
 
@@ -5663,19 +5660,13 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Solver" })
     String CaptchaSolverComparison_column_solver();
 
-    @Default(lngs = { "en" }, values = { "Supports %s1 captcha types\r\nDoubleclick opens buy credits page" })
-    String CaptchaSolverComparison_solver_tooltip(String supportedCount);
-
-    @Default(lngs = { "en" }, values = { "Supports %s1 captcha types" })
-    String CaptchaSolverComparison_solver_tooltip_noBuyPage(String supportedCount);
-
     @Default(lngs = { "en" }, values = { "Supported" })
     String CaptchaSolverComparison_supported();
 
     @Default(lngs = { "en" }, values = { "Not supported" })
     String CaptchaSolverComparison_notSupported();
 
-    @Default(lngs = { "en" }, values = { "The list of supported captcha types is self-declared: a solver may support more captcha types than listed here." })
+    @Default(lngs = { "en" }, values = { "The supported captcha types of external captcha solvers are self-declared: an external solver may support more captcha types than listed here. This table only shows captcha types which JDownloader itself supports." })
     String CaptchaSolverComparison_disclaimer();
 
     @Default(lngs = { "en" }, values = { "Feedback: report correct captchas" })
@@ -5738,7 +5729,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Preselected captcha solvers" })
     String CaptchaSolverComparison_preselectSolvers_label();
 
-    @Default(lngs = { "en" }, values = { "All" })
+    @Default(lngs = { "en" }, values = { "All by selected types" })
     String CaptchaSolverComparison_preselectSolvers_all();
 
     @Default(lngs = { "en" }, values = { "Custom" })
@@ -5747,7 +5738,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "All enabled captcha solvers" })
     String CaptchaSolverComparison_preselectSolvers_enabled();
 
-    @Default(lngs = { "en" }, values = { "All usable captcha solvers" })
+    @Default(lngs = { "en" }, values = { "All usable (enabled & ready) captcha solvers" })
     String CaptchaSolverComparison_preselectSolvers_usable();
 
     @Default(lngs = { "en" }, values = { "No captcha solver is selected" })
@@ -5759,29 +5750,41 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "No captcha solver is usable. A solver must be enabled and have a valid account" })
     String CaptchaSolverComparison_noSolverUsable();
 
-    @Default(lngs = { "en" }, values = { "Hide from selection" })
+    @Default(lngs = { "en" }, values = { "Hide" })
     String CaptchaSolverComparison_hideFromSelection();
 
-    @Default(lngs = { "en" }, values = { "Preselected solver types" })
+    @Default(lngs = { "en" }, values = { "Preselected solver groups" })
     String CaptchaSolverComparison_preselectSolverTypes_label();
 
     @Default(lngs = { "en" }, values = { "All" })
     String CaptchaSolverComparison_preselectSolverTypes_all();
 
-    @Default(lngs = { "en" }, values = { "External solvers" })
-    String CaptchaSolverComparison_preselectSolverTypes_external();
-
-    @Default(lngs = { "en" }, values = { "Local solvers" })
-    String CaptchaSolverComparison_preselectSolverTypes_local();
-
-    @Default(lngs = { "en" }, values = { "Remote solvers" })
-    String CaptchaSolverComparison_preselectSolverTypes_remote();
+    @Default(lngs = { "en" }, values = { "Manual captcha solving" })
+    String CaptchaSolverComparison_preselectSolverTypes_manual();
 
     @Default(lngs = { "en" }, values = { "Custom" })
     String CaptchaSolverComparison_preselectSolverTypes_custom();
 
     @Default(lngs = { "en" }, values = { "No solver type is selected" })
     String CaptchaSolverComparison_noSolverTypeSelected();
+
+    @Default(lngs = { "en" }, values = { "Captcha types" })
+    String CaptchaSolverComparison_columnMenu_types();
+
+    @Default(lngs = { "en" }, values = { "Select/Deselect all" })
+    String CaptchaSolverComparison_columnMenu_selectAll();
+
+    @Default(lngs = { "en" }, values = { "Hide captcha type '%s1'" })
+    String CaptchaSolverComparison_columnMenu_hideType(String type);
+
+    @Default(lngs = { "en" }, values = { "Show in comparison table" })
+    String SolverOrderTable_context_showInComparisonTable();
+
+    @Default(lngs = { "en" }, values = { "Create captcha rule" })
+    String SolverOrderTable_context_createCaptchaRule();
+
+    @Default(lngs = { "en" }, values = { "Hide all others" })
+    String CaptchaSolverComparison_hideAllOthers();
 
     @Default(lngs = { "en" }, values = { "Downloads" })
     String CaptchaRequestType_HOSTER();
@@ -6179,8 +6182,8 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Dialog (Window) in Browser(Chrome, Firefox, Edge,..." })
     String BrowserSolverService_gettypeName();
 
-    @Default(lngs = { "en" }, values = { "Manual remote Captcha Solving" })
-    String CaptchaAPISolver_getName();
+    @Default(lngs = { "en" }, values = { "MyJDownloader (manual remote captcha solving)" })
+    String SolverType_JD_REMOTE_MYJD();
 
     @Default(lngs = { "en" }, values = { "My.JDownloader.org, Mobile Apps,..." })
     String CaptchaAPISolver_gettypeName();
@@ -6203,7 +6206,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Service" })
     String SolverOrderTableModel_initColumns_service();
 
-    @Default(lngs = { "en" }, values = { "Solver Type" })
+    @Default(lngs = { "en" }, values = { "Type" })
     String SolverOrderTableModel_initColumns_type_();
 
     @Default(lngs = { "en" }, values = { "Wait for" })

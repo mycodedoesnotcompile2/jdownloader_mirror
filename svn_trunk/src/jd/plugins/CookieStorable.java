@@ -8,9 +8,8 @@ public class CookieStorable implements Storable {
     public String getPath() {
         if (this.cookie != null) {
             return this.cookie.getPath();
-        } else {
-            return this.path;
         }
+        return this.path;
     }
 
     public void setPath(String path) {
@@ -20,9 +19,8 @@ public class CookieStorable implements Storable {
     public String getHost() {
         if (this.cookie != null) {
             return this.cookie.getHost();
-        } else {
-            return this.host;
         }
+        return this.host;
     }
 
     public void setHost(String host) {
@@ -44,9 +42,8 @@ public class CookieStorable implements Storable {
     public String getKey() {
         if (this.cookie != null) {
             return this.cookie.getKey();
-        } else {
-            return this.key;
         }
+        return this.key;
     }
 
     public void setKey(String key) {
@@ -56,9 +53,8 @@ public class CookieStorable implements Storable {
     public String getDomain() {
         if (this.cookie != null) {
             return this.cookie.getDomain();
-        } else {
-            return this.domain;
         }
+        return this.domain;
     }
 
     public void setDomain(String domain) {
@@ -68,9 +64,8 @@ public class CookieStorable implements Storable {
     public long getHostTime() {
         if (this.cookie != null) {
             return this.cookie.getHostTime();
-        } else {
-            return this.hostTime;
         }
+        return this.hostTime;
     }
 
     public void setHostTime(long hostTime) {
@@ -80,9 +75,8 @@ public class CookieStorable implements Storable {
     public long getCreationTime() {
         if (this.cookie != null) {
             return this.cookie.getCreationTime();
-        } else {
-            return this.creationTime;
         }
+        return this.creationTime;
     }
 
     public void setCreationTime(long creationTime) {
@@ -92,21 +86,34 @@ public class CookieStorable implements Storable {
     public long getExpireTime() {
         if (this.cookie != null) {
             return this.cookie.getExpireDate();
-        } else {
-            return this.expireTime;
         }
+        return this.expireTime;
     }
 
     public void setExpireTime(long expireTime) {
         this.expireTime = expireTime;
     }
 
-    private String  path   = null;
-    private String  host   = null;
-    private String  value  = null;
-    private String  key    = null;
-    private String  domain = null;
-    private Boolean secure = null;
+    private String path     = null;
+    private String host     = null;
+    private String value    = null;
+    private String key      = null;
+    private String domain   = null;
+    private String sameSite = null;
+
+    public String getSameSite() {
+        if (this.cookie != null) {
+            return this.cookie.getSameSite();
+        }
+        return sameSite;
+    }
+
+    public void setSameSite(String sameSite) {
+        this.sameSite = sameSite;
+    }
+
+    private Boolean secure   = null;
+    private Boolean hostOnly = null;
 
     public Boolean getSecure() {
         if (this.cookie != null) {
@@ -125,7 +132,7 @@ public class CookieStorable implements Storable {
     private final Cookie cookie;
 
     public CookieStorable(/* Storable */) {
-        this.cookie = null;
+        this(null);
     }
 
     public CookieStorable(Cookie cookie) {
@@ -142,6 +149,20 @@ public class CookieStorable implements Storable {
         ret.setCreationTime(this.getCreationTime());
         ret.setExpireDate(this.getExpireTime());
         ret.setSecure(getSecure());
+        ret.setPath(getPath());
+        ret.setHostOnly(getHostOnly());
+        ret.setSameSite(getSameSite());
         return ret;
+    }
+
+    public Boolean getHostOnly() {
+        if (this.cookie != null) {
+            return this.cookie.getHostOnly();
+        }
+        return hostOnly;
+    }
+
+    public void setHostOnly(Boolean hostOnly) {
+        this.hostOnly = hostOnly;
     }
 }

@@ -15,6 +15,7 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.http;
 
+import java.net.URL;
 import java.util.Date;
 import java.util.Locale;
 
@@ -23,11 +24,41 @@ import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.logging2.extmanager.LoggerFactory;
 
 public class Cookie {
-    private String  path   = null;
-    private String  host   = null;
-    private String  value  = null;
-    private String  key    = null;
-    private Boolean secure = null;
+    private String  path     = null;
+    private String  host     = null;
+    private String  value    = null;
+    private String  key      = null;
+    private Boolean secure   = null;
+    private Boolean hostOnly = null;
+    private String  sameSite = null;
+
+    public String getSameSite() {
+        final String ret = sameSite;
+        if (ret != null) {
+            return ret;
+        }
+        return "Lax";// default
+    }
+
+    public void setSameSite(String sameSite) {
+        if ("Lax".equalsIgnoreCase(sameSite)) {
+            this.sameSite = "Lax";
+        } else if ("Strict".equalsIgnoreCase(sameSite)) {
+            this.sameSite = "Strict";
+        } else if ("None".equalsIgnoreCase(sameSite)) {
+            this.sameSite = "None";
+        } else {
+            this.sameSite = null;
+        }
+    }
+
+    public Boolean getHostOnly() {
+        return hostOnly;
+    }
+
+    public void setHostOnly(Boolean hostOnly) {
+        this.hostOnly = hostOnly;
+    }
 
     public Boolean isSecure() {
         return this.secure;
@@ -45,6 +76,7 @@ public class Cookie {
     public Cookie() {
     }
 
+    @Deprecated
     public Cookie(final String host, final String key, final String value) {
         this.setHost(host);
         this.setKey(key);
@@ -63,26 +95,64 @@ public class Cookie {
             return false;
         }
         final Cookie other = (Cookie) obj;
-        if (!StringUtils.equalsIgnoreCase(this.getHost(), other.getHost())) {
+        host: {
+            if (getHost() == null || other.getHost() == null) {
+                // entries that don't have host set
+                break host;
+            }
+            if (StringUtils.equalsIgnoreCase(this.getHost(), other.getHost())) {
+                break host;
+            }
             return false;
         }
-        if (!StringUtils.equals(this.getKey(), other.getKey())) {
+        key: {
+            if (StringUtils.equals(this.getKey(), other.getKey())) {
+                break key;
+            }
             return false;
         }
         /*
          * setting cookie via br.setCookie always has a null path, in order to allow updating of existing cookie entries we need to not
          * analyse original path that is null! -raztoki20160506
          */
-        if (!StringUtils.equals(this.getPath(), other.getPath())) {
+        path: {
+            if (StringUtils.equals(this.getPath(), other.getPath())) {
+                break path;
+            }
             return false;
         }
-        /*
-         * domain property is not used at the moment, that's why we ignore it
-         *
-         * TODO: add proper support once a service really uses this feature
-         *
-         * if (!StringUtils.equalsIgnoreCase(this.getDomain(), other.getDomain())) { return false; }
-         */
+        hostOnly: {
+            if (getHostOnly() == null || other.getHostOnly() == null) {
+                // old entries without this information
+                break hostOnly;
+            }
+            if (getHostOnly() == other.getHostOnly()) {
+                break hostOnly;
+            }
+            return false;
+        }
+        domain: {
+            if (StringUtils.equals(getDomain(), other.getDomain())) {
+                // same domain
+                break domain;
+            }
+            if (StringUtils.isAllNotEmpty(this.getDomain(), other.getDomain()) && !StringUtils.equalsIgnoreCase(this.getDomain(), other.getDomain())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public boolean matches(final URL url) {
+        if (Boolean.TRUE.equals(isSecure()) && !"https".equalsIgnoreCase(url.getProtocol())) {
+            return false;
+        }
+        if (Boolean.TRUE.equals(getHostOnly()) && !StringUtils.equalsIgnoreCase(url.getHost(), getDomain())) {
+            return false;
+        }
+        if (!StringUtils.endsWithCaseInsensitive(url.getHost(), getDomain())) {
+            return false;
+        }
         return true;
     }
 
@@ -155,7 +225,12 @@ public class Cookie {
     }
 
     public void setDomain(final String domain) {
-        this.domain = domain;
+        if (domain == null) {
+            this.domain = null;
+        } else {
+            // RFC 6265, remove leading dot
+            this.domain = domain.replaceFirst("^\\.+", "");
+        }
     }
 
     public void setExpireDate(final long time) {
@@ -220,13 +295,26 @@ public class Cookie {
 
     @Override
     public String toString() {
-        return this.getKey() + "=" + this.getValue() + " @" + this.getHost();
+        return this.getKey() + "=" + this.getValue() + " @Host:" + this.getHost() + "/Domain:" + getDomain() + "/HostOnly:" + getHostOnly() + "/Path:" + getPath() + "/SameSite:" + getSameSite();
     }
 
-    protected synchronized void update(final Cookie cookie2) {
-        this.setCreationTime(cookie2.getCreationTime());
-        this.setExpireDate(cookie2.getExpireDate());
-        this.setValue(cookie2.getValue());
-        this.setHostTime(cookie2.getHostTime());
+    protected synchronized void update(final Cookie source) {
+        this.setCreationTime(source.getCreationTime());
+        this.setExpireDate(source.getExpireDate());
+        this.setValue(source.getValue());
+        this.setHostTime(source.getHostTime());
+        final Boolean hostOnly = source.getHostOnly();
+        if (hostOnly != null) {
+            setHostOnly(hostOnly);
+        }
+        final Boolean secure = source.isSecure();
+        if (secure != null) {
+            setSecure(secure);
+        }
+        final String domain = source.getDomain();
+        if (domain != null) {
+            setDomain(domain);
+        }
+        setSameSite(source.getSameSite());
     }
 }

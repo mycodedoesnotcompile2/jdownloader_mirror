@@ -37,7 +37,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 import org.appwork.testframework.AWTest;
-import org.appwork.utils.Application;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
 
 /**
@@ -53,7 +52,6 @@ public class ContentDispositionTest extends AWTest {
      * http://greenbytes.de/tech/tc2231/
      */
     public void runTest() throws Exception {
-        Application.setApplication(".test");
         final ArrayList<String[]> tests = new ArrayList<String[]>();
         if (true) {
             tests.add(new String[] { "attachment;", null });
@@ -67,7 +65,6 @@ public class ContentDispositionTest extends AWTest {
             tests.add(new String[] { "attachment; filename=\"=?UTF-8?B?UHLDvGZzdW1tZW4uc2hhMQ==?=\"", "Prüfsummen.sha1" });
             tests.add(new String[] { "attachment;filename*=UTF-8''Test%20Test%20%282008%29.rar;filename=\"Test Test (2008).rar\"; ", "Test Test (2008).rar" });
             tests.add(new String[] { "attachment;filename*=UTF-8''TEST (2015).rar;filename=\"TEST (2015).rar\";", "TEST (2015).rar" });
-
             tests.add(new String[] { "attachment; filename=\"test.zip\"; creation-date=\"Thu, 27 Nov 2014 10:17:31 +0000\"; modification-date=\"Thu, 27 Nov 2014 10:17:31 +0000\"", "test.zip" });
             tests.add(new String[] { "attachment; filename=\"foo.html\"", "foo.html" });
             tests.add(new String[] { "attachment; filename=\"0000000000111111111122222\"", "0000000000111111111122222" });
@@ -105,7 +102,6 @@ public class ContentDispositionTest extends AWTest {
             tests.add(new String[] { "attachment; filename=\"foo-ae.html\"; filename*=UTF-8''foo-%c3%a4.html", "foo-ä.html" });
             tests.add(new String[] { "attachment; filename*=UTF-8''foo-%c3%a4.html; filename=\"foo-ae.html\"", "foo-ä.html" });
             tests.add(new String[] { "attachment; filename*=UTF-8''A-%2541.html", "A-%41.html" });
-
             tests.add(new String[] { "attachment; filename=\"=?ISO-8859-1?Q?foo-=E4.html?=\"", "foo-ä.html" });// RFC2047, Q Encoding
             tests.add(new String[] { "attachment; filename=\"=?ISO-8859-1*EN?Q?foo-=E4.html?=\"", "foo-ä.html" });// RFC2047, Q Encoding +
                                                                                                                   // Language specification
@@ -119,14 +115,11 @@ public class ContentDispositionTest extends AWTest {
             tests.add(new String[] { "attachment; filename=\"=?UTF-8?B?dGVzdC56aXA=?=\"", "test.zip" });// RFC2047, B Encoding
             tests.add(new String[] { "attachment; filename=\"=?UTF-8*EN?B?dGVzdC56aXA=?=\"", "test.zip" });// RFC2047, B Encoding + Language
                                                                                                            // specification
-
             tests.add(new String[] { "attachment; filename*=foo.html", "foo.html" });
             tests.add(new String[] { "attachment; filename*=\"foo.html\"", "foo.html" });
-
             // http://test.greenbytes.de/tech/tc2231/#attwithfn2231quot, RFC2231 encoded , with double quotes around the parameter value.
             tests.add(new String[] { "attachment; filename*=\"UTF-8''foo-%c3%a4.html\"", "foo-ä.html" });
         }
-
         for (String test[] : tests) {
             final String result = HTTPConnectionUtils.getFileNameFromDispositionHeader(test[0]);
             try {

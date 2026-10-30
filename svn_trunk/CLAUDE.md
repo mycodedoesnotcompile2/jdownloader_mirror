@@ -130,6 +130,38 @@ private static AtomicLong              CACHED_LOID_TIMESTAMP = new AtomicLong(-1
 
 This applies only to container classes that hold shared **state**. An immutable constant — even one whose type is a container, such as a fixed `Arrays.asList(...)` of config values, or a `Pattern` — stays `static final`: it is a per-class constant, not shared cross-instance state.
 
+## Search History Popup (Suggestions)
+
+Applies to every search field that shows a history/suggestion popup. Reference implementation: `SearchField` together with `SearchHistoryManager`.
+
+### Opening direction
+
+The direction is a **fixed design decision per search field**, derived from where that field is placed in the UI. It is **not** calculated at runtime (no screen/window position or free-space checks):
+
+- Search field sits at the **bottom edge** of the window → always open **upward**, above the field. This is the case for the download and linkgrabber search fields, which are always at the very bottom of the JD window.
+- Search field sits at the **top or in the middle** of the window → always open **downward**, below the field.
+
+### Sorting
+
+The **newest entry is always the one closest to the search field**, the oldest entry is the farthest away. The list order therefore flips with the direction:
+
+| Direction | Order (top → bottom) |
+|---|---|
+| Upward | oldest … newest (newest directly above the field) |
+| Downward | newest … oldest (newest directly below the field) |
+
+- `SearchHistoryManager.listMatching` returns the entries newest first → use as is for downward, reverse for upward.
+- The first arrow key press (UP or DOWN, regardless of which one) selects the entry closest to the field (the newest). Further presses move through the list; moving past either end clears the selection, so the user gets back to the typed text.
+- Without a selection the popup is scrolled to the entries closest to the field (the newest); with a selection it is scrolled to the selected entry.
+- Inline completion always uses the newest matching entry, independent of the direction.
+
+### Deleting entries
+
+- `DELETE` with a selected entry removes that history entry and does **not** delete text. Without a selected entry `DELETE` behaves like in any text field.
+- Every row has a remove icon at its right end. It is only shown for the highlighted row, but its space is always reserved so the text does not jump. A click on the icon removes the entry, a click anywhere else on the row applies it.
+- Entries are removed via `SearchHistoryManager.remove(...)` (shared, persistent history), then the popup is refreshed.
+- After a removal the selection moves to a neighbor so several entries can be removed in a row. The neighbor is chosen by age, not by screen position: the next **newer** entry (towards the search field) if there is one, else the next **older** one, else the selection is cleared. In a downward popup the newer neighbor is therefore the one above, in an upward popup the one below.
+
 ## Throw After a Method That Only Ever Throws
 
 When a method's sole purpose is to throw (it never returns normally), any call to it must be followed by an explicit `throw` — even though that code is unreachable. This keeps the compiler's control-flow analysis happy (e.g. definite-assignment, missing-return-statement) and documents the intent at the call site.
@@ -199,7 +231,7 @@ Applies to every new text field that offers suggestions based on previous input.
 - The history data always lives in a subclass of `org.jdownloader.gui.packagehistorycontroller.HistoryManager<T>` (singleton, persisted via config). Do not build ad-hoc history lists inside the GUI component.
 - `HistoryManager` already handles: newest first, case-insensitive duplicate removal, cut to `getMaxLength()`, asynchronous save and save on shutdown. Do not re-implement this.
 - The maximum length comes from a config value (`getMaxLength()`): `0` = history disabled (nothing is stored or suggested), default `25`, maximum `250`.
-- A term is added to the history **only** on Enter or when a history entry is chosen, never while typing and not on focus loss.
+- A term is added to the history on Enter, when a history entry is chosen and on **permanent** focus loss (`!FocusEvent.isTemporary()`, e.g. not when switching to another window). Never while typing. A pending inline completion that has not been accepted is removed before storing on focus loss. This matches the other histories, which store on focus loss as well (e.g. download destination and package name in `AbstractNodePropertiesPanel`).
 
 ### Suggestion behavior
 

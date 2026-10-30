@@ -736,7 +736,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
     private String                              acceptLanguage        = "de, en-gb;q=0.9, en;q=0.8";
     /*
      * -1 means use default Timeouts
-     * 
+     *
      * 0 means infinite (DO NOT USE if not needed)
      */
     private int                                 connectTimeout        = -1;
@@ -1290,16 +1290,17 @@ public class Browser implements HTTPConnectionFactoryInterface {
         if (request == null) {
             return;
         }
-        final String host = Browser.getHost(request.getURL());
-        final Cookies cookies = this.getCookies(host);
+        final URL url = request.getURL();
+        final Cookies cookies = this.getCookies(url);
         if (cookies == null) {
             return;
         }
         final Cookies requestCookies = request.getCookies();
         for (final Cookie cookie : cookies.getCookies()) {
-            if (!cookie.isExpired()) {
-                requestCookies.add(cookie);
+            if (cookie.isExpired() || !cookie.matches(url)) {
+                continue;
             }
+            requestCookies.add(cookie);
         }
     }
 
@@ -1331,29 +1332,39 @@ public class Browser implements HTTPConnectionFactoryInterface {
         return this.connectTimeout < 0 ? Browser.TIMEOUT_CONNECT : this.connectTimeout;
     }
 
+    @Deprecated
+    public String getCookie(final String url, final String key) {
+        return this.getCookie(url, key, null);
+    }
+
     public String getCookie(final String url, final String key, String pattern) {
+        try {
+            return getCookie(new URL(url), key, pattern);
+        } catch (MalformedURLException e) {
+            final Cookie cookie = getCookies(url).get(null, key, pattern);
+            return cookie != null ? cookie.getValue() : null;
+        }
+    }
+
+    public String getCookie(final URL url, final String key, String pattern) {
         final Cookies cookies = this.getCookies(url);
-        final Cookie cookie = cookies.get(key, pattern);
+        final Cookie cookie = cookies.get(url, key, pattern);
         return cookie != null ? cookie.getValue() : null;
     }
 
-    public String getHostCookie(final String key, final String pattern) {
-        return this.getCookie(this.getHost(), key, pattern);
-    }
-
     public String getHostCookie(final String key) {
-        return this.getHostCookie(key, null);
+        return this.getCookie(_getURL(), key, null);
     }
 
-    public String getCookie(final String url, final String key) {
-        return this.getCookie(url, key, null);
+    public String getHostCookie(final String key, final String pattern) {
+        return this.getCookie(_getURL(), key, pattern);
     }
 
     public HashMap<String, Cookies> getCookies() {
         return this.cookiesExclusive ? this.cookies : Browser.COOKIES;
     }
 
-    public Cookies getCookies(final String url) {
+    public Cookies getCookies(final URL url) {
         final String host = Browser.getHost(url);
         final Map<String, Cookies> map = this.getCookies();
         synchronized (map) {
@@ -1366,16 +1377,16 @@ public class Browser implements HTTPConnectionFactoryInterface {
     }
 
     @Deprecated
-    public Cookies getCookiesWithUserAgent(final String url) {
-        final Cookies cookies = this.getCookies(url);
-        String userAgent = null;
-        if (this.getRequest() != null) {
-            userAgent = this.getHeaders().getValue("User-Agent");
-            if (userAgent != null) {
-                cookies.setUserAgent(userAgent);
+    public Cookies getCookies(final String url) {
+        try {
+            return getCookies(new URL(url));
+        } catch (MalformedURLException e) {
+            try {
+                return getCookies(new URL("https://" + url));
+            } catch (MalformedURLException e2) {
+                throw new WTFException(e);
             }
         }
-        return cookies;
     }
 
     public void getDownload(final File file, final String urlString) throws IOException {
@@ -2527,9 +2538,31 @@ public class Browser implements HTTPConnectionFactoryInterface {
         this.connectTimeout = connectTimeout;
     }
 
+    @Deprecated
     public void setCookie(final String url, final String key, final String value) {
+        try {
+            setCookie(new URL(url), key, value);
+        } catch (MalformedURLException e) {
+            final Cookies cookies = this.getCookies(url);
+            final Cookie existing = cookies.get((String) null, key);
+            if (existing != null) {
+                existing.setValue(value);
+                return;
+            }
+            final Cookie newCookie = new Cookie(Browser.getHost(url), key, value);
+            cookies.add(newCookie);
+        }
+    }
+
+    public void setCookie(final URL url, final String key, final String value) {
         final Cookies cookies = this.getCookies(url);
-        cookies.add(new Cookie(Browser.getHost(url), key, value));
+        final Cookie existing = cookies.get(url, key);
+        if (existing != null) {
+            existing.setValue(value);
+            return;
+        }
+        final Cookie newCookie = new Cookie(Browser.getHost(url), key, value);
+        cookies.add(newCookie);
     }
 
     public void setCookie(final Cookie cookie) {
@@ -2537,15 +2570,6 @@ public class Browser implements HTTPConnectionFactoryInterface {
         cookies.add(cookie);
     }
 
-    /**
-     * Adds given Cookies to current Cookies session for given host. Will also set User-Agent if given.
-     *
-     * @author raztoki
-     * @since JD2
-     * @param url
-     * @param iCookies
-     * @param replace
-     */
     public void setCookies(final String url, final Cookies iCookies) {
         this.setCookies(url, iCookies, false);
         final String userAgent = iCookies.getUserAgent();

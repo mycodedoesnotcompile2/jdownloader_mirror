@@ -16,6 +16,7 @@
 package jd.http;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,29 +29,33 @@ import java.util.regex.Pattern;
 import jd.parser.Regex;
 
 import org.appwork.exceptions.WTFException;
+import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
 import org.appwork.utils.formatter.HexFormatter;
 import org.appwork.utils.logging2.LogInterface;
 
 public class Cookies {
     public static Cookies parseSetCookies(final Request request) throws IOException {
         final URLConnectionAdapter httpConnection = request.getHttpConnection();
+        final boolean isHTTPsConnection = "https".equalsIgnoreCase(request.getURL().getProtocol());
         final String date = httpConnection.getHeaderField("Date");
         final List<String> setCookies = httpConnection.getHeaderFields("Set-Cookie");
         final Cookies ret = new Cookies();
         if (setCookies == null || setCookies.size() == 0) {
             return ret;
         }
-        final String host = Browser.getHost(request.getURL());
+        final String tldDomain = Browser.getHost(request.getURL());
+        final String domain = request.getURL().getHost();
         for (int i = 0; i < setCookies.size(); i++) {
             final String setCookie = setCookies.get(i);
             final Cookie cookie = new Cookie();
-            cookie.setHost(host);
+            cookie.setHost(tldDomain);
+            cookie.setHostOnly(Boolean.TRUE);
+            cookie.setDomain(domain);
             cookie.setHostTime(date);
             final StringTokenizer st = new StringTokenizer(setCookie, ";");
             while (st.hasMoreTokens()) {
@@ -76,12 +81,15 @@ public class Cookies {
                     continue;
                 }
                 if (key != null) {
-                    if ("path".equalsIgnoreCase(key)) {
+                    if ("samesite".equalsIgnoreCase(key)) {
+                        cookie.setSameSite(value);
+                    } else if ("path".equalsIgnoreCase(key)) {
                         cookie.setPath(value);
                     } else if ("expires".equalsIgnoreCase(key)) {
                         cookie.setExpires(value);
                     } else if ("domain".equalsIgnoreCase(key)) {
                         cookie.setDomain(value);
+                        cookie.setHostOnly(Boolean.FALSE);
                     } else if ("secure".equalsIgnoreCase(key)) {
                         cookie.setSecure(true);
                     } else if ("HttpOnly".equalsIgnoreCase(key)) {
@@ -107,18 +115,27 @@ public class Cookies {
                 }
             }
             if (cookie.getKey() != null) {
-                ret.add(cookie);
+                if (Boolean.TRUE.equals(cookie.isSecure() && !isHTTPsConnection)) {
+                    LogV3.warning("Ignore unsecure cookie:" + cookie);
+                } else {
+                    ret.add(cookie);
+                }
             }
         }
         return ret;
     }
 
-    public static Cookies parseCookies(final String cookieString, final String host, final String serverTime, boolean isSetCookie) {
+    @Deprecated
+    public static Cookies parseCookies(final String cookieString, final URL url, final String serverTime, boolean isSetCookie) {
         final String header = cookieString;
         String path = null;
         String expires = null;
-        String domain = null;
         boolean secure = false;
+        final boolean isHTTPsConnection = "https".equalsIgnoreCase(url.getProtocol());
+        final String tldDomain = Browser.getHost(url);
+        String domain = isSetCookie ? url.getHost() : tldDomain;
+        Boolean hostOnly = isSetCookie ? Boolean.TRUE : null;
+        String sameSite = isSetCookie ? "Lax" : null;
         final LinkedHashMap<String, String> tmp = new LinkedHashMap<String, String>();
         /* Cookie individual elements */
         final StringTokenizer st = new StringTokenizer(header, ";");
@@ -145,12 +162,15 @@ public class Cookies {
                 continue;
             }
             if (key != null) {
-                if ("path".equalsIgnoreCase(key)) {
+                if ("samesite".equalsIgnoreCase(key)) {
+                    sameSite = value;
+                } else if ("path".equalsIgnoreCase(key)) {
                     path = value;
                 } else if ("expires".equalsIgnoreCase(key)) {
                     expires = value;
                 } else if ("domain".equalsIgnoreCase(key)) {
                     domain = value;
+                    hostOnly = false;
                 } else if ("secure".equalsIgnoreCase(key)) {
                     secure = true;
                 } else if ("HttpOnly".equalsIgnoreCase(key)) {
@@ -174,15 +194,21 @@ public class Cookies {
              */
             if (next.getValue() != null) {
                 final Cookie cookie = new Cookie();
-                cookies.add(cookie);
-                cookie.setHost(host);
+                cookie.setHost(tldDomain);
                 cookie.setPath(path);
                 cookie.setDomain(domain);
                 cookie.setExpires(expires);
+                cookie.setHostOnly(hostOnly);
                 cookie.setValue(next.getValue());
                 cookie.setKey(next.getKey());
                 cookie.setHostTime(serverTime);
                 cookie.setSecure(secure);
+                cookie.setSameSite(sameSite);
+                if (Boolean.TRUE.equals(cookie.isSecure() && !isHTTPsConnection)) {
+                    LogV3.warning("Ignore unsecure cookie:" + cookie);
+                } else {
+                    cookies.add(cookie);
+                }
             }
         }
         return cookies;
@@ -231,7 +257,6 @@ public class Cookies {
             }
         }
         try {
-            final long timeStamp = Time.timestamp();
             final List<Object> entries = ReflectionUtils.wrapList(input, false, Object.class);
             if (entries != null) {
                 final Cookies ret = new Cookies();
@@ -260,33 +285,29 @@ public class Cookies {
                         final String key = (String) cookieInfo.get("name");
                         final String value = (String) cookieInfo.get("value");
                         final String path = (String) cookieInfo.get("path");
-                        final boolean secure = ((Boolean) cookieInfo.get("secure")).booleanValue();
+                        final String sameSite = (String) cookieInfo.get("sameSite");
+                        final Boolean secure = (Boolean) cookieInfo.get("secure");
+                        final Boolean hostOnly = (Boolean) cookieInfo.get("hostOnly");
                         if (StringUtils.isEmpty(domain) || StringUtils.isEmpty(key) || StringUtils.isEmpty(value) || StringUtils.isEmpty(path)) {
                             /* Skip invalid objects */
                             continue;
                         }
+                        cookie.setSameSite(sameSite);
                         cookie.setHost(domain);
                         cookie.setPath(path);
                         cookie.setDomain(domain);
+                        cookie.setKey(key);
+                        cookie.setValue(value);
+                        cookie.setSecure(secure);
+                        cookie.setHostOnly(hostOnly);
                         final Long expirationDate = Cookies.parseTimestamp(cookieInfo.get("expirationDate"));
                         if (expirationDate != null) {
                             cookie.setExpireDate(expirationDate.longValue());
                         } else {
                             cookie.setExpireDate(-1);
                         }
-                        cookie.setKey(key);
-                        cookie.setValue(value);
-                        cookie.setSecure(secure);
                     } else {
                         continue;
-                    }
-                    if (false && cookie.getExpireDate() >= 0) {
-                        cookie.setHostTime(timeStamp);
-                        cookie.setCreationTime(timeStamp);
-                        if (cookie.isExpired()) {
-                            logger.info("Skip expired cookie:" + cookie);
-                            continue;
-                        }
                     }
                     ret.add(cookie);
                 }
@@ -321,31 +342,27 @@ public class Cookies {
                             final String key = (String) cookieInfo.get("name");
                             final String value = (String) cookieInfo.get("value");
                             final String path = (String) cookieInfo.get("path");
-                            final boolean secure = ((Boolean) cookieInfo.get("secure")).booleanValue();
+                            final String sameSite = (String) cookieInfo.get("sameSite");
+                            final Boolean secure = (Boolean) cookieInfo.get("secure");
+                            final Boolean hostOnly = (Boolean) cookieInfo.get("hostOnly");
                             if (StringUtils.isEmpty(domain) || StringUtils.isEmpty(key) || StringUtils.isEmpty(value) || StringUtils.isEmpty(path)) {
                                 /* Skip invalid objects */
                                 continue;
                             }
                             final Cookie cookie = new Cookie();
+                            cookie.setSameSite(sameSite);
                             cookie.setHost(domain);
                             cookie.setPath(path);
                             cookie.setDomain(domain);
+                            cookie.setKey(key);
+                            cookie.setValue(value);
+                            cookie.setSecure(secure);
+                            cookie.setHostOnly(hostOnly);
                             final Long expirationDate = Cookies.parseTimestamp(cookieInfo.get("expirationDate"));
                             if (expirationDate != null) {
                                 cookie.setExpireDate(expirationDate.longValue());
                             } else {
                                 cookie.setExpireDate(-1);
-                            }
-                            cookie.setKey(key);
-                            cookie.setValue(value);
-                            cookie.setSecure(secure);
-                            if (false && cookie.getExpireDate() >= 0) {
-                                cookie.setHostTime(timeStamp);
-                                cookie.setCreationTime(timeStamp);
-                                if (cookie.isExpired()) {
-                                    logger.info("Skip expired cookie:" + cookie);
-                                    continue;
-                                }
                             }
                             ret.add(cookie);
                         }
@@ -369,8 +386,9 @@ public class Cookies {
         }
     }
 
-    public static Cookies parseCookies(final String cookieString, final String host, final String serverTime) {
-        return Cookies.parseCookies(cookieString, host, serverTime, false);
+    @Deprecated
+    public static Cookies parseCookies(final String cookieString, final URL url, final String serverTime) {
+        return Cookies.parseCookies(cookieString, url, serverTime, false);
     }
 
     private final CopyOnWriteArrayList<Cookie> cookies   = new CopyOnWriteArrayList<Cookie>();
@@ -390,14 +408,15 @@ public class Cookies {
                 return;
             }
         }
-        this.cookies.add(cookie);
+        this.cookies.addIfAbsent(cookie);
     }
 
     public void add(final Cookies newcookies) {
-        if (newcookies != null) {
-            for (final Cookie cookie : newcookies.getCookies()) {
-                this.add(cookie);
-            }
+        if (newcookies == null) {
+            return;
+        }
+        for (final Cookie cookie : newcookies.getCookies()) {
+            this.add(cookie);
         }
     }
 
@@ -405,10 +424,9 @@ public class Cookies {
         if (StringUtils.isEmpty(useragent)) {
             this.userAgent = null;
             return false;
-        } else {
-            this.userAgent = useragent;
-            return true;
         }
+        this.userAgent = useragent;
+        return true;
     }
 
     public String getUserAgent() {
@@ -421,35 +439,63 @@ public class Cookies {
 
     public static String NOTDELETEDPATTERN = "^(?i)((?!^deleted$).)*$";
 
+    @Deprecated
     public Cookie get(final String key, final String valuePattern) {
-        final Cookie cookie = this.get(key);
-        if (cookie != null) {
-            if (valuePattern == null) {
-                return cookie;
-            } else {
-                final String cookieValue = cookie.getValue();
-                if (cookieValue != null && Pattern.compile(valuePattern).matcher(cookieValue).matches()) {
-                    return cookie;
-                } else {
-                    return null;
+        return get(null, key, valuePattern);
+    }
+
+    public String getCookieString(URL url) {
+        if (cookies != null && !cookies.isEmpty()) {
+            final StringBuilder buffer = new StringBuilder();
+            for (final Cookie cookie : cookies) {
+                // Pfade sollten verarbeitet werden...TODO
+                if (cookie.isExpired() || !cookie.matches(url)) {
+                    continue;
                 }
+                if (buffer.length() > 0) {
+                    buffer.append("; ");
+                }
+                buffer.append(cookie.getKey());
+                buffer.append("=");
+                buffer.append(cookie.getValue());
             }
+            return buffer.toString();
+        }
+        return null;
+    }
+
+    public Cookie get(URL url, final String key, final String valuePattern) {
+        final Cookie cookie = this.get(url, key);
+        if (cookie == null) {
+            return null;
+        }
+        if (valuePattern == null) {
+            return cookie;
+        }
+        final String cookieValue = cookie.getValue();
+        if (cookieValue != null && Pattern.compile(valuePattern).matcher(cookieValue).matches()) {
+            return cookie;
         } else {
             return null;
         }
     }
 
+    @Deprecated
     public Cookie get(final String key) {
+        return get((URL) null, key);
+    }
+
+    public Cookie get(URL url, final String key) {
         if (key == null) {
             return null;
         }
         for (final Cookie cookie : this.cookies) {
-            if (cookie.getKey().equals(key)) {
+            if (cookie.getKey().equals(key) && (url == null || cookie.matches(url))) {
                 return cookie;
             }
         }
         for (final Cookie cookie : this.cookies) {
-            if (cookie.getKey().equalsIgnoreCase(key)) {
+            if (cookie.getKey().equalsIgnoreCase(key) && (url == null || cookie.matches(url))) {
                 return cookie;
             }
         }
@@ -474,6 +520,7 @@ public class Cookies {
      * @author raztoki
      * @since JD2
      */
+    @Deprecated
     public void remove(final String keyName) {
         if (keyName != null) {
             final Cookie ckie = this.get(keyName);

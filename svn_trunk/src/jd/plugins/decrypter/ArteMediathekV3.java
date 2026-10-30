@@ -42,6 +42,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.components.hls.HlsContainer.CODEC_TYPE;
 import org.jdownloader.plugins.components.hls.HlsContainer.StreamCodec;
 import org.jdownloader.plugins.components.hls.HlsContainerStorable;
+import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
@@ -49,6 +50,8 @@ import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.CryptedLink;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
@@ -59,7 +62,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.ArteTv;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 53796 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53823 $", interfaceVersion = 4, names = {}, urls = {})
 public class ArteMediathekV3 extends PluginForDecrypt {
     public ArteMediathekV3(PluginWrapper wrapper) {
         super(wrapper);
@@ -137,6 +140,11 @@ public class ArteMediathekV3 extends PluginForDecrypt {
     private static Browser prepBRAPI(final Browser br) {
         br.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer Nzc1Yjc1ZjJkYjk1NWFhN2I2MWEwMmRlMzAzNjI5NmU3NWU3ODg4ODJjOWMxNTMxYzEzZGRjYjg2ZGE4MmIwOA");
         return br;
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.BUBBLE_NOTIFICATION };
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
@@ -275,6 +283,7 @@ public class ArteMediathekV3 extends PluginForDecrypt {
         brc.getPage(playerConfigURL);
         final Map<String, Object> player = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
         String originalVersionAudioLanguage = null;
+        boolean drmNotificationDisplayed = false;
         final List<Map<String, Object>> streams = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(player, "data/attributes/streams");
         final Map<String, Object> error = (Map<String, Object>) JavaScriptEngineFactory.walkJson(player, "data/attributes/error");
         if (streams.isEmpty() && error != null && error.containsKey("code")) {
@@ -304,6 +313,11 @@ public class ArteMediathekV3 extends PluginForDecrypt {
                     if (m3u8.get(0).isEncrypted()) {
                         DRM_checked = Boolean.TRUE;
                         logger.info("skip HLS due to DRM protection:" + m3u8.get(0).getEncryptionMethod());
+                        if (!drmNotificationDisplayed) {
+                            /* Display information message to user (only once per video) */
+                            drmNotificationDisplayed = true;
+                            this.displayBubbleNotification("DRM protected content", titleAndSubtitle + "\r\nSome or all streams of this video cannot be downloaded because they are DRM protected!");
+                        }
                         break hlsQualities;
                     }
                     DRM_checked = Boolean.FALSE;
@@ -739,6 +753,15 @@ public class ArteMediathekV3 extends PluginForDecrypt {
         } else {
             for (final DownloadLink result : ret) {
                 distribute(result);
+            }
+        }
+        if (drmNotificationDisplayed) {
+            /* Add dummy link so that the user gets feedback in the linkgrabber about the skipped DRM protected streams. */
+            final DownloadLink drmRetryLink = createLinkCrawlerRetry(getCurrentLink(), new DecrypterRetryException(RetryReason.UNSUPPORTED_DRM, titleAndSubtitle, "Some or all streams of this video are DRM protected and cannot be downloaded."));
+            if (drmRetryLink != null) {
+                drmRetryLink._setFilePackage(fp);
+                ret.add(drmRetryLink);
+                distribute(drmRetryLink);
             }
         }
         return ret;

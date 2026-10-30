@@ -990,7 +990,7 @@ public class Application {
      * @param newJar
      */
     public synchronized static void setApplication(final String newAppFolder) {
-        if (ROOT != null) {
+        if (ROOT != null && !StringUtils.equals(newAppFolder, APP_FOLDER)) {
             DebugMode.debugger();
         }
         Application.ROOT = null;

@@ -33,7 +33,7 @@ public class CaptchaAPIManualRemoteSolverService extends AbstractSolverService {
 
     @Override
     public SolverType getType() {
-        return SolverType.JD_REMOTE_API;
+        return SolverType.JD_REMOTE_MYJD;
     }
 
     @Override

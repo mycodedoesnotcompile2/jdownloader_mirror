@@ -19,6 +19,18 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
 
+import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
@@ -33,19 +45,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer.StreamCodec;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-
-@HostPlugin(revision = "$Revision: 53314 $", interfaceVersion = 3, names = { "M3u8" }, urls = { "m3u8s?://.+" })
+@HostPlugin(revision = "$Revision: 53806 $", interfaceVersion = 3, names = { "M3u8" }, urls = { "m3u8s?://.+" })
 public class GenericM3u8 extends PluginForHost {
     public static final String  PRESET_NAME_PROPERTY               = "preSetName";
     private static final String DEPRECATED_NAME_PROPERTY           = "deprecatedName";
@@ -132,8 +132,9 @@ public class GenericM3u8 extends PluginForHost {
         final String cookiesString = link.getStringProperty("cookies");
         final String downloadurl = getContentURL(link);
         if (cookiesString != null) {
-            final String host = Browser.getHost(downloadurl);
-            br.setCookies(host, Cookies.parseCookies(cookiesString, host, null));
+            final URL url = new URL(downloadurl);
+            final String host = Browser.getHost(url);
+            br.setCookies(host, Cookies.parseCookies(cookiesString, url, null));
         }
         final String referer = getReferer(link);
         if (referer != null) {
@@ -216,9 +217,8 @@ public class GenericM3u8 extends PluginForHost {
     public static void setFilename(Plugin plugin, final DownloadLink link, final boolean setFinalFilename) throws MalformedURLException {
         if (link.getFinalFileName() != null) {
             /**
-             * No not modify filename once final name has been set. </br>
-             * This e.g. allows other plugins/crawlers to set desired filenames telling this plugin not to use the default filenames down
-             * below.
+             * No not modify filename once final name has been set. </br> This e.g. allows other plugins/crawlers to set desired filenames
+             * telling this plugin not to use the default filenames down below.
              */
             return;
         }

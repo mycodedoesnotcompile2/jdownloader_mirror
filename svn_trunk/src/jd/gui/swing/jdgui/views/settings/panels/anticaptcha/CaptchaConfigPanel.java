@@ -2,6 +2,8 @@ package jd.gui.swing.jdgui.views.settings.panels.anticaptcha;
 
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import java.awt.Component;
+import java.awt.event.ItemEvent;
+import java.awt.event.ItemListener;
 
 import javax.swing.Icon;
 import javax.swing.JLabel;
@@ -15,7 +17,6 @@ import org.appwork.utils.DebugMode;
 import org.jdownloader.captcha.v2.SolverService;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.settings.AbstractConfigPanel;
-import org.jdownloader.gui.settings.Pair;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
@@ -31,6 +32,7 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
     // private CESSettingsPanel psp;
     private SolverOrderTable          solverOrderTable;
     private SolverComparisonContainer solverComparisonContainer;
+    private CaptchaRulesContainer     rulesContainer;
     private CaptchaSettingsTabbedPane tabs;
     private JScrollPane               solversScrollPane;
     private CaptchaTestPanel          testPanel;
@@ -50,15 +52,30 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
         debugTabShown = false;
         this.addHeader(getTitle(), new AbstractIcon(IconKey.ICON_OCR, 32));
         this.addDescriptionPlain(_GUI.T.AntiCaptchaConfigPanel_onShow_description());
-        final Pair<Checkbox> useExternalSolverAccounts = addPair(_GUI.T.CaptchaConfigPanel_useExternalSolverAccounts(), null, new Checkbox(CFG_GENERAL.USE_AVAILABLE_CAPTCHA_SOLVER_ACCOUNTS));
-        final Pair<Checkbox> avoidAutoSolverForLoginCaptchas = addPair(_GUI.T.CaptchaConfigPanel_avoidAutoSolverForLoginCaptchas(), null, new Checkbox(CFG_CAPTCHA.AVOID_AUTO_SOLVER_FOR_LOGIN_CAPTCHAS));
+        /* The two general settings are part of the solver overview tab, so they do not waste space above the tabs. */
+        final Checkbox useExternalSolverAccounts = new Checkbox(CFG_GENERAL.USE_AVAILABLE_CAPTCHA_SOLVER_ACCOUNTS);
+        useExternalSolverAccounts.setText(_GUI.T.CaptchaConfigPanel_useExternalSolverAccounts());
+        final Checkbox avoidAutoSolverForLoginCaptchas = new Checkbox(CFG_CAPTCHA.AVOID_AUTO_SOLVER_FOR_LOGIN_CAPTCHAS);
+        avoidAutoSolverForLoginCaptchas.setText(_GUI.T.CaptchaConfigPanel_avoidAutoSolverForLoginCaptchas());
         avoidAutoSolverForLoginCaptchas.setToolTipText(_GUI.T.CaptchaConfigPanel_avoidAutoSolverForLoginCaptchas_tooltip());
-        avoidAutoSolverForLoginCaptchas.setConditionPair(useExternalSolverAccounts);
+        /* Only makes sense while external solver accounts are used. Item listener: it also reacts if the setting is changed elsewhere. */
+        useExternalSolverAccounts.addItemListener(new ItemListener() {
+            @Override
+            public void itemStateChanged(final ItemEvent e) {
+                avoidAutoSolverForLoginCaptchas.setEnabled(useExternalSolverAccounts.isSelected());
+            }
+        });
+        avoidAutoSolverForLoginCaptchas.setEnabled(useExternalSolverAccounts.isSelected());
+        final MigPanel generalSettings = new MigPanel("ins 5 5 0 5, wrap 1, gapy 0", "[grow,fill]", "[][]");
+        generalSettings.setOpaque(false);
+        generalSettings.add(useExternalSolverAccounts);
+        generalSettings.add(avoidAutoSolverForLoginCaptchas);
         /* Tabbed area at the top: solver overview and captcha rules (similar to the Linkgrabber Filter panel). */
         final SolverOrderTable table = this.solverOrderTable = new SolverOrderTable();
         final SolverOrderContainer container = new SolverOrderContainer(table);
         /* Width tracking: long texts in the solver settings must not make the panel wider than the visible area. */
-        final MigPanel solversTab = new WidthTrackingPanel("ins 0, wrap 1", "[grow,fill]", "[grow,fill]");
+        final MigPanel solversTab = new WidthTrackingPanel("ins 0, wrap 1", "[grow,fill]", "[][grow,fill]");
+        solversTab.add(generalSettings, "growx");
         solversTab.add(container, "grow");
         final CaptchaSettingsTabbedPane tabs = this.tabs = new CaptchaSettingsTabbedPane();
         final JScrollPane solversScrollPane = this.solversScrollPane = new JScrollPane(solversTab);
@@ -69,7 +86,8 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
         /* No frame around the whole tab: the tables inside have their own, a second one would be a double border (like in the rules tab). */
         solversScrollPane.setBorder(null);
         tabs.addTab(_GUI.T.CaptchaConfigPanel_solverOverviewAndSettings(), solversScrollPane);
-        tabs.addTab("Captcha Rules", new CaptchaRulesContainer());
+        this.rulesContainer = new CaptchaRulesContainer();
+        tabs.addTab("Captcha Rules", rulesContainer);
         this.solverComparisonContainer = new SolverComparisonContainer();
         tabs.addTab(_GUI.T.CaptchaSolverComparison_tab_title(), solverComparisonContainer);
         /* Always shown in the IDE; in the stable only via the (advanced settings only) setting "ShowCaptchaDebugPanel". */
@@ -158,6 +176,41 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
                 }
                 tabs.setSelectedComponent(testScrollPane);
                 testPanel.selectMultiTestSolvers(solvers, types);
+            }
+        });
+    }
+
+    /**
+     * Shows the "Solver comparison table" tab and selects the given solvers in its table. Solvers that are not in the table because of
+     * the selection there are made visible first (see {@link SolverComparisonContainer#showSolvers(java.util.Collection)}).
+     */
+    public static void showInComparisonTable(final java.util.Collection<SolverService> solvers) {
+        final CaptchaConfigPanel captchaConfigPanel = ConfigurationView.getInstance().getSubPanel(CaptchaConfigPanel.class);
+        if (captchaConfigPanel != null) {
+            captchaConfigPanel.selectInComparisonTable(solvers);
+        }
+    }
+
+    /** Shows the "Captcha Rules" tab and opens the "add captcha rule" dialog there with the given solver preselected. */
+    public static void createCaptchaRule(final SolverService solver) {
+        final CaptchaConfigPanel captchaConfigPanel = ConfigurationView.getInstance().getSubPanel(CaptchaConfigPanel.class);
+        if (captchaConfigPanel != null) {
+            SwingUtilities.invokeLater(new Runnable() {
+                @Override
+                public void run() {
+                    captchaConfigPanel.tabs.setSelectedComponent(captchaConfigPanel.rulesContainer);
+                    captchaConfigPanel.rulesContainer.addRuleFor(solver);
+                }
+            });
+        }
+    }
+
+    private void selectInComparisonTable(final java.util.Collection<SolverService> solvers) {
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                tabs.setSelectedComponent(solverComparisonContainer);
+                solverComparisonContainer.showSolvers(solvers);
             }
         });
     }

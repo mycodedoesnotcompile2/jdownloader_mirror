@@ -37,6 +37,7 @@ import java.io.ByteArrayOutputStream;
 import java.util.zip.GZIPOutputStream;
 
 import org.appwork.testframework.AWTest;
+import org.appwork.utils.DataURLInputStream;
 import org.appwork.utils.IO;
 import org.appwork.utils.encoding.Base64;
 import org.appwork.utils.net.Base64OutputStream;
@@ -63,6 +64,21 @@ public class DataUrlTests extends AWTest {
         byte[] bytesZipped = IO.dataUrlToBytes("data:application/gzip;base64," + base64Gzipped);
         assertEqualsDeep(bytesRaw, bytesZipped);
         assertEqualsDeep(bytesRaw, url.getBytes("UTF-8"));
+        assertNull(DataURLInputStream.open("https://example.com/favicon.ico"));
+        final DataURLInputStream svg = DataURLInputStream.open("data:image/svg+xml;charset=utf-8,%3Csvg%3E");
+        try {
+            assertEquals("image/svg+xml;charset=utf-8", svg.getMimeType());
+            assertEqualsDeep(new byte[] { '<', 's', 'v', 'g', '>' }, IO.readStream(-1, svg));
+        } finally {
+            svg.close();
+        }
+        final DataURLInputStream png = DataURLInputStream.open("data:image/png;base64," + base64);
+        try {
+            assertEquals("image/png", png.getMimeType());
+            assertEqualsDeep(url.getBytes("UTF-8"), IO.readStream(-1, png));
+        } finally {
+            png.close();
+        }
     }
 
     public static void main(String[] args) {

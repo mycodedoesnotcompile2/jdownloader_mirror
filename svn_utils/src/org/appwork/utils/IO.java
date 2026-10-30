@@ -114,10 +114,6 @@ public class IO {
      * @throws IOException
      */
     public static void copyFile(ProgressFeedback progress, final File in, final File out, final SYNC sync) throws IOException {
-        FileInputStream fis = null;
-        FileOutputStream fos = null;
-        FileChannel inChannel = null;
-        FileChannel outChannel = null;
         try {
             if (out.exists()) {
                 throw new IOException("Cannot overwrite " + out);
@@ -125,53 +121,56 @@ public class IO {
             if (!in.exists()) {
                 throw new FileNotFoundException(in.getAbsolutePath());
             }
-            fis = new FileInputStream(in);
-            fos = new FileOutputStream(out);
-            inChannel = fis.getChannel();
-            outChannel = fos.getChannel();
-            if (progress != null) {
-                progress.setBytesTotal(in.length());
-            }
-            /*
-             * The per-call transfer size is capped at a magic number (64MB - 32KB). This cap originates from an old Windows limitation:
-             * copying more than ~64MB in a single transferTo call could fail with "Insufficient system resources exist to complete the
-             * requested service" (see http://forum.java.sun.com/thread.jspa?threadID=439695&messageID=2917510). We loop until the whole
-             * file has been transferred, which is also required on non-Windows platforms because transferTo is not guaranteed to move all
-             * bytes in one call. The behaviour is identical on all platforms, so there is no platform-specific branch.
-             */
-            final int maxCount = 64 * 1024 * 1024 - 32 * 1024;
-            final long size = inChannel.size();
-            long position = 0;
-            while (position < size) {
-                position += inChannel.transferTo(position, maxCount, outChannel);
-                if (progress != null) {
-                    progress.setBytesProcessed(position);
+            final FileInputStream fis = new FileInputStream(in);
+            try {
+                // RandomAccessFile is required to avoid loosing pre-allocated space, FileOutputStream truncates the files and that does
+                // free pre-allocation
+                final RandomAccessFile raf = new RandomAccessFile(out, "rw");
+                try {
+                    final FileChannel inChannel = fis.getChannel();
+                    final FileChannel outChannel = raf.getChannel();
+                    if (progress != null) {
+                        progress.setBytesTotal(in.length());
+                    }
+                    /*
+                     * The per-call transfer size is capped at a magic number (64MB - 32KB). This cap originates from an old Windows
+                     * limitation: copying more than ~64MB in a single transferTo call could fail with "Insufficient system resources exist
+                     * to complete the requested service" (see http://forum.java.sun.com/thread.jspa?threadID=439695&messageID=2917510). We
+                     * loop until the whole file has been transferred, which is also required on non-Windows platforms because transferTo is
+                     * not guaranteed to move all bytes in one call. The behaviour is identical on all platforms, so there is no
+                     * platform-specific branch.
+                     */
+                    final int maxCount = 64 * 1024 * 1024 - 32 * 1024;
+                    final long inChannelSize = inChannel.size();
+                    long position = 0;
+                    while (position < inChannelSize) {
+                        position += inChannel.transferTo(position, maxCount, outChannel);
+                        if (progress != null) {
+                            progress.setBytesProcessed(position);
+                        }
+                    }
+                    outChannel.truncate(inChannelSize);
+                    if (sync != null) {
+                        switch (sync) {
+                        case DATA:
+                            outChannel.force(false);
+                            break;
+                        case META_AND_DATA:
+                            outChannel.force(true);
+                            break;
+                        case NONE:
+                        default:
+                            break;
+                        }
+                    }
+                } finally {
+                    raf.close();
                 }
-            }
-            if (sync != null) {
-                switch (sync) {
-                case DATA:
-                    outChannel.force(false);
-                    break;
-                case META_AND_DATA:
-                    outChannel.force(true);
-                    break;
-                case NONE:
-                default:
-                    break;
-                }
+            } finally {
+                fis.close();
             }
         } catch (final IOException e) {
             throw e;
-        } finally {
-            try {
-                fos.close();
-            } catch (final Throwable e) {
-            }
-            try {
-                fis.close();
-            } catch (final Throwable e) {
-            }
         }
     }
 

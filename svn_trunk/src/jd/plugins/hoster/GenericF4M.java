@@ -15,11 +15,8 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.net.URL;
 import java.util.List;
-
-import org.jdownloader.downloader.hds.HDSDownloader;
-import org.jdownloader.plugins.components.hds.HDSContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -32,7 +29,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 46973 $", interfaceVersion = 3, names = { "f4m" }, urls = { "f4ms?://.+?(\\.f4m?(\\?.+)?|$)" })
+import org.jdownloader.downloader.hds.HDSDownloader;
+import org.jdownloader.plugins.components.hds.HDSContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 53806 $", interfaceVersion = 3, names = { "f4m" }, urls = { "f4ms?://.+?(\\.f4m?(\\?.+)?|$)" })
 public class GenericF4M extends PluginForHost {
     public GenericF4M(PluginWrapper wrapper) {
         super(wrapper);
@@ -97,8 +98,9 @@ public class GenericF4M extends PluginForHost {
     public void handleFree(final DownloadLink downloadLink) throws Exception {
         final String cookiesString = downloadLink.getStringProperty("cookies");
         if (cookiesString != null) {
-            final String host = Browser.getHost(downloadLink.getPluginPatternMatcher());
-            br.setCookies(host, Cookies.parseCookies(cookiesString, host, null));
+            final URL url = new URL(downloadLink.getPluginPatternMatcher());
+            final String host = Browser.getHost(url);
+            br.setCookies(host, Cookies.parseCookies(cookiesString, url, null));
         }
         final String referer = getReferer(downloadLink);
         if (referer != null) {

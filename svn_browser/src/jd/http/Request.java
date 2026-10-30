@@ -61,30 +61,6 @@ public abstract class Request {
         }
     }
 
-    public static String getCookieString(final Cookies cookies, URL url) {
-        if (cookies != null && !cookies.isEmpty()) {
-            final boolean secure = "https".equalsIgnoreCase(url.getProtocol());
-            final StringBuilder buffer = new StringBuilder();
-            for (final Cookie cookie : cookies.getCookies()) {
-                // Pfade sollten verarbeitet werden...TODO
-                if (cookie.isExpired()) {
-                    continue;
-                }
-                if (!secure && Boolean.TRUE.equals(cookie.isSecure())) {
-                    continue;
-                }
-                if (buffer.length() > 0) {
-                    buffer.append("; ");
-                }
-                buffer.append(cookie.getKey());
-                buffer.append("=");
-                buffer.append(cookie.getValue());
-            }
-            return buffer.toString();
-        }
-        return null;
-    }
-
     private Request redirectOrigin = null;
 
     public Request getRedirectOrigin() {
@@ -474,7 +450,11 @@ public abstract class Request {
     }
 
     public String getCookieString() {
-        return Request.getCookieString(this.cookies, this.getURL());
+        final Cookies cookies = this.cookies;
+        if (cookies == null) {
+            return null;
+        }
+        return cookies.getCookieString(getURL());
     }
 
     public String getCustomCharset() {

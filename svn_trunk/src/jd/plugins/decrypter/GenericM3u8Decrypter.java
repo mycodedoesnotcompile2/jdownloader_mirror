@@ -55,7 +55,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer.StreamCodec;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
-@DecrypterPlugin(revision = "$Revision: 53556 $", interfaceVersion = 3, names = { "m3u8" }, urls = { "(https?://.+\\.m3u8|m3u8://https?://.*)($|(?:\\?|%3F)[^\\s<>\"']*|#.*)" })
+@DecrypterPlugin(revision = "$Revision: 53806 $", interfaceVersion = 3, names = { "m3u8" }, urls = { "(https?://.+\\.m3u8|m3u8://https?://.*)($|(?:\\?|%3F)[^\\s<>\"']*|#.*)" })
 public class GenericM3u8Decrypter extends PluginForDecrypt {
     @Override
     public Boolean siteTesterDisabled() {
@@ -88,7 +88,7 @@ public class GenericM3u8Decrypter extends PluginForDecrypt {
                 cookiesString = downloadLink.getStringProperty("cookies");
                 if (cookiesString != null) {
                     final String host = Browser.getHost(source.getURL());
-                    br.setCookies(host, Cookies.parseCookies(cookiesString, host, null));
+                    br.setCookies(host, Cookies.parseCookies(cookiesString, new URL(source.getURL()), null));
                 }
                 preSetTitle = downloadLink.getStringProperty(GenericM3u8.PRESET_NAME_PROPERTY);
                 enforceReferrerURL = downloadLink.getReferrerUrl();

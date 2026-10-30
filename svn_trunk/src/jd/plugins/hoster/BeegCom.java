@@ -22,6 +22,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.config.BeegComConfig;
+import org.jdownloader.plugins.components.config.BeegComConfig.MODE;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -34,16 +44,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.config.BeegComConfig;
-import org.jdownloader.plugins.components.config.BeegComConfig.MODE;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 51427 $", interfaceVersion = 2, names = { "beeg.com" }, urls = { "https?://(?:www\\.|beta\\.)?beeg\\.com/(-\\d+$|-?\\d+\\?t=\\d+-\\d+|-?\\d{8,}$)" })
+@HostPlugin(revision = "$Revision: 53823 $", interfaceVersion = 2, names = { "beeg.com" }, urls = { "https?://(?:www\\.|beta\\.)?beeg\\.com/(-\\d+$|-?\\d+\\?t=\\d+-\\d+|-?\\d{8,}$)" })
 public class BeegCom extends PluginForHost {
     private String dllink[] = null;
 
@@ -73,8 +74,9 @@ public class BeegCom extends PluginForHost {
         return Integer.MAX_VALUE;
     }
 
-    private static final String PROPERTY_IS_HLS  = "is_hls";
-    private static final String PROPERTY_QUALITY = "what_quality";
+    private static final String PROPERTY_IS_HLS        = "is_hls";
+    private static final String PROPERTY_IS_HLS_MASTER = "is_hls_master";
+    private static final String PROPERTY_QUALITY       = "what_quality";
 
     @Override
     public String getLinkID(final DownloadLink link) {
@@ -107,11 +109,6 @@ public class BeegCom extends PluginForHost {
     }
 
     @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        return requestFileInformation(link, false);
-    }
-
-    @Override
     public void clean() {
         super.clean();
         dllink = null;
@@ -125,7 +122,8 @@ public class BeegCom extends PluginForHost {
         return url;
     }
 
-    public AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws Exception {
+    @Override
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         dllink = null;
         final String extDefault = ".mp4";
         if (!link.isNameSet()) {
@@ -179,8 +177,8 @@ public class BeegCom extends PluginForHost {
         if (qualities_hls == null || qualities_hls.size() == 0) {
             qualities_hls = (Map<String, String>) file.get("hls_resources");
         }
-
         Boolean isHLS = null;
+        boolean isHlsMaster = false;
         String mp4URL[] = null;
         if (qualities_http != null) {
             mp4URL = filter(qualities_http, link);
@@ -204,8 +202,20 @@ public class BeegCom extends PluginForHost {
             dllink = mp4URL;
             isHLS = false;
         }
-        if (isHLS(link) && !Boolean.TRUE.equals(isHLS)) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        if (dllink == null && this.getPluginEnvironment() == PluginEnvironment.DOWNLOAD) {
+            /**
+             * 2026-10-30: <br>
+             * No download links in "facts/file" -> Build HLS master URL from "play_url" response. Only done for real downloads, not for the
+             * linkcheck.
+             */
+            br.getPage("https://store.externulls.com/video/play_url/" + videoidOriginal);
+            /* Expect plaintext answer starting with "key=" which we need to build HLS master URL. */
+            final String playUrlPath = br.getRequest().getHtmlCode().trim();
+            if (br.getHttpConnection().getResponseCode() == 200 && !StringUtils.isEmpty(playUrlPath)) {
+                dllink = new String[] { null, "https://video.beeg.com/" + playUrlPath };
+                isHLS = true;
+                isHlsMaster = true;
+            }
         }
         if (dllink != null && !StringUtils.isEmpty(dllink[1]) && !dllink[1].startsWith("http")) {
             dllink[1] = "https://video.beeg.com/" + dllink[1];
@@ -216,13 +226,23 @@ public class BeegCom extends PluginForHost {
         }
         br.getHeaders().put("Referer", link.getPluginPatternMatcher());
         if (dllink != null) {
-            link.setProperty(PROPERTY_QUALITY, dllink[0]);
+            if (dllink[0] != null) {
+                link.setProperty(PROPERTY_QUALITY, dllink[0]);
+            } else {
+                /* Quality is unknown (HLS master from "play_url") -> Do not keep a stale value from an earlier run. */
+                link.removeProperty(PROPERTY_QUALITY);
+            }
             if (Boolean.TRUE.equals(isHLS)) {
                 link.setProperty(PROPERTY_IS_HLS, true);
+                if (isHlsMaster) {
+                    link.setProperty(PROPERTY_IS_HLS_MASTER, true);
+                } else {
+                    link.removeProperty(PROPERTY_IS_HLS_MASTER);
+                }
             } else {
                 link.removeProperty(PROPERTY_IS_HLS);
             }
-            if (!isDownload && !isHLS) {
+            if (this.getPluginEnvironment() != PluginEnvironment.DOWNLOAD && !isHLS) {
                 basicLinkCheck(br.cloneBrowser(), br.createGetRequest(dllink[1]), link, link.getFinalFileName(), extDefault);
             }
         }
@@ -231,13 +251,21 @@ public class BeegCom extends PluginForHost {
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
-        requestFileInformation(link, true);
+        requestFileInformation(link);
         if (dllink == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         if (isHLS(link)) {
             checkFFmpeg(link, "Download a HLS Stream");
-            dl = new HLSDownloader(link, br, this.dllink[1]);
+            final String hlsurl;
+            if (link.getBooleanProperty(PROPERTY_IS_HLS_MASTER, false)) {
+                br.getPage(dllink[1]);
+                final HlsContainer hlsbest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(this.br));
+                hlsurl = hlsbest.getStreamURL();
+            } else {
+                hlsurl = dllink[1];
+            }
+            dl = new HLSDownloader(link, br, hlsurl);
         } else {
             /* 2025-08-04: Important: Avoid wrong referer! */
             // final Browser br_download = br;
@@ -279,6 +307,7 @@ public class BeegCom extends PluginForHost {
 
     protected BeegComConfig.QUALITY[] sort(final DownloadLink link) throws Exception {
         final List<BeegComConfig.QUALITY> ret = new ArrayList<BeegComConfig.QUALITY>();
+        /* Previously used quality is only a preference: If it is no longer available, fall back to the configured qualities. */
         final String selectedQuality = link.getStringProperty(PROPERTY_QUALITY);
         if (selectedQuality != null) {
             try {
@@ -286,24 +315,22 @@ public class BeegCom extends PluginForHost {
             } catch (Exception ignore) {
             }
         }
-        if (ret.size() == 0) {
-            final BeegComConfig config = PluginJsonConfig.get(getConfigInterface());
-            final Set<BeegComConfig.QUALITY> qualities;
-            final MODE mode = config.getQualityMode();
-            switch (mode) {
-            case BEST:
-                qualities = null;
-                break;
-            case BEST_SELECTED:
-                qualities = config.getPreferredQuality();
-                break;
-            default:
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported:" + mode);
-            }
-            for (final BeegComConfig.QUALITY quality : BeegComConfig.QUALITY.values()) {
-                if (qualities == null || qualities.contains(quality)) {
-                    ret.add(quality);
-                }
+        final BeegComConfig config = PluginJsonConfig.get(getConfigInterface());
+        final Set<BeegComConfig.QUALITY> qualities;
+        final MODE mode = config.getQualityMode();
+        switch (mode) {
+        case BEST:
+            qualities = null;
+            break;
+        case BEST_SELECTED:
+            qualities = config.getPreferredQuality();
+            break;
+        default:
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported:" + mode);
+        }
+        for (final BeegComConfig.QUALITY quality : BeegComConfig.QUALITY.values()) {
+            if ((qualities == null || qualities.contains(quality)) && !ret.contains(quality)) {
+                ret.add(quality);
             }
         }
         return ret.toArray(new BeegComConfig.QUALITY[0]);
@@ -371,6 +398,7 @@ public class BeegCom extends PluginForHost {
     @Override
     public void resetDownloadlink(DownloadLink link) {
         link.removeProperty(PROPERTY_IS_HLS);
+        link.removeProperty(PROPERTY_IS_HLS_MASTER);
         link.removeProperty(PROPERTY_QUALITY);
     }
 

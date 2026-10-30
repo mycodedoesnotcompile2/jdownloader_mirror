@@ -1,5 +1,6 @@
 package jd.gui.swing.jdgui.views.settings.panels.anticaptcha;
 
+import java.awt.Component;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -10,11 +11,15 @@ import java.util.Set;
 
 import javax.swing.Icon;
 import javax.swing.JLabel;
+import javax.swing.JTable;
+import javax.swing.table.JTableHeader;
 
 import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtDefaultRowSorter;
+import org.appwork.swing.exttable.ExtTableHeaderRenderer;
 import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.swing.exttable.columns.ExtIconColumn;
+import org.appwork.swing.exttable.columns.ExtLongColumn;
 import org.appwork.swing.exttable.columns.ExtTextColumn;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.EDTRunner;
@@ -53,20 +58,13 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
     private volatile int                 solverColumnWidth   = SOLVER_COLUMN_WIDTH;
     /* True: only show solvers that support every selected (visible) captcha type. */
     private volatile boolean             onlyFullSupport     = false;
+    /* Assigned in initColumns, which is called inside the super constructor: no initializer here, it would reset the field. */
+    private ExtColumn<SolverService> supportedCountColumn;
     /* True: sort by the number of supported types among the selected ones instead of the total number of supported types. */
     private volatile boolean             sortBySelectedTypes = false;
 
     public SolverComparisonTableModel() {
         super("SolverComparisonTableModel");
-    }
-
-    /** Returns the tooltip shared by all solver tables (services table and comparison table) for the solver name cell. */
-    public static String getSolverTooltip(final SolverService solver) {
-        final String supportedCount = String.valueOf(getSupportedCount(solver));
-        if (solver.getBuyURL() == null) {
-            return _GUI.T.CaptchaSolverComparison_solver_tooltip_noBuyPage(supportedCount);
-        }
-        return _GUI.T.CaptchaSolverComparison_solver_tooltip(supportedCount);
     }
 
     /**
@@ -108,6 +106,15 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
             }
         }
         return ret;
+    }
+
+    /** True if the given solver is a row of the table with the current selections and filters (also if the rows are not rebuilt yet). */
+    public boolean isShown(final SolverService solver) {
+        if (isEmptyDueToNoTypes() || !getCandidateSolvers().contains(solver)) {
+            return false;
+        }
+        final boolean fullSupportOnly = onlyFullSupport && !isFullSupportImpossible();
+        return !fullSupportOnly || supportsAllSelected(solver);
     }
 
     /** Selects the solvers that are shown as rows. */
@@ -177,7 +184,8 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
 
     /** Default width of the column for the given captcha type: capped to the header word's width, see {@link TypeColumn}. */
     public static int getTypeColumnDefaultWidth(final CAPTCHA_TYPE type) {
-        return Math.max(TYPE_ICON_SIZE + 16, textWidth(type.getDisplayName()) + 16);
+        /* The header shows the icon of the captcha type in front of its name. */
+        return Math.max(TYPE_ICON_SIZE + 16, textWidth(type.getDisplayName()) + TYPE_ICON_SIZE + 4 + 16);
     }
 
     /** Current default width of the solver column, see {@link #setSolvers(List)}. */
@@ -257,6 +265,16 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
         };
     }
 
+    /** The column with the number of supported captcha types. Hidable via the column menu of the table, see the container. */
+    public ExtColumn<SolverService> getSupportedCountColumn() {
+        return supportedCountColumn;
+    }
+
+    /** Returns the captcha type of the given column, or null if it is not the column of a captcha type. */
+    public CAPTCHA_TYPE getCaptchaType(final ExtColumn<SolverService> column) {
+        return column instanceof TypeColumn ? ((TypeColumn) column).type : null;
+    }
+
     @Override
     protected void initColumns() {
         addColumn(new ExtTextColumn<SolverService>(_GUI.T.CaptchaSolverComparison_column_solver()) {
@@ -270,9 +288,10 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
                 return value.getName();
             }
 
+            /* The description of the solver (the solver overview table has other tooltips). */
             @Override
             protected String getTooltipText(final SolverService value) {
-                return getSolverTooltip(value);
+                return value.getDescription();
             }
 
             /** Double click opens the page where an account for this solver can be bought. */
@@ -291,6 +310,20 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
                 return false;
             }
         });
+        /* Always right next to the solver column. */
+        supportedCountColumn = new ExtLongColumn<SolverService>(_GUI.T.SolverOrderTableModel_column_supportedCaptchaTypes(), this) {
+            @Override
+            protected long getLong(final SolverService value) {
+                return getSupportedCount(value);
+            }
+
+            @Override
+            public int getDefaultWidth() {
+                return 120;
+            }
+
+        };
+        addColumn(supportedCountColumn);
         for (final CAPTCHA_TYPE type : CaptchaType.getProcessableCaptchaTypes()) {
             addColumn(new TypeColumn(type));
         }
@@ -322,6 +355,20 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
                     }
                 }
             });
+        }
+
+        /* Header: the icon of the captcha type in front of its name. */
+        @Override
+        public ExtTableHeaderRenderer getHeaderRenderer(final JTableHeader jTableHeader) {
+            return new ExtTableHeaderRenderer(this, jTableHeader) {
+                @Override
+                public Component getTableCellRendererComponent(final JTable table, final Object value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
+                    super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                    setIcon(type.getIcon());
+                    setText(type.getDisplayName());
+                    return this;
+                }
+            };
         }
 
         /*

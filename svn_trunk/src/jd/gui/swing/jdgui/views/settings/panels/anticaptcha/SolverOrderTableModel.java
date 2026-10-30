@@ -292,15 +292,10 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
                 return value.getName();
             }
 
-            /* Only the double click hint (no supported captcha types count), as it depends on what a double click does for this solver. */
+            /* The description of the solver (the comparison table shows the same). */
             @Override
             protected String getTooltipText(final SolverService value) {
-                if (value instanceof BrowserSolverService) {
-                    return _GUI.T.SolverOrderTable_tooltip_selectBrowser();
-                } else if (value.getBuyURL() != null) {
-                    return _GUI.T.SolverOrderTable_tooltip_buyPage();
-                }
-                return null;
+                return value.getDescription();
             }
 
             /* Double click opens the page where an account for this solver can be bought. */
@@ -319,6 +314,12 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
             @Override
             public boolean isEnabled(SolverService obj) {
                 return obj.getConfigV3().isEnabled();
+            }
+
+            /* Hidden by default, can be shown via the column menu. */
+            @Override
+            public boolean isDefaultVisible() {
+                return false;
             }
 
             @Override
@@ -596,7 +597,7 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
             }
         });
         /* Number of captchas the solver (all accounts of the service together) is working on right now (hidden by default, sortable). */
-        activeJobsColumn = new ExtLongColumn<SolverService>("Number of active solver jobs", this) {
+        activeJobsColumn = new ExtLongColumn<SolverService>("Number of active captcha challenges", this) {
             @Override
             protected long getLong(final SolverService value) {
                 return ChallengeResponseController.getInstance().getActiveCaptchaCount(value.getID());

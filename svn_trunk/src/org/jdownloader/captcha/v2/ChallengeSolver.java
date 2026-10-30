@@ -122,10 +122,10 @@ public abstract class ChallengeSolver<T> {
                 return NewTheme.I().getIcon(IconKey.ICON_BROWSE, size);
             }
         },
-        JD_REMOTE_API {
+        JD_REMOTE_MYJD {
             @Override
             public String getLabel() {
-                return _GUI.T.CaptchaAPISolver_getName();
+                return _GUI.T.SolverType_JD_REMOTE_MYJD();
             }
 
             @Override

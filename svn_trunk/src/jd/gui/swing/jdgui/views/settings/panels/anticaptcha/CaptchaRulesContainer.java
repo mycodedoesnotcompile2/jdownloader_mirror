@@ -12,6 +12,7 @@ import org.appwork.swing.components.ExtButton;
 import org.appwork.swing.exttable.utils.MinimumSelectionObserver;
 import org.appwork.utils.swing.SwingUtils;
 import org.jdownloader.captcha.v2.CaptchaChallengeFilter;
+import org.jdownloader.captcha.v2.SolverService;
 import org.jdownloader.gui.translate._GUI;
 
 import jd.gui.swing.jdgui.views.settings.components.SettingsComponent;
@@ -81,6 +82,11 @@ public class CaptchaRulesContainer extends MigPanel implements SettingsComponent
                 action.setEnabled(count >= minSelections);
             }
         });
+    }
+
+    /** Opens the "add captcha rule" dialog with the given solver preselected. */
+    public void addRuleFor(final SolverService solver) {
+        new CaptchaRulesAddAction(table).addRule(solver);
     }
 
     public CaptchaRulesTable getTable() {

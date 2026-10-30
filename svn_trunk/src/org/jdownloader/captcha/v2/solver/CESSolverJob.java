@@ -166,7 +166,7 @@ public class CESSolverJob<T> {
             switch (other.getSolverType()) {
             case JD_LOCAL_DIALOG:
             case JD_LOCAL_BROWSER:
-            case JD_REMOTE_API:
+            case JD_REMOTE_MYJD:
                 return true;
             case JD_LOCAL:
             case EXTERNAL:

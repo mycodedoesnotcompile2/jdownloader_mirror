@@ -190,7 +190,9 @@ import jd.http.StaticProxySelector;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.Formatter;
 import jd.nutils.JDHash;
+import jd.controlling.accountchecker.AccountCheckerThread;
 import jd.plugins.Account.AccountError;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.download.DownloadInterface;
@@ -631,13 +633,20 @@ public abstract class PluginForHost extends Plugin {
         c.setTimeout(getChallengeTimeout(c));
         invalidateLastChallengeResponse();
         PluginProgress progress = null;
+        Account checkedAccount = null;
         try {
             if (isAccountLoginCaptchaChallenge(link, c)) {
                 c.setCaptchaRequestType(CaptchaRequestType.HOSTER_LOGIN);
+                /* The account manager shows which captcha is solved for the account that is checked right now. */
+                final Thread thread = Thread.currentThread();
+                if (thread instanceof AccountCheckerThread && ((AccountCheckerThread) thread).getJob() != null) {
+                    checkedAccount = ((AccountCheckerThread) thread).getJob().getAccount();
+                    checkedAccount.setSolvingCaptchaType(CAPTCHA_TYPE.getCaptchaTypeForChallenge(c));
+                }
             } else {
                 c.setCaptchaRequestType(CaptchaRequestType.HOSTER);
                 if (link != null) {
-                    progress = new CaptchaStepProgress(0, 1, null);
+                    progress = new CaptchaStepProgress(0, 1, null, CAPTCHA_TYPE.getCaptchaTypeForChallenge(c));
                     progress.setProgressSource(this);
                     progress.setDisplayInProgressColumnEnabled(false);
                     link.addPluginProgress(progress);
@@ -683,6 +692,9 @@ public abstract class PluginForHost extends Plugin {
         } finally {
             if (progress != null) {
                 link.removePluginProgress(progress);
+            }
+            if (checkedAccount != null) {
+                checkedAccount.setSolvingCaptchaType(null);
             }
         }
     }

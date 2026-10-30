@@ -11,6 +11,8 @@ import java.awt.Image;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.FocusEvent;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
@@ -19,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -104,6 +107,14 @@ public class SearchField<SearchCat extends SearchCatInterface, PackageType exten
         setBorder(BorderFactory.createCompoundBorder(orgBorder, BorderFactory.createEmptyBorder(0, 28, 0, 18)));
         addMouseMotionListener(this);
         addMouseListener(this);
+        addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyReleased(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
+                    setText("");
+                }
+            }
+        });
         // setSelectedCategory(defCategory);,
         focusAction = new AppAction() {
             @Override
@@ -245,6 +256,26 @@ public class SearchField<SearchCat extends SearchCatInterface, PackageType exten
     }
 
     private final static String REGEX_FILTER = "regex:";
+    /* True if the entered filter text is not a valid regular expression. The text is then shown in red. */
+    private volatile boolean    invalidFilterPattern = false;
+
+    private void setInvalidFilterPattern(final boolean invalid) {
+        if (invalidFilterPattern != invalid) {
+            invalidFilterPattern = invalid;
+            repaint();
+        }
+    }
+
+    /*
+     * ExtTextField resets the foreground color on focus changes, therefore the color is overridden here instead of being set.
+     */
+    @Override
+    public Color getForeground() {
+        if (invalidFilterPattern) {
+            return Color.RED;
+        }
+        return super.getForeground();
+    }
 
     private void updateFilter() {
         String filterRegex = this.getText();
@@ -253,6 +284,7 @@ public class SearchField<SearchCat extends SearchCatInterface, PackageType exten
         if (enabled) {
             final List<Pattern> list = new ArrayList<Pattern>();
             try {
+                setInvalidFilterPattern(false);
                 if (JsonConfig.create(GeneralSettings.class).isFilterRegex() || filterRegex.startsWith(REGEX_FILTER)) {
                     if (filterRegex.startsWith(REGEX_FILTER)) {
                         filterRegex = filterRegex.substring(REGEX_FILTER.length());
@@ -265,11 +297,16 @@ public class SearchField<SearchCat extends SearchCatInterface, PackageType exten
                     }
                 }
                 newFilter = getFilter(list, getSelectedCategory());
+            } catch (final PatternSyntaxException e) {
+                /* Invalid regular expression: no filter is applied, show the text in red */
+                setInvalidFilterPattern(true);
             } catch (final Throwable e) {
                 if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                     e.printStackTrace();
                 }
             }
+        } else {
+            setInvalidFilterPattern(false);
         }
         final PackageControllerTableModelFilter<PackageType, ChildType> oldFilter = appliedFilter.getAndSet(newFilter);
         if (oldFilter != null) {

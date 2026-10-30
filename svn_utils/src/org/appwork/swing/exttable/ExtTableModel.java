@@ -50,6 +50,7 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 import javax.swing.Icon;
 import javax.swing.ListSelectionModel;
@@ -178,7 +179,7 @@ public abstract class ExtTableModel<E> extends AbstractTableModel {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see javax.swing.table.AbstractTableModel#fireTableChanged(javax.swing.event.TableModelEvent)
      */
     @Override
@@ -558,7 +559,7 @@ public abstract class ExtTableModel<E> extends AbstractTableModel {
     public TableCellEditor getCelleditorByColumn(final int modelColumnIndex) {
         /*
          * Math.max(0, columnIndex)
-         *
+         * 
          * WORKAROUND for -1 column access,Index out of Bound,Unknown why it happens but this workaround seems to do its job
          */
         return this.getExtColumnByModelIndex(modelColumnIndex);
@@ -573,7 +574,7 @@ public abstract class ExtTableModel<E> extends AbstractTableModel {
     public ExtColumn<E> getCellrendererByColumn(final int columnIndex) {
         /*
          * Math.max(0, columnIndex)
-         *
+         * 
          * WORKAROUND for -1 column access,Index out of Bound,Unknown why it happens but this workaround seems to do its job
          */
         return this.columns.get(Math.max(0, columnIndex));
@@ -613,7 +614,7 @@ public abstract class ExtTableModel<E> extends AbstractTableModel {
     public String getColumnName(final int column) {
         /*
          * Math.max(0, columnIndex)
-         *
+         * 
          * WORKAROUND for -1 column access,Index out of Bound,Unknown why it happens but this workaround seems to do its job
          */
         return this.columns.get(Math.max(0, column)).getName();
@@ -1063,9 +1064,9 @@ public abstract class ExtTableModel<E> extends AbstractTableModel {
 
     /*
      * this will be called after fireTableStructureChanged. you can customize everything after this
-     *
+     * 
      * true = restore selection
-     *
+     * 
      * false = do not restore selection
      */
     protected boolean postSetTableData(final List<E> newtableData) {
@@ -1110,6 +1111,36 @@ public abstract class ExtTableModel<E> extends AbstractTableModel {
     }
 
     /**
+     * Builds the pattern used by {@link #searchNextObject(int, String, boolean, boolean)}. The pattern is meant to be used with
+     * {@link java.util.regex.Matcher#matches()}, therefore it is wrapped in <code>.*?</code>. Also used to validate user input before a
+     * search.
+     *
+     * @param ret
+     *            the search term. Without <code>regex</code>, <code>*</code> is a wildcard and everything else is matched literally
+     * @param caseSensitive
+     * @param regex
+     *            true if <code>ret</code> is a regular expression
+     * @return the compiled pattern
+     * @throws PatternSyntaxException
+     *             if <code>regex</code> is true and <code>ret</code> is not a valid regular expression
+     */
+    public Pattern createSearchPattern(final String ret, final boolean caseSensitive, final boolean regex) throws PatternSyntaxException {
+        final int flags = (caseSensitive ? 0 : Pattern.CASE_INSENSITIVE) | Pattern.DOTALL;
+        if (regex) {
+            return Pattern.compile(".*?" + ret + ".*?", flags);
+        }
+        final String[] pats = ret.split("\\*");
+        final StringBuilder pattern = new StringBuilder();
+        for (final String pp : pats) {
+            if (pattern.length() > 0) {
+                pattern.append(".*?");
+            }
+            pattern.append(Pattern.quote(pp));
+        }
+        return Pattern.compile(".*?" + pattern.toString() + ".*?", flags);
+    }
+
+    /**
      * @param startRow
      * @param ret
      * @param caseSensitive
@@ -1117,20 +1148,7 @@ public abstract class ExtTableModel<E> extends AbstractTableModel {
      * @return
      */
     public E searchNextObject(final int startRow, final String ret, final boolean caseSensitive, final boolean regex) {
-        final Pattern p;
-        if (!regex) {
-            final String[] pats = ret.split("\\*");
-            final StringBuilder pattern = new StringBuilder();
-            for (final String pp : pats) {
-                if (pattern.length() > 0) {
-                    pattern.append(".*?");
-                }
-                pattern.append(Pattern.quote(pp));
-            }
-            p = Pattern.compile(".*?" + pattern.toString() + ".*?", caseSensitive == false ? Pattern.CASE_INSENSITIVE : 0 | Pattern.DOTALL);
-        } else {
-            p = Pattern.compile(".*?" + ret + ".*?", caseSensitive == false ? Pattern.CASE_INSENSITIVE : 0 | Pattern.DOTALL);
-        }
+        final Pattern p = createSearchPattern(ret, caseSensitive, regex);
         final List<E> ltableData = this.getTableData();
         for (int i = startRow; i < ltableData.size(); i++) {
             for (int c = 0; c < this.columns.size(); c++) {

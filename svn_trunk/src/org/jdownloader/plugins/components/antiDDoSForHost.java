@@ -63,7 +63,7 @@ import org.mozilla.javascript.ScriptableObject;
  *
  */
 @SuppressWarnings({ "deprecation", "unused" })
-@HostPlugin(revision = "$Revision: 52373 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53806 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class antiDDoSForHost extends PluginForHost {
     public antiDDoSForHost(PluginWrapper wrapper) {
         super(wrapper);
@@ -656,7 +656,7 @@ public abstract class antiDDoSForHost extends PluginForHost {
                             // add meta cookies to current previous request cookies
                             for (int i = 0; i < cookieHeaders.size(); i++) {
                                 final String header = cookieHeaders.get(i);
-                                ckies.add(Cookies.parseCookies(header, host, date));
+                                ckies.add(Cookies.parseCookies(header, ibr._getURL(), date));
                             }
                             // set ckies as current cookies
                             ibr.getHttpConnection().getRequest().setCookies(ckies);

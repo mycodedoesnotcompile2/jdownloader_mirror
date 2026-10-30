@@ -20,19 +20,6 @@ import java.util.regex.Pattern;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.logging2.LogInterface;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.RequestHistory.TYPE;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-import org.mozilla.javascript.ConsString;
-import org.mozilla.javascript.Context;
-import org.mozilla.javascript.ContextFactory;
-import org.mozilla.javascript.ScriptableObject;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookie;
@@ -54,13 +41,26 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.UserAgents;
 import jd.plugins.components.UserAgents.BrowserName;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+import org.jdownloader.plugins.components.RequestHistory.TYPE;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.mozilla.javascript.ConsString;
+import org.mozilla.javascript.Context;
+import org.mozilla.javascript.ContextFactory;
+import org.mozilla.javascript.ScriptableObject;
+
 /**
  *
  * @author raztoki
  *
  */
 @SuppressWarnings({ "deprecation", "unused" })
-@DecrypterPlugin(revision = "$Revision: 50777 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53806 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class antiDDoSForDecrypt extends PluginForDecrypt {
     public antiDDoSForDecrypt(PluginWrapper wrapper) {
         super(wrapper);
@@ -605,7 +605,7 @@ public abstract class antiDDoSForDecrypt extends PluginForDecrypt {
                         // add meta cookies to current previous request cookies
                         for (int i = 0; i < cookieHeaders.size(); i++) {
                             final String header = cookieHeaders.get(i);
-                            ckies.add(Cookies.parseCookies(header, host, date));
+                            ckies.add(Cookies.parseCookies(header, ibr._getURL(), date));
                         }
                         // set ckies as current cookies
                         ibr.getHttpConnection().getRequest().setCookies(ckies);

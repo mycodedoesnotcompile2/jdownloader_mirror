@@ -64,7 +64,8 @@ public class FolderChooser extends PathChooser implements SettingsComponent {
             @Override
             public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
                 final List<String> list = DownloadPathHistoryManager.getInstance().listPaths(initialPath);
-                destination.setList(list);
+                /* false = Do not auto select the first entry, else opening the popup would overwrite the path in the text field */
+                destination.setList(list, false);
             }
 
             @Override

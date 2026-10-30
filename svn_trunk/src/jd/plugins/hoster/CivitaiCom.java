@@ -23,15 +23,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Exceptions;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.config.CivitaiComConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -51,7 +42,15 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53797 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Exceptions;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.config.CivitaiComConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 53806 $", interfaceVersion = 3, names = {}, urls = {})
 public class CivitaiCom extends PluginForHost {
     public CivitaiCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -173,11 +172,8 @@ public class CivitaiCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         this.setBrowserExclusive();
-        if (account != null) {
-            this.login(account);
-        }
         try {
-            final CivitaiComConfig cfg = PluginJsonConfig.get(CivitaiComConfig.class);
+            final CivitaiComConfig cfg = get(CivitaiComConfig.class);
             if (regex_image.patternFind()) {
                 if (account != null) {
                     return requestFileInformationImageAPI(link, account, contentID);
@@ -252,8 +248,7 @@ public class CivitaiCom extends PluginForHost {
                 }
                 /**
                  * 2024-03-11: Important: Do not open up the regex for original image too much or you run into risk of accidentally
-                 * downloading the wrong image, see: </br>
-                 * https://board.jdownloader.org/showthread.php?t=95419
+                 * downloading the wrong image, see: </br> https://board.jdownloader.org/showthread.php?t=95419
                  */
                 /* 2023-09-11: Base URL hardcoded from: https://civitai.com/_next/static/chunks/pages/_app-191d571abe9dc30e.js */
                 final String baseURL = "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/";
@@ -313,10 +308,11 @@ public class CivitaiCom extends PluginForHost {
         if (link == null || account == null || imageID == null) {
             throw new IllegalArgumentException();
         }
-        this.login(account);
+        final Browser brc = br.cloneBrowser();
+        this.login(brc, account);
         /* GET /api/v1/images?imageId=<id> — Authorization header already set by caller via login() */
-        br.getPage(getApiBase() + "/images?imageId=" + imageID + "&browsingLevel=31");// browsingLevel required to mature content
-        final Map<String, Object> response = checkErrorsAPI(br, true);
+        brc.getPage(getApiBase() + "/images?imageId=" + imageID + "&browsingLevel=31");// browsingLevel required to mature content
+        final Map<String, Object> response = checkErrorsAPI(brc, true);
         final List<Object> items = (List<Object>) response.get("items");
         if (items == null || items.isEmpty()) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -338,7 +334,7 @@ public class CivitaiCom extends PluginForHost {
             directURL = cdnURL + "/original=true/" + Encoding.urlEncode(imageID);
         }
         link.setProperty(PROPERTY_DIRECTURL, directURL);
-        final CivitaiComConfig cfg = PluginJsonConfig.get(CivitaiComConfig.class);
+        final CivitaiComConfig cfg = get(CivitaiComConfig.class);
         String filename;
         if (cfg.isUseIndexIDForImageFilename()) {
             filename = imageID;
@@ -437,7 +433,7 @@ public class CivitaiCom extends PluginForHost {
         }
     }
 
-    private void login(final Account account) throws Exception {
+    private void login(final Browser br, final Account account) throws Exception {
         synchronized (account) {
             br.setCookiesExclusive(true);
             /* See: https://github.com/civitai/civitai/wiki/REST-API-Reference#authorization */
@@ -504,10 +500,11 @@ public class CivitaiCom extends PluginForHost {
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
-        login(account);
+        final Browser brc = br.cloneBrowser();
+        login(brc, account);
         // https://developer.civitai.com/site/reference/users
-        br.getPage(getApiBase() + "/me");
-        final Map<String, Object> response = checkErrorsAPI(br, true);
+        brc.getPage(getApiBase() + "/me");
+        final Map<String, Object> response = checkErrorsAPI(brc, true);
         final String email = (String) response.get("email");
         if (email != null) {
             account.setUser(email);

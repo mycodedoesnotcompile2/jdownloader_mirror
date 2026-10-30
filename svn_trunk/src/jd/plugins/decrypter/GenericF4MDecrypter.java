@@ -20,15 +20,6 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.Files;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.HexFormatter;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter.ExtensionsFilterInterface;
-import org.jdownloader.plugins.components.hds.HDSContainer;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -42,7 +33,16 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 46974 $", interfaceVersion = 3, names = { "f4m" }, urls = { "https?://.+\\.f4m($|\\?[^\\s<>\"']*|#.*)" })
+import org.appwork.utils.Files;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.HexFormatter;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter.ExtensionsFilterInterface;
+import org.jdownloader.plugins.components.hds.HDSContainer;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+
+@DecrypterPlugin(revision = "$Revision: 53806 $", interfaceVersion = 3, names = { "f4m" }, urls = { "https?://.+\\.f4m($|\\?[^\\s<>\"']*|#.*)" })
 public class GenericF4MDecrypter extends PluginForDecrypt {
     @Override
     public Boolean siteTesterDisabled() {
@@ -69,7 +69,7 @@ public class GenericF4MDecrypter extends PluginForDecrypt {
                 cookiesString = downloadLink.getStringProperty("cookies", null);
                 if (cookiesString != null) {
                     final String host = Browser.getHost(source.getURL());
-                    br.setCookies(host, Cookies.parseCookies(cookiesString, host, null));
+                    br.setCookies(host, Cookies.parseCookies(cookiesString, new URL(source.getURL()), null));
                 }
             }
             if (!StringUtils.equals(source.getURL(), param.getCryptedUrl())) {

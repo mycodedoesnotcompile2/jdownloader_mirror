@@ -209,6 +209,9 @@ public interface JdownloaderTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Captcha recognition" })
     String gui_downloadview_statustext_jac();
 
+    @Default(lngs = { "en" }, values = { "Solving captcha %s1..." })
+    String gui_downloadview_statustext_solving(String captchaType);
+
     @Default(lngs = { "en" }, values = { "Although JDownloader runs on your javaversion, we advise to install the latest java updates. \r\nJDownloader will run more stable, faster, and will look better. \r\n\r\nVisit http://jdownloader.org/download." })
     String gui_javacheck_newerjavaavailable_msg();
 

@@ -50,6 +50,7 @@ import org.jdownloader.DomainInfo;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.components.ColumnButton;
 import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.translate._JDT;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
@@ -68,6 +69,7 @@ import jd.controlling.accountchecker.AccountCheckerEventListener;
 import jd.gui.swing.jdgui.interfaces.SwitchPanelEvent;
 import jd.gui.swing.jdgui.interfaces.SwitchPanelListener;
 import jd.plugins.Account;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountTrafficView;
 import jd.plugins.PluginForHost;
@@ -1152,6 +1154,11 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
 
     public static String accountToStatusString(Account value) {
         if (value.isChecking()) {
+            final CAPTCHA_TYPE solvingCaptchaType = value.getSolvingCaptchaType();
+            if (solvingCaptchaType != null) {
+                /* The check waits for a captcha: say which one. */
+                return _JDT.T.gui_downloadview_statustext_solving(solvingCaptchaType.getDisplayName());
+            }
             return _GUI.T.PremiumAccountTableModel_refresh();
         }
         final String errString = value.getErrorString();
@@ -1207,6 +1214,10 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
 
     public static Icon accountToStatusIcon(Account value) {
         if (value.isChecking()) {
+            final CAPTCHA_TYPE solvingCaptchaType = value.getSolvingCaptchaType();
+            if (solvingCaptchaType != null && solvingCaptchaType.getIcon() != null) {
+                return solvingCaptchaType.getIcon();
+            }
             return REFRESH;
         }
         if (value.getError() == null) {

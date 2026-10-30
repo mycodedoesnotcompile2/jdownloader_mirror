@@ -629,7 +629,7 @@ public class LiveHeaderInvoker extends ReconnectInvoker {
                                     postRequest.setContentType(value);
                                 }
                             } else if (StringUtils.equalsIgnoreCase(key, "cookie")) {
-                                final Cookies cookies = Cookies.parseCookies(value, null, null);
+                                final Cookies cookies = Cookies.parseCookies(value, browserRequest.getURL(), null);
                                 logger.info("Set-Cookies:" + cookies);
                                 browserRequest.getCookies().add(cookies);
                             } else if (key != null && !blackList.contains(key.toLowerCase(Locale.ENGLISH))) {

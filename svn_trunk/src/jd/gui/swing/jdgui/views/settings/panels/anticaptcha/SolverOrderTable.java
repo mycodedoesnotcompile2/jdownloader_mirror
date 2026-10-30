@@ -19,6 +19,7 @@ import org.jdownloader.captcha.v2.solver.service.BrowserSolverService;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.images.NewTheme;
 import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSolverService;
 
 import jd.gui.swing.jdgui.BasicJDTable;
@@ -100,8 +101,28 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
      * </ul>
      * All solver types additionally get an enable/disable action for the whole selection.
      */
+    /**
+     * "Show in comparison table": all selected solvers if the right-clicked one is part of the selection, otherwise only the right-clicked
+     * one.
+     */
+    private JMenuItem createShowInComparisonItem(final SolverService contextObject, final List<SolverService> selection) {
+        final List<SolverService> solvers = selection != null && selection.contains(contextObject) ? new ArrayList<SolverService>(selection) : new ArrayList<SolverService>(Collections.singletonList(contextObject));
+        final JMenuItem showInComparison = new JMenuItem(_GUI.T.SolverOrderTable_context_showInComparisonTable(), NewTheme.I().getIcon(IconKey.ICON_LIST, 18));
+        showInComparison.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(final ActionEvent e) {
+                CaptchaConfigPanel.showInComparisonTable(solvers);
+            }
+        });
+        return showInComparison;
+    }
+
     @Override
     protected JPopupMenu onContextMenu(final JPopupMenu popup, final SolverService contextObject, final List<SolverService> selection, final ExtColumn<SolverService> column, final MouseEvent mouseEvent) {
+        if (contextObject != null) {
+            /* Always the first entry. */
+            popup.add(createShowInComparisonItem(contextObject, selection));
+        }
         if (contextObject instanceof CaptchaAPIManualRemoteSolverService) {
             final CaptchaAPIManualRemoteSolverService myjd = (CaptchaAPIManualRemoteSolverService) contextObject;
             /* MyJDownloader logo icon in front of the text (reuses the solver's own icon). */
@@ -116,19 +137,18 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
         } else if (contextObject instanceof PluginForCaptchaSolverSolverService) {
             final PluginForCaptchaSolverSolverService external = (PluginForCaptchaSolverSolverService) contextObject;
             /*
-             * Account manager icon in front of the text (same icon the Account Manager settings panel uses). Only offered if the solver
-             * has an account the account manager could show.
+             * Account manager icon in front of the text (same icon the Account Manager settings panel uses). Greyed out if the solver has no
+             * account the account manager could show.
              */
-            if (external.hasAccount()) {
-                final JMenuItem openAccountManager = new JMenuItem(_GUI.T.SolverOrderTable_context_openAccountManager(), new AbstractIcon(IconKey.ICON_PREMIUM, 18));
-                openAccountManager.addActionListener(new ActionListener() {
-                    @Override
-                    public void actionPerformed(final ActionEvent e) {
-                        external.openAccountManagerSelectingFirstMatchingAccount();
-                    }
-                });
-                popup.add(openAccountManager);
-            }
+            final JMenuItem openAccountManager = new JMenuItem(_GUI.T.SolverOrderTable_context_openAccountManager(), new AbstractIcon(IconKey.ICON_PREMIUM, 18));
+            openAccountManager.setEnabled(external.hasAccount());
+            openAccountManager.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(final ActionEvent e) {
+                    external.openAccountManagerSelectingFirstMatchingAccount();
+                }
+            });
+            popup.add(openAccountManager);
             if (external.getBuyURL() != null) {
                 /* Paid solver: same "Buy" icon and affiliate/redirect link logic as the account manager. */
                 final JMenuItem buyCredits = new JMenuItem(_GUI.T.SolverOrderTable_context_buyCredits(), new AbstractIcon(IconKey.ICON_BUY, 18));
@@ -171,6 +191,17 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
                 }
             });
             popup.add(addAccount);
+        }
+        if (contextObject != null) {
+            /* Only for the right-clicked solver, never for the whole selection. */
+            final JMenuItem createRule = new JMenuItem(_GUI.T.SolverOrderTable_context_createCaptchaRule(), NewTheme.I().getIcon(IconKey.ICON_ADD, 18));
+            createRule.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(final ActionEvent e) {
+                    CaptchaConfigPanel.createCaptchaRule(contextObject);
+                }
+            });
+            popup.add(createRule);
         }
         if (selection != null && !selection.isEmpty()) {
             /* Enable/disable all selected solvers at once, same behavior as in the download list. */

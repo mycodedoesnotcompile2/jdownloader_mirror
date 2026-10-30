@@ -32,24 +32,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.simplejson.MinimalMemoryMap;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Hash;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.RedditConfig;
-import org.jdownloader.plugins.components.config.RedditConfig.CommentsPackagenameScheme;
-import org.jdownloader.plugins.components.config.RedditConfig.FilenameScheme;
-import org.jdownloader.plugins.components.config.RedditConfig.PreviewCrawlerMode;
-import org.jdownloader.plugins.components.config.RedditConfig.TextCrawlerMode;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
-import org.jdownloader.plugins.controller.host.LazyHostPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -76,7 +58,25 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.RedditCom;
 
-@DecrypterPlugin(revision = "$Revision: 53802 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.storage.simplejson.MinimalMemoryMap;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Hash;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.RedditConfig;
+import org.jdownloader.plugins.components.config.RedditConfig.CommentsPackagenameScheme;
+import org.jdownloader.plugins.components.config.RedditConfig.FilenameScheme;
+import org.jdownloader.plugins.components.config.RedditConfig.PreviewCrawlerMode;
+import org.jdownloader.plugins.components.config.RedditConfig.TextCrawlerMode;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
+import org.jdownloader.plugins.controller.host.LazyHostPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 53821 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { RedditCom.class })
 public class RedditComCrawler extends PluginForDecrypt {
     public RedditComCrawler(PluginWrapper wrapper) {
@@ -99,8 +99,8 @@ public class RedditComCrawler extends PluginForDecrypt {
     public int getMaxConcurrentProcessingInstances() {
         /**
          * 2023-08-07: Try not to run into API rate-limits RE:
-         * https://support.reddithelp.com/hc/en-us/articles/16160319875092-Reddit-Data-API-Wiki </br>
-         * IMPORTANT: Dev: If you want to set this to a value higher than 1, first check API rate-limit handling and implement locks!!
+         * https://support.reddithelp.com/hc/en-us/articles/16160319875092-Reddit-Data-API-Wiki </br> IMPORTANT: Dev: If you want to set
+         * this to a value higher than 1, first check API rate-limit handling and implement locks!!
          */
         return 1;
     }
@@ -163,9 +163,9 @@ public class RedditComCrawler extends PluginForDecrypt {
         }
     }
 
-    private static AtomicReference<String>       CACHED_LOID           = new AtomicReference<String>();
-    private static AtomicLong                    CACHED_LOID_TIMESTAMP = new AtomicLong(-1);
-    private static final long                    CACHED_LOID_MAX_AGE   = 3 * 60 * 60 * 1000L;
+    private static AtomicReference<String> CACHED_LOID           = new AtomicReference<String>();
+    private static AtomicLong              CACHED_LOID_TIMESTAMP = new AtomicLong(-1);
+    private static final long              CACHED_LOID_MAX_AGE   = 3 * 60 * 60 * 1000L;
 
     private void authorize_json_api_usage() throws Exception {
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
@@ -467,8 +467,8 @@ public class RedditComCrawler extends PluginForDecrypt {
             if (crosspost_parent_list != null && crosspost_parent_list.size() == 1) {
                 /**
                  * post is a crosspost -> Crawl original post content <br>
-                 * See: https://www.reddit.com/r/redditdev/comments/18c67v8/how_to_detect_crossposts_in_praw/ </br>
-                 * If we fail to do this, some video elements may be downloaded in max 720p while 1080p is available via "fallback_url".
+                 * See: https://www.reddit.com/r/redditdev/comments/18c67v8/how_to_detect_crossposts_in_praw/ </br> If we fail to do this,
+                 * some video elements may be downloaded in max 720p while 1080p is available via "fallback_url".
                  */
                 data = crosspost_parent_list.get(0);
             }
@@ -693,8 +693,7 @@ public class RedditComCrawler extends PluginForDecrypt {
                     }
                     /**
                      * Return "preview video" because e.g. in some cases original video is hosted on imgur.com but it is offline while
-                     * content on reddit is still online e.g.: </br>
-                     * /r/Bellissima/comments/151ruli/brit_manuela/
+                     * content on reddit is still online e.g.: </br> /r/Bellissima/comments/151ruli/brit_manuela/
                      */
                     if (reddit_video_preview != null && !addedRedditSelfhostedVideo) {
                         final String hls_url = reddit_video_preview.get("hls_url").toString();
@@ -750,6 +749,9 @@ public class RedditComCrawler extends PluginForDecrypt {
                         if (extension == null) {
                             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                         }
+                        if ("jpg".equalsIgnoreCase(extension)) {
+                            extension = "jpeg";// server expects jpeg and not jpg
+                        }
                         final DownloadLink image = this.createDownloadlink("https://i.redd.it/" + mediaID + "." + extension);
                         image.setProperty(RedditCom.PROPERTY_SERVER_FILENAME_WITHOUT_EXT, mediaID);
                         image.setProperty(RedditCom.PROPERTY_TYPE, RedditCom.PROPERTY_TYPE_image);
@@ -764,8 +766,8 @@ public class RedditComCrawler extends PluginForDecrypt {
                     }
                 } else {
                     /**
-                     * No image gallery or offline image gallery. </br>
-                     * --> Look for embedded content from external sources - the object is always given but can be empty
+                     * No image gallery or offline image gallery. </br> --> Look for embedded content from external sources - the object is
+                     * always given but can be empty
                      */
                     final Map<String, Object> embeddedMediaInfo = (Map<String, Object>) data.get("media_embed");
                     if (embeddedMediaInfo != null && !embeddedMediaInfo.isEmpty()) {

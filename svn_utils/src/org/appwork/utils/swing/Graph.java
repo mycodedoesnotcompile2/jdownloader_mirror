@@ -80,6 +80,7 @@ abstract public class Graph extends JPanel implements ToolTipHandler {
     protected volatile int                            value;
     protected long[]                                  averageCache;
     protected long[]                                  cache;
+    private volatile long[][]                         additionalSeriesCache = new long[0][];
     private Color                                     averageColor     = new Color(0x333333);
     private Color                                     averageTextColor = new Color(0);
     private int                                       capacity         = 0;
@@ -224,6 +225,35 @@ abstract public class Graph extends JPanel implements ToolTipHandler {
      */
     abstract public int getValue();
 
+    /** Optional extra curves sharing this graph's time axis and scale. */
+    protected int getAdditionalSeriesCount() {
+        return 0;
+    }
+
+    protected int getAdditionalSeriesValue(final int series) {
+        return 0;
+    }
+
+    protected Color getAdditionalSeriesColorTop(final int series) {
+        return new Color(70, 150, 255, 70);
+    }
+
+    protected Color getAdditionalSeriesColorBottom(final int series) {
+        return new Color(20, 100, 230, 150);
+    }
+
+    protected long getAdditionalSeriesAverage(final int series) {
+        final long[][] caches = additionalSeriesCache;
+        if (series < 0 || series >= caches.length || caches[series].length == 0) {
+            return 0;
+        }
+        long sum = 0;
+        for (final long value : caches[series]) {
+            sum += value;
+        }
+        return all <= 0 ? 0 : sum / all;
+    }
+
     /**
      * @return the antiAliasing
      */
@@ -268,6 +298,12 @@ abstract public class Graph extends JPanel implements ToolTipHandler {
             for (final long element : this.averageCache) {
                 max = Math.max(element, max);
             }
+            final long[][] additionalCaches = this.additionalSeriesCache;
+            for (final long[] additionalCache : additionalCaches) {
+                for (final long element : additionalCache) {
+                    max = Math.max(element, max);
+                }
+            }
             final Limiter[] limitertmp = this.getLimiter();
             if (limitertmp != null) {
                 for (final Limiter l : limitertmp) {
@@ -305,6 +341,29 @@ abstract public class Graph extends JPanel implements ToolTipHandler {
                 g2.fill(apoly);
                 g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
                 g2.draw(apoly);
+            }
+            for (int series = 0; series < additionalCaches.length; series++) {
+                final long[] additionalCache = additionalCaches[series];
+                boolean hasValues = false;
+                final Polygon additional = new Polygon();
+                additional.addPoint(0, this.getHeight());
+                int additionalIndex = this.valueIndex;
+                for (int x = 0; x < additionalCache.length; x++) {
+                    final int polyX = (x * this.getWidth()) / (additionalCache.length - 1);
+                    final long seriesValue = additionalCache[additionalIndex];
+                    hasValues |= seriesValue > 0;
+                    additional.addPoint(polyX, this.getHeight() - (int) ((polyHeight * seriesValue * 0.9) / max));
+                    additionalIndex = (additionalIndex + 1) % additionalCache.length;
+                }
+                additional.addPoint(this.getWidth(), this.getHeight());
+                if (hasValues) {
+                    final Color top = getAdditionalSeriesColorTop(series);
+                    final Color bottom = getAdditionalSeriesColorBottom(series);
+                    g2.setPaint(new GradientPaint(this.getWidth() / 2, this.getHeight() - this.getPaintHeight(), top, this.getWidth() / 2, this.getHeight(), bottom));
+                    g2.fill(additional);
+                    g2.setColor(bottom);
+                    g2.draw(additional);
+                }
             }
             if (this.textFont != null) {
                 g2.setFont(this.textFont);
@@ -492,6 +551,8 @@ abstract public class Graph extends JPanel implements ToolTipHandler {
                 return;
             }
             this.valueIndex = 0;
+            final int additionalSeries = Math.max(0, getAdditionalSeriesCount());
+            this.additionalSeriesCache = new long[additionalSeries][this.cache.length];
             thread = new Thread("Speedmeter updater") {
                 @Override
                 public void run() {
@@ -521,6 +582,10 @@ abstract public class Graph extends JPanel implements ToolTipHandler {
                                 Graph.this.all = Math.min(Graph.this.all + 1, Graph.this.cache.length);
                                 Graph.this.averageCache[Graph.this.valueIndex] = (Graph.this.average / Graph.this.all);
                                 Graph.this.cache[Graph.this.valueIndex] = Graph.this.value;
+                                final long[][] additionalCaches = Graph.this.additionalSeriesCache;
+                                for (int series = 0; series < additionalCaches.length; series++) {
+                                    additionalCaches[series][Graph.this.valueIndex] = Math.max(0, Graph.this.getAdditionalSeriesValue(series));
+                                }
                                 Graph.this.valueIndex++;
                                 Graph.this.valueIndex = Graph.this.valueIndex % Graph.this.cache.length;
                             }

@@ -25,13 +25,19 @@ import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JList;
+import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+import javax.swing.event.TableModelEvent;
+import javax.swing.event.TableModelListener;
 import javax.swing.plaf.basic.ComboPopup;
 
 import org.appwork.swing.MigPanel;
+import org.appwork.swing.exttable.ExtCheckBoxMenuItem;
 import org.appwork.swing.exttable.ExtColumn;
 import org.jdownloader.captcha.v2.CaptchaHistoryEntry;
 import org.jdownloader.captcha.v2.CaptchaHistoryManager;
@@ -65,16 +71,16 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
         USED
     }
 
-    /** Sets of solver types the "preselected solver types" dropdown can select. */
+    /** Groups of solver types the "preselected solver groups" dropdown can select. */
     private enum SolverTypePreselect {
         /** All solver types. */
         ALL,
+        /** The automatic local solver (JAC). */
+        JAC,
+        /** Manual captcha solving: the captcha dialog, the browser solver and the MyJDownloader remote solver. */
+        MANUAL,
         /** External (plugin based) solvers only. The default. */
         EXTERNAL,
-        /** Solvers running locally: automatic (JAC), dialog and browser solver. */
-        LOCAL,
-        /** The remote solver (MyJDownloader). */
-        REMOTE,
         /** The manual selection of the user, external solvers as long as the user never changed the selection. */
         CUSTOM
     }
@@ -118,6 +124,8 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
     /** True if the captcha history contains captcha types, i.e. the "Used by me" preset can be selected (otherwise it is greyed out). */
     private boolean                              usedAvailable = false;
     private final JScrollPane                    scrollPane;
+    /** Hint below the table about the self-declared captcha types of external solvers, only shown if the table contains one. */
+    private final JLabel                         disclaimerLabel;
     private final JComboBox                      solverTypePresetCombo;
     /** Multi-select "[x/y] [Type1, Type2, ...]" control of the solver types. */
     private final MultiComboBox<SolverType>      solverTypesCombo;
@@ -138,8 +146,6 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
     private final Set<SolverService>             selectedSolvers     = new LinkedHashSet<SolverService>();
     /** True while the solver dropdown/multi-select is modified programmatically so that its listener does not reset the selection. */
     private boolean                              adjustingSolvers    = false;
-    /** True if at least one solver is enabled, i.e. the "All" solver preset can be selected (otherwise it is greyed out). */
-    private boolean                              solverAllAvailable  = false;
     /** True if at least one solver is enabled and usable, i.e. the "usable" solver preset can be selected (otherwise it is greyed out). */
     private boolean                              solverUsableAvailable = false;
     /** The solvers of the "Custom" preset, remembered for the running session only. null = the user never populated it, then all solvers. */
@@ -198,23 +204,32 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
                         }
                     });
                     popup.add(hide);
+                    /* Deselects every solver except the selected ones. Greyed out for the same reason as "Hide". */
+                    final JMenuItem hideOthers = new JMenuItem(_GUI.T.CaptchaSolverComparison_hideAllOthers(), NewTheme.I().getIcon(IconKey.ICON_REMOVE, 16));
+                    hideOthers.setEnabled(selection.size() != SolverComparisonContainer.this.model.getRowCount());
+                    hideOthers.addActionListener(new ActionListener() {
+                        @Override
+                        public void actionPerformed(final ActionEvent e) {
+                            hideAllOthers(new ArrayList<SolverService>(selection));
+                        }
+                    });
+                    popup.add(hideOthers);
                 }
                 if (contextObject instanceof PluginForCaptchaSolverSolverService) {
                     final PluginForCaptchaSolverSolverService external = (PluginForCaptchaSolverSolverService) contextObject;
                     if (popup.getComponentCount() > 0) {
                         popup.addSeparator();
                     }
-                    /* Only offered if the solver has an account the account manager could show. */
-                    if (external.hasAccount()) {
-                        final JMenuItem openAccountManager = new JMenuItem(_GUI.T.SolverOrderTable_context_openAccountManager(), new AbstractIcon(IconKey.ICON_PREMIUM, 18));
-                        openAccountManager.addActionListener(new ActionListener() {
-                            @Override
-                            public void actionPerformed(final ActionEvent e) {
-                                external.openAccountManagerSelectingFirstMatchingAccount();
-                            }
-                        });
-                        popup.add(openAccountManager);
-                    }
+                    /* Greyed out if the solver has no account the account manager could show. */
+                    final JMenuItem openAccountManager = new JMenuItem(_GUI.T.SolverOrderTable_context_openAccountManager(), new AbstractIcon(IconKey.ICON_PREMIUM, 18));
+                    openAccountManager.setEnabled(external.hasAccount());
+                    openAccountManager.addActionListener(new ActionListener() {
+                        @Override
+                        public void actionPerformed(final ActionEvent e) {
+                            external.openAccountManagerSelectingFirstMatchingAccount();
+                        }
+                    });
+                    popup.add(openAccountManager);
                     if (external.getBuyURL() != null) {
                         final JMenuItem buyCredits = new JMenuItem(_GUI.T.SolverOrderTable_context_buyCredits(), new AbstractIcon(IconKey.ICON_BUY, 18));
                         buyCredits.addActionListener(new ActionListener() {
@@ -249,15 +264,18 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
                 return popup.getComponentCount() == 0 ? null : popup;
             }
 
-            /* The shown columns are controlled by the selection above the table only, so the table's own column menu/button is disabled. */
+            /*
+             * Own column menu: the captcha type columns are controlled by the captcha type selection above the table, so the default menu
+             * (which would hide columns on its own) is replaced, see createColumnMenu.
+             */
             @Override
             protected JPopupMenu columnControlMenu(final ExtColumn<SolverService> extColumn) {
-                return null;
+                return createColumnMenu(extColumn);
             }
 
             @Override
             public boolean isColumnButtonVisible() {
-                return false;
+                return true;
             }
         };
         /* Many captcha type columns: keep their width and scroll horizontally instead of squeezing them. */
@@ -488,9 +506,9 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
             }
         });
         solverTypePresetCombo.addItem(SolverTypePreselect.ALL);
+        solverTypePresetCombo.addItem(SolverTypePreselect.JAC);
+        solverTypePresetCombo.addItem(SolverTypePreselect.MANUAL);
         solverTypePresetCombo.addItem(SolverTypePreselect.EXTERNAL);
-        solverTypePresetCombo.addItem(SolverTypePreselect.LOCAL);
-        solverTypePresetCombo.addItem(SolverTypePreselect.REMOTE);
         solverTypePresetCombo.addItem(SolverTypePreselect.CUSTOM);
         /* Default: external solvers only. */
         solverTypePresetCombo.setSelectedItem(SolverTypePreselect.EXTERNAL);
@@ -542,7 +560,16 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
             }
         });
         add(scrollPane, "grow");
-        add(new JLabel(_GUI.T.CaptchaSolverComparison_disclaimer()), "growx, wmin 10");
+        /* Only about external solvers: shown as long as at least one of them is in the table. */
+        disclaimerLabel = new JLabel(_GUI.T.CaptchaSolverComparison_disclaimer(), NewTheme.I().getIcon(IconKey.ICON_INFO, 18), SwingConstants.LEADING);
+        disclaimerLabel.setVisible(false);
+        add(disclaimerLabel, "growx, wmin 10, hidemode 3");
+        model.addTableModelListener(new TableModelListener() {
+            @Override
+            public void tableChanged(final TableModelEvent e) {
+                updateDisclaimerVisibility();
+            }
+        });
         /* Default: all captcha types selected. */
         selectedTypes.addAll(allTypes);
         syncTypesCombo();
@@ -550,12 +577,151 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
         refresh();
     }
 
+    /**
+     * Menu of the column header / the column button: show or hide the column with the number of supported captcha types, hide the captcha
+     * type of the clicked column and select the captcha types. Hiding or showing a captcha type changes the captcha type selection above
+     * the table (and with it the preset, like a manual change there).
+     */
+    private JPopupMenu createColumnMenu(final ExtColumn<SolverService> extColumn) {
+        final JPopupMenu popup = new JPopupMenu();
+        final CAPTCHA_TYPE clickedType = extColumn == null ? null : model.getCaptchaType(extColumn);
+        if (clickedType != null) {
+            final JMenuItem hideType = new JMenuItem(_GUI.T.CaptchaSolverComparison_columnMenu_hideType(clickedType.getDisplayName()), clickedType.getIcon());
+            hideType.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(final ActionEvent e) {
+                    setTypeSelected(clickedType, false);
+                }
+            });
+            popup.add(hideType);
+            popup.addSeparator();
+        }
+        final ExtColumn<SolverService> countColumn = model.getSupportedCountColumn();
+        final ExtCheckBoxMenuItem countItem = new ExtCheckBoxMenuItem(countColumn.getName());
+        countItem.setHideOnClick(false);
+        countItem.setSelected(model.isColumnVisible(countColumn));
+        countItem.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(final ActionEvent e) {
+                model.setColumnVisible(countColumn, countItem.isSelected());
+            }
+        });
+        popup.add(countItem);
+        popup.addSeparator();
+        final JMenu typesMenu = new JMenu(_GUI.T.CaptchaSolverComparison_columnMenu_types());
+        final ExtCheckBoxMenuItem selectAllItem = new ExtCheckBoxMenuItem(_GUI.T.CaptchaSolverComparison_columnMenu_selectAll());
+        selectAllItem.setHideOnClick(false);
+        selectAllItem.setSelected(selectedTypes.size() == allTypes.size());
+        selectAllItem.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(final ActionEvent e) {
+                selectedTypes.clear();
+                if (selectAllItem.isSelected()) {
+                    selectedTypes.addAll(allTypes);
+                }
+                syncTypesCombo();
+                onManualSelectionChange();
+            }
+        });
+        typesMenu.add(selectAllItem);
+        typesMenu.addSeparator();
+        for (final CAPTCHA_TYPE type : allTypes) {
+            final ExtCheckBoxMenuItem typeItem = new ExtCheckBoxMenuItem(type.getDisplayName());
+            typeItem.setIcon(type.getIcon());
+            typeItem.setHideOnClick(false);
+            typeItem.setSelected(selectedTypes.contains(type));
+            typeItem.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(final ActionEvent e) {
+                    setTypeSelected(type, typeItem.isSelected());
+                }
+            });
+            typesMenu.add(typeItem);
+        }
+        popup.add(typesMenu);
+        return popup;
+    }
+
+    /** Selects or deselects one captcha type like the multi-select above the table does. */
+    private void setTypeSelected(final CAPTCHA_TYPE type, final boolean selected) {
+        if (selected) {
+            selectedTypes.add(type);
+        } else {
+            selectedTypes.remove(type);
+        }
+        syncTypesCombo();
+        onManualSelectionChange();
+    }
+
+    /**
+     * Selects the given solvers in the table and scrolls to the first one. If one of them is not in the table because of the selections
+     * and filters above it, they are reset first: all solver groups and solvers, all captcha types and the filter "only solvers that
+     * support all selected captcha types" is switched off.
+     */
+    public void showSolvers(final java.util.Collection<SolverService> solvers) {
+        refresh();
+        boolean allShown = true;
+        for (final SolverService solver : solvers) {
+            allShown &= model.isShown(solver);
+        }
+        if (!allShown) {
+            /* Solver groups and solvers: everything. */
+            adjustingSolverTypes = true;
+            try {
+                solverTypePresetCombo.setSelectedItem(SolverTypePreselect.ALL);
+            } finally {
+                adjustingSolverTypes = false;
+            }
+            applySolverTypePreset(SolverTypePreselect.ALL);
+            /* All captcha types. */
+            rememberedSelection = new LinkedHashSet<CAPTCHA_TYPE>(allTypes);
+            adjusting = true;
+            try {
+                presetCombo.setSelectedItem(Preselect.SELECTION);
+            } finally {
+                adjusting = false;
+            }
+            applyPreset(Preselect.SELECTION);
+            onlyFullSupportCheckBox.setSelected(false);
+            model.setOnlyFullSupport(false);
+        }
+        /* The rows are rebuilt on the EDT: select once that is done. */
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                table.getSelectionModel().clearSelection();
+                int firstRow = -1;
+                for (final SolverService solver : solvers) {
+                    final int row = model.getRowforObject(solver);
+                    if (row < 0) {
+                        continue;
+                    }
+                    table.getSelectionModel().addSelectionInterval(row, row);
+                    firstRow = firstRow < 0 ? row : Math.min(firstRow, row);
+                }
+                if (firstRow >= 0) {
+                    table.scrollRectToVisible(table.getCellRect(firstRow, 0, true));
+                }
+            }
+        });
+    }
+
+    /** Shows the hint below the table only if at least one external solver is in the table. */
+    private void updateDisclaimerVisibility() {
+        boolean externalSolverShown = false;
+        for (final SolverService solver : model.getTableData()) {
+            if (solver.getType() == SolverType.EXTERNAL) {
+                externalSolverShown = true;
+                break;
+            }
+        }
+        disclaimerLabel.setVisible(externalSolverShown);
+    }
+
     /** True if the given dropdown entry is greyed out, i.e. it cannot be selected: "Used by me" and the solver presets "All" / "usable". */
     private boolean isPresetDisabled(final Object preset) {
         if (preset == Preselect.USED) {
             return !usedAvailable;
-        } else if (preset == SolverPreselect.ALL) {
-            return !solverAllAvailable;
         } else if (preset == SolverPreselect.USABLE) {
             return !solverUsableAvailable;
         }
@@ -638,19 +804,14 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
         }
     }
 
-    /** "All" needs at least one enabled solver, the "usable" preset at least one enabled and usable one; otherwise they are greyed out. */
+    /** The "usable" preset needs at least one enabled and usable solver; otherwise it is greyed out. */
     private void updateSolverPresetAvailability() {
-        boolean anyEnabled = false;
         boolean anyUsable = false;
         for (final SolverService solver : allSolvers) {
-            if (solver.getConfigV3().isEnabled()) {
-                anyEnabled = true;
-                if (solver.isReady()) {
-                    anyUsable = true;
-                }
+            if (solver.getConfigV3().isEnabled() && solver.isReady()) {
+                anyUsable = true;
             }
         }
-        solverAllAvailable = anyEnabled;
         solverUsableAvailable = anyUsable;
     }
 
@@ -722,6 +883,14 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
         onSolverSelectionChanged();
     }
 
+    /** Context menu "Hide all others": keeps only the given solvers selected, which turns the preset into "Custom". */
+    private void hideAllOthers(final List<SolverService> solvers) {
+        selectedSolvers.retainAll(solvers);
+        switchToCustomSolverSelection();
+        syncSolversCombo();
+        onSolverSelectionChanged();
+    }
+
     /** Reflects {@link #selectedSolvers} in the multi-select control without triggering its own change handling. */
     private void syncSolversCombo() {
         adjustingSolvers = true;
@@ -777,13 +946,19 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
         allServices.clear();
         allServices.addAll(ChallengeResponseController.getInstance().listServices());
         syncSolverTypesCombo();
-        reloadSolvers();
+        reloadSolvers(false);
         rebuildPresetCombo();
         updateFullSupportCheckBox();
     }
 
     /** Rebuilds the rows and the solver selection from all solvers of the selected solver types. */
-    private void reloadSolvers() {
+    /**
+     * @param resetToAll
+     *            true if the solver types changed: then all solvers of the selected types are selected ("All by selected types"),
+     *            whatever the solver preset was before. The remembered "Custom" selection is not touched. false: the current solver
+     *            preset is applied again (enabled/usable solvers change while the application is running).
+     */
+    private void reloadSolvers(final boolean resetToAll) {
         final List<SolverService> typedSolvers = new ArrayList<SolverService>();
         for (final SolverService service : allServices) {
             if (selectedSolverTypes.contains(service.getType())) {
@@ -800,27 +975,31 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
         }
         model.setSolvers(typedSolvers);
         updateSolverPresetAvailability();
-        /* Enabled/usable solvers and the solver list change while the application is running, so the preset is applied again. */
         final Object currentSolverPreset = solverPresetCombo.getSelectedItem();
-        if (currentSolverPreset instanceof SolverPreselect && !isPresetDisabled(currentSolverPreset)) {
+        if (!resetToAll && currentSolverPreset instanceof SolverPreselect && !isPresetDisabled(currentSolverPreset)) {
             applySolverPreset((SolverPreselect) currentSolverPreset);
-        } else {
-            /* The chosen preset is not available anymore (e.g. all solvers got disabled): keep the selection, but as "Custom". */
-            selectedSolvers.retainAll(allSolvers);
-            switchToCustomSolverSelection();
-            syncSolversCombo();
-            onSolverSelectionChanged();
+            return;
         }
+        /* Solver types changed or the chosen preset is not available anymore: all solvers of the selected types. */
+        adjustingSolvers = true;
+        try {
+            solverPresetCombo.setSelectedItem(SolverPreselect.ALL);
+        } finally {
+            adjustingSolvers = false;
+        }
+        applySolverPreset(SolverPreselect.ALL);
     }
 
     private static String getSolverTypePresetName(final SolverTypePreselect preset) {
         switch (preset) {
+        case JAC:
+            /* Same text as the name of the solver itself. */
+            return _GUI.T.JACSolver_getName_();
+        case MANUAL:
+            return _GUI.T.CaptchaSolverComparison_preselectSolverTypes_manual();
         case EXTERNAL:
-            return _GUI.T.CaptchaSolverComparison_preselectSolverTypes_external();
-        case LOCAL:
-            return _GUI.T.CaptchaSolverComparison_preselectSolverTypes_local();
-        case REMOTE:
-            return _GUI.T.CaptchaSolverComparison_preselectSolverTypes_remote();
+            /* Same text as the type of the external solvers. */
+            return _GUI.T.CaptchaSolverService_type();
         case CUSTOM:
             return _GUI.T.CaptchaSolverComparison_preselectSolverTypes_custom();
         case ALL:
@@ -833,13 +1012,13 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
     private Set<SolverType> getSolverTypePresetTypes(final SolverTypePreselect preset) {
         final Set<SolverType> ret = new LinkedHashSet<SolverType>();
         switch (preset) {
-        case LOCAL:
+        case JAC:
             ret.add(SolverType.JD_LOCAL);
+            break;
+        case MANUAL:
             ret.add(SolverType.JD_LOCAL_DIALOG);
             ret.add(SolverType.JD_LOCAL_BROWSER);
-            break;
-        case REMOTE:
-            ret.add(SolverType.JD_REMOTE_API);
+            ret.add(SolverType.JD_REMOTE_MYJD);
             break;
         case CUSTOM:
             if (rememberedSolverTypeSelection != null) {
@@ -901,7 +1080,7 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
     }
 
     private void onSolverTypeSelectionChanged() {
-        reloadSolvers();
+        reloadSolvers(true);
         updateFullSupportCheckBox();
         table.repaint();
     }

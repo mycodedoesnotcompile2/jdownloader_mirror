@@ -395,12 +395,24 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
         addIconValueRow(rows, _GUI.T.CaptchaIndicator_type(), typeName, typeIcon);
         addTooltipRow(rows, _GUI.T.CaptchaIndicator_origin(getContext().getLabel()), null, false);
         final String fileName = getFileName();
-        if (fileName != null) {
-            addNameFieldRow(rows, _GUI.T.CaptchaIndicator_filename(), new FileNameField(fileName, false));
-        }
-        final String packageName = getPackageName();
-        if (packageName != null) {
-            addNameFieldRow(rows, _GUI.T.CaptchaIndicator_package(), new PackageNameField(packageName));
+        switch (getContext()) {
+        case ACCOUNT_CHECK:
+            /* The "file name" of an account check is the account, which has neither an extension nor a package. */
+            if (fileName != null) {
+                addIconValueRow(rows, _GUI.T.CaptchaIndicator_account(), fileName, null);
+            }
+            break;
+        case CRAWLER:
+        case DOWNLOAD:
+        default:
+            if (fileName != null) {
+                addNameFieldRow(rows, _GUI.T.CaptchaIndicator_filename(), new FileNameField(fileName, false));
+            }
+            final String packageName = getPackageName();
+            if (packageName != null) {
+                addNameFieldRow(rows, _GUI.T.CaptchaIndicator_package(), new PackageNameField(packageName));
+            }
+            break;
         }
         final List<LiveRow> newLiveRows = new ArrayList<LiveRow>();
         addLiveRow(rows, newLiveRows, null, false, new TextProvider() {

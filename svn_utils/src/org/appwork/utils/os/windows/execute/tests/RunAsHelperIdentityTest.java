@@ -8,6 +8,7 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.os.windows.execute.tests;
 
+import java.io.File;
 import java.io.Serializable;
 import java.util.EnumSet;
 import java.util.Set;
@@ -79,11 +80,13 @@ import com.sun.jna.platform.win32.WinDef.HWND;
  *    Step 1: Create non-admin test user
  *    Step 2: Execute task as that user (not elevated)
  *    Step 3: We expect runInOwnerSession to FAIL (privilege)
+ *    Requires a JRE outside any private user profile (see {@link #assertJavaBinaryLaunchableByPlainLocalUser()}).
  *
  * 04 Admin-capable test user -&gt; session owner
  *    Step 1: Create admin-capable test user
  *    Step 2: Execute task as that user (not elevated); runInOwnerSession must FAIL
  *    Step 3: Nested elevated-admin task; session-owner probe must match InteractiveOwnerBaseline
+ *    Same JRE location requirement as scenario 03. The nested elevated JVM is the same binary.
  * </pre>
  */
 @TestDependency({ "org.appwork.utils.os.windows.execute.RunAsHelper", "org.appwork.testframework.executer.AdminExecuter", "org.appwork.testframework.executer.AdminHelperProcess" })
@@ -136,8 +139,82 @@ public class RunAsHelperIdentityTest extends AWTest {
         test01LocalSystemToSessionOwnerIdentity(baseline, interactiveSessionId);
         test01bLocalSystemToSessionOwnerViaRunInOwnerSession(baseline, interactiveSessionId);
         test02ElevatedAdminToSessionOwnerIdentity(baseline);
+        // Scenarios 03 and 04 launch this JVM's java binary as a different Windows account.
+        assertJavaBinaryLaunchableByPlainLocalUser();
         test03PlainTestUserCannotLaunchSessionOwnerIdentity();
         test04AdminCapableTestUserToSessionOwnerIdentity(baseline);
+    }
+
+    /**
+     * Scenarios 03 and 04 start {@link CrossSystem#getJavaBinary()} via {@code CreateProcessWithLogonW} as a newly created local account.
+     * A JRE under a private profile (Eclipse JustJ in {@code %USERPROFILE%\.p2}) is not executable by that account. Windows then returns
+     * error 5 before {@link org.appwork.testframework.executer.RunSerializedTaskMain} runs, which looks like a task failure.
+     */
+    private void assertJavaBinaryLaunchableByPlainLocalUser() throws Exception {
+        final String javaBin = CrossSystem.getJavaBinary();
+        final File javaFile = javaBin != null && javaBin.trim().length() > 0 ? new File(javaBin) : null;
+        if (javaFile == null || !javaFile.isAbsolute() || !javaFile.isFile()) {
+            final String shown = javaFile != null ? javaFile.getPath() : String.valueOf(javaBin);
+            final String message = "RunAsHelperIdentityTest: java binary is not an absolute existing file (" + shown + "). Scenarios 03 and 04 launch this binary as a different Windows user. Start the test with a JRE installed for all users, for example under C:\\Program Files.";
+            logInfoAnyway(message);
+            throw new Exception(message);
+        }
+        if (!isUnderPrivateUserProfile(javaFile)) {
+            logInfoAnyway("RunAsHelperIdentityTest: java binary is outside private user profiles: " + javaFile.getAbsolutePath());
+            return;
+        }
+        final String message = "RunAsHelperIdentityTest: JRE is in a private user profile, so a plain local test user cannot start it: " + javaFile.getAbsolutePath() + ". Scenarios 03 and 04 create another account and launch this same binary. A path under %USERPROFILE% (for example Eclipse JustJ in .p2) is not readable by that account, so CreateProcessWithLogonW fails with Win32 error 5 (access denied) and no result.hex. Start this test with a JRE installed for all users, for example C:\\Program Files\\Eclipse Adoptium\\...\\bin\\javaw.exe.";
+        logInfoAnyway(message);
+        throw new Exception(message);
+    }
+
+    /**
+     * @return true when {@code javaFile} lies under the current user profile or another private profile directory (a folder directly under
+     *         {@code Users}, excluding Public and Default).
+     */
+    private static boolean isUnderPrivateUserProfile(final File javaFile) {
+        final String absolutePath = javaFile.getAbsolutePath().replace('/', '\\');
+        final String userProfile = System.getenv("USERPROFILE");
+        if (userProfile != null && isPathUnderDirectory(absolutePath, userProfile)) {
+            return true;
+        }
+        final String systemDrive = System.getenv("SystemDrive");
+        final String drive = systemDrive != null && systemDrive.trim().length() > 0 ? systemDrive.trim() : "C:";
+        final String usersRoot = drive + "\\Users\\";
+        if (!absolutePath.regionMatches(true, 0, usersRoot, 0, usersRoot.length())) {
+            return false;
+        }
+        final String rest = absolutePath.substring(usersRoot.length());
+        final int slash = rest.indexOf('\\');
+        final String profileFolder = slash >= 0 ? rest.substring(0, slash) : rest;
+        if (profileFolder.length() == 0) {
+            return false;
+        }
+        if (profileFolder.equalsIgnoreCase("Public") || profileFolder.equalsIgnoreCase("Default") || profileFolder.equalsIgnoreCase("Default User") || profileFolder.equalsIgnoreCase("All Users")) {
+            return false;
+        }
+        return true;
+    }
+
+    private static boolean isPathUnderDirectory(final String absolutePath, final String directory) {
+        if (absolutePath == null || directory == null) {
+            return false;
+        }
+        String dir = directory.replace('/', '\\');
+        while (dir.endsWith("\\")) {
+            dir = dir.substring(0, dir.length() - 1);
+        }
+        if (dir.length() == 0 || absolutePath.length() < dir.length()) {
+            return false;
+        }
+        if (!absolutePath.regionMatches(true, 0, dir, 0, dir.length())) {
+            return false;
+        }
+        if (absolutePath.length() == dir.length()) {
+            return true;
+        }
+        final char next = absolutePath.charAt(dir.length());
+        return next == '\\';
     }
 
     /**

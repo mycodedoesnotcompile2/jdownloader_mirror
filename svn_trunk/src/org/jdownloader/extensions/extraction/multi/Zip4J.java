@@ -18,6 +18,7 @@ import net.lingala.zip4j.exception.ZipException;
 import net.lingala.zip4j.io.inputstream.ZipInputStream;
 import net.lingala.zip4j.model.ExtraDataRecord;
 import net.lingala.zip4j.model.FileHeader;
+import net.lingala.zip4j.util.InternalZipConstants;
 import net.sf.sevenzipjbinding.SevenZipException;
 
 import org.appwork.utils.Files;
@@ -303,7 +304,10 @@ public class Zip4J extends IExtraction {
                     final byte[] data = extraDataRecord.getData();
                     if (data != null && data.length >= 5 && data[0] == 1) {
                         try {
-                            final long fileNameCRC32 = Hash.getCRC32(fileHeader.getFileName().getBytes("ISO_8859_1"));
+                            final byte[] generalPurposeFlag = fileHeader.getGeneralPurposeFlag();
+                            // general purpose bit 11 , UTF-8 vs CP437
+                            final boolean isUtf8 = (generalPurposeFlag[1] & 0x08) != 0;
+                            final long fileNameCRC32 = Hash.getCRC32(fileHeader.getFileName().getBytes(isUtf8 ? "UTF-8" : InternalZipConstants.ZIP_STANDARD_CHARSET_NAME));
                             final long fileNameCheckCRC32 = Integer.toUnsignedLong(ByteBuffer.wrap(Arrays.copyOfRange(data, 1, 5)).order(ByteOrder.LITTLE_ENDIAN).getInt());
                             final String fileNameFromExtraDataRecord = new String(data, 5, data.length - 5, "UTF-8");
                             if (fileNameCheckCRC32 == fileNameCRC32 || fileNameFromExtraDataRecord.equals(fileHeader.getFileName())) {

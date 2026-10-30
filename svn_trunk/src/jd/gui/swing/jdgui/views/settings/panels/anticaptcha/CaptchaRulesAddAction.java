@@ -27,6 +27,16 @@ public class CaptchaRulesAddAction extends AbstractAddAction {
 
     @Override
     public void actionPerformed(final ActionEvent e) {
+        addRule(null);
+    }
+
+    /**
+     * Lets the user pick the solver of the new rule and adds the rule.
+     *
+     * @param preselected
+     *            The solver that is preselected in the dialog, may be null (then the first one).
+     */
+    public void addRule(final SolverService preselected) {
         /*
          * Only solvers that are usable right now ("Ready") are offered, so the choice is limited to what the user can actually solve with
          * (e.g. an external solver only shows up once it has a valid account). A rule for a currently unusable solver would have no effect
@@ -46,14 +56,19 @@ public class CaptchaRulesAddAction extends AbstractAddAction {
              */
             services.addAll(allServices);
         }
+        if (preselected != null && !services.contains(preselected)) {
+            /* The user asked for this solver explicitly, so it is offered even if it is not usable right now. */
+            services.add(preselected);
+        }
         if (services.isEmpty()) {
             Dialog.getInstance().showErrorDialog(_GUI.T.CaptchaRules_add_no_solver());
             return;
         }
         final SolverService[] options = services.toArray(new SolverService[services.size()]);
+        final int defaultIndex = preselected != null ? services.indexOf(preselected) : 0;
         final int selectedIndex;
         try {
-            selectedIndex = Dialog.getInstance().showComboDialog(0, _GUI.T.CaptchaRules_add_title(), _GUI.T.CaptchaRules_add_message(), options, 0, null, null, null, new SolverListCellRenderer());
+            selectedIndex = Dialog.getInstance().showComboDialog(0, _GUI.T.CaptchaRules_add_title(), _GUI.T.CaptchaRules_add_message(), options, defaultIndex, null, null, null, new SolverListCellRenderer());
         } catch (final DialogNoAnswerException ex) {
             /* User cancelled or closed the dialog */
             return;

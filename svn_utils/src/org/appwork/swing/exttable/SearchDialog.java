@@ -33,6 +33,7 @@
  * ==================================================================================================================================================== */
 package org.appwork.swing.exttable;
 
+import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Frame;
 import java.awt.Point;
@@ -43,6 +44,7 @@ import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
+import java.util.regex.PatternSyntaxException;
 
 import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
@@ -54,14 +56,16 @@ import javax.swing.JLabel;
 import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.WindowConstants;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.text.JTextComponent;
+
+import net.miginfocom.swing.MigLayout;
 
 import org.appwork.utils.BinaryLogic;
 import org.appwork.utils.locale._AWU;
 import org.appwork.utils.swing.SwingUtils;
 import org.appwork.utils.swing.dialog.AbstractDialog;
-
-import net.miginfocom.swing.MigLayout;
 
 /**
  * @deprecated port to {@link AbstractDialog}
@@ -115,6 +119,39 @@ public abstract class SearchDialog extends JDialog implements WindowListener, Ac
         this.add(regularExpression);
         this.add(caseSensitive);
         this.add(okButton, "skip 2,alignx right,wrap");
+        /* Validate the input live: invalid regular expressions are shown in red and cannot be searched */
+        final Color defaultForeground = input.getForeground();
+        final Runnable validator = new Runnable() {
+            public void run() {
+                boolean valid = true;
+                try {
+                    owner.getModel().createSearchPattern(input.getText(), caseSensitive.isSelected(), regularExpression.isSelected());
+                } catch (final PatternSyntaxException e) {
+                    valid = false;
+                }
+                input.setForeground(valid ? defaultForeground : Color.RED);
+                okButton.setEnabled(valid);
+            }
+        };
+        input.getDocument().addDocumentListener(new DocumentListener() {
+            public void insertUpdate(final DocumentEvent e) {
+                validator.run();
+            }
+
+            public void removeUpdate(final DocumentEvent e) {
+                validator.run();
+            }
+
+            public void changedUpdate(final DocumentEvent e) {
+                validator.run();
+            }
+        });
+        regularExpression.addActionListener(new ActionListener() {
+            public void actionPerformed(final ActionEvent e) {
+                validator.run();
+            }
+        });
+        validator.run();
         // pack dialog
         invalidate();
         pack();
