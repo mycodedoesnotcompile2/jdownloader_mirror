@@ -59,7 +59,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.PixivNetGallery;
 
-@HostPlugin(revision = "$Revision: 51117 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53827 $", interfaceVersion = 3, names = {}, urls = {})
 public class PixivNet extends PluginForHost {
     public PixivNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -459,7 +459,12 @@ public class PixivNet extends PluginForHost {
                     loginRef = "";
                 }
                 final String siteKeyEnterpriseInvisible = loginInfo.get("pixivAccount.recaptchaEnterpriseScoreSiteKey").toString();
-                final String reCaptchaEnterpriseInvisibleAction = (String) loginInfo.get("pixivAccount.recaptchaEnterpriseScoreAction");
+                String reCaptchaEnterpriseInvisibleAction = (String) loginInfo.get("pixivAccount.recaptchaEnterpriseScoreAction");
+                if (StringUtils.isEmpty(reCaptchaEnterpriseInvisibleAction)) {
+                    reCaptchaEnterpriseInvisibleAction = "accounts/login";
+                    logger.info("Failed to extract reCaptchaV3 action from json -> Using fallback: " + reCaptchaEnterpriseInvisibleAction);
+                }
+                final String reCaptchaEnterpriseInvisibleAction_final = reCaptchaEnterpriseInvisibleAction;
                 final String siteKeyEnterpriseNormal = (String) loginInfo.get("pixivAccount.recaptchaEnterpriseCheckboxSiteKey");
                 final boolean requiresNormalReCaptchaV2 = true;
                 String reCaptchaV2Response = "";
@@ -473,7 +478,7 @@ public class PixivNet extends PluginForHost {
                     @Override
                     protected Map<String, Object> getV3Action(final String source) {
                         final Map<String, Object> ret = new HashMap<String, Object>();
-                        ret.put("action", reCaptchaEnterpriseInvisibleAction);
+                        ret.put("action", reCaptchaEnterpriseInvisibleAction_final);
                         return ret;
                     }
                 };

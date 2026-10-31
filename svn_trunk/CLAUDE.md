@@ -251,6 +251,13 @@ Applies to every new text field that offers suggestions based on previous input.
 | ESC | First press closes the popup / removes a pending inline completion. The next press clears the field. |
 | Mouse | Click on an entry applies it. Click on the remove icon at the right edge of a row removes it. Hovering selects a row. |
 
+## Search Fields: Clear Button
+
+Every **search field** (a field that only filters or looks something up, and is allowed to be empty) shows a clear button (X icon, `IconKey.ICON_CLOSE`) at its right end. It is only visible while the field contains text, clicking it empties the field (the mouse cursor turns into a hand over it).
+
+- `HistorySearchField` draws it by default. A field with its own clear button (e.g. `SearchField`) overrides `isClearButtonEnabled()` and returns `false`.
+- Do **not** add it to fields that must always hold a value, e.g. the download directory selection, package name or file name fields. An X there would let the user create an invalid state.
+
 ## Time and Durations
 
 - Write durations with the existing constants, not with manual multiplication: `TimeUnit.MINUTES.toMillis(5)` instead of `5 * 60 * 1000l`.

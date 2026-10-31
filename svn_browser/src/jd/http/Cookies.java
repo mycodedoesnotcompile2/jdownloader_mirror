@@ -17,6 +17,9 @@ package jd.http;
 
 import java.io.IOException;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -33,6 +36,7 @@ import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.HexFormatter;
@@ -41,7 +45,7 @@ import org.appwork.utils.logging2.LogInterface;
 public class Cookies {
     public static Cookies parseSetCookies(final Request request) throws IOException {
         final URLConnectionAdapter httpConnection = request.getHttpConnection();
-        final boolean isHTTPsConnection = "https".equalsIgnoreCase(request.getURL().getProtocol());
+        final String protocol = request.getURL().getProtocol();
         final String date = httpConnection.getHeaderField("Date");
         final List<String> setCookies = httpConnection.getHeaderFields("Set-Cookie");
         final Cookies ret = new Cookies();
@@ -54,7 +58,9 @@ public class Cookies {
             final String setCookie = setCookies.get(i);
             final Cookie cookie = new Cookie();
             cookie.setHost(tldDomain);
-            cookie.setHostOnly(Boolean.TRUE);
+            cookie.setProtocol(protocol);
+            cookie.setHostOnly(Boolean.TRUE);// default,changes on domain attribute
+            cookie.setSecure(Boolean.FALSE);// default,changes on secure attribute
             cookie.setDomain(domain);
             cookie.setHostTime(date);
             final StringTokenizer st = new StringTokenizer(setCookie, ";");
@@ -89,9 +95,9 @@ public class Cookies {
                         cookie.setExpires(value);
                     } else if ("domain".equalsIgnoreCase(key)) {
                         cookie.setDomain(value);
-                        cookie.setHostOnly(Boolean.FALSE);
+                        cookie.setHostOnly(Boolean.FALSE);// no longer hostOnly
                     } else if ("secure".equalsIgnoreCase(key)) {
-                        cookie.setSecure(true);
+                        cookie.setSecure(Boolean.TRUE);// now secure
                     } else if ("HttpOnly".equalsIgnoreCase(key)) {
                         // HttpOnly
                     } else if ("Max-Age".equalsIgnoreCase(key)) {
@@ -115,7 +121,7 @@ public class Cookies {
                 }
             }
             if (cookie.getKey() != null) {
-                if (Boolean.TRUE.equals(cookie.isSecure() && !isHTTPsConnection)) {
+                if (Boolean.TRUE.equals(cookie.isSecure()) && !cookie.isSecureProtocol()) {
                     LogV3.warning("Ignore unsecure cookie:" + cookie);
                 } else {
                     ret.add(cookie);
@@ -130,12 +136,12 @@ public class Cookies {
         final String header = cookieString;
         String path = null;
         String expires = null;
-        boolean secure = false;
-        final boolean isHTTPsConnection = "https".equalsIgnoreCase(url.getProtocol());
         final String tldDomain = Browser.getHost(url);
         String domain = isSetCookie ? url.getHost() : tldDomain;
-        Boolean hostOnly = isSetCookie ? Boolean.TRUE : null;
+        Boolean hostOnly = isSetCookie ? Boolean.TRUE : null;// default,changes on domain attribute
         String sameSite = isSetCookie ? "Lax" : null;
+        Boolean secure = isSetCookie ? Boolean.FALSE : null;// default,changes on secure attribute
+        final String protocol = url.getProtocol();
         final LinkedHashMap<String, String> tmp = new LinkedHashMap<String, String>();
         /* Cookie individual elements */
         final StringTokenizer st = new StringTokenizer(header, ";");
@@ -170,9 +176,9 @@ public class Cookies {
                     expires = value;
                 } else if ("domain".equalsIgnoreCase(key)) {
                     domain = value;
-                    hostOnly = false;
+                    hostOnly = Boolean.FALSE;// no longer hostOnly
                 } else if ("secure".equalsIgnoreCase(key)) {
-                    secure = true;
+                    secure = Boolean.TRUE;// now secure
                 } else if ("HttpOnly".equalsIgnoreCase(key)) {
                     // HttpOnly
                 } else if ("Max-Age".equalsIgnoreCase(key)) {
@@ -196,6 +202,7 @@ public class Cookies {
                 final Cookie cookie = new Cookie();
                 cookie.setHost(tldDomain);
                 cookie.setPath(path);
+                cookie.setProtocol(protocol);
                 cookie.setDomain(domain);
                 cookie.setExpires(expires);
                 cookie.setHostOnly(hostOnly);
@@ -204,7 +211,7 @@ public class Cookies {
                 cookie.setHostTime(serverTime);
                 cookie.setSecure(secure);
                 cookie.setSameSite(sameSite);
-                if (Boolean.TRUE.equals(cookie.isSecure() && !isHTTPsConnection)) {
+                if (Boolean.TRUE.equals(cookie.isSecure()) && !cookie.isSecureProtocol()) {
                     LogV3.warning("Ignore unsecure cookie:" + cookie);
                 } else {
                     cookies.add(cookie);
@@ -300,6 +307,9 @@ public class Cookies {
                         cookie.setValue(value);
                         cookie.setSecure(secure);
                         cookie.setHostOnly(hostOnly);
+                        if (Boolean.TRUE.equals(secure)) {
+                            cookie.setProtocol(Cookie.SECURE_HTTPS);
+                        }
                         final Long expirationDate = Cookies.parseTimestamp(cookieInfo.get("expirationDate"));
                         if (expirationDate != null) {
                             cookie.setExpireDate(expirationDate.longValue());
@@ -358,6 +368,9 @@ public class Cookies {
                             cookie.setValue(value);
                             cookie.setSecure(secure);
                             cookie.setHostOnly(hostOnly);
+                            if (Boolean.TRUE.equals(secure)) {
+                                cookie.setProtocol(Cookie.SECURE_HTTPS);
+                            }
                             final Long expirationDate = Cookies.parseTimestamp(cookieInfo.get("expirationDate"));
                             if (expirationDate != null) {
                                 cookie.setExpireDate(expirationDate.longValue());
@@ -444,24 +457,77 @@ public class Cookies {
         return get(null, key, valuePattern);
     }
 
-    public String getCookieString(URL url) {
-        if (cookies != null && !cookies.isEmpty()) {
-            final StringBuilder buffer = new StringBuilder();
-            for (final Cookie cookie : cookies) {
-                // Pfade sollten verarbeitet werden...TODO
-                if (cookie.isExpired() || !cookie.matches(url)) {
-                    continue;
-                }
-                if (buffer.length() > 0) {
-                    buffer.append("; ");
-                }
-                buffer.append(cookie.getKey());
-                buffer.append("=");
-                buffer.append(cookie.getValue());
+    private static final Comparator<Cookie> BEST_MATCH_COMPARATOR = new Comparator<Cookie>() {
+        @Override
+        public int compare(Cookie c1, Cookie c2) {
+            // 0. Custom-Cookie Check
+            final boolean custom1 = c1.isCustomCookie();
+            final boolean custom2 = c2.isCustomCookie();
+            if (custom1 != custom2) {
+                return custom1 ? -1 : 1; // Custom-Cookie gewinnt sofort
             }
-            return buffer.toString();
+            // 1. Pfadlänge (absteigend)
+            final int p1 = c1.getPath().length();
+            final int p2 = c2.getPath().length();
+            if (p1 != p2) {
+                return Integer.compare(p2, p1);
+            }
+            // 2. Host-Only (true vor false)
+            final boolean h1 = Boolean.TRUE.equals(c1.isHostOnly());
+            final boolean h2 = Boolean.TRUE.equals(c2.isHostOnly());
+            if (h1 != h2) {
+                return h1 ? -1 : 1;
+            }
+            // 3. Domain-Länge (absteigend)
+            final int d1 = c1.getDomain() != null ? c1.getDomain().length() : 0;
+            final int d2 = c2.getDomain() != null ? c2.getDomain().length() : 0;
+            if (d1 != d2) {
+                return Integer.compare(d2, d1);
+            }
+            return 0;
         }
-        return null;
+    };
+
+    public String getCookieString(URL url) {
+        if (cookies.isEmpty()) {
+            return null;
+        }
+        final Map<String, List<Cookie>> keyValues = new LinkedHashMap<String, List<Cookie>>();
+        final StringBuilder buffer = new StringBuilder();
+        final List<Cookie> toSend = new ArrayList<Cookie>();
+        for (final Cookie cookie : cookies) {
+            if (cookie.isExpired() || !cookie.matches(url)) {
+                continue;
+            }
+            toSend.add(cookie);
+        }
+        for (final Cookie cookie : toSend) {
+            List<Cookie> list = keyValues.get(cookie.getKey());
+            if (list == null) {
+                list = new ArrayList<Cookie>();
+                keyValues.put(cookie.getKey(), list);
+            }
+            list.add(cookie);
+        }
+        for (List<Cookie> values : keyValues.values()) {
+            if (values.size() == 1) {
+                continue;
+            }
+            Collections.sort(values, BEST_MATCH_COMPARATOR);
+        }
+        for (final Entry<String, List<Cookie>> keyValue : keyValues.entrySet()) {
+            if (buffer.length() > 0) {
+                buffer.append("; ");
+            }
+            buffer.append(keyValue.getKey());
+            buffer.append("=");
+            final List<Cookie> values = keyValue.getValue();
+            if (values.size() > 1) {
+                DebugMode.debugger();
+            }
+            buffer.append(values.get(0).getValue());
+        }
+        return buffer.toString();
     }
 
     public Cookie get(URL url, final String key, final String valuePattern) {

@@ -50,7 +50,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 53401 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https?://((?:www\\.|m\\.)?soundcloud\\.com/[^<>\"\\']+(?:\\?format=html\\&page=\\d+|\\?page=\\d+)?|api\\.soundcloud\\.com/tracks/\\d+(?:\\?secret_token=[A-Za-z0-9\\-_]+)?|api\\.soundcloud\\.com/playlists/\\d+(?:\\?|.*?\\&)secret_token=[A-Za-z0-9\\-_]+)" })
+@DecrypterPlugin(revision = "$Revision: 53829 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https?://((?:www\\.|m\\.)?soundcloud\\.com/[^<>\"\\']+(?:\\?format=html\\&page=\\d+|\\?page=\\d+)?|api\\.soundcloud\\.com/tracks/\\d+(?:\\?secret_token=[A-Za-z0-9\\-_]+)?|api\\.soundcloud\\.com/playlists/\\d+(?:\\?|.*?\\&)secret_token=[A-Za-z0-9\\-_]+)" })
 public class SoundCloudComDecrypter extends PluginForDecrypt {
     public SoundCloudComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -837,8 +837,18 @@ public class SoundCloudComDecrypter extends PluginForDecrypt {
         if (data == null) {
             return;
         }
-        final AvailableStatus status = this.hostPlugin.checkStatusJson(this, link, account, data);
-        link.setAvailableStatus(status);
+        try {
+            final AvailableStatus status = this.hostPlugin.checkStatusJson(this, link, account, data);
+            link.setAvailableStatus(status);
+        } catch (PluginException e) {
+            logger.log(e);
+            if (e.getLinkStatus() == LinkStatus.ERROR_FATAL || e.getLinkStatus() == LinkStatus.ERROR_FILE_NOT_FOUND) {
+                link.setAvailableStatus(AvailableStatus.FALSE);
+            } else {
+                link.setAvailableStatus(AvailableStatus.UNCHECKED);
+            }
+        }
+
     }
 
     @Override

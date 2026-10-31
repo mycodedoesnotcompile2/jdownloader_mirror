@@ -1365,6 +1365,9 @@ public class Browser implements HTTPConnectionFactoryInterface {
     }
 
     public Cookies getCookies(final URL url) {
+        if (url == null) {
+            DebugMode.debugger();
+        }
         final String host = Browser.getHost(url);
         final Map<String, Cookies> map = this.getCookies();
         synchronized (map) {
@@ -1379,6 +1382,9 @@ public class Browser implements HTTPConnectionFactoryInterface {
     @Deprecated
     public Cookies getCookies(final String url) {
         try {
+            if (url == null) {
+                return getCookies((URL) null);
+            }
             return getCookies(new URL(url));
         } catch (MalformedURLException e) {
             try {
@@ -2541,14 +2547,12 @@ public class Browser implements HTTPConnectionFactoryInterface {
     @Deprecated
     public void setCookie(final String url, final String key, final String value) {
         try {
+            if (url == null) {
+                DebugMode.debugger();
+            }
             setCookie(new URL(url), key, value);
         } catch (MalformedURLException e) {
             final Cookies cookies = this.getCookies(url);
-            final Cookie existing = cookies.get((String) null, key);
-            if (existing != null) {
-                existing.setValue(value);
-                return;
-            }
             final Cookie newCookie = new Cookie(Browser.getHost(url), key, value);
             cookies.add(newCookie);
         }
@@ -2556,11 +2560,6 @@ public class Browser implements HTTPConnectionFactoryInterface {
 
     public void setCookie(final URL url, final String key, final String value) {
         final Cookies cookies = this.getCookies(url);
-        final Cookie existing = cookies.get(url, key);
-        if (existing != null) {
-            existing.setValue(value);
-            return;
-        }
         final Cookie newCookie = new Cookie(Browser.getHost(url), key, value);
         cookies.add(newCookie);
     }

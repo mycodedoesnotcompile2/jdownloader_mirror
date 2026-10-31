@@ -23,14 +23,9 @@ import java.util.Map;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.Application;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.parser.UrlQuery;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.jdownloader.downloader.text.TextDownloader;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.components.config.InstagramConfig;
@@ -44,12 +39,8 @@ import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.Cookie;
 import jd.http.Cookies;
-import jd.http.RequestHeader;
 import jd.http.URLConnectionAdapter;
-import jd.http.requests.PostRequest;
 import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.parser.html.Form.MethodType;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
@@ -69,7 +60,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.InstaGramComDecrypter;
 
-@HostPlugin(revision = "$Revision: 52569 $", interfaceVersion = 4, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53833 $", interfaceVersion = 4, names = {}, urls = {})
 @PluginDependencies(dependencies = { InstaGramComDecrypter.class })
 public class InstaGramCom extends PluginForHost {
     @SuppressWarnings("deprecation")
@@ -80,11 +71,7 @@ public class InstaGramCom extends PluginForHost {
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        if (allowCookieLoginOnly) {
-            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.COOKIE_LOGIN_ONLY };
-        } else {
-            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL };
-        }
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.COOKIE_LOGIN_ONLY };
     }
 
     public static List<String[]> getPluginDomains() {
@@ -120,6 +107,29 @@ public class InstaGramCom extends PluginForHost {
     public static Browser prepBRAltAPI(final Browser br) {
         /* https://github.com/qsniyg/maxurl/blob/master/userscript.user.js */
         br.getHeaders().put("User-Agent", "Instagram 361.0.0.35.82 (iPad13,8; iOS 18_0; en_US; en-US; scale=2.00; 2048x2732; 674117118) AppleWebKit/420+");
+        /* 2026-10-30: Headers of the iPad app as sent by instaloader. */
+        br.getHeaders().put("x-ads-opt-out", "1");
+        br.getHeaders().put("x-bloks-is-panorama-enabled", "true");
+        br.getHeaders().put("x-bloks-version-id", "16b7bd25c6c06886d57c4d455265669345a2d96625385b8ee30026ac2dc5ed97");
+        br.getHeaders().put("x-fb-client-ip", "True");
+        br.getHeaders().put("x-fb-connection-type", "wifi");
+        br.getHeaders().put("x-fb-http-engine", "Liger");
+        br.getHeaders().put("x-fb-server-cluster", "True");
+        br.getHeaders().put("x-fb", "1");
+        br.getHeaders().put("x-ig-abr-connection-speed-kbps", "2");
+        br.getHeaders().put("x-ig-app-id", "124024574287414");
+        br.getHeaders().put("x-ig-app-locale", "en-US");
+        br.getHeaders().put("x-ig-app-startup-country", "US");
+        br.getHeaders().put("x-ig-bandwidth-speed-kbps", "0.000");
+        br.getHeaders().put("x-ig-capabilities", "36r/F/8=");
+        br.getHeaders().put("x-ig-connection-type", "WiFi");
+        br.getHeaders().put("x-ig-device-locale", "en-US");
+        br.getHeaders().put("x-ig-mapped-locale", "en-US");
+        br.getHeaders().put("x-ig-timezone-offset", "0");
+        br.getHeaders().put("x-ig-www-claim", "0");
+        br.getHeaders().put("x-tigon-is-retry", "False");
+        br.getHeaders().put("x-whatsapp", "0");
+        br.getHeaders().put("x-pigeon-session-id", java.util.UUID.randomUUID().toString());
         // 429 == too many requests, we need to rate limit requests.
         // 400 , {"message":"Media not found or unavailable","status":"fail"}
         br.setAllowedResponseCodes(new int[] { 400, 429 });
@@ -131,7 +141,6 @@ public class InstaGramCom extends PluginForHost {
         return MAINPAGE + "/about/legal/terms/";
     }
 
-    private static final boolean allowCookieLoginOnly                        = true;
     private String               dllink                                      = null;
     /**
      * https://instagram.api-docs.io/1.0 </br>
@@ -173,7 +182,6 @@ public class InstaGramCom extends PluginForHost {
     public static final String   PROPERTY_forced_packagename                 = "forced_packagename";
     public static final String   PROPERTY_is_private                         = "is_private";
     private final String         ACCOUNT_USERNAME                            = "username";
-    private final String         ACCOUNT_DISPLAED_COOKIE_LOGIN_HINT          = "displayed_cookie_login_hint";
     private boolean              hasJustRefreshedDirecturl                   = false;
 
     public static void setRequestLimit() {
@@ -405,12 +413,32 @@ public class InstaGramCom extends PluginForHost {
         return downloadurl;
     }
 
+    /**
+     * 2026-10-30: The mobile API (i.instagram.com) answers with empty data or "fail" without an Authorization bearer token. The token is
+     * derived from the login cookies (same as instaloader does). Does nothing if we are not logged in.
+     */
+    public static void setBearerAuthorization(final Browser br) {
+        final String sessionid = br.getCookie(MAINPAGE, "sessionid", Cookies.NOTDELETEDPATTERN);
+        final String ds_user_id = br.getCookie(MAINPAGE, "ds_user_id", Cookies.NOTDELETEDPATTERN);
+        if (sessionid == null || ds_user_id == null) {
+            return;
+        }
+        final Map<String, Object> tokenData = new java.util.LinkedHashMap<String, Object>();
+        tokenData.put("ds_user_id", ds_user_id);
+        tokenData.put("sessionid", sessionid);
+        br.getHeaders().put("Authorization", "Bearer IGT:2:" + Encoding.Base64Encode(JSonStorage.serializeToJson(tokenData)));
+        br.getHeaders().put("ig-intended-user-id", ds_user_id);
+        br.getHeaders().put("ig-u-ds-user-id", ds_user_id);
+    }
+
     public static void getPageAltAPI(final Account account, final Browser br, final String url) throws PluginException, IOException {
+        setBearerAuthorization(br);
         br.getPage(url);
         checkErrorsAltAPI(account, br);
     }
 
     public static void postPageAltAPI(final Account account, final Browser br, final String url, final UrlQuery query) throws PluginException, IOException {
+        setBearerAuthorization(br);
         br.postPage(url, query);
         checkErrorsAltAPI(account, br);
     }
@@ -736,173 +764,9 @@ public class InstaGramCom extends PluginForHost {
                     } else {
                         errorSessionExpired(account);
                     }
-                } else if (allowCookieLoginOnly) {
+                } else {
                     showCookieLoginInfo();
                     throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_required());
-                }
-                logger.info("Full login required");
-                boolean accountIsForSureInvalid = false;
-                try {
-                    final boolean requestWithNoCookies = br.getCookies(getHost()).isEmpty();
-                    br.getPage(MAINPAGE + "/");
-                    if (br.getHttpConnection().getResponseCode() == 500) {
-                        if (requestWithNoCookies) {
-                            // maybe with set cookies the request will work now?
-                            br.getPage(MAINPAGE + "/");
-                        }
-                        if (br.getHttpConnection().getResponseCode() == 500) {
-                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                        }
-                    }
-                    final String csrftoken = br.getRegex("\"csrf_token\"\\s*:\\s*\"(.*?)\"").getMatch(0);
-                    if (csrftoken == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    br.setCookie(MAINPAGE, "csrftoken", csrftoken);
-                    final String rollout_hash = br.getRegex("\"rollout_hash\"\\s*:\\s*\"(.*?)\"").getMatch(0);
-                    if (rollout_hash == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    final RequestHeader ajaxHeaders = new RequestHeader();
-                    ajaxHeaders.put("Accept", "*/*");
-                    ajaxHeaders.put("X-Instagram-AJAX", rollout_hash);
-                    ajaxHeaders.put("X-CSRFToken", csrftoken);
-                    ajaxHeaders.put("X-Requested-With", "XMLHttpRequest");
-                    final PostRequest post = new PostRequest("https://www.instagram.com/accounts/login/ajax/");
-                    post.setHeaders(ajaxHeaders);
-                    post.setContentType("application/x-www-form-urlencoded");
-                    /* 2020-05-19: https://github.com/instaloader/instaloader/pull/623 */
-                    final String enc_password = "#PWD_INSTAGRAM_BROWSER:0:" + System.currentTimeMillis() + ":" + account.getPass();
-                    post.setPostDataString("username=" + Encoding.urlEncode(account.getUser()) + "&enc_password=" + Encoding.urlEncode(enc_password) + "&optIntoOneTap=false&queryParams=%7B%7D");
-                    br.getPage(post);
-                    final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
-                    if (entries.get("status").toString().equals("fail")) {
-                        /* 2021-07-13: 2FA login required --> Not implemented so far */
-                        final Boolean two_factor_required = (Boolean) entries.get("two_factor_required");
-                        if (two_factor_required == null || !two_factor_required) {
-                            /* Invalid login credentials */
-                            throw new AccountInvalidException();
-                        }
-                        final boolean twoFactorLoginBroken = true;
-                        if (twoFactorLoginBroken) {
-                            /*
-                             * 2021-07-13: 2FA login not (yet) finished --> Throw error if it is required within login process of a user
-                             * using JD outside of IDE.
-                             */
-                            showCookieLoginInformationWebsiteLoginFailed(account);
-                            throw new AccountUnavailableException("2-factor-authentication required: Try again later or try cookie login method", 30 * 60 * 1000l);
-                        }
-                        final Map<String, Object> two_factor_info = (Map<String, Object>) entries.get("two_factor_info");
-                        if (!(Boolean) two_factor_info.get("sms_two_factor_on")) {
-                            throw new AccountInvalidException("Unsupported 2FA login method (only 2FA SMS is supported)");
-                        }
-                        final DownloadLink dl_dummy;
-                        if (this.getDownloadLink() != null) {
-                            dl_dummy = this.getDownloadLink();
-                        } else {
-                            dl_dummy = new DownloadLink(this, "Account", this.getHost(), "https://" + account.getHoster(), true);
-                        }
-                        String twoFACode = getUserInput("Enter 2-Factor Authentication code for phone number " + two_factor_info.get("obfuscated_phone_number"), dl_dummy);
-                        if (twoFACode != null) {
-                            twoFACode = twoFACode.trim();
-                        }
-                        if (twoFACode == null || !twoFACode.matches("\\d+")) {
-                            if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                                throw new AccountInvalidException("Ungültiges Format der 2-faktor-Authentifizierung!");
-                            } else {
-                                throw new AccountInvalidException("Invalid 2-factor-authentication code format!");
-                            }
-                        }
-                        final Form login2 = new Form();
-                        login2.setMethod(MethodType.POST);
-                        login2.setAction("/accounts/login/ajax/two_factor/");
-                        login2.put("identifier", Encoding.urlEncode(two_factor_info.get("two_factor_identifier").toString()));
-                        login2.put("trust_signal", "false");
-                        login2.put("username", two_factor_info.get("username").toString());
-                        login2.put("verificationCode", twoFACode);
-                        login2.put("verification_method", "1");
-                        // login2.put("queryParams", Encoding.urlEncode("TODO"));
-                        br.submitForm(login2);
-                        final Map<String, Object> login2Response = restoreFromString(br.toString(), TypeRef.MAP);
-                        if (!login2Response.get("status").equals("success")) {
-                            throw new AccountInvalidException("2-factor-authentication failed");
-                        }
-                        /*
-                         * Old login challenge handling (also unfinished). This is similar to 2FA but more a security measure which
-                         * Instagram can trigger at any time. 2FA will only be required if enabled by the user.
-                         */
-                        // final String page = PluginJSonUtils.getJsonValue(br, "checkpoint_url");
-                        // br.getPage(page);
-                        // handleLoginChallenge(this.br);
-                        // final boolean tryOldChallengeHandling = false;
-                        // if (tryOldChallengeHandling) {
-                        // // verify by email.
-                        // Form f = br.getFormBySubmitvalue("Verify+by+Email");
-                        // if (f == null) {
-                        // throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                        // }
-                        // br.submitForm(f);
-                        // f = br.getFormBySubmitvalue("Verify+Account");
-                        // if (f == null) {
-                        // throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                        // }
-                        // // dialog here to ask for 2factor verification 6 digit code.
-                        // final DownloadLink dummyLink = new DownloadLink(null, "Account 2 Factor Auth", MAINPAGE, br.getURL(), true);
-                        // final String code = getUserInput("2 Factor Authenication\r\nPlease enter in the 6 digit code within your
-                        // Instagram
-                        // linked email account", dummyLink);
-                        // if (code == null) {
-                        // throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nInvalid 2 Factor response",
-                        // PluginException.VALUE_ID_PREMIUM_DISABLE);
-                        // }
-                        // f.put("response_code", Encoding.urlEncode(code));
-                        // // correct or incorrect?
-                        // if (br.containsHTML(">Please check the code we sent you and try again\\.<")) {
-                        // throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nInvalid 2 Factor response",
-                        // PluginException.VALUE_ID_PREMIUM_DISABLE);
-                        // }
-                        // // now 2factor most likely wont have the authenticated json if statement below....
-                        // // TODO: confirm what's next.
-                        // throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unfinished code, please report issue with logs to
-                        // Development Team.");
-                        // }
-                    }
-                    if (!br.containsHTML("\"authenticated\"\\s*:\\s*true\\s*")) {
-                        accountIsForSureInvalid = true;
-                        if (br.containsHTML("\"user\"\\s*:\\s*true\\s*")) {
-                            /* {"user":true,"authenticated":false,"status":"ok"} */
-                            throw new AccountInvalidException("Sorry, your password was incorrect. Please double-check your password.");
-                        } else {
-                            throw new AccountInvalidException();
-                        }
-                    }
-                    if (Boolean.TRUE.equals(entries.get("oneTapPrompt"))) {
-                        /*
-                         * 2022-10-12: Login successful but we might not yet have those login cookies -> One additional request may be
-                         * needed
-                         */
-                        logger.info("Account is valid but one or multiple additional steps are required");
-                        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                            throw new AccountInvalidException("Cannot handle 'one tap prompt login step' yet! Use cookie login instead.");
-                        }
-                        /* 2022-10-12: Unfinished code */
-                        br.getPage("/accounts/onetap/?next=%2F");
-                        br.postPage(ALT_API_BASE + "/web/accounts/request_one_tap_login_nonce/", "");
-                        logger.warning("oneTapPrompt handling is unfinished. Login will probably fail!");
-                    }
-                    cookies = br.getCookies(MAINPAGE);
-                    if (verifyCookies(account, cookies)) {
-                        account.saveCookies(cookies, "");
-                    } else {
-                        logger.warning("Looks like we're not logged in although full login looked successful");
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                } catch (final Exception e) {
-                    /* Tell user to use cookie login instead */
-                    if (!accountIsForSureInvalid) {
-                        showCookieLoginInformationWebsiteLoginFailed(account);
-                    }
-                    throw e;
                 }
             } catch (final PluginException e) {
                 if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
@@ -1042,50 +906,6 @@ public class InstaGramCom extends PluginForHost {
         }
     }
 
-    private Thread showCookieLoginInformationWebsiteLoginFailed(final Account account) {
-        synchronized (account) {
-            if (account.hasProperty(ACCOUNT_DISPLAED_COOKIE_LOGIN_HINT)) {
-                /* This hint has already been displayed to the user for this account -> Don't display it again. */
-                return null;
-            }
-            final Thread thread = new Thread() {
-                public void run() {
-                    try {
-                        final String help_article_url = "https://support.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions";
-                        String message = "";
-                        final String title;
-                        if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                            title = "Instagram - Login";
-                            message += "Hallo liebe(r) Instagram NutzerIn\r\n";
-                            message += "Instagram verlangt zusätzliche Schritte beim Login in deinen Account. JDownloader unterstützt diese (noch) nicht.\r\n";
-                            message += "Versuche bitte folgende alternative login Methode:\r\n";
-                            message += help_article_url;
-                        } else {
-                            title = "Instagram - Login";
-                            message += "Hello dear Instagram user\r\n";
-                            message += "Instagram is demanding additional login steps to login in your account. JDownloader does not (yet) support those.\r\n";
-                            message += "Try the following alternative login method as a workaround:\r\n";
-                            message += help_article_url;
-                        }
-                        final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, title, message);
-                        dialog.setTimeout(3 * 60 * 1000);
-                        if (CrossSystem.isOpenBrowserSupported() && !Application.isHeadless()) {
-                            CrossSystem.openURL(help_article_url);
-                        }
-                        final ConfirmDialogInterface ret = UIOManager.I().show(ConfirmDialogInterface.class, dialog);
-                        ret.throwCloseExceptions();
-                    } catch (final Throwable e) {
-                        getLogger().log(e);
-                    }
-                };
-            };
-            thread.setDaemon(true);
-            thread.start();
-            account.setProperty(ACCOUNT_DISPLAED_COOKIE_LOGIN_HINT, true);
-            return thread;
-        }
-    }
-
     /** Checks loggedin state based on html code (NOT cookies!) */
     private boolean isLoggedIn(final Browser br) {
         // return br.getCookies(MAINPAGE).get("sessionid", Cookies.NOTDELETEDPATTERN) != null && br.getCookies(MAINPAGE).get("ds_user_id",
@@ -1146,7 +966,9 @@ public class InstaGramCom extends PluginForHost {
     }
 
     public static Browser prepBRWebsite(final Browser br) {
-        br.getHeaders().put("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36");
+        /* 2026-10-30: Instagram serves outdated browsers a stripped page without embedded json data -> Use a current User-Agent. */
+        br.getHeaders().put("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36");
+        br.getHeaders().put("Accept-Language", "en-US,en;q=0.8");
         br.setCookie(MAINPAGE, "ig_pr", "1");
         // 429 == too many requests, we need to rate limit requests.
         br.setAllowedResponseCodes(new int[] { 400, 429, 500 });

@@ -25,6 +25,23 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import jd.PluginWrapper;
+import jd.controlling.ProgressController;
+import jd.http.Browser;
+import jd.plugins.Account;
+import jd.plugins.CryptedLink;
+import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.ArteTv;
+import jd.plugins.hoster.DirectHTTP;
+
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
@@ -45,24 +62,7 @@ import org.jdownloader.plugins.components.hls.HlsContainerStorable;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-import jd.PluginWrapper;
-import jd.controlling.ProgressController;
-import jd.http.Browser;
-import jd.plugins.Account;
-import jd.plugins.CryptedLink;
-import jd.plugins.DecrypterRetryException;
-import jd.plugins.DecrypterRetryException.RetryReason;
-import jd.plugins.DecrypterPlugin;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForDecrypt;
-import jd.plugins.hoster.ArteTv;
-import jd.plugins.hoster.DirectHTTP;
-
-@DecrypterPlugin(revision = "$Revision: 53823 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53835 $", interfaceVersion = 4, names = {}, urls = {})
 public class ArteMediathekV3 extends PluginForDecrypt {
     public ArteMediathekV3(PluginWrapper wrapper) {
         super(wrapper);
@@ -418,6 +418,11 @@ public class ArteMediathekV3 extends PluginForDecrypt {
                                 // DEU = Deutsch (ISO-639-2 Sprachcode)
                                 audioCode = "VOA";
                                 audioShortLabel = "O";
+                            } else if ("VO-HUN".equalsIgnoreCase(version) || "VOEU-HUN".equalsIgnoreCase(version)) {
+                                // VO / VOEU = Version Originale (Européenne) (Originalton der Produktion)
+                                // HUN = Hungarian / Ungarisch (ISO-639-2 Sprachcode hun / Ungarisch)
+                                audioCode = "VO";
+                                audioShortLabel = "HUN";
                             } else if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported:" + version);
                             }
@@ -893,6 +898,7 @@ public class ArteMediathekV3 extends PluginForDecrypt {
         SPANISH,
         POLISH,
         ROMANIAN,
+        HUNGARIAN,
         OTHER;
     }
 
@@ -943,6 +949,8 @@ public class ArteMediathekV3 extends PluginForDecrypt {
             return Language.POLISH;
         } else if (apiosCode.endsWith("[ROU]")) {
             return Language.ROMANIAN;
+        } else if (apiosCode.endsWith("[HUN]")) {
+            return Language.HUNGARIAN;
         } else {
             return Language.OTHER;
         }
