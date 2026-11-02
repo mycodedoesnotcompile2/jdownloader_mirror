@@ -22,6 +22,7 @@ import org.jdownloader.captcha.v2.ChallengeSolver.SolverFeature;
 import org.jdownloader.captcha.v2.SolverStatus;
 import org.jdownloader.captcha.v2.challenge.altcha.AltchaChallenge;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
+import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
@@ -52,7 +53,7 @@ import jd.plugins.PluginException;
 public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abstractPluginForCaptchaSolver {
     /**
      * Task types with proxy. Documented for: reCAPTCHA v2 (https://2captcha.com/api-docs/recaptcha-v2), reCAPTCHA v2 Enterprise,
-     * Cloudflare Turnstile and Altcha. reCAPTCHA v3 has no task type with proxy. hCaptcha is not documented (404) -> not
+     * Cloudflare Turnstile, Altcha and CutCaptcha. reCAPTCHA v3 has no task type with proxy. hCaptcha is not documented (404) -> not
      * included.
      */
     private static final Map<String, String> PROXY_TASK_TYPES = new HashMap<String, String>();
@@ -61,6 +62,7 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
         PROXY_TASK_TYPES.put("RecaptchaV2EnterpriseTaskProxyless", "RecaptchaV2EnterpriseTask");
         PROXY_TASK_TYPES.put("TurnstileTaskProxyless", "TurnstileTask");
         PROXY_TASK_TYPES.put("AltchaTaskProxyless", "AltchaTask");
+        PROXY_TASK_TYPES.put("CutCaptchaTaskProxyless", "CutCaptchaTask");
     }
 
     @Override
@@ -178,6 +180,13 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
             if (hCaptcha != null && AbstractHCaptcha.TYPE.INVISIBLE.equals(hCaptcha.getType())) {
                 task.put("isInvisible", true);
             }
+        } else if (captchachallenge instanceof CutCaptchaChallenge) {
+            /* CutCaptcha: https://2captcha.com/api-docs/cutcaptcha */
+            final CutCaptchaChallenge challenge = (CutCaptchaChallenge) captchachallenge;
+            task.put("type", "CutCaptchaTaskProxyless");
+            task.put("miseryKey", challenge.getSiteKey());
+            task.put("apiKey", challenge.getApiKey());
+            task.put("websiteURL", challenge.getSiteUrl(this));
         } else if (captchachallenge instanceof CloudflareTurnstileChallenge) {
             /* Cloudflare turnstile: https://2captcha.com/api-docs/cloudflare-turnstile */
             final CloudflareTurnstileChallenge challenge = (CloudflareTurnstileChallenge) captchachallenge;
@@ -258,7 +267,7 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
                 token = (String) solutionmap.get("gRecaptchaResponse");
             }
             AbstractResponse resp = null;
-            if (captchachallenge instanceof RecaptchaV2Challenge || captchachallenge instanceof HCaptchaChallenge || captchachallenge instanceof CloudflareTurnstileChallenge || captchachallenge instanceof AltchaChallenge) {
+            if (captchachallenge instanceof RecaptchaV2Challenge || captchachallenge instanceof HCaptchaChallenge || captchachallenge instanceof CloudflareTurnstileChallenge || captchachallenge instanceof CutCaptchaChallenge || captchachallenge instanceof AltchaChallenge) {
                 resp = new TokenCaptchaResponse((Challenge<String>) captchachallenge, job.getSolver(), token);
             } else if (captchachallenge instanceof MultiClickCaptchaChallenge) {
                 /* Coordinates task: https://2captcha.com/api-docs/coordinates */

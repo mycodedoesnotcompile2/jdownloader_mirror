@@ -29,6 +29,8 @@ import java.util.StringTokenizer;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.regex.Pattern;
 
+import jd.http.Cookie.ImportCookie;
+import jd.http.Cookie.ServerCookie;
 import jd.parser.Regex;
 
 import org.appwork.exceptions.WTFException;
@@ -56,7 +58,7 @@ public class Cookies {
         final String domain = request.getURL().getHost();
         for (int i = 0; i < setCookies.size(); i++) {
             final String setCookie = setCookies.get(i);
-            final Cookie cookie = new Cookie();
+            final ServerCookie cookie = Cookie.SOURCE.SERVER.newCookieInstance();
             cookie.setHost(tldDomain);
             cookie.setProtocol(protocol);
             cookie.setHostOnly(Boolean.TRUE);// default,changes on domain attribute
@@ -141,6 +143,7 @@ public class Cookies {
         Boolean hostOnly = isSetCookie ? Boolean.TRUE : null;// default,changes on domain attribute
         String sameSite = isSetCookie ? "Lax" : null;
         Boolean secure = isSetCookie ? Boolean.FALSE : null;// default,changes on secure attribute
+        final Cookie.SOURCE source = isSetCookie ? Cookie.SOURCE.SERVER : Cookie.SOURCE.MANUAL;
         final String protocol = url.getProtocol();
         final LinkedHashMap<String, String> tmp = new LinkedHashMap<String, String>();
         /* Cookie individual elements */
@@ -199,7 +202,7 @@ public class Cookies {
              * no cookies are cookies without a value
              */
             if (next.getValue() != null) {
-                final Cookie cookie = new Cookie();
+                final Cookie cookie = source.newCookieInstance();
                 cookie.setHost(tldDomain);
                 cookie.setPath(path);
                 cookie.setProtocol(protocol);
@@ -268,7 +271,7 @@ public class Cookies {
             if (entries != null) {
                 final Cookies ret = new Cookies();
                 for (final Object entry : entries) {
-                    final Cookie cookie = new Cookie();
+                    final ImportCookie cookie = Cookie.SOURCE.IMPORT.newCookieInstance();
                     final List<String> cookiesList = ReflectionUtils.wrapList(entry, false, String.class);
                     if (cookiesList != null) {
                         final int listSize = cookiesList.size();
@@ -359,7 +362,7 @@ public class Cookies {
                                 /* Skip invalid objects */
                                 continue;
                             }
-                            final Cookie cookie = new Cookie();
+                            final ImportCookie cookie = Cookie.SOURCE.IMPORT.newCookieInstance();
                             cookie.setSameSite(sameSite);
                             cookie.setHost(domain);
                             cookie.setPath(path);

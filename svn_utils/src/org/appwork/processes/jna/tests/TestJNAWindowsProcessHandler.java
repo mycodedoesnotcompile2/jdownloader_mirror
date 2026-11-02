@@ -41,7 +41,11 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+
+import org.appwork.jna.processes.CTRLSender;
+import org.appwork.jna.windows.Kernel32Ext;
 
 import org.appwork.app.gui.BasicGui;
 import org.appwork.processes.ProcessHandler;
@@ -62,6 +66,7 @@ import org.appwork.utils.parser.ShellParser;
 import org.appwork.utils.parser.ShellParser.Style;
 import org.appwork.utils.processes.command.AbstractLineHandler;
 import org.appwork.utils.processes.command.Command;
+import org.appwork.utils.processes.command.ProcessOutputHandler;
 
 import com.sun.jna.Pointer;
 import com.sun.jna.platform.win32.Kernel32;
@@ -99,6 +104,11 @@ public class TestJNAWindowsProcessHandler extends AWTest {
         JNAWindowsProcessHandler handler = new JNAWindowsProcessHandler();
         testSendCloseToWindow(unique, handler);
         testSendCTRL(unique, handler);
+        testSendCTRLRefusedWithoutCaller(unique, handler);
+        testSendCTRLRefusedForeignProcessOnConsole(unique, handler);
+        testSendCTRLRefusedIfCallerIsOnConsole(unique, handler);
+        testCTRLSenderExitCodes();
+        testTerminateForcedAfterRequestMixed(unique, handler);
         testKill(unique, handler);
         testListByProcessInfoWithNormalOnly(unique, handler);
         testListByProcessInfoWithJNAOnly(handler);
@@ -272,6 +282,11 @@ public class TestJNAWindowsProcessHandler extends AWTest {
     }
 
     protected void testSendCTRL(String unique, ProcessHandler handler) throws IOException, InterruptedException, Exception {
+        // The Cursor/VS Code debug console (internalConsole) starts this JVM with CTRL+C disabled (new process group). Windows
+        // passes that "ignore CTRL+C" flag on to child processes, so cmd and ping received the CTRL+C from CTRLSender but ignored
+        // it and the test failed with "Could not kill" (standalone in a terminal it passed). Restore normal CTRL+C handling
+        // before starting cmd so the children inherit it. This JVM is not attached to the console of cmd, so it is not hit.
+        Kernel32Ext.INSTANCE.SetConsoleCtrlHandler(null, false);
         Command c = new Command("cmd", "/c", "ping localhost -n 1000 -" + unique);
         c.setOutputHandler(new AbstractLineHandler() {
             @Override
@@ -308,6 +323,218 @@ public class TestJNAWindowsProcessHandler extends AWTest {
             assertEqualsDeep(list, list3);
         } finally {
             c.getProcess().destroyForcibly();
+        }
+    }
+
+    /**
+     * Finds a process of the given executable whose command line contains the marker. Null if not found within the timeout.
+     */
+    private ProcessInfo findProcess(ProcessHandler handler, String path, String marker, int timeoutMs) throws Exception {
+        final Timeout timeout = new Timeout(timeoutMs);
+        while (timeout.isAlive()) {
+            for (ProcessInfo p : handler.listByPath(path)) {
+                if (p.getCommandLine() != null && p.getCommandLine().contains(marker)) {
+                    return p;
+                }
+            }
+            Thread.sleep(200);
+        }
+        return null;
+    }
+
+    private ProcessInfo findPing(ProcessHandler handler, String marker, int timeoutMs) throws Exception {
+        return findProcess(handler, "C:\\Windows\\System32\\PING.EXE", marker, timeoutMs);
+    }
+
+    /**
+     * Kills the process with the marker, if it is still there. For cleanup in finally blocks: short timeout, no waiting if it is gone.
+     */
+    private void killPingQuietly(ProcessHandler handler, String marker) throws Exception {
+        final ProcessInfo ping = findPing(handler, marker, 1000);
+        if (ping != null) {
+            handler.terminateForced(ping, 0);
+        }
+    }
+
+    /**
+     * Runs CTRLSender in its own JVM like the handler does and returns its exit code. Fails instead of hanging if the helper does not end.
+     */
+    private int runCTRLSender(String pid, String callerPid) throws Exception {
+        final String[] args;
+        if (callerPid == null) {
+            args = new String[] { CrossSystem.getJavaBinary(), "-cp", ManagementFactory.getRuntimeMXBean().getClassPath(), CTRLSender.class.getName(), pid };
+        } else {
+            args = new String[] { CrossSystem.getJavaBinary(), "-cp", ManagementFactory.getRuntimeMXBean().getClassPath(), CTRLSender.class.getName(), pid, callerPid };
+        }
+        final Command command = new Command(args);
+        final ProcessOutputHandler po;
+        command.setOutputHandler(po = new ProcessOutputHandler());
+        command.start(true);
+        try {
+            if (!command.getProcess().waitFor(60, TimeUnit.SECONDS)) {
+                throw new Exception("CTRLSender did not end within 60s");
+            }
+            command.waitFor();
+            return po.getResult().getExitCode();
+        } finally {
+            command.destroy();
+        }
+    }
+
+    /**
+     * Without caller PID the CTRLSender cannot know that cmd (the parent of ping) was started by us. It may be a user's shell, so
+     * nothing must be sent: exit code FOREIGN_PROCESS_ON_CONSOLE and ping keeps running.
+     */
+    protected void testSendCTRLRefusedWithoutCaller(String unique, ProcessHandler handler) throws Exception {
+        final String marker = "-anocaller" + unique;
+        // children inherit "ignore CTRL" from an IDE debug console; without this "ping keeps running" would prove nothing
+        Kernel32Ext.INSTANCE.SetConsoleCtrlHandler(null, false);
+        Command c = new Command("cmd", "/c", "ping localhost -n 1000 " + marker);
+        c.setOutputHandler(new AbstractLineHandler() {
+            @Override
+            public void handleLine(String line, Object caller) {
+            }
+        });
+        c.start(true);
+        try {
+            final ProcessInfo ping = findPing(handler, marker, 10000);
+            assertTrue(ping != null, "Should find ping");
+            assertEquals(CTRLSender.FOREIGN_PROCESS_ON_CONSOLE, runCTRLSender(ping.getPid() + "", null));
+            Thread.sleep(1000);
+            assertTrue(handler.listByProcessInfo(ping).size() == 1, "ping must still run: CTRL must not be sent if cmd (not started by the caller) shares the console");
+        } finally {
+            if (c.getProcess() != null && c.getProcess().isAlive()) {
+                c.getProcess().destroyForcibly();
+            }
+            killPingQuietly(handler, marker);
+        }
+    }
+
+    /**
+     * The caller itself must never receive CTRL. Here the "caller" (ping) is a descendant of the target (cmd) and attached to its
+     * console: CTRL has to be refused, nothing may be hit.
+     */
+    protected void testSendCTRLRefusedIfCallerIsOnConsole(String unique, ProcessHandler handler) throws Exception {
+        final String marker = "-acaller" + unique;
+        Kernel32Ext.INSTANCE.SetConsoleCtrlHandler(null, false);
+        Command c = new Command("cmd", "/c", "ping localhost -n 1000 " + marker);
+        c.setOutputHandler(new AbstractLineHandler() {
+            @Override
+            public void handleLine(String line, Object caller) {
+            }
+        });
+        c.start(true);
+        try {
+            final ProcessInfo ping = findPing(handler, marker, 10000);
+            final ProcessInfo cmd = findProcess(handler, "C:\\Windows\\System32\\cmd.exe", marker, 10000);
+            assertTrue(ping != null && cmd != null, "Should find ping and cmd");
+            assertEquals(CTRLSender.FOREIGN_PROCESS_ON_CONSOLE, runCTRLSender(cmd.getPid() + "", ping.getPid() + ""));
+            Thread.sleep(1000);
+            assertTrue(handler.listByProcessInfo(ping).size() == 1, "the caller must not receive CTRL");
+        } finally {
+            if (c.getProcess() != null && c.getProcess().isAlive()) {
+                c.getProcess().destroyForcibly();
+            }
+            killPingQuietly(handler, marker);
+        }
+    }
+
+    /**
+     * Exit codes must be distinguishable: a missing process is not an error, unusable arguments are an error. (A JVM that cannot start
+     * the class returns 1, which must be neither of them.)
+     */
+    protected void testCTRLSenderExitCodes() throws Exception {
+        assertEquals(CTRLSender.PROCESS_NOT_FOUND, runCTRLSender("99999999", null));
+        assertEquals(CTRLSender.EXCEPTION, runCTRLSender("notapid", null));
+        assertTrue(CTRLSender.PROCESS_NOT_FOUND != 1, "1 is the exit code of a JVM that failed to start the class");
+    }
+
+    /**
+     * cmd starts two pings on ONE console: the target and a sibling that is not part of the target's tree. CTRL would hit the sibling too,
+     * so it must be refused (CTRLNotSentException), the sibling must survive, and the target must be terminated forced right away without
+     * waiting for the timeout.
+     */
+    protected void testSendCTRLRefusedForeignProcessOnConsole(String unique, ProcessHandler handler) throws Exception {
+        final String siblingMarker = "-asibling" + unique;
+        final String targetMarker = "-atarget" + unique;
+        Kernel32Ext.INSTANCE.SetConsoleCtrlHandler(null, false);
+        Command c = new Command("cmd", "/c", "start /b ping localhost -n 1000 " + siblingMarker + " & ping localhost -n 1000 " + targetMarker);
+        c.setOutputHandler(new AbstractLineHandler() {
+            @Override
+            public void handleLine(String line, Object caller) {
+            }
+        });
+        c.start(true);
+        try {
+            final ProcessInfo sibling = findPing(handler, siblingMarker, 10000);
+            final ProcessInfo target = findPing(handler, targetMarker, 10000);
+            assertTrue(sibling != null && target != null, "Should find both pings");
+            boolean refused = false;
+            try {
+                handler.terminateRequest(target);
+            } catch (JNAWindowsProcessHandler.CTRLNotSentException e) {
+                refused = true;
+            }
+            assertTrue(refused, "CTRL must be refused: the sibling ping shares the console");
+            Thread.sleep(1000);
+            assertTrue(handler.listByProcessInfo(target).size() == 1, "target must still run, nothing was sent");
+            assertTrue(handler.listByProcessInfo(sibling).size() == 1, "sibling must not be hit");
+            final long start = Time.now();
+            handler.terminateForcedAfterRequest(TimeSpan.parse("60s"), 0, target);
+            final long duration = Time.now() - start;
+            assertTrue(duration < 15000, "Must terminate forced without waiting for the timeout. Took " + duration + "ms");
+            assertTrue(handler.listByProcessInfo(target).isEmpty(), "target must be gone");
+            assertTrue(handler.listByProcessInfo(sibling).size() == 1, "sibling must survive");
+        } finally {
+            if (c.getProcess() != null && c.getProcess().isAlive()) {
+                c.getProcess().destroyForcibly();
+            }
+            killPingQuietly(handler, siblingMarker);
+            killPingQuietly(handler, targetMarker);
+        }
+    }
+
+    /**
+     * One process gets CTRL (own console), one is refused (foreign sibling on its console) in the same terminateForcedAfterRequest call.
+     * The refused one must not wait for the other, both must end, and the foreign sibling must survive.
+     */
+    protected void testTerminateForcedAfterRequestMixed(String unique, ProcessHandler handler) throws Exception {
+        final String okMarker = "-aokproc" + unique;
+        final String siblingMarker = "-amixsib" + unique;
+        final String refusedMarker = "-amixref" + unique;
+        Kernel32Ext.INSTANCE.SetConsoleCtrlHandler(null, false);
+        final AbstractLineHandler ignore = new AbstractLineHandler() {
+            @Override
+            public void handleLine(String line, Object caller) {
+            }
+        };
+        Command ok = new Command("cmd", "/c", "ping localhost -n 1000 " + okMarker);
+        ok.setOutputHandler(ignore);
+        Command refused = new Command("cmd", "/c", "start /b ping localhost -n 1000 " + siblingMarker + " & ping localhost -n 1000 " + refusedMarker);
+        refused.setOutputHandler(ignore);
+        ok.start(true);
+        refused.start(true);
+        try {
+            final ProcessInfo okPing = findPing(handler, okMarker, 10000);
+            final ProcessInfo sibling = findPing(handler, siblingMarker, 10000);
+            final ProcessInfo refusedPing = findPing(handler, refusedMarker, 10000);
+            assertTrue(okPing != null && sibling != null && refusedPing != null, "Should find all pings");
+            final long start = Time.now();
+            handler.terminateForcedAfterRequest(TimeSpan.parse("60s"), 0, okPing, refusedPing);
+            final long duration = Time.now() - start;
+            assertTrue(duration < 30000, "Took " + duration + "ms");
+            assertTrue(handler.listByProcessInfo(okPing).isEmpty(), "ok process must be gone");
+            assertTrue(handler.listByProcessInfo(refusedPing).isEmpty(), "refused process must be gone (forced)");
+            assertTrue(handler.listByProcessInfo(sibling).size() == 1, "foreign sibling must survive");
+        } finally {
+            for (Command c : new Command[] { ok, refused }) {
+                if (c.getProcess() != null && c.getProcess().isAlive()) {
+                    c.getProcess().destroyForcibly();
+                }
+            }
+            killPingQuietly(handler, okMarker);
+            killPingQuietly(handler, siblingMarker);
+            killPingQuietly(handler, refusedMarker);
         }
     }
 

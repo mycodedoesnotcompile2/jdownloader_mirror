@@ -18,19 +18,20 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
 import jd.parser.html.Form;
+import jd.parser.html.InputField;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 51062 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 53838 $", interfaceVersion = 3, names = {}, urls = {})
 public class FreedlInk extends XFileSharingProBasic {
     public FreedlInk(final PluginWrapper wrapper) {
         super(wrapper);
@@ -99,9 +100,24 @@ public class FreedlInk extends XFileSharingProBasic {
 
     @Override
     protected Form findFormDownload2Free(Browser br) {
-        final Form ret = super.findFormDownload2Free(br);
-        if (ret == null) {
-            return null;
+        Form ret = br.getFormbyProperty("name", "FREE1");// F1 is ads for premium FREE1 is the correct one
+        if (ret != null) {
+            final InputField adblock_detected = ret.getInputField("adblock_detected");
+            if (adblock_detected != null && StringUtils.isEmpty(adblock_detected.getValue())) {
+                adblock_detected.setValue("0");
+            }
+        } else {
+            final Form[] forms = br.getForms();
+            for (final Form form : forms) {
+                final InputField op_field = form.getInputFieldByName("op");
+                if (op_field != null && op_field.getValue().contains("download2")) {
+
+                }
+            }
+            ret = super.findFormDownload2Free(br);
+            if (ret == null) {
+                return null;
+            }
         }
         ret.put("download_free", "1");
         return ret;

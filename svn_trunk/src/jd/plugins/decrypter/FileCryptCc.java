@@ -32,6 +32,7 @@ import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
+import org.jdownloader.captcha.v2.challenge.cutcaptcha.CaptchaHelperCrawlerPluginCutCaptcha;
 import org.jdownloader.captcha.v2.challenge.powcaptcha.AbstractPowCaptcha;
 import org.jdownloader.captcha.v2.challenge.powcaptcha.CaptchaHelperCrawlerPluginPowCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
@@ -59,7 +60,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 53778 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53839 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileCryptCc extends PluginForDecrypt {
     public FileCryptCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -67,7 +68,7 @@ public class FileCryptCc extends PluginForDecrypt {
 
     @Override
     public int getMaxConcurrentProcessingInstances() {
-        /* Limit to 1 to avoid getting IP-banned by filecrypt or filecrypt forcing user to always enter captchas. */
+        /* Limit to 1 to avoid getting IP-banned by filecrypt or filecrypt forcing user to always enter CutCaptcha captchas. */
         return 1;
     }
 
@@ -700,6 +701,10 @@ public class FileCryptCc extends PluginForDecrypt {
             } else if (captchaForm != null && captchaForm.containsHTML("=\"g-recaptcha\"")) {
                 final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
                 captchaForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+            } else if (StringUtils.containsIgnoreCase(captchaURL, "cutcaptcha")) {
+                logger.info("Attempting to solve CutCaptcha");
+                final String cutcaptchaToken = new CaptchaHelperCrawlerPluginCutCaptcha(this, br, null).getToken();
+                captchaForm.put("cap_token", Encoding.urlEncode(cutcaptchaToken));
             } else if (AbstractPowCaptcha.containsPowCaptchaClass(captchaForm)) {
                 logger.info("Attempting to solve powCAPTCHA");
                 final String proxyUrl = getConfiguredProxyUrl();

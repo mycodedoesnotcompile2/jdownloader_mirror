@@ -45,7 +45,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -69,7 +68,6 @@ import org.appwork.utils.Time;
 import org.appwork.utils.duration.TimeSpan;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.JNAProcessInfo;
-import org.appwork.utils.os.WindowsUtils;
 import org.appwork.utils.os.NotSupportedException;
 import org.appwork.utils.processes.command.Command;
 import org.appwork.utils.processes.command.ProcessOutputHandler;
@@ -423,12 +421,25 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
         return title.trim();
     }
 
+    /**
+     * CTRL was deliberately NOT sent (it would have hit foreign processes). Waiting for the process to react makes no sense.
+     */
+    public static class CTRLNotSentException extends IOException {
+        private static final long serialVersionUID = 1L;
+
+        public CTRLNotSentException(final String message) {
+            super(message);
+        }
+    }
+
     protected void sendCTRLToPID(final int pid) throws IOException {
         new NonInterruptibleRunnable<Void, IOException>() {
             @Override
             public Void run() throws IOException, InterruptedException {
                 LogV3.info("Execute CTRL Sender for PID " + pid);
-                final Command command = new Command(CrossSystem.getJavaBinary(), "-cp", java.lang.management.ManagementFactory.getRuntimeMXBean().getClassPath(), CTRLSender.class.getName(), pid + "");
+                // CTRLSender sends CTRL+C to the whole console of the target and refuses if any process outside the target's
+                // process tree (e.g. this JVM) is attached to it. Our PID is only passed for its log output.
+                final Command command = new Command(CrossSystem.getJavaBinary(), "-cp", java.lang.management.ManagementFactory.getRuntimeMXBean().getClassPath(), CTRLSender.class.getName(), pid + "", CrossSystem.getPID() + "");
                 ProcessOutputHandler po;
                 command.setOutputHandler(po = new ProcessOutputHandler());
                 command.start(true);
@@ -436,6 +447,9 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
                 LogV3.info(po.getResult().toString());
                 if (po.getResult().getExitCode() == CTRLSender.PROCESS_NOT_FOUND) {
                     LogV3.info("Process Not Found");
+                } else if (po.getResult().getExitCode() == CTRLSender.FOREIGN_PROCESS_ON_CONSOLE) {
+                    // terminateForcedAfterRequest catches this and terminates the process forced right away, without waiting
+                    throw new CTRLNotSentException("Could not send CTRL to " + pid + ": foreign processes (e.g. this process " + CrossSystem.getPID() + ") share its console. CTRL was not sent, use terminateForced instead");
                 } else if (po.getResult().getExitCode() != 0) {
                     throw new IOException("Could not send CTRL: " + po.getResult().getExitCode());
                 }
@@ -831,22 +845,46 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
         if (proccesses.length == 0) {
             return false;
         }
+        // processes for which nothing was sent: no point in waiting, terminate them forced right away
+        final List<ProcessInfo> notSent = new ArrayList<ProcessInfo>();
+        final List<ProcessInfo> toWaitFor = new ArrayList<ProcessInfo>();
         for (ProcessInfo p : proccesses) {
             fill(p);
             try {
                 if (terminateRequest(p)) {
                     result = true;
                 }
+                toWaitFor.add(p);
+            } catch (CTRLNotSentException e) {
+                LogV3.log(e);
+                notSent.add(p);
             } catch (IOException e) {
                 // swallow - we might be successfull with forced
                 LogV3.log(e);
+                toWaitFor.add(p);
             }
         }
-        LogV3.info("Close requested. Wait Timeout " + timeout);
-        final List<ProcessInfo> running = waitForExit(timeout, proccesses);
-        LogV3.info("Done. Remaining: " + running.size());
+        int failed = 0;
+        // Before waiting for the others. No isRunning check: it would swallow errors, and terminateForced handles processes that are
+        // already gone.
+        for (final ProcessInfo p : notSent) {
+            LogV3.info("CTRL was not sent. Terminate forced without waiting: " + p);
+            try {
+                if (terminateForced(p, exitCode)) {
+                    result = true;
+                }
+            } catch (final IOException e) {
+                LogV3.log(e);
+                failed++;
+            }
+        }
+        final List<ProcessInfo> running = new ArrayList<ProcessInfo>();
+        if (toWaitFor.size() > 0) {
+            LogV3.info("Close requested. Wait Timeout " + timeout);
+            running.addAll(waitForExit(timeout, toWaitFor.toArray(new ProcessInfo[0])));
+            LogV3.info("Done. Remaining: " + running.size());
+        }
         if (running.size() > 0) {
-            int failed = 0;
             LogV3.info("Timeout " + timeout + " expired. Terminate remaining processes");
             for (final ProcessInfo p : running) {
                 try {
@@ -858,9 +896,9 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
                     failed++;
                 }
             }
-            if (failed > 0) {
-                throw new IOException("Failed to exit at least " + failed + " processes");
-            }
+        }
+        if (failed > 0) {
+            throw new IOException("Failed to exit at least " + failed + " processes");
         }
         return result;
     }

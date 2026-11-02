@@ -155,6 +155,7 @@ public class CookieStorable implements Storable {
     private long         creationTime = -1;
     private long         expireTime   = -1;
     private final Cookie cookie;
+    private String       source       = null;
 
     public CookieStorable(/* Storable */) {
         this(null);
@@ -165,7 +166,14 @@ public class CookieStorable implements Storable {
     }
 
     public Cookie _restore() {
-        final Cookie ret = new Cookie();
+        Cookie.SOURCE source = Cookie.SOURCE.LEGACY;
+        try {
+            if (getSource() != null) {
+                source = Cookie.SOURCE.valueOf(getSource());
+            }
+        } catch (IllegalArgumentException e) {
+        }
+        final Cookie ret = source.newCookieInstance();
         ret.setHost(this.getHost());
         ret.setValue(this.getValue());
         ret.setKey(this.getKey());
@@ -191,5 +199,20 @@ public class CookieStorable implements Storable {
 
     public void setHostOnly(Boolean hostOnly) {
         this.hostOnly = hostOnly;
+    }
+
+    public String getSource() {
+        if (this.cookie != null) {
+            return this.cookie.getSource().name();
+        }
+        return source;
+    }
+
+    /**
+     * @param source
+     *            the source to set
+     */
+    public void setSource(String source) {
+        this.source = source;
     }
 }

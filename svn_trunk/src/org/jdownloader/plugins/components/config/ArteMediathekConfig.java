@@ -1,11 +1,15 @@
 package org.jdownloader.plugins.components.config;
 
+import java.util.Set;
+
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
+import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.storage.config.annotations.DefaultStringValue;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.LabelInterface;
+import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginHost;
@@ -28,20 +32,39 @@ public interface ArteMediathekConfig extends PluginConfigInterface {
     final String                                        text_CrawlHTTP1080p                                 = "Crawl 1080p?";
     final String                                        text_CrawlUnknownHTTPVideoQualities                 = "Crawl unknown http video qualities?";
     final String                                        text_LanguageSelectionMode                          = "Language selection mode";
-    final String                                        text_CrawlLanguageEnglish                           = "Crawl language english?";
-    final String                                        text_CrawlLanguageFrench                            = "Crawl language french?";
-    final String                                        text_CrawlLanguageGerman                            = "Crawl language german?";
-    final String                                        text_CrawlLanguageItalian                           = "Crawl language italian?";
-    final String                                        text_CrawlLanguagePolish                            = "Crawl language polish?";
-    final String                                        text_CrawlLanguageSpanish                           = "Crawl language spanish?";
-    final String                                        text_CrawlLanguageRomanian                          = "Crawl language omanian?";
-    final String                                        text_CrawlLanguageUnknown                           = "Crawl unknown languages?";
     final String                                        text_QualitySelectionFallbackMode                   = "Define what to add if based on your selection no video results are found";
     final String                                        text_GetFilenameSchemeTypeV2                        = "Select filename scheme type";
     final String                                        text_GetFilenameScheme                              = "Enter custom filename scheme";
     final String                                        text_GetPackagenameSchemeType                       = "Select package name scheme type";
     final String                                        text_GetPackagenameScheme                           = "Enter custom package name scheme";
     public static final ArteMediathekConfig.TRANSLATION TRANSLATION                                         = new TRANSLATION();
+
+    public static enum LANGUAGE {
+        ENGLISH("en"),
+        FRENCH("fr"),
+        GERMAN("de"),
+        ITALIAN("it"),
+        SPANISH("es"),
+        POLISH("pl"),
+        ROMANIAN("ro"),
+        HUNGARIAN("hu"),
+        OTHER(null);
+
+        private final String iso6391Code;
+
+        private LANGUAGE(String iso6391Code) {
+            this.iso6391Code = iso6391Code;
+        }
+
+        public static LANGUAGE iso6391CodeToLanguage(final String code) {
+            for (LANGUAGE lng : values()) {
+                if (StringUtils.equalsIgnoreCase(lng.iso6391Code, code)) {
+                    return lng;
+                }
+            }
+            return LANGUAGE.OTHER;
+        }
+    }
 
     public static class TRANSLATION {
         public String getCrawlThumbnail_label() {
@@ -98,38 +121,6 @@ public interface ArteMediathekConfig extends PluginConfigInterface {
 
         public String getLanguageSelectionMode_label() {
             return text_LanguageSelectionMode;
-        }
-
-        public String getCrawlLanguageEnglish_label() {
-            return text_CrawlLanguageEnglish;
-        }
-
-        public String getCrawlLanguageFrench_label() {
-            return text_CrawlLanguageFrench;
-        }
-
-        public String getCrawlLanguageGerman_label() {
-            return text_CrawlLanguageGerman;
-        }
-
-        public String getCrawlLanguageItalian_label() {
-            return text_CrawlLanguageItalian;
-        }
-
-        public String getCrawlLanguagePolish_label() {
-            return text_CrawlLanguagePolish;
-        }
-
-        public String getCrawlLanguageSpanish_label() {
-            return text_CrawlLanguageSpanish;
-        }
-
-        public String getCrawlLanguageRomanian_label() {
-            return text_CrawlLanguageRomanian;
-        }
-
-        public String getCrawlLanguageUnknown_label() {
-            return text_CrawlLanguageUnknown;
         }
 
         public String getQualitySelectionFallbackMode_label() {
@@ -317,68 +308,11 @@ public interface ArteMediathekConfig extends PluginConfigInterface {
     void setLanguageSelectionMode(LanguageSelectionMode mode);
 
     @AboutConfig
-    @DefaultBooleanValue(true)
-    @DescriptionForConfigEntry(text_CrawlLanguageEnglish)
     @Order(300)
-    boolean isCrawlLanguageEnglish();
+    @DefaultOnNull
+    Set<LANGUAGE> getCrawlLanguages();
 
-    void setCrawlLanguageEnglish(boolean b);
-
-    @AboutConfig
-    @DefaultBooleanValue(true)
-    @DescriptionForConfigEntry(text_CrawlLanguageFrench)
-    @Order(301)
-    boolean isCrawlLanguageFrench();
-
-    void setCrawlLanguageFrench(boolean b);
-
-    @AboutConfig
-    @DefaultBooleanValue(true)
-    @DescriptionForConfigEntry(text_CrawlLanguageGerman)
-    @Order(302)
-    boolean isCrawlLanguageGerman();
-
-    void setCrawlLanguageGerman(boolean b);
-
-    @AboutConfig
-    @DefaultBooleanValue(true)
-    @DescriptionForConfigEntry(text_CrawlLanguageItalian)
-    @Order(303)
-    boolean isCrawlLanguageItalian();
-
-    void setCrawlLanguageItalian(boolean b);
-
-    @AboutConfig
-    @DefaultBooleanValue(true)
-    @DescriptionForConfigEntry(text_CrawlLanguagePolish)
-    @Order(304)
-    boolean isCrawlLanguagePolish();
-
-    void setCrawlLanguagePolish(boolean b);
-
-    @AboutConfig
-    @DefaultBooleanValue(true)
-    @DescriptionForConfigEntry(text_CrawlLanguageSpanish)
-    @Order(305)
-    boolean isCrawlLanguageSpanish();
-
-    void setCrawlLanguageSpanish(boolean b);
-
-    @AboutConfig
-    @DefaultBooleanValue(true)
-    @DescriptionForConfigEntry(text_CrawlLanguageRomanian)
-    @Order(305)
-    boolean isCrawlLanguageRomanian();
-
-    void setCrawlLanguageRomanian(boolean b);
-
-    @AboutConfig
-    @DefaultBooleanValue(true)
-    @DescriptionForConfigEntry(text_CrawlLanguageUnknown)
-    @Order(310)
-    boolean isCrawlLanguageUnknown();
-
-    void setCrawlLanguageUnknown(boolean b);
+    void setCrawlLanguages(Set<LANGUAGE> languages);
 
     public static enum QualitySelectionFallbackMode implements LabelInterface {
         BEST {

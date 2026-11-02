@@ -50,6 +50,7 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.downloader.hls.M3U8Playlist;
 import org.jdownloader.plugins.components.config.ArteMediathekConfig;
 import org.jdownloader.plugins.components.config.ArteMediathekConfig.FilenameSchemeType;
+import org.jdownloader.plugins.components.config.ArteMediathekConfig.LANGUAGE;
 import org.jdownloader.plugins.components.config.ArteMediathekConfig.LanguageSelectionMode;
 import org.jdownloader.plugins.components.config.ArteMediathekConfig.PackagenameSchemeType;
 import org.jdownloader.plugins.components.config.ArteMediathekConfig.QualitySelectionFallbackMode;
@@ -62,7 +63,7 @@ import org.jdownloader.plugins.components.hls.HlsContainerStorable;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 53835 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53838 $", interfaceVersion = 4, names = {}, urls = {})
 public class ArteMediathekV3 extends PluginForDecrypt {
     public ArteMediathekV3(PluginWrapper wrapper) {
         super(wrapper);
@@ -492,39 +493,19 @@ public class ArteMediathekV3 extends PluginForDecrypt {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final Language langFromURL = iso6391CodeToLanguageEnum(langFromURLStr);
-        final List<Language> selectedLanguages = new ArrayList<Language>();
+        final LANGUAGE langFromURL = iso6391CodeToLanguageEnum(langFromURLStr);
+        final List<LANGUAGE> selectedLanguages = new ArrayList<LANGUAGE>();
         if (cfg.getLanguageSelectionMode() == LanguageSelectionMode.ALL_SELECTED) {
-            if (cfg.isCrawlLanguageEnglish()) {
-                selectedLanguages.add(Language.ENGLISH);
-            }
-            if (cfg.isCrawlLanguageFrench()) {
-                selectedLanguages.add(Language.FRENCH);
-            }
-            if (cfg.isCrawlLanguageGerman()) {
-                selectedLanguages.add(Language.GERMAN);
-            }
-            if (cfg.isCrawlLanguageItalian()) {
-                selectedLanguages.add(Language.ITALIAN);
-            }
-            if (cfg.isCrawlLanguagePolish()) {
-                selectedLanguages.add(Language.POLISH);
-            }
-            if (cfg.isCrawlLanguageSpanish()) {
-                selectedLanguages.add(Language.SPANISH);
-            }
-            if (cfg.isCrawlLanguageRomanian()) {
-                selectedLanguages.add(Language.ROMANIAN);
-            }
-            if (cfg.isCrawlLanguageUnknown()) {
-                selectedLanguages.add(Language.OTHER);
+            selectedLanguages.addAll(cfg.getCrawlLanguages());
+            if (selectedLanguages.isEmpty()) {
+                selectedLanguages.addAll(Arrays.asList(LANGUAGE.values()));
             }
         } else {
             /* Language by URL */
             selectedLanguages.add(langFromURL);
         }
         final Number durationSecondsO = (Number) vid.get("durationSeconds");
-        final HashSet<Language> existingLanguages = new HashSet<Language>();
+        final HashSet<LANGUAGE> existingLanguages = new HashSet<LANGUAGE>();
         /* Look ahead and collect existing languages */
         for (final List<Map<String, Object>> videoStreamsByLanguage : languagePacks.values()) {
             for (final Map<String, Object> videoStream : videoStreamsByLanguage) {
@@ -869,90 +850,61 @@ public class ArteMediathekV3 extends PluginForDecrypt {
         }
     }
 
-    private static Language iso6391CodeToLanguageEnum(final String iso6391Code) {
-        if (iso6391Code.equalsIgnoreCase("en")) {
-            return Language.ENGLISH;
-        } else if (iso6391Code.equalsIgnoreCase("fr")) {
-            return Language.FRENCH;
-        } else if (iso6391Code.equalsIgnoreCase("de")) {
-            return Language.GERMAN;
-        } else if (iso6391Code.equalsIgnoreCase("it")) {
-            return Language.ITALIAN;
-        } else if (iso6391Code.equalsIgnoreCase("pl")) {
-            return Language.POLISH;
-        } else if (iso6391Code.equalsIgnoreCase("es")) {
-            return Language.SPANISH;
-        } else if (iso6391Code.equalsIgnoreCase("ro")) {
-            return Language.ROMANIAN;
-        } else {
-            /* Unknown/unsupported code */
-            return Language.OTHER;
-        }
+    private static LANGUAGE iso6391CodeToLanguageEnum(final String iso6391Code) {
+        return LANGUAGE.iso6391CodeToLanguage(iso6391Code);
     }
 
-    private static enum Language {
-        ENGLISH,
-        FRENCH,
-        GERMAN,
-        ITALIAN,
-        SPANISH,
-        POLISH,
-        ROMANIAN,
-        HUNGARIAN,
-        OTHER;
-    }
-
-    private static Language parseAudioLanguage(final String apiosCode) {
+    private static LANGUAGE parseAudioLanguage(final String apiosCode) {
         final String euLanguage = new Regex(apiosCode, "^(VOEU\\[[A-Z]+\\])").getMatch(0);
         if (euLanguage != null) {
             // uses same identifier
             return parseSubtitleLanguage(euLanguage);
         }
         final String languageChar = new Regex(apiosCode, "^VO?([A-Z])").getMatch(0);
-        if (languageChar != null) {
+        if (languageChar != null && !apiosCode.equals("VO")) {
             if ("F".equals(languageChar)) {
-                return Language.FRENCH;
+                return LANGUAGE.FRENCH;
             } else if ("A".equals(languageChar)) {
-                return Language.GERMAN;
+                return LANGUAGE.GERMAN;
             } else {
                 /**
-                 * .g. VOEU -> Original version which usually comes with foreign subtitle -> It's okay to return Language.OTHER for such
+                 * .g. VOEU -> Original version which usually comes with foreign subtitle -> It's okay to return LANGUAGE.OTHER for such
                  * items!
                  */
-                return Language.OTHER;
+                return LANGUAGE.OTHER;
             }
         }
-        return Language.OTHER;
+        return LANGUAGE.OTHER;
     }
 
-    private static Language parseSubtitleLanguage(final String apiosCode) {
+    private static LANGUAGE parseSubtitleLanguage(final String apiosCode) {
         final String subtitleLanguage = new Regex(apiosCode, "-STM?(A|F)").getMatch(0);
         if (subtitleLanguage != null) {
             if ("F".equals(subtitleLanguage)) {
-                return Language.FRENCH;
+                return LANGUAGE.FRENCH;
             } else if ("A".equals(subtitleLanguage)) {
-                return Language.GERMAN;
+                return LANGUAGE.GERMAN;
             } else {
-                return Language.OTHER;
+                return LANGUAGE.OTHER;
             }
         } else if (apiosCode.endsWith("[DEU]") || apiosCode.endsWith("[GER]")) {
-            return Language.GERMAN;
+            return LANGUAGE.GERMAN;
         } else if (apiosCode.endsWith("[FRA]") || apiosCode.endsWith("[FRE]")) {
-            return Language.FRENCH;
+            return LANGUAGE.FRENCH;
         } else if (apiosCode.endsWith("[ANG]") || apiosCode.endsWith("[ENG]")) {
-            return Language.ENGLISH;
+            return LANGUAGE.ENGLISH;
         } else if (apiosCode.endsWith("[ESP]") || apiosCode.endsWith("[SPA]")) {
-            return Language.SPANISH;
+            return LANGUAGE.SPANISH;
         } else if (apiosCode.endsWith("[ITA]")) {
-            return Language.ITALIAN;
+            return LANGUAGE.ITALIAN;
         } else if (apiosCode.endsWith("[POL]")) {
-            return Language.POLISH;
+            return LANGUAGE.POLISH;
         } else if (apiosCode.endsWith("[ROU]")) {
-            return Language.ROMANIAN;
+            return LANGUAGE.ROMANIAN;
         } else if (apiosCode.endsWith("[HUN]")) {
-            return Language.HUNGARIAN;
+            return LANGUAGE.HUNGARIAN;
         } else {
-            return Language.OTHER;
+            return LANGUAGE.OTHER;
         }
     }
 
@@ -1058,11 +1010,11 @@ public class ArteMediathekV3 extends PluginForDecrypt {
     public static interface VersionInfo {
         VersionType getVersionType();
 
-        Language getAudioLanguage();
+        LANGUAGE getAudioLanguage();
 
-        Language getAudioLanguageByVersionType();
+        LANGUAGE getAudioLanguageByVersionType();
 
-        Language getSubtitleLanguage();
+        LANGUAGE getSubtitleLanguage();
 
         SubtitleType getSubtitleType();
 
@@ -1081,18 +1033,18 @@ public class ArteMediathekV3 extends PluginForDecrypt {
 
     public static VersionInfo parseVersionInfo(final String apiosCode, final String originalVersionAudioLanguage) {
         final SubtitleType subtitleType = SubtitleType.parse(apiosCode);
-        final Language audioLanguage = parseAudioLanguage(apiosCode);
-        final Language subtitleLanguage = parseSubtitleLanguage(apiosCode);
+        final LANGUAGE audioLanguage = parseAudioLanguage(apiosCode);
+        final LANGUAGE subtitleLanguage = parseSubtitleLanguage(apiosCode);
         final VersionType versionType = VersionType.parse(apiosCode);
-        final Language originalAudioLanguageFromapiosCode;
+        final LANGUAGE originalAudioLanguageFromapiosCode;
         if (versionType == VersionType.ORIGINAL_FRANCAIS) {
-            originalAudioLanguageFromapiosCode = Language.FRENCH;
+            originalAudioLanguageFromapiosCode = LANGUAGE.FRENCH;
         } else if (versionType == VersionType.ORIGINAL_GERMAN) {
-            originalAudioLanguageFromapiosCode = Language.GERMAN;
+            originalAudioLanguageFromapiosCode = LANGUAGE.GERMAN;
         } else {
             originalAudioLanguageFromapiosCode = null;
         }
-        final Language originalAudioLanguage = originalVersionAudioLanguage != null ? iso6391CodeToLanguageEnum(originalVersionAudioLanguage) : originalAudioLanguageFromapiosCode;
+        final LANGUAGE originalAudioLanguage = originalVersionAudioLanguage != null ? iso6391CodeToLanguageEnum(originalVersionAudioLanguage) : originalAudioLanguageFromapiosCode;
         return new VersionInfo() {
             @Override
             public SubtitleType getSubtitleType() {
@@ -1100,13 +1052,13 @@ public class ArteMediathekV3 extends PluginForDecrypt {
             }
 
             @Override
-            public Language getSubtitleLanguage() {
+            public LANGUAGE getSubtitleLanguage() {
                 return subtitleLanguage;
             }
 
             @Override
-            public Language getAudioLanguage() {
-                if (audioLanguage == Language.OTHER) {
+            public LANGUAGE getAudioLanguage() {
+                if (audioLanguage == LANGUAGE.OTHER) {
                     /* Try to determine language by VersionType */
                     return getAudioLanguageByVersionType();
                 } else {
@@ -1115,19 +1067,19 @@ public class ArteMediathekV3 extends PluginForDecrypt {
             }
 
             @Override
-            public Language getAudioLanguageByVersionType() {
+            public LANGUAGE getAudioLanguageByVersionType() {
                 if (versionType == VersionType.ORIGINAL_FRANCAIS) {
-                    return Language.FRENCH;
+                    return LANGUAGE.FRENCH;
                 } else if (versionType == VersionType.NON_ORIGINAL_FRANCAIS) {
-                    return Language.FRENCH;
+                    return LANGUAGE.FRENCH;
                 } else if (versionType == VersionType.ORIGINAL_GERMAN) {
-                    return Language.GERMAN;
+                    return LANGUAGE.GERMAN;
                 } else if (versionType == VersionType.NON_ORIGINAL_GERMAN) {
-                    return Language.GERMAN;
+                    return LANGUAGE.GERMAN;
                 } else if (versionType == VersionType.ORIGINAL && originalAudioLanguage != null) {
                     return originalAudioLanguage;
                 } else {
-                    return Language.OTHER;
+                    return LANGUAGE.OTHER;
                 }
             }
 

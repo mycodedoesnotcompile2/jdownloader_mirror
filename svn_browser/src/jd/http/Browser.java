@@ -3367,6 +3367,34 @@ public class Browser implements HTTPConnectionFactoryInterface {
                     if (request.containsHTML("<h1>\\s*AVVISO\\s*</h1>") && request.containsHTML("per le garanzie nelle comunicazioni") && request.containsHTML("www\\.agcom\\.it")) {
                         return this;
                     }
+                    /**
+                     * <title>Sito Illegale - AGCOM</title> <h1>ATTENZIONE SITO ILLEGALE</h1>
+                     *
+                     * <p class="warning-text">
+                     * L'accesso al presente sito è stato disabilitato in esecuzione di un provvedimento Agcom per violazione del diritto
+                     * d'autore e connessi
+                     * </p>
+                     *
+                     * <p>
+                     * È possibile presentare <a
+                     * href="https://www.agcom.it/competenze/antipirateria-e-piracy-shield/piattaforma-piracy-shield#link_utili">reclamo</a>
+                     * per i provvedimenti cautelari e i blocchi tramite Piracy Shield ai sensi del Regolamento Agcom sul diritto d'autore
+                     * online
+                     * </p>
+                     *
+                     * <p>
+                     * La violazione della legge sul diritto d'autore ha rilevanza penale e comporta sanzioni pecuniarie
+                     * </p>
+                     *
+                     * <p>
+                     * Per maggiori informazioni visita la <a
+                     * href="https://www.agcom.it/competenze/piattaforme-online/antipirateria-e-piracy-shield">pagina dedicata</a> sul sito
+                     * Agcom.it
+                     * </p>
+                     */
+                    if (request.containsHTML("<h1>\\s*ATTENZIONE SITO ILLEGALE\\s*</h1>") && request.containsHTML("per violazione del diritto") && request.containsHTML("www\\.agcom\\.it")) {
+                        return this;
+                    }
                 }
                 return null;
             }

@@ -25,9 +25,82 @@ import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.logging2.extmanager.LoggerFactory;
 
 public class Cookie {
+    public static class ServerCookie extends Cookie {
+        private ServerCookie() {
+        }
+
+        @Override
+        public SOURCE getSource() {
+            return SOURCE.SERVER;
+        }
+    }
+
+    public static class ImportCookie extends Cookie {
+        private ImportCookie() {
+        }
+
+        @Override
+        public SOURCE getSource() {
+            return SOURCE.IMPORT;
+        }
+    }
+
+    public static class ManualCookie extends Cookie {
+        private ManualCookie() {
+        }
+
+        @Override
+        public SOURCE getSource() {
+            return SOURCE.MANUAL;
+        }
+    }
+
+    public static class LegacyCookie extends Cookie {
+        private LegacyCookie() {
+        }
+
+        @Override
+        public SOURCE getSource() {
+            return SOURCE.LEGACY;
+        }
+    }
+
+    public static enum SOURCE {
+        SERVER {
+            @Override
+            public ServerCookie newCookieInstance() {
+                return new ServerCookie();
+            }
+        },
+        IMPORT {
+            @Override
+            public ImportCookie newCookieInstance() {
+                return new ImportCookie();
+            }
+        },
+        MANUAL {
+            @Override
+            public ManualCookie newCookieInstance() {
+                return new ManualCookie();
+            }
+        },
+        LEGACY {
+            @Override
+            public Cookie newCookieInstance() {
+                return new Cookie();
+            }
+        };
+        public abstract <T extends Cookie> T newCookieInstance();
+    }
+
     public final static String UNSECURE_HTTP = "http";
     public final static String SECURE_HTTPS  = "https";
-    private String             protocol      = null;
+
+    public SOURCE getSource() {
+        return SOURCE.MANUAL;
+    }
+
+    private String protocol = null;
 
     public String getProtocol() {
         return protocol;
@@ -108,7 +181,7 @@ public class Cookie {
     private long   creationTime = System.currentTimeMillis();
     private long   expireTime   = -1;
 
-    public Cookie() {
+    private Cookie() {
     }
 
     @Deprecated
@@ -302,8 +375,9 @@ public class Cookie {
         this.creationTime = time;
     }
 
-    public void setDomain(final String domain) {
-        if (domain == null) {
+    public void setDomain(String domain) {
+        domain = cleanAttributeValue(domain);
+        if (StringUtils.isEmpty(domain)) {
             this.domain = null;
         } else {
             // RFC 6265, remove leading dot
@@ -359,12 +433,29 @@ public class Cookie {
         this.key = key;
     }
 
-    public void setPath(final String path) {
+    public void setPath(String path) {
+        path = cleanAttributeValue(path);
         if (StringUtils.isEmpty(path)) {
             this.path = null;
         } else {
             this.path = path;
         }
+    }
+
+    protected String cleanAttributeValue(String val) {
+        if (val == null) {
+            return null;
+        }
+        val = val.trim();
+        // Äußere einfache oder doppelte Anführungszeichen entfernen (Chromium-Verhalten)
+        if (val.length() >= 2) {
+            char first = val.charAt(0);
+            char last = val.charAt(val.length() - 1);
+            if (first == '"' && last == '"' || first == '\'' && last == '\'') {
+                val = val.substring(1, val.length() - 1).trim();
+            }
+        }
+        return val;
     }
 
     public void setValue(final String value) {
