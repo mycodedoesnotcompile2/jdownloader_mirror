@@ -417,14 +417,19 @@ public class Cookies {
         this.add(cookies);
     }
 
-    public synchronized void add(final Cookie cookie) {
-        for (final Cookie cookie2 : this.cookies) {
-            if (cookie2.equals(cookie)) {
-                cookie2.update(cookie);
+    public synchronized void add(final Cookie newCookie) {
+        if (newCookie.getKey() == null) {
+            return;
+        }
+        for (final Cookie cookie : this.getCookies()) {
+            if (removeExpired(cookie)) {
+                continue;
+            } else if (cookie.equals(newCookie)) {
+                cookie.update(newCookie);
                 return;
             }
         }
-        this.cookies.addIfAbsent(cookie);
+        cookies.addIfAbsent(newCookie);
     }
 
     public void add(final Cookies newcookies) {
@@ -450,7 +455,7 @@ public class Cookies {
     }
 
     public void clear() {
-        this.cookies.clear();
+        this.getCookies().clear();
     }
 
     public static String NOTDELETEDPATTERN = "^(?i)((?!^deleted$).)*$";
@@ -491,14 +496,25 @@ public class Cookies {
         }
     };
 
+    protected boolean removeExpired(Cookie cookie) {
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && cookie.isExpired()) {
+            getCookies().remove(cookie);
+            return true;
+        }
+        return false;
+    }
+
     public String getCookieString(URL url) {
-        if (cookies.isEmpty()) {
+        if (getCookies().isEmpty()) {
             return null;
         }
         final Map<String, List<Cookie>> keyValues = new LinkedHashMap<String, List<Cookie>>();
         final StringBuilder buffer = new StringBuilder();
         final List<Cookie> toSend = new ArrayList<Cookie>();
-        for (final Cookie cookie : cookies) {
+        for (final Cookie cookie : getCookies()) {
+            if (removeExpired(cookie)) {
+                continue;
+            }
             if (cookie.isExpired() || !cookie.matches(url)) {
                 continue;
             }
@@ -534,41 +550,58 @@ public class Cookies {
     }
 
     public Cookie get(URL url, final String key, final String valuePattern) {
-        final Cookie cookie = this.get(url, key);
-        if (cookie == null) {
+        final List<Cookie> cookies = list(url, key);
+        if (cookies == null) {
             return null;
         }
         if (valuePattern == null) {
-            return cookie;
+            return cookies.get(0);
         }
-        final String cookieValue = cookie.getValue();
-        if (cookieValue != null && Pattern.compile(valuePattern).matcher(cookieValue).matches()) {
-            return cookie;
-        } else {
-            return null;
-        }
-    }
-
-    @Deprecated
-    public Cookie get(final String key) {
-        return get((URL) null, key);
-    }
-
-    public Cookie get(URL url, final String key) {
-        if (key == null) {
-            return null;
-        }
-        for (final Cookie cookie : this.cookies) {
-            if (cookie.getKey().equals(key) && (url == null || cookie.matches(url))) {
-                return cookie;
-            }
-        }
-        for (final Cookie cookie : this.cookies) {
-            if (cookie.getKey().equalsIgnoreCase(key) && (url == null || cookie.matches(url))) {
+        final Pattern pattern = Pattern.compile(valuePattern);
+        for (Cookie cookie : cookies) {
+            final String cookieValue = cookie.getValue();
+            if (cookieValue != null && pattern.matcher(cookieValue).matches()) {
                 return cookie;
             }
         }
         return null;
+    }
+
+    @Deprecated
+    public Cookie get(final String key) {
+        return get(null, key, null);
+    }
+
+    public List<Cookie> list(URL url, final String key) {
+        if (key == null) {
+            return null;
+        }
+        final List<Cookie> ret = new ArrayList<Cookie>();
+        for (final Cookie cookie : this.getCookies()) {
+            if (removeExpired(cookie)) {
+                continue;
+            } else if (key.equals(cookie.getKey()) && (url == null || cookie.matches(url))) {
+                ret.add(cookie);
+            }
+        }
+        for (final Cookie cookie : this.getCookies()) {
+            if (removeExpired(cookie)) {
+                continue;
+            } else if (key.equalsIgnoreCase(cookie.getKey()) && (url == null || cookie.matches(url)) && !ret.contains(cookie)) {
+                ret.add(cookie);
+            }
+        }
+        if (ret.isEmpty()) {
+            return null;
+        }
+        if (url != null) {
+            Collections.sort(ret, BEST_MATCH_COMPARATOR);
+        }
+        return ret;
+    }
+
+    public Cookie get(URL url, final String key) {
+        return get(url, key, null);
     }
 
     public List<Cookie> getCookies() {
@@ -576,11 +609,11 @@ public class Cookies {
     }
 
     public boolean isEmpty() {
-        return this.cookies.isEmpty();
+        return this.getCookies().isEmpty();
     }
 
-    public void remove(final Cookie cookie) {
-        this.cookies.remove(cookie);
+    public boolean remove(final Cookie cookie) {
+        return cookie != null && getCookies().remove(cookie);
     }
 
     /**
@@ -590,19 +623,15 @@ public class Cookies {
      * @since JD2
      */
     @Deprecated
-    public void remove(final String keyName) {
-        if (keyName != null) {
-            final Cookie ckie = this.get(keyName);
-            if (ckie != null) {
-                this.cookies.remove(ckie);
-            }
-        }
+    public boolean remove(final String keyName) {
+        final List<Cookie> remove = list(null, keyName);
+        return remove != null && getCookies().removeAll(remove);
     }
 
     @Override
     public String toString() {
         final StringBuilder ret = new StringBuilder();
-        for (final Cookie el : this.cookies) {
+        for (final Cookie el : this.getCookies()) {
             if (ret.length() > 0) {
                 ret.append("\r\n");
             }

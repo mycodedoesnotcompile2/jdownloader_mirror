@@ -19,6 +19,7 @@ import java.util.regex.Pattern;
 
 import jd.controlling.TaskQueue;
 import jd.controlling.linkcollector.LinkCollectingJob;
+import jd.controlling.linkcollector.LinkCollector.MoveToDownloadlistMode;
 import jd.controlling.linkcollector.LinknameCleaner;
 import jd.controlling.linkcollector.PackagizerInterface;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -1094,17 +1095,10 @@ public class PackagizerController implements PackagizerInterface, FileCreationLi
             /* customize auto extract */
             link.getArchiveInfo().setAutoExtract(b ? BooleanStatus.TRUE : BooleanStatus.FALSE);
         }
-        if ((b = lgr.getRule().isAutoAddEnabled()) != null) {
-            /* customize auto add */
-            link.setAutoConfirmEnabled(b);
-        }
-        if ((b = lgr.getRule().isAutoStartEnabled()) != null) {
-            /* customize auto start */
-            link.setAutoStartEnabled(b);
-        }
-        if ((b = lgr.getRule().isAutoForcedStartEnabled()) != null) {
-            /* customize auto start */
-            link.setForcedAutoStartEnabled(b);
+        final MoveToDownloadlistMode moveToDownloadlistMode = lgr.getRule().getMoveToDownloadlistMode();
+        if (moveToDownloadlistMode != null) {
+            /* customize how the link is moved to the downloadlist */
+            moveToDownloadlistMode.applyTo(link);
         }
         return true;
     }

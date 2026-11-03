@@ -12,12 +12,12 @@ import org.appwork.utils.Files;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.os.CrossSystem;
 
-public class DiskSpaceChecker {
+public abstract class DiskSpaceChecker {
     protected final DiskSpaceReservation         diskSpaceReservation;
     protected final Object                       requestor;
     protected final CopyOnWriteArrayList<String> roots = new CopyOnWriteArrayList<String>();
 
-    public DiskSpaceChecker(final DiskSpaceReservation diskSpaceReservation, final Object requestor) {
+    protected DiskSpaceChecker(final DiskSpaceReservation diskSpaceReservation, final Object requestor) {
         this.diskSpaceReservation = diskSpaceReservation;
         this.requestor = requestor;
         findRoots();

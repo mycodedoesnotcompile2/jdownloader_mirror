@@ -2,12 +2,17 @@ package org.jdownloader.controlling.contextmenu;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import javax.swing.Action;
 import javax.swing.Icon;
 import javax.swing.KeyStroke;
 
+import org.appwork.loggingv3.LogV3;
 import org.appwork.swing.action.BasicAction;
 import org.appwork.swing.components.CheckBoxIcon;
 import org.appwork.swing.components.ExtMergedIcon;
@@ -93,6 +98,24 @@ public abstract class CustomizableAppAction extends AppAction {
         }
     }
 
+    private static final Set<String> UNKNOWN_ENUM_VALUES_LOGGED = Collections.synchronizedSet(new HashSet<String>());
+
+    /**
+     * Resolves a stored setup value to an enum constant. Returns null if the stored value does not exist (anymore), so callers can keep
+     * their default. The problem is logged only once per enum class and value.
+     */
+    public static Object getEnumSetupValue(final Class<? extends Enum> type, final String value) throws Exception {
+        try {
+            return ReflectionUtils.getEnumValueOf(type, value);
+        } catch (IllegalArgumentException e) {
+            /* Stored value is not part of the enum anymore (e.g. constant renamed or removed): fall back to the default */
+            if (UNKNOWN_ENUM_VALUES_LOGGED.add(type.getName() + "." + value)) {
+                LogV3.warning("ENUM value has changed? Unknown stored value '" + value + "' for enum " + type.getName() + ", using default. Valid values: " + Arrays.toString(ReflectionUtils.getEnumValues(type)));
+            }
+            return null;
+        }
+    }
+
     public void loadContextSetups() {
         final List<ActionContext> setupObjects = this.setupObjects;
         if (setupObjects != null) {
@@ -114,7 +137,7 @@ public abstract class CustomizableAppAction extends AppAction {
                             if (v == null) {
                                 continue;
                             } else if (Clazz.isEnum(type)) {
-                                v = ReflectionUtils.getEnumValueOf(type, v.toString());
+                                v = getEnumSetupValue(type, v.toString());
                                 if (v == null) {
                                     continue;
                                 }

@@ -5,12 +5,28 @@ import org.jdownloader.controlling.Priority;
 import org.jdownloader.controlling.filter.FilterRule;
 import org.jdownloader.translate._JDT;
 
+import jd.controlling.linkcollector.LinkCollector.MoveToDownloadlistMode;
+
 public class PackagizerRule extends FilterRule implements Storable {
     // Fields sorted alphabetically by type, then by name
+    /**
+     * @deprecated Legacy flag, kept solely so old configs can still be deserialized and migrated to {@link #moveToDownloadlistMode} via
+     *             {@link #_migrateLegacyFilters()}. Do not use for new code.
+     */
+    @Deprecated
     private Boolean  autoAddEnabled;
     private Boolean  autoExtractionEnabled;
+    /**
+     * @deprecated see {@link #autoAddEnabled}
+     */
+    @Deprecated
     private Boolean  autoForcedStartEnabled;
+    /**
+     * @deprecated see {@link #autoAddEnabled}
+     */
+    @Deprecated
     private Boolean  autoStartEnabled;
+    private MoveToDownloadlistMode moveToDownloadlistMode = null;
     private boolean  stopAfterThisRule = false;
     private Boolean  linkEnabled;
     private int      chunks;
@@ -54,9 +70,7 @@ public class PackagizerRule extends FilterRule implements Storable {
         ret.setComment(getComment());
         ret.setChunks(getChunks());
         ret.setAutoExtractionEnabled(isAutoExtractionEnabled());
-        ret.setAutoAddEnabled(isAutoAddEnabled());
-        ret.setAutoStartEnabled(isAutoStartEnabled());
-        ret.setAutoForcedStartEnabled(isAutoForcedStartEnabled());
+        ret.setMoveToDownloadlistMode(getMoveToDownloadlistMode());
         ret.setLinkEnabled(getLinkEnabled());
         ret.setMoveto(getMoveto());
         ret.setRename(getRename());
@@ -75,10 +89,19 @@ public class PackagizerRule extends FilterRule implements Storable {
     }
 
     // Getters and Setters (sorted alphabetically by field name)
+    /**
+     * @deprecated only used by Storable (JSON key "autoAddEnabled") and {@link #_migrateLegacyFilters()}. Returns the raw (possibly null)
+     *             stored value on purpose.
+     */
+    @Deprecated
     public Boolean isAutoAddEnabled() {
         return autoAddEnabled;
     }
 
+    /**
+     * @deprecated only used by Storable and {@link #_migrateLegacyFilters()}.
+     */
+    @Deprecated
     public void setAutoAddEnabled(Boolean autoAddEnabled) {
         this.autoAddEnabled = autoAddEnabled;
     }
@@ -91,20 +114,75 @@ public class PackagizerRule extends FilterRule implements Storable {
         this.autoExtractionEnabled = autoExtractionEnabled;
     }
 
+    /**
+     * @deprecated only used by Storable (JSON key "autoForcedStartEnabled") and {@link #_migrateLegacyFilters()}. Returns the raw
+     *             (possibly null) stored value on purpose.
+     */
+    @Deprecated
     public Boolean isAutoForcedStartEnabled() {
         return autoForcedStartEnabled;
     }
 
+    /**
+     * @deprecated only used by Storable and {@link #_migrateLegacyFilters()}.
+     */
+    @Deprecated
     public void setAutoForcedStartEnabled(Boolean autoForcedStartEnabled) {
         this.autoForcedStartEnabled = autoForcedStartEnabled;
     }
 
+    /**
+     * @deprecated only used by Storable (JSON key "autoStartEnabled") and {@link #_migrateLegacyFilters()}. Returns the raw (possibly
+     *             null) stored value on purpose.
+     */
+    @Deprecated
     public Boolean isAutoStartEnabled() {
         return autoStartEnabled;
     }
 
+    /**
+     * @deprecated only used by Storable and {@link #_migrateLegacyFilters()}.
+     */
+    @Deprecated
     public void setAutoStartEnabled(Boolean autoStartEnabled) {
         this.autoStartEnabled = autoStartEnabled;
+    }
+
+    /**
+     * Migrates the deprecated auto add / auto start / forced auto start flags into {@link #moveToDownloadlistMode}. Auto start and forced
+     * auto start imply a confirm, because a download can only be started once the link is in the downloadlist. A legacy "disabled" value
+     * has no effect on its own and results in no mode (null). Idempotent: after migration the legacy flags are cleared so subsequent calls
+     * (and the next save) are no-ops.
+     */
+    @Override
+    public void _migrateLegacyFilters() {
+        super._migrateLegacyFilters();
+        if (autoAddEnabled == null && autoStartEnabled == null && autoForcedStartEnabled == null) {
+            return;
+        }
+        if (moveToDownloadlistMode == null) {
+            if (Boolean.TRUE.equals(autoForcedStartEnabled)) {
+                moveToDownloadlistMode = MoveToDownloadlistMode.CONFIRM_AND_START_FORCED;
+            } else if (Boolean.TRUE.equals(autoStartEnabled)) {
+                moveToDownloadlistMode = MoveToDownloadlistMode.CONFIRM_AND_START;
+            } else if (Boolean.TRUE.equals(autoAddEnabled)) {
+                moveToDownloadlistMode = MoveToDownloadlistMode.CONFIRM;
+            }
+        }
+        autoAddEnabled = null;
+        autoStartEnabled = null;
+        autoForcedStartEnabled = null;
+    }
+
+    /**
+     * @return null if this rule does not change how the link is moved to the downloadlist.
+     */
+    public MoveToDownloadlistMode getMoveToDownloadlistMode() {
+        return moveToDownloadlistMode;
+    }
+
+    public void setMoveToDownloadlistMode(MoveToDownloadlistMode moveToDownloadlistMode) {
+        this.moveToDownloadlistMode = moveToDownloadlistMode;
     }
 
     public int getChunks() {

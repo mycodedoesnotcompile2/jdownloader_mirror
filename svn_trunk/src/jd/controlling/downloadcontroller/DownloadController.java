@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -43,6 +44,19 @@ import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
+
+import jd.controlling.downloadcontroller.DownloadWatchDog.DownloadLinkJob;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNodeFilter;
+import jd.controlling.packagecontroller.PackageController;
+import jd.parser.Regex;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLinkProperty;
+import jd.plugins.DownloadLinkStorable;
+import jd.plugins.FilePackage;
+import jd.plugins.FilePackageProperty;
+import jd.plugins.PluginForHost;
+import jd.utils.JDUtilities;
 
 import org.appwork.controlling.SingleReachableState;
 import org.appwork.exceptions.WTFException;
@@ -88,18 +102,6 @@ import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.GeneralSettings.CreateFolderTrigger;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.packagecontroller.AbstractPackageChildrenNodeFilter;
-import jd.controlling.packagecontroller.PackageController;
-import jd.parser.Regex;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLinkProperty;
-import jd.plugins.DownloadLinkStorable;
-import jd.plugins.FilePackage;
-import jd.plugins.FilePackageProperty;
-import jd.plugins.PluginForHost;
-import jd.utils.JDUtilities;
-
 public class DownloadController extends PackageController<FilePackage, DownloadLink> {
     private final transient DownloadControllerEventSender eventSender         = new DownloadControllerEventSender();
     private final DelayedRunnable                         downloadSaver;
@@ -110,6 +112,8 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
     public static final SingleReachableState              DOWNLOADLIST_LOADED = new SingleReachableState("DOWNLOADLIST_COMPLETE");
     private static final DownloadController               INSTANCE            = new DownloadController();
     private static final Object                           SAVELOADLOCK        = new Object();
+    /* SHA-1 of the uncompressed JSON of the last list written by this session (guarded by SAVELOADLOCK), null until the first save. */
+    private byte[]                                        lastSavedDigest     = null;
 
     /**
      * darf erst nachdem der JDController init wurde, aufgerufen werden
@@ -369,23 +373,27 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
                 final HashSet<String> created = new HashSet<String>();
                 for (final FilePackage fp : fps) {
                     if (createFolder) {
-                        String folder = fp.getDownloadDirectory();
-                        if (created.add(folder)) {
-                            final File folderFile = new File(folder);
+                        /* Resolve relative paths and dynamic tags exactly like the download itself does. */
+                        final File folderFile = LinkTreeUtils.getDownloadDirectory(fp);
+                        if (created.add(folderFile.getAbsolutePath())) {
                             if (folderFile.exists()) {
                                 /* folder already exists */
                                 logger.info("Skip folder creation: " + folderFile + " already exists");
-                                continue;
-                            }
-                            /* folder does not exist */
-                            try {
-                                FilePathChecker.createFolderPath(folderFile);
-                                logger.info("Create folder: " + folderFile);
-                            } catch (IOException e) {
-                                logger.info("Could not create folder: " + folderFile);
+                            } else {
+                                /* folder does not exist */
+                                try {
+                                    FilePathChecker.createFolderPath(folderFile);
+                                    logger.info("Create folder: " + folderFile);
+                                } catch (IOException e) {
+                                    logger.info("Could not create folder: " + folderFile);
+                                }
                             }
                         }
                     }
+                    /*
+                     * Always add the package. The folder handling above only decides whether a folder must be created and must never skip
+                     * the package itself (an existing folder is the normal case).
+                     */
                     addmovePackageAt(fp, counter++);
                 }
                 return null;
@@ -633,7 +641,22 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
     private LinkedList<FilePackage> load(final File file) {
         synchronized (SAVELOADLOCK) {
             try {
-                return loadFile(file, false);
+                MessageDigest digest = null;
+                try {
+                    digest = MessageDigest.getInstance("SHA-1");
+                } catch (final Exception e) {
+                    /* optional optimization only, a missing digest must never make the load fail (and the list get renamed) */
+                    logger.log(e);
+                }
+                final LinkedList<FilePackage> ret = loadFile(file, false, digest);
+                if (ret != null && digest != null && downloadLists.size() > 0 && file.equals(downloadLists.get(0))) {
+                    /*
+                     * Same fingerprint save() builds for this content: if the list is unchanged until the next save, nothing needs to be
+                     * written. Only valid for the newest list: otherwise the skip would keep a missing/renamed file as the current list.
+                     */
+                    lastSavedDigest = digest.digest();
+                }
+                return ret;
             } catch (final Throwable e) {
                 final File renameTo = new File(file.getAbsolutePath() + ".backup");
                 boolean backup = false;
@@ -654,6 +677,14 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
     }
 
     public LinkedList<FilePackage> loadFile(final File file, final boolean rescueMode) throws IOException {
+        return loadFile(file, rescueMode, null);
+    }
+
+    /**
+     * @param digest
+     *            optional: receives the raw JSON of all package/link entries in file order (without extraInfo), see save()
+     */
+    private LinkedList<FilePackage> loadFile(final File file, final boolean rescueMode, final MessageDigest digest) throws IOException {
         logger.info("Load List: " + file);
         if (file == null || !file.exists()) {
             return null;
@@ -753,6 +784,9 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
                             }
                             bos.reset();
                             IO.readStream((int) entry.getSize(), entryInputStream, bos);
+                            if (digest != null) {
+                                digest.update(bos.toByteArray(), 0, bos.size());
+                            }
                             final DownloadLinkStorable storable = mapper.stringToObject(new String(bos.toByteArray(), 0, bos.size(), UTF8), downloadLinkStorableTypeRef);
                             if (storable != null) {
                                 loadedPackage.downloadLinks.add(new LoadedPackage.IndexedDownloadLink(childIndex, storable._getDownloadLink()));
@@ -764,6 +798,9 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
                             final Integer packageIndex = Integer.valueOf(entry.getName());
                             bos.reset();
                             IO.readStream((int) entry.getSize(), entryInputStream, bos);
+                            if (digest != null) {
+                                digest.update(bos.toByteArray(), 0, bos.size());
+                            }
                             final FilePackageStorable storable = mapper.stringToObject(new String(bos.toByteArray(), 0, bos.size(), UTF8), filePackageStorable);
                             if (storable != null) {
                                 final LoadedPackage loadedPackage = packageMap.get(packageIndex);
@@ -892,57 +929,48 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
                                 return 0;
                             }
 
-                            private final void updatePluginInstance(DownloadLink link) {
-                                final long currentDefaultVersion;
-                                final String currentDefaultHost;
-                                final PluginForHost defaultPlugin = link.getDefaultPlugin();
-                                if (defaultPlugin != null) {
-                                    currentDefaultHost = defaultPlugin.getLazyP().getHost();
-                                    currentDefaultVersion = defaultPlugin.getLazyP().getVersion();
-                                } else {
-                                    currentDefaultHost = null;
-                                    currentDefaultVersion = -1;
-                                }
-                                final PluginForHost newDefaultPlugin = finder.assignPlugin(link, true);
-                                final long newDefaultVersion;
-                                final String newDefaultHost;
-                                if (newDefaultPlugin != null) {
-                                    newDefaultVersion = newDefaultPlugin.getLazyP().getVersion();
-                                    newDefaultHost = newDefaultPlugin.getLazyP().getHost();
-                                } else {
-                                    newDefaultVersion = -1;
-                                    newDefaultHost = null;
-                                }
-                                if (newDefaultPlugin != null && (currentDefaultVersion != newDefaultVersion || !StringUtils.equals(currentDefaultHost, newDefaultHost))) {
-                                    logger.info("Update Plugin for: " + link.getName() + ":" + link.getHost() + ":" + currentDefaultVersion + " to " + newDefaultPlugin.getLazyP().getDisplayName() + ":" + newDefaultPlugin.getLazyP().getVersion());
-                                    if (link.getFinalLinkState() == FinalLinkState.PLUGIN_DEFECT) {
-                                        link.setFinalLinkState(null);
-                                    }
-                                }
-                            }
-
                             @Override
                             public boolean acceptNode(final DownloadLink node) {
-                                final SingleDownloadController controller = node.getDownloadLinkController();
-                                if (controller != null) {
-                                    controller.getJobsAfterDetach().add(new DownloadWatchDogJob() {
-                                        @Override
-                                        public void execute(DownloadSession currentSession) {
-                                            updatePluginInstance(node);
+                                DownloadWatchDog.getInstance().enqueueJob(new DownloadLinkJob(node) {
+                                    private final void updatePluginInstance(DownloadLink link) {
+                                        final long currentDefaultVersion;
+                                        final String currentDefaultHost;
+                                        final PluginForHost defaultPlugin = link.getDefaultPlugin();
+                                        if (defaultPlugin != null) {
+                                            currentDefaultHost = defaultPlugin.getLazyP().getHost();
+                                            currentDefaultVersion = defaultPlugin.getLazyP().getVersion();
+                                        } else {
+                                            currentDefaultHost = null;
+                                            currentDefaultVersion = -1;
                                         }
+                                        final PluginForHost newDefaultPlugin = finder.assignPlugin(link, true);
+                                        final long newDefaultVersion;
+                                        final String newDefaultHost;
+                                        if (newDefaultPlugin != null) {
+                                            newDefaultVersion = newDefaultPlugin.getLazyP().getVersion();
+                                            newDefaultHost = newDefaultPlugin.getLazyP().getHost();
+                                        } else {
+                                            newDefaultVersion = -1;
+                                            newDefaultHost = null;
+                                        }
+                                        if (newDefaultPlugin != null && (currentDefaultVersion != newDefaultVersion || !StringUtils.equals(currentDefaultHost, newDefaultHost))) {
+                                            logger.info("Update Plugin for: " + link.getName() + ":" + link.getHost() + ":" + currentDefaultVersion + " to " + newDefaultPlugin.getLazyP().getDisplayName() + ":" + newDefaultPlugin.getLazyP().getVersion());
+                                            if (link.getFinalLinkState() == FinalLinkState.PLUGIN_DEFECT) {
+                                                link.setFinalLinkState(null);
+                                            }
+                                        }
+                                    }
 
-                                        @Override
-                                        public void interrupt() {
-                                        }
+                                    @Override
+                                    protected boolean stopDownload(DownloadLink link) {
+                                        return false;
+                                    }
 
-                                        @Override
-                                        public boolean isHighPriority() {
-                                            return false;
-                                        }
-                                    });
-                                } else {
-                                    updatePluginInstance(node);
-                                }
+                                    @Override
+                                    public void execute(DownloadLink link, DownloadSession currentSession) {
+                                        updatePluginInstance(link);
+                                    }
+                                });
                                 return false;
                             }
                         });
@@ -1000,6 +1028,10 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
             }
             if (removeList.size() > 0) {
                 fp.getChildren().removeAll(removeList);
+                if (fp.getChildren().size() == 0) {
+                    /* the cleanup removed all links, so do not keep an empty package around */
+                    iterator.remove();
+                }
             }
         }
     }
@@ -1086,12 +1118,15 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
             boolean deleteFile = true;
             ZipOutputStream zos = null;
             FileOutputStream fos = null;
+            /* Set when the content equals the last saved list: the new file is thrown away, so the expensive fsync is skipped. */
+            final AtomicBoolean unchanged = new AtomicBoolean(false);
             try {
+                final MessageDigest digest = MessageDigest.getInstance("SHA-1");
                 fos = new FileOutputStream(file) {
                     @Override
                     public void close() throws IOException {
                         try {
-                            if (getChannel().isOpen()) {
+                            if (!unchanged.get() && getChannel().isOpen()) {
                                 getChannel().force(true);
                             }
                         } finally {
@@ -1104,11 +1139,13 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
                 final OutputStream entryOutputStream = new OutputStream() {
                     @Override
                     public void write(int b) throws IOException {
+                        digest.update((byte) b);
                         finalZos.write(b);
                     }
 
                     @Override
                     public void write(byte[] b, int off, int len) throws IOException {
+                        digest.update(b, off, len);
                         finalZos.write(b, off, len);
                     }
 
@@ -1169,15 +1206,34 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
                     /* the method above can throw exceptions, eg in SVN */
                     logger.log(e);
                 }
+                /*
+                 * The fingerprint must be taken before the extraInfo entry: it contains a timestamp that differs on every save and would
+                 * make every list look changed.
+                 */
+                final byte[] currentDigest = digest.digest();
                 final ZipEntry downloadControllerEntry = new ZipEntry("extraInfo");
                 downloadControllerEntry.setMethod(ZipEntry.DEFLATED);
                 zos.putNextEntry(downloadControllerEntry);
                 JSonStorage.getMapper().writeObject(entryOutputStream, dcs);
                 zos.closeEntry();
+                if (downloadLists.size() > 0 && lastSavedDigest != null && MessageDigest.isEqual(lastSavedDigest, currentDigest)) {
+                    /*
+                     * Nothing changed since the last save: keep the existing lists untouched. Rotating now would only push an identical
+                     * copy in and drop the oldest real backup.
+                     */
+                    unchanged.set(true);
+                    logger.info("DownloadList unchanged since last save, nothing written: " + downloadLists.get(0));
+                    zos.close();
+                    zos = null;
+                    fos = null;
+                    /* deleteFile stays true, the finally block removes the redundant file */
+                    return true;
+                }
                 zos.close();
                 zos = null;
                 fos = null;
                 deleteFile = false;
+                lastSavedDigest = currentDigest;
                 try {
                     final int keepXOld = Math.max(JsonConfig.create(GeneralSettings.class).getKeepXOldLists(), 0);
                     while (downloadLists.size() > keepXOld) {
@@ -1250,47 +1306,20 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
                             final File file = new File(downloadLink.getFileOutput());
                             final long filesize;
                             if (file.isFile() && (filesize = file.length()) > 0) {
-                                DownloadWatchDog.getInstance().enqueueJob(new DownloadWatchDogJob() {
-                                    @Override
-                                    public boolean isHighPriority() {
-                                        return false;
-                                    }
+                                DownloadWatchDog.getInstance().enqueueJob(new DownloadLinkJob(downloadLink) {
 
                                     @Override
-                                    public void interrupt() {
-                                    }
-
-                                    private void setFinished(final DownloadLink downloadLink) {
-                                        downloadLink.setVerifiedFileSize(filesize);
-                                        downloadLink.setDownloadCurrent(filesize);
-                                        downloadLink.setFinalLinkState(FinalLinkState.FINISHED_MIRROR);
+                                    public void execute(DownloadLink link, DownloadSession currentSession) {
+                                        link.setVerifiedFileSize(filesize);
+                                        link.setDownloadCurrent(filesize);
+                                        link.setFinalLinkState(FinalLinkState.FINISHED_MIRROR);
                                     }
 
                                     @Override
-                                    public void execute(DownloadSession currentSession) {
-                                        final SingleDownloadController con = downloadLink.getDownloadLinkController();
-                                        if (con == null) {
-                                            setFinished(downloadLink);
-                                        } else {
-                                            /* link has a running singleDownloadController, abort it and reset it after */
-                                            con.getJobsAfterDetach().add(new DownloadWatchDogJob() {
-                                                @Override
-                                                public void interrupt() {
-                                                }
-
-                                                @Override
-                                                public void execute(DownloadSession currentSession) {
-                                                    setFinished(downloadLink);
-                                                }
-
-                                                @Override
-                                                public boolean isHighPriority() {
-                                                    return false;
-                                                }
-                                            });
-                                            con.abort();
-                                        }
+                                    protected boolean stopDownload(DownloadLink link) {
+                                        return true;
                                     }
+
                                 });
                             }
                         }

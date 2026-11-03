@@ -52,14 +52,14 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53565 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53856 $", interfaceVersion = 3, names = {}, urls = {})
 public class Fast2shareCom extends PluginForHost {
     /* API docs: https://fast2share.com/docs */
-    private static final String API_BASE                   = "https://api.fast2share.com/v1";
-    private static final String PROPERTY_ACCOUNT_TOKEN     = "fast2sharecom_token";
-    private static final String PROPERTY_DIRECTURL         = "fast2sharecom_directurl";
+    private static final String API_BASE               = "https://api.fast2share.com/v1";
+    private static final String PROPERTY_ACCOUNT_TOKEN = "fast2sharecom_token";
+    private static final String PROPERTY_DIRECTURL     = "fast2sharecom_directurl";
     /** Boolean property, set to true for files that can only be downloaded with a premium account ("access":"premium"). */
-    private static final String PROPERTY_PREMIUMONLY       = "fast2sharecom_premiumonly";
+    private static final String PROPERTY_PREMIUMONLY   = "fast2sharecom_premiumonly";
 
     public Fast2shareCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -221,7 +221,7 @@ public class Fast2shareCom extends PluginForHost {
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
         /* Downloads via the API always require an account; premium-only files additionally require a premium account. */
-        if (link.getBooleanProperty(PROPERTY_PREMIUMONLY, false)) {
+        if (link.hasProperty(PROPERTY_PREMIUMONLY)) {
             throw new AccountRequiredException("This file can only be downloaded with a premium account");
         } else {
             throw new AccountRequiredException("A (free) account is required to download this file");
@@ -418,10 +418,10 @@ public class Fast2shareCom extends PluginForHost {
     /**
      * Parses an API date/time string into epoch milliseconds, or -1 if it cannot be parsed. </br>
      * The real API responses deviate from the docs here: the docs show clean ISO 8601 (e.g. "2026-07-01T10:00:00+00:00") but some endpoints
-     * actually return a raw PostgreSQL timestamptz (e.g. "2026-08-31 15:19:16.927653+00") with a space separator, microseconds and a 2-digit
-     * timezone offset. Both variants are handled: the separator can be a space or 'T'; fractional seconds are dropped. Java 1.6's
-     * SimpleDateFormat cannot parse microseconds (SSSSSS) or ISO timezones (X), so the offset is normalized to the RFC 822 form (e.g. "+00" /
-     * "+00:00" -> "+0000") and parsed with the Z pattern.
+     * actually return a raw PostgreSQL timestamptz (e.g. "2026-08-31 15:19:16.927653+00") with a space separator, microseconds and a
+     * 2-digit timezone offset. Both variants are handled: the separator can be a space or 'T'; fractional seconds are dropped. Java 1.6's
+     * SimpleDateFormat cannot parse microseconds (SSSSSS) or ISO timezones (X), so the offset is normalized to the RFC 822 form (e.g. "+00"
+     * / "+00:00" -> "+0000") and parsed with the Z pattern.
      */
     private long parseAPIDate(final String dateStr) {
         final Regex dateRegex = new Regex(dateStr, "(\\d{4}-\\d{2}-\\d{2})[ T](\\d{2}:\\d{2}:\\d{2})(?:\\.\\d+)?([+-]\\d{2}(?::?\\d{2})?)?");
@@ -627,11 +627,7 @@ public class Fast2shareCom extends PluginForHost {
 
     @Override
     public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            /* Downloads always require an account (a free account is enough for non premium-only files). */
-            return false;
-        }
-        if (link.getBooleanProperty(PROPERTY_PREMIUMONLY, false) && AccountType.PREMIUM != account.getType()) {
+        if (link.hasProperty(PROPERTY_PREMIUMONLY) && AccountType.PREMIUM != account.getType()) {
             /* Premium-only file but the given account is not a premium account. */
             return false;
         }
@@ -641,5 +637,14 @@ public class Fast2shareCom extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
+    }
+
+    @Override
+    public void resetDownloadlink(final DownloadLink link) {
+        /**
+         * Remove property just in case an item was premiumonly and is now downloadable for free. <br>
+         * Uploaders can change this setting for their files at any point of time.
+         */
+        link.removeProperty(PROPERTY_PREMIUMONLY);
     }
 }

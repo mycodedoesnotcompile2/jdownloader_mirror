@@ -73,16 +73,15 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
 
     /** Groups of solver types the "preselected solver groups" dropdown can select. */
     private enum SolverTypePreselect {
-        /** All solver types. */
-        ALL,
-        /** The automatic local solver (JAC). */
-        JAC,
-        /** Manual captcha solving: the captcha dialog, the browser solver and the MyJDownloader remote solver. */
-        MANUAL,
+        /**
+         * The manual selection of the user. Selecting it in the dropdown selects all solver types, the preset is also switched to
+         * automatically as soon as the user changes the selection of another preset.
+         */
+        CUSTOM,
         /** External (plugin based) solvers only. The default. */
         EXTERNAL,
-        /** The manual selection of the user, external solvers as long as the user never changed the selection. */
-        CUSTOM
+        /** The solvers of JDownloader itself: all solver types except the external ones. */
+        JDOWNLOADER
     }
 
     /** Sets of solvers the "preselected captcha solvers" dropdown can select. */
@@ -133,8 +132,6 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
     private final Set<SolverType>                selectedSolverTypes = new LinkedHashSet<SolverType>();
     /** True while the solver type dropdown/multi-select is modified programmatically so that its listener does not reset the selection. */
     private boolean                              adjustingSolverTypes = false;
-    /** The solver types of the "Custom" preset, remembered for the running session only. null = the user never populated it. */
-    private Set<SolverType>                      rememberedSolverTypeSelection = null;
     /** All solvers of all types, before the solver type selection is applied. */
     private final List<SolverService>            allServices         = new ArrayList<SolverService>();
     private final JComboBox                      solverPresetCombo;
@@ -505,11 +502,9 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
                 return label;
             }
         });
-        solverTypePresetCombo.addItem(SolverTypePreselect.ALL);
-        solverTypePresetCombo.addItem(SolverTypePreselect.JAC);
-        solverTypePresetCombo.addItem(SolverTypePreselect.MANUAL);
-        solverTypePresetCombo.addItem(SolverTypePreselect.EXTERNAL);
         solverTypePresetCombo.addItem(SolverTypePreselect.CUSTOM);
+        solverTypePresetCombo.addItem(SolverTypePreselect.EXTERNAL);
+        solverTypePresetCombo.addItem(SolverTypePreselect.JDOWNLOADER);
         /* Default: external solvers only. */
         solverTypePresetCombo.setSelectedItem(SolverTypePreselect.EXTERNAL);
         selectedSolverTypes.addAll(getSolverTypePresetTypes(SolverTypePreselect.EXTERNAL));
@@ -668,11 +663,12 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
             /* Solver groups and solvers: everything. */
             adjustingSolverTypes = true;
             try {
-                solverTypePresetCombo.setSelectedItem(SolverTypePreselect.ALL);
+                solverTypePresetCombo.setSelectedItem(SolverTypePreselect.CUSTOM);
             } finally {
                 adjustingSolverTypes = false;
             }
-            applySolverTypePreset(SolverTypePreselect.ALL);
+            /* "Custom" selects all solver types. */
+            applySolverTypePreset(SolverTypePreselect.CUSTOM);
             /* All captcha types. */
             rememberedSelection = new LinkedHashSet<CAPTCHA_TYPE>(allTypes);
             adjusting = true;
@@ -992,19 +988,14 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
 
     private static String getSolverTypePresetName(final SolverTypePreselect preset) {
         switch (preset) {
-        case JAC:
-            /* Same text as the name of the solver itself. */
-            return _GUI.T.JACSolver_getName_();
-        case MANUAL:
-            return _GUI.T.CaptchaSolverComparison_preselectSolverTypes_manual();
         case EXTERNAL:
             /* Same text as the type of the external solvers. */
             return _GUI.T.CaptchaSolverService_type();
+        case JDOWNLOADER:
+            return _GUI.T.CaptchaSolverComparison_preselectSolverTypes_jdownloader();
         case CUSTOM:
-            return _GUI.T.CaptchaSolverComparison_preselectSolverTypes_custom();
-        case ALL:
         default:
-            return _GUI.T.CaptchaSolverComparison_preselectSolverTypes_all();
+            return _GUI.T.CaptchaSolverComparison_preselectSolverTypes_custom();
         }
     }
 
@@ -1012,30 +1003,22 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
     private Set<SolverType> getSolverTypePresetTypes(final SolverTypePreselect preset) {
         final Set<SolverType> ret = new LinkedHashSet<SolverType>();
         switch (preset) {
-        case JAC:
-            ret.add(SolverType.JD_LOCAL);
-            break;
-        case MANUAL:
-            ret.add(SolverType.JD_LOCAL_DIALOG);
-            ret.add(SolverType.JD_LOCAL_BROWSER);
-            ret.add(SolverType.JD_REMOTE_MYJD);
-            break;
-        case CUSTOM:
-            if (rememberedSolverTypeSelection != null) {
-                ret.addAll(rememberedSolverTypeSelection);
-                break;
-            }
-            /* Never populated: external solvers, like the default. */
-            ret.add(SolverType.EXTERNAL);
-            break;
-        case ALL:
+        case JDOWNLOADER:
             for (final SolverType type : SolverType.values()) {
-                ret.add(type);
+                if (type != SolverType.EXTERNAL) {
+                    ret.add(type);
+                }
             }
             break;
         case EXTERNAL:
-        default:
             ret.add(SolverType.EXTERNAL);
+            break;
+        case CUSTOM:
+        default:
+            /* Selecting "Custom" yourself selects all solver types, the user then narrows it down. */
+            for (final SolverType type : SolverType.values()) {
+                ret.add(type);
+            }
             break;
         }
         return ret;
@@ -1054,11 +1037,8 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
      */
     private void onManualSolverTypeSelectionChange() {
         final Object currentPreset = solverTypePresetCombo.getSelectedItem();
-        if (currentPreset == SolverTypePreselect.CUSTOM) {
-            /* The user edits the selection itself -> remember it. */
-            rememberedSolverTypeSelection = new LinkedHashSet<SolverType>(selectedSolverTypes);
-        } else if (currentPreset instanceof SolverTypePreselect && !selectedSolverTypes.equals(getSolverTypePresetTypes((SolverTypePreselect) currentPreset))) {
-            rememberedSolverTypeSelection = new LinkedHashSet<SolverType>(selectedSolverTypes);
+        if (currentPreset != SolverTypePreselect.CUSTOM && currentPreset instanceof SolverTypePreselect && !selectedSolverTypes.equals(getSolverTypePresetTypes((SolverTypePreselect) currentPreset))) {
+            /* The user's own selection stays as it is, only the dropdown switches to "Custom". */
             adjustingSolverTypes = true;
             try {
                 solverTypePresetCombo.setSelectedItem(SolverTypePreselect.CUSTOM);

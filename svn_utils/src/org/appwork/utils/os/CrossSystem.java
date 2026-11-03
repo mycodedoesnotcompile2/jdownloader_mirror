@@ -338,6 +338,8 @@ public class CrossSystem {
         UBUNTU_RESOLUTE(OSFamily.LINUX, "26\\.04"), // 26.04
         @StorableDoc("Ubuntu 26.10 (Stonking Stingray)")
         UBUNTU_STONKING(OSFamily.LINUX, "26\\.10"), // 26.10
+        @StorableDoc("Ubuntu 27.04 (Tenacious T-Rex)")
+        UBUNTU_TENACIOUS(OSFamily.LINUX, "27\\.04"), // 27.04
         /*
          * MAC: List must be sorted by release Date!!
          */
@@ -461,7 +463,6 @@ public class CrossSystem {
         WINDOWS_11_26H1(OSFamily.WINDOWS),
         @StorableDoc("Windows 11 version 26H2 (2026 Update)")
         WINDOWS_11_26H2(OSFamily.WINDOWS);
-
         private final OSFamily family;
         private final Pattern  releasePattern;
 
@@ -535,7 +536,6 @@ public class CrossSystem {
         OTHERS,
         @StorableDoc("Windows family of operating systems (Windows 7, 10, 11, Server editions, etc.)")
         WINDOWS;
-
         public static OSFamily get(final OperatingSystem os) {
             return os != null ? os.getFamily() : null;
         }
@@ -978,7 +978,7 @@ public class CrossSystem {
                     final boolean isServer = osName != null && osName.toLowerCase(Locale.ENGLISH).contains("server");
                     if (isServer) {
                         // https://learn.microsoft.com/en-us/windows/release-health/windows-server-release-info
-                        if (buildNumber >= 26040 /* Preview */ || buildNumber >= 26100 /* GA */) {
+                        if (buildNumber >= 26040 /* Preview */|| buildNumber >= 26100 /* GA */) {
                             this.set(OperatingSystem.WINDOWS_SERVER_2025);
                         } else if (buildNumber >= 20348) {
                             this.set(OperatingSystem.WINDOWS_SERVER_2022);

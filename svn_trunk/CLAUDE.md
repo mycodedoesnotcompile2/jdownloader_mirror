@@ -2,11 +2,28 @@
 
 ## Version Control
 
-**This project uses SVN (Subversion), not git.**
+**This project uses SVN (Subversion).**
 
-When asked for a commit message, provide the message as **plain text with no git-specific syntax** — no `git commit -m` wrapper and no other git wrappers.
+When asked for a commit message, provide the message as **plain text with no svn-specific syntax** — no `svn commit -m` wrapper and no other svn wrappers.
 
 Always wrap the commit message in a fenced ```text code block so it can be copied with one click. The block must contain only the commit message itself (subject line, blank line, body), nothing else.
+
+**No manual line breaks inside the message.** Do not hard-wrap lines at a fixed width. Every paragraph and every list item is written as one single line; line breaks are only used to separate the subject, blank lines, headings and list items.
+
+**Describe the changes in the style of [Keep a Changelog 1.0.0](https://keepachangelog.com/en/1.0.0/).** After the subject line, group the body under the headings `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed` and `Security` (only the ones that apply, in that order). Each entry is a `-` list item written for a reader of the changelog: say what changed from the user's or caller's point of view, not how the code was edited. Use `Fixed` for bug fixes and `Changed` for behaviour or performance changes of existing functionality.
+
+```text
+Short subject line
+
+Added
+- ...
+
+Changed
+- ...
+
+Fixed
+- ...
+```
 
 ## Building / Compiling
 

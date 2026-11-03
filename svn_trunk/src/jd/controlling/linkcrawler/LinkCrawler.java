@@ -451,6 +451,8 @@ public class LinkCrawler {
     }
 
     private static final Object LINKCRAWLERRULESLOCK = new Object();
+    /* Compiled once: used for every match in getCryptedLinks to find the first http(s) URL inside a source URL. */
+    private static final Pattern HTTP_URL_START      = Pattern.compile("https?://");
 
     public void updateLinkCrawlerRule(final LinkCrawlerRule updateRule) {
         boolean refresh = false;
@@ -2865,7 +2867,7 @@ public class LinkCrawler {
                 if (match.equals(source.getURL())) {
                     result = DISTRIBUTE.NEXT;
                 } else {
-                    final Matcher firstHttp = Pattern.compile("https?://").matcher(sourceURL);
+                    final Matcher firstHttp = HTTP_URL_START.matcher(sourceURL);
                     final int firstHttpIndex = firstHttp.find() ? firstHttp.start() : -1;
                     if (firstHttpIndex == sourceURL.indexOf(match)) {
                         result = DISTRIBUTE.NEXT;

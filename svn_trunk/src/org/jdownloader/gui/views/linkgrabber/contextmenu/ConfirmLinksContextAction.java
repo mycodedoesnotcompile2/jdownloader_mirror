@@ -15,6 +15,17 @@ import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.ListCellRenderer;
 
+import jd.controlling.downloadcontroller.DownloadController;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings;
+import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings.SwitchToDownloadlistBehavior;
+import jd.controlling.linkcollector.LinkCollector.MoveLinksMode;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.interfaces.View;
+import jd.plugins.DownloadLink;
+
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.storage.config.annotations.SpinnerValidator;
 import org.appwork.swing.MigPanel;
@@ -50,7 +61,7 @@ import org.jdownloader.gui.event.GUIEventSender;
 import org.jdownloader.gui.event.GUIListener;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
-import org.jdownloader.gui.views.linkgrabber.LinkGrabberTable;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 import org.jdownloader.gui.views.linkgrabber.LinkgrabberSearchField;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
@@ -59,17 +70,6 @@ import org.jdownloader.settings.GraphicalUserInterfaceSettings.ConfirmIncomplete
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.settings.staticreferences.CFG_LINKGRABBER;
 import org.jdownloader.translate._JDT;
-
-import jd.controlling.downloadcontroller.DownloadController;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings;
-import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings.SwitchToDownloadlistBehavior;
-import jd.controlling.linkcollector.LinkCollector.MoveLinksMode;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.interfaces.View;
-import jd.plugins.DownloadLink;
 
 public class ConfirmLinksContextAction extends CustomizableTableContextAppAction<CrawledPackage, CrawledLink> implements GUIListener, ActionContext {
     public static final String SELECTION_ONLY = "selectionOnly";
@@ -348,21 +348,21 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
         this.forceDownloads = forceDownloads;
     }
 
-    private boolean                      ctrlToggle                                            = true;
-    private boolean                      forceDownloads                                        = false;
-    private Priority                     piority                                               = Priority.DEFAULT;
-    private boolean                      assignPriorityEnabled                                 = false;
-    private PackageExpandBehavior        packageExpandBehavior                                 = PackageExpandBehavior.UNCHANGED;
-    private OnOfflineLinksAction         handleOffline                                         = OnOfflineLinksAction.GLOBAL;
-    private OnDupesLinksAction           handleDupes                                           = OnDupesLinksAction.GLOBAL;
-    private MergeSameNamedPackagesOptions mergeSameNamedPackages                               = MergeSameNamedPackagesOptions.GLOBAL;
-    private AutoStartOptions             autoStart                                             = AutoStartOptions.AUTO;
-    private boolean                      clearListAfterConfirm                                 = false;
-    private SwitchToDownloadlistBehavior switchToDownloadlistBehavior                          = SwitchToDownloadlistBehavior.GLOBAL_DEFAULT;
-    private boolean                      metaCtrl                                              = false;
-    private ConfirmationDialogBehavior   confirmationDialogBehavior                            = ConfirmationDialogBehavior.DISABLED;
-    private int                          minNumberofPackagesForConfirmMoveToDownloadlistDialog = 1;
-    private int                          minNumberofLinksForConfirmMoveToDownloadlistDialog    = 1;
+    private boolean                       ctrlToggle                                            = true;
+    private boolean                       forceDownloads                                        = false;
+    private Priority                      piority                                               = Priority.DEFAULT;
+    private boolean                       assignPriorityEnabled                                 = false;
+    private PackageExpandBehavior         packageExpandBehavior                                 = PackageExpandBehavior.UNCHANGED;
+    private OnOfflineLinksAction          handleOffline                                         = OnOfflineLinksAction.GLOBAL;
+    private OnDupesLinksAction            handleDupes                                           = OnDupesLinksAction.GLOBAL;
+    private MergeSameNamedPackagesOptions mergeSameNamedPackages                                = MergeSameNamedPackagesOptions.GLOBAL;
+    private AutoStartOptions              autoStart                                             = AutoStartOptions.AUTO;
+    private boolean                       clearListAfterConfirm                                 = false;
+    private SwitchToDownloadlistBehavior  switchToDownloadlistBehavior                          = SwitchToDownloadlistBehavior.GLOBAL_DEFAULT;
+    private boolean                       metaCtrl                                              = false;
+    private ConfirmationDialogBehavior    confirmationDialogBehavior                            = ConfirmationDialogBehavior.DISABLED;
+    private int                           minNumberofPackagesForConfirmMoveToDownloadlistDialog = 1;
+    private int                           minNumberofLinksForConfirmMoveToDownloadlistDialog    = 1;
 
     public static String getTranslationForAssignPriorityEnabled() {
         return _JDT.T.ConfirmLinksContextAction_getTranslationForAssignPriorityEnabled();
@@ -900,38 +900,6 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
         metaCtrl = KeyObserver.getInstance().isMetaDown(true) || KeyObserver.getInstance().isControlDown(true);
     }
 
-    public void actionPerformed(ActionEvent e) {
-        if (!isEnabled()) {
-            return;
-        }
-        final ConfirmLinksSettings cls = new ConfirmLinksSettings(MoveLinksMode.MANUAL);
-        cls.setAutoStartDownloads(doAutostart());
-        cls.setClearLinkgrabberlistOnConfirm(isClearListAfterConfirm());
-        cls.setSwitchToDownloadlistBehavior(getSwitchToDownloadlistBehavior());
-        if (isAssignPriorityEnabled()) {
-            cls.setPriority(getPriority());
-        }
-        cls.setPackageExpandBehavior(this.getPackageExpandBehavior());
-        cls.setForceDownloads(isForceDownloads());
-        cls.setHandleOffline(getHandleOffline());
-        cls.setHandleDupes(getHandleDupes());
-        cls.setMergeSameNamedPackagesInDownloadlistInExistingPackagesOnConfirm(getMergeSameNamedPackages().isEnabled());
-        cls.setConfirmationDialogBehavior(this.getConfirmationDialogBehavior());
-        cls.setConfirmationDialogThresholdMinPackages(getMinNumberofPackagesForMoveToDownloadlistConfirmDialog());
-        cls.setConfirmationDialogThresholdMinLinks(getMinNumberofLinksForMoveToDownloadlistConfirmDialog());
-        final SelectionInfo<CrawledPackage, CrawledLink> si;
-        if (isSelectionOnly()) {
-            si = getSelection();
-        } else {
-            si = getAllLinkgrabberItems();
-        }
-        confirmSelection(si, cls);
-    }
-
-    public SelectionInfo<CrawledPackage, CrawledLink> getAllLinkgrabberItems() {
-        return LinkGrabberTable.getInstance().getSelectionInfo(false, true);
-    }
-
     protected boolean doAutostart() {
         final boolean ret = autoStart != null && autoStart.isEnabled();
         if (metaCtrl && isCtrlToggle()) {
@@ -993,11 +961,11 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
     }
 
     @Override
-    protected SelectionInfo<CrawledPackage, CrawledLink> getSelection() {
-        if (!isSelectionOnly()) {
-            return LinkGrabberTable.getInstance().getSelectionInfo(false, true);
+    protected SelectionType getSelectionType() {
+        if (isSelectionOnly()) {
+            return SelectionType.SELECTED;
         } else {
-            return LinkGrabberTable.getInstance().getSelectionInfo(true, true);
+            return SelectionType.ALL;
         }
     }
 
@@ -1041,6 +1009,29 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
     public void setSelectionOnly(boolean selectionOnly) {
         this.selectionOnly = selectionOnly;
         updateLabelAndIcon();
+    }
+
+    @Override
+    protected void onActionPerformed(ActionEvent e, SelectionType selectionType, SelectionInfo<CrawledPackage, CrawledLink> selectionInfo) {
+        if (!isEnabled()) {
+            return;
+        }
+        final ConfirmLinksSettings cls = new ConfirmLinksSettings(MoveLinksMode.MANUAL);
+        cls.setAutoStartDownloads(doAutostart());
+        cls.setClearLinkgrabberlistOnConfirm(isClearListAfterConfirm());
+        cls.setSwitchToDownloadlistBehavior(getSwitchToDownloadlistBehavior());
+        if (isAssignPriorityEnabled()) {
+            cls.setPriority(getPriority());
+        }
+        cls.setPackageExpandBehavior(this.getPackageExpandBehavior());
+        cls.setForceDownloads(isForceDownloads());
+        cls.setHandleOffline(getHandleOffline());
+        cls.setHandleDupes(getHandleDupes());
+        cls.setMergeSameNamedPackagesInDownloadlistInExistingPackagesOnConfirm(getMergeSameNamedPackages().isEnabled());
+        cls.setConfirmationDialogBehavior(this.getConfirmationDialogBehavior());
+        cls.setConfirmationDialogThresholdMinPackages(getMinNumberofPackagesForMoveToDownloadlistConfirmDialog());
+        cls.setConfirmationDialogThresholdMinLinks(getMinNumberofLinksForMoveToDownloadlistConfirmDialog());
+        confirmSelection(selectionInfo, cls);
     }
 
     protected void updateLabelAndIcon() {
@@ -1116,17 +1107,4 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
         return _GUI.T.ConfirmAction_ConfirmAction_context_add_and_start();
     }
 
-    @Override
-    public boolean isEnabled() {
-        final SelectionInfo<CrawledPackage, CrawledLink> allItems;
-        if (this.isSelectionOnly() && !this.hasSelection()) {
-            /* Only selected items but none are selected */
-            return false;
-        } else if ((allItems = getAllLinkgrabberItems()) == null || allItems.isEmpty()) {
-            /* All items but no items are in linkgrabber */
-            return false;
-        } else {
-            return super.isEnabled();
-        }
-    }
 }

@@ -6,7 +6,6 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.appwork.storage.config.JsonConfig;
-import org.appwork.utils.JVMVersion;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.os.ContainerRuntime;
@@ -58,12 +57,7 @@ public class DiskSpaceManager {
         if (reservation == null) {
             throw new IllegalArgumentException("reservation must not be null!");
         }
-        final DiskSpaceChecker checker;
-        if (JVMVersion.isMinimum(JVMVersion.JAVA_1_7)) {
-            checker = new DiskSpaceChecker17(reservation, requestor);
-        } else {
-            checker = new DiskSpaceChecker(reservation, requestor);
-        }
+        final DiskSpaceChecker checker = new DiskSpaceChecker17(reservation, requestor);
         if (!config.isFreeSpaceCheckEnabled()) {
             /* Free space check disabled in config. */
             return handle(checker, DISKSPACERESERVATIONRESULT.OK, null, null);
@@ -109,8 +103,33 @@ public class DiskSpaceManager {
         }
     }
 
-    public synchronized long getReservedDiskSpace(final File path, final Object requestor) {
-        final DiskSpaceReservation reservation = new DiskSpaceReservation() {
+    /**
+     * Checks if files of the given total size fit onto the destination when they are moved from sourceFolder to destinationFolder. </br> If
+     * both folders are on the same root (volume), a move only renames the file system entries and needs no additional space. Only if the
+     * files have to be copied to another volume, the free space of the destination (including already reserved space and the configured
+     * forced free space) is checked.
+     *
+     * @param size
+     *            Total size of the files that are moved
+     */
+    public synchronized DISKSPACERESERVATIONRESULT checkMove(final File sourceFolder, final File destinationFolder, final long size, final LogInterface logger) {
+        if (!config.isFreeSpaceCheckEnabled() || size <= 0) {
+            /* Nothing to copy or free space check disabled in config. */
+            return DISKSPACERESERVATIONRESULT.OK;
+        }
+        {
+            final File sourceDirecotry = sourceFolder.isDirectory() ? sourceFolder : sourceFolder.getParentFile();
+            final File destDirecotry = destinationFolder.isDirectory() ? destinationFolder : destinationFolder.getParentFile();
+            if (sourceDirecotry.equals(destDirecotry)) {
+                /* Same directory -> the files are only renamed, no additional space needed. */
+                return DISKSPACERESERVATIONRESULT.OK;
+            }
+        }
+        if (createChecker(sourceFolder, null, logger).isSameRoot(createChecker(destinationFolder, null, logger))) {
+            /* Same volume -> the files are only renamed, no additional space needed. */
+            return DISKSPACERESERVATIONRESULT.OK;
+        }
+        return check(new DiskSpaceReservation() {
             @Override
             public Object getOwner() {
                 return null;
@@ -118,7 +137,32 @@ public class DiskSpaceManager {
 
             @Override
             public LogInterface getLogger() {
-                return LogController.CL(true);
+                return logger;
+            }
+
+            @Override
+            public File getDestination() {
+                return destinationFolder;
+            }
+
+            @Override
+            public long getSize() {
+                return size;
+            }
+        });
+    }
+
+    private DiskSpaceChecker createChecker(final File path, final Object requestor, final LogInterface logger) {
+        final LogInterface logI = logger != null ? logger : LogController.CL(true);
+        final DiskSpaceReservation reservation = new DiskSpaceReservation() {
+            @Override
+            public Object getOwner() {
+                return requestor;
+            }
+
+            @Override
+            public LogInterface getLogger() {
+                return logI;
             }
 
             @Override
@@ -131,16 +175,15 @@ public class DiskSpaceManager {
                 return 0;
             }
         };
-        final DiskSpaceChecker checker;
-        if (JVMVersion.isMinimum(JVMVersion.JAVA_1_7)) {
-            checker = new DiskSpaceChecker17(reservation, requestor);
-        } else {
-            checker = new DiskSpaceChecker(reservation, requestor);
-        }
+        return new DiskSpaceChecker17(reservation, null);
+    }
+
+    public synchronized long getReservedDiskSpace(final File path, final Object requestor) {
+        final DiskSpaceChecker checker = createChecker(path, requestor, LogController.CL(true));
         if (!isValidRoot(checker)) {
             return -1;
         }
-        long requestedDiskSpace = Math.max(0, reservation.getSize());
+        long requestedDiskSpace = Math.max(0, checker.getDiskSpaceReservation().getSize());
         for (final DiskSpaceChecker reservedDiskSpace : reservations) {
             if (reservedDiskSpace.isSameRoot(checker)) {
                 requestedDiskSpace += Math.max(0, reservedDiskSpace.getSize());

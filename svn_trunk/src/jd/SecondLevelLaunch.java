@@ -501,6 +501,7 @@ public class SecondLevelLaunch {
         }
         LoggerFactory.getDefaultLogger().info("JDownloader2");
         try {
+            IconIO.ICO_SUPPORTED = null;
             IconIO.initSvgFactory();
         } catch (final Throwable ignore) {
             LoggerFactory.getDefaultLogger().log(ignore);

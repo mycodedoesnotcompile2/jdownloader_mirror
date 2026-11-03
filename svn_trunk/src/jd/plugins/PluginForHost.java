@@ -48,6 +48,52 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.SwingConstants;
 
+import jd.PluginWrapper;
+import jd.captcha.JACMethod;
+import jd.config.SubConfiguration;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.controlling.captcha.CaptchaSettings;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.controlling.downloadcontroller.AccountCache.ACCOUNTTYPE;
+import jd.controlling.downloadcontroller.DiskSpaceManager.DISKSPACERESERVATIONRESULT;
+import jd.controlling.downloadcontroller.DiskSpaceReservation;
+import jd.controlling.downloadcontroller.DownloadSession;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.downloadcontroller.DownloadWatchDog.DownloadLinkJob;
+import jd.controlling.downloadcontroller.ExceptionRunnable;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.downloadcontroller.SingleDownloadController.WaitingQueueItem;
+import jd.controlling.linkchecker.LinkChecker;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcrawler.CheckableLink;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.LinkCrawlerThread;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.proxy.AbstractProxySelectorImpl;
+import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
+import jd.controlling.reconnect.ipcheck.IPCheckException;
+import jd.controlling.reconnect.ipcheck.OfflineException;
+import jd.gui.swing.jdgui.views.settings.panels.pluginsettings.PluginConfigPanel;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.NoGateWayException;
+import jd.http.ProxySelectorInterface;
+import jd.http.Request;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.Formatter;
+import jd.nutils.JDHash;
+import jd.plugins.Account.AccountError;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
+import jd.plugins.download.DownloadInterface;
+import jd.plugins.download.DownloadInterfaceFactory;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.Downloadable;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
@@ -130,6 +176,7 @@ import org.jdownloader.images.BadgeIcon;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.CaptchaStepProgress;
 import org.jdownloader.plugins.ConditionalSkipReasonException;
+import org.jdownloader.plugins.FinalLinkState;
 import org.jdownloader.plugins.PluginTaskID;
 import org.jdownloader.plugins.SkipReason;
 import org.jdownloader.plugins.SkipReasonException;
@@ -154,52 +201,6 @@ import org.jdownloader.translate._JDT;
 import org.jdownloader.updatev2.UpdateController;
 import org.jdownloader.updatev2.UpdateHandler;
 
-import jd.PluginWrapper;
-import jd.captcha.JACMethod;
-import jd.config.SubConfiguration;
-import jd.controlling.captcha.CaptchaSettings;
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.controlling.downloadcontroller.AccountCache.ACCOUNTTYPE;
-import jd.controlling.downloadcontroller.DiskSpaceManager.DISKSPACERESERVATIONRESULT;
-import jd.controlling.downloadcontroller.DiskSpaceReservation;
-import jd.controlling.downloadcontroller.DownloadSession;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.DownloadWatchDogJob;
-import jd.controlling.downloadcontroller.ExceptionRunnable;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.downloadcontroller.SingleDownloadController.WaitingQueueItem;
-import jd.controlling.linkchecker.LinkChecker;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcrawler.CheckableLink;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.linkcrawler.LinkCrawlerThread;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.proxy.AbstractProxySelectorImpl;
-import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
-import jd.controlling.reconnect.ipcheck.IPCheckException;
-import jd.controlling.reconnect.ipcheck.OfflineException;
-import jd.gui.swing.jdgui.views.settings.panels.pluginsettings.PluginConfigPanel;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.NoGateWayException;
-import jd.http.ProxySelectorInterface;
-import jd.http.Request;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.Formatter;
-import jd.nutils.JDHash;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.plugins.Account.AccountError;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.MultiHostHost.MultihosterHostStatus;
-import jd.plugins.download.DownloadInterface;
-import jd.plugins.download.DownloadInterfaceFactory;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.Downloadable;
-
 /**
  * Dies ist die Oberklasse fuer alle Plugins, die von einem Anbieter Dateien herunterladen koennen
  *
@@ -208,13 +209,14 @@ import jd.plugins.download.Downloadable;
 public abstract class PluginForHost extends Plugin {
     private static final String    COPY_MOVE_FILE = "CopyMoveFile";
     private static final Pattern[] PATTERNS       = new Pattern[] {
-            /**
-             * these patterns should split filename and fileextension (extension must include the point)
-             */
-            // multipart rar archives
-            Pattern.compile("(.*)(\\.pa?r?t?\\.?[0-9]+.*?\\.rar$)", Pattern.CASE_INSENSITIVE),
-            // normal files with extension
-            Pattern.compile("(.*)(\\..*?$)", Pattern.CASE_INSENSITIVE) };
+        /**
+         * these patterns should split filename and fileextension (extension must include the
+         * point)
+         */
+        // multipart rar archives
+        Pattern.compile("(.*)(\\.pa?r?t?\\.?[0-9]+.*?\\.rar$)", Pattern.CASE_INSENSITIVE),
+        // normal files with extension
+        Pattern.compile("(.*)(\\..*?$)", Pattern.CASE_INSENSITIVE) };
     private LazyHostPlugin         lazyP          = null;
     /**
      * Is true if the user has answered a captcha challenge. Does not say anything whether or not the answer was correct.
@@ -1205,8 +1207,8 @@ public abstract class PluginForHost extends Plugin {
             }
             /**
              * In some cases, individual hosts can have different traffic calculation values than 100%. <br>
-             * This calculation applies for the global account-traffic and not for the individual host. </br>
-             * Example: File size is 1GB, individual host traffic calculation factor is 400% <br>
+             * This calculation applies for the global account-traffic and not for the individual host. </br> Example: File size is 1GB,
+             * individual host traffic calculation factor is 400% <br>
              * Account traffic needed: 4GB <br>
              * Individual host traffic needed: 1GB
              */
@@ -2448,39 +2450,15 @@ public abstract class PluginForHost extends Plugin {
                         }
                     });
                 } else {
-                    DownloadWatchDog.getInstance().enqueueJob(new DownloadWatchDogJob() {
+                    DownloadWatchDog.getInstance().enqueueJob(new DownloadLinkJob(downloadLink) {
                         @Override
-                        public boolean isHighPriority() {
+                        protected boolean stopDownload(DownloadLink link) {
                             return false;
-                        }
+                        };
 
                         @Override
-                        public void interrupt() {
-                        }
-
-                        @Override
-                        public void execute(DownloadSession currentSession) {
-                            final SingleDownloadController con = downloadLink.getDownloadLinkController();
-                            final DownloadWatchDogJob updateDownloadLinkJob = new DownloadWatchDogJob() {
-                                @Override
-                                public void execute(DownloadSession currentSession) {
-                                    updateDownloadLink(checkableLink, url);
-                                }
-
-                                @Override
-                                public void interrupt() {
-                                }
-
-                                @Override
-                                public boolean isHighPriority() {
-                                    return false;
-                                }
-                            };
-                            if (con == null || !con.isAlive()) {
-                                updateDownloadLinkJob.execute(currentSession);
-                            } else {
-                                con.getJobsAfterDetach().add(updateDownloadLinkJob);
-                            }
+                        public void execute(DownloadLink link, DownloadSession currentSession) {
+                            updateDownloadLink(checkableLink, url);
                         }
                     });
                 }
@@ -2744,6 +2722,18 @@ public abstract class PluginForHost extends Plugin {
     }
 
     /**
+     * Decides without touching the filesystem whether there is a file on disk that was downloaded for the given link and therefore belongs
+     * to it. </br> Normally this is the case as soon as bytes were loaded. Empty files are the exception: Nothing is ever "loaded" for
+     * them, but the file exists once the download finished successfully and the file size is known to be 0.
+     */
+    public static boolean hasOwnFileOnDisk(final DownloadLink link) {
+        if (link.getView().getBytesLoaded() > 0) {
+            return true;
+        }
+        return FinalLinkState.CheckFinished(link.getFinalLinkState()) && link.getView().getBytesTotalVerified() == 0;
+    }
+
+    /**
      * Do not call directly. This method is called from the DownloadWatchdog.rename method only. The DownloadWatchdog assures, that the
      * method is not called during a processing download, but afterwards. Avoid to override this method. if possible, try to override
      * #listFilePairsToMove instead
@@ -2754,7 +2744,7 @@ public abstract class PluginForHost extends Plugin {
      * @param value
      */
     public void move(DownloadLink link, String currentDirectory, String currentName, String newDirectory, String newName) throws Exception {
-        if (link.getView().getBytesLoaded() <= 0) {
+        if (!hasOwnFileOnDisk(link)) {
             /*
              * Nothing was downloaded for this link, so there is no file that belongs to it. Even if a file with that name happens to exist
              * on disk, it is not ours to move or rename, so abort before touching the filesystem.
@@ -2889,8 +2879,9 @@ public abstract class PluginForHost extends Plugin {
          * DiskSpaceManager, not a raw File.getUsableSpace(), so the free-space-check toggle, forced-free buffer, other downloads'
          * reservations and filesystem special cases are honoured, like DownloadLinkDownloadable.rename().
          */
-        final long requiredSpace = old.length();
         final DiskSpaceReservation reservation = new DiskSpaceReservation() {
+            final long requiredSpace = old.length();
+
             @Override
             public File getDestination() {
                 return newFile;
@@ -2912,7 +2903,7 @@ public abstract class PluginForHost extends Plugin {
             }
         };
         if (DISKSPACERESERVATIONRESULT.FAILED.equals(DownloadWatchDog.getInstance().getSession().getDiskSpaceManager().check(reservation))) {
-            throw new IOException("Not enough free space to move " + old + " to " + newFile + ". Required: " + requiredSpace + " bytes");
+            throw new IOException("Not enough free space to move " + old + " to " + newFile + ". Required: " + reservation.getSize() + " bytes");
         }
         // we did an file exists check earlier. so if the file exists here, the only reason is a failed rename/move;
         newFile.delete();

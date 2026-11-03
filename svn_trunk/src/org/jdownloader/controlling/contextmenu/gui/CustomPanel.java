@@ -165,7 +165,7 @@ public class CustomPanel extends MigPanel {
 
                 final Object[] values = ReflectionUtils.getEnumValues((Class<? extends Enum>) gs.getType());
                 String value = (String) actionData.fetchSetup(gs.getKey());
-                Object myValue = value == null ? null : ReflectionUtils.getEnumValueOf((Class<? extends Enum>) gs.getType(), value);
+                Object myValue = value == null ? null : CustomizableAppAction.getEnumSetupValue((Class<? extends Enum>) gs.getType(), value);
 
                 if (value == null || myValue == null) {
                     myValue = gs.get(actionClass);

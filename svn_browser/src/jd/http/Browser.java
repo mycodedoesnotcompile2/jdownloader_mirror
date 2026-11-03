@@ -736,7 +736,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
     private String                              acceptLanguage        = "de, en-gb;q=0.9, en;q=0.8";
     /*
      * -1 means use default Timeouts
-     *
+     * 
      * 0 means infinite (DO NOT USE if not needed)
      */
     private int                                 connectTimeout        = -1;
@@ -2553,14 +2553,20 @@ public class Browser implements HTTPConnectionFactoryInterface {
             setCookie(new URL(url), key, value);
         } catch (MalformedURLException e) {
             final Cookies cookies = this.getCookies(url);
-            final Cookie newCookie = new Cookie(Browser.getHost(url), key, value);
+            final Cookie newCookie = Cookie.SOURCE.MANUAL.newCookieInstance();
+            newCookie.setHost(Browser.getHost(url));
+            newCookie.setKey(key);
+            newCookie.setValue(value);
             cookies.add(newCookie);
         }
     }
 
     public void setCookie(final URL url, final String key, final String value) {
         final Cookies cookies = this.getCookies(url);
-        final Cookie newCookie = new Cookie(Browser.getHost(url), key, value);
+        final Cookie newCookie = Cookie.SOURCE.MANUAL.newCookieInstance();
+        newCookie.setHost(Browser.getHost(url));
+        newCookie.setKey(key);
+        newCookie.setValue(value);
         cookies.add(newCookie);
     }
 
@@ -3855,8 +3861,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
                     return null;
                 }
                 if (true) { /*
-                 * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
-                 */
+                             * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
+                             */
                     /* See new ESET NOD32 html code 2023: https://board.jdownloader.org/showthread.php?t=91433 */
                     return null;
                 }

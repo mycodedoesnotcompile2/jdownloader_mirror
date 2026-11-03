@@ -40,6 +40,7 @@ import javax.swing.event.ChangeListener;
 import jd.controlling.ClipboardMonitoring;
 import jd.controlling.ClipboardMonitoring.ClipboardContent;
 import jd.controlling.linkcollector.LinkCollectingJob;
+import jd.controlling.linkcollector.LinkCollector.MoveToDownloadlistMode;
 import jd.controlling.linkcollector.LinkOrigin;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.CrawledLinkModifier;
@@ -90,7 +91,6 @@ import org.jdownloader.gui.packagehistorycontroller.PackageHistoryEntry;
 import org.jdownloader.gui.packagehistorycontroller.PackageHistoryManager;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.DownloadFolderChooserDialog;
-import org.jdownloader.gui.views.linkgrabber.actions.AddLinksAction.EnableDisableUnchanged;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.BadgeIcon;
 import org.jdownloader.logging.LogController;
@@ -107,7 +107,7 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
     private LinkgrabberSettings                 config;
     private ExtTextField                        password;
     private ExtCheckBox                         extractToggle;
-    private EnableDisableUnchanged              autoStart = EnableDisableUnchanged.UNCHANGED;
+    private MoveToDownloadlistMode              moveToDownloadlistMode = MoveToDownloadlistMode.UNCHANGED;
 
     @Override
     protected void _init() {
@@ -116,36 +116,20 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
     }
 
     /**
-     * @return the autoStart
+     * @return how the added links are moved to the downloadlist
      */
-    public EnableDisableUnchanged getAutoStart() {
-        return autoStart;
+    public MoveToDownloadlistMode getMoveToDownloadlistMode() {
+        return moveToDownloadlistMode;
     }
 
     /**
-     * @param autoStart
-     *            the autoStart to set
+     * @param moveToDownloadlistMode
+     *            how the added links are moved to the downloadlist
      */
-    public void setAutoStart(EnableDisableUnchanged autoStart) {
-        this.autoStart = autoStart;
+    public void setMoveToDownloadlistMode(MoveToDownloadlistMode moveToDownloadlistMode) {
+        this.moveToDownloadlistMode = moveToDownloadlistMode;
     }
 
-    /**
-     * @return the autoConfirm
-     */
-    public EnableDisableUnchanged getAutoConfirm() {
-        return autoConfirm;
-    }
-
-    /**
-     * @param autoConfirm
-     *            the autoConfirm to set
-     */
-    public void setAutoConfirm(EnableDisableUnchanged autoConfirm) {
-        this.autoConfirm = autoConfirm;
-    }
-
-    private EnableDisableUnchanged autoConfirm                             = EnableDisableUnchanged.UNCHANGED;
     private JButton                confirmOptions;
     private boolean                deepAnalyse                             = false;
     private DelayedRunnable        delayedValidate;
@@ -318,26 +302,21 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
             });
         }
         // there is no GUI for this - set externally
-        final EnableDisableUnchanged ac = getAutoConfirm();
-        if (ac != null && ac != EnableDisableUnchanged.UNCHANGED) {
-            modifiers.add(new CrawledLinkModifier() {
-                @Override
-                public boolean modifyCrawledLink(CrawledLink link) {
-                    link.setAutoConfirmEnabled(ac == EnableDisableUnchanged.ENABLED);
-                    return true;
-                }
-            });
-        }
-        // there is no GUI for this - set externally
-        final EnableDisableUnchanged as = getAutoStart();
-        if (as != null && as != EnableDisableUnchanged.UNCHANGED) {
-            modifiers.add(new CrawledLinkModifier() {
-                @Override
-                public boolean modifyCrawledLink(CrawledLink link) {
-                    link.setAutoStartEnabled(as == EnableDisableUnchanged.ENABLED);
-                    return true;
-                }
-            });
+        final MoveToDownloadlistMode finalMoveToDownloadlistMode = getMoveToDownloadlistMode();
+        if (finalMoveToDownloadlistMode != null) {
+            switch (finalMoveToDownloadlistMode) {
+            case UNCHANGED:
+                break;
+            default:
+                modifiers.add(new CrawledLinkModifier() {
+                    @Override
+                    public boolean modifyCrawledLink(CrawledLink link) {
+                        finalMoveToDownloadlistMode.applyTo(link);
+                        return true;
+                    }
+                });
+                break;
+            }
         }
         final String passwordTxt = password.getText();
         if (StringUtils.isNotEmpty(passwordTxt)) {

@@ -63,14 +63,19 @@ import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
+import java.net.URI;
 import java.net.URL;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.imageio.ImageIO;
@@ -87,6 +92,7 @@ import org.appwork.swing.components.IconIdentifier;
 import org.appwork.testhelper.AWTestValidateClassReference;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.IO;
+import org.appwork.utils.ModifyLock;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.URLStream;
 import org.appwork.utils.ImageProvider.ImageProvider;
@@ -199,7 +205,7 @@ public class IconIO {
     protected static final String                    CLASS_ORG_APPWORK_UTILS_IMAGES_SVG_WEISJ_JSVG_FACTORY = "org.appwork.utils.images.svg.WeisjJSVGFactory";
     public static final String                       SVG_FACTORY_KEY                                       = "SVG_FACTORY";
     private static final AtomicReference<SVGFactory> SVG_FACTORY                                           = new AtomicReference<SVGFactory>();
-    private static Boolean                           ICO_SUPPORTED;
+    public static Boolean                            ICO_SUPPORTED;
     private volatile static Method                   ICO_DECODER;
     static {
         ImageIO.setUseCache(false);
@@ -460,6 +466,65 @@ public class IconIO {
         return loadImage(resource);
     }
 
+    private final static WeakHashMap<ModifyLock, Object> LOCKS = new WeakHashMap<ModifyLock, Object>();
+
+    public static ModifyLock getLockForResource(final URL url) {
+        synchronized (LOCKS) {
+            Object key = url;
+            if ("file".equals(url.getProtocol())) {
+                try {
+                    Path path = Paths.get(url.toURI()).normalize();
+                    key = path;
+                    path = path.toRealPath();
+                    key = path;
+                } catch (IOException ignore) {
+                    ignore.printStackTrace();
+                } catch (Exception ignore) {
+                    ignore.printStackTrace();
+                }
+            } else {
+                try {
+                    URI uri = url.toURI().normalize();
+                    key = uri;
+                } catch (Exception ignore) {
+                    ignore.printStackTrace();
+                }
+            }
+            for (Entry<ModifyLock, Object> lock : LOCKS.entrySet()) {
+                if (key.equals(lock.getValue())) {
+                    return lock.getKey();
+                }
+            }
+            final ModifyLock lock = new ModifyLock();
+            LOCKS.put(lock, url);
+            return lock;
+        }
+    }
+
+    public static Image loadIcon(final InputStream is) throws IOException {
+        if (!isIcoSupported()) {
+            return null;
+        }
+        try {
+            final List<BufferedImage> bufferedImages = (List<BufferedImage>) ICO_DECODER.invoke(null, is);
+            if (bufferedImages != null && bufferedImages.size() > 0) {
+                final ArrayList<Image> images = new ArrayList<Image>(bufferedImages);
+                MultiResolutionImageHelper.sortImagesBySize(images);
+                if (images.size() > 1 && MultiResolutionImageHelper.isSupported()) {
+                    // biggest one as base image
+                    return org.appwork.resources.MultiResolutionImageHelper.create(images.size() - 1, images.toArray(new Image[0]));
+                } else {
+                    return images.get(images.size() - 1);
+                }
+            }
+            return null;
+        } catch (InvocationTargetException e) {
+            throw new IOException(e);
+        } catch (IllegalAccessException e) {
+            throw new IOException(e);
+        }
+    }
+
     /**
      * @param resource
      * @return
@@ -468,63 +533,57 @@ public class IconIO {
         if (resource == null) {
             return null;
         }
-        if (StringUtils.endsWithCaseInsensitive(resource.getPath(), ".exe") && isExeSupported()) {
-            Image ret;
+        final ModifyLock lock = getLockForResource(resource);
+        final boolean readL = lock.readLock();
+        try {
+            if (StringUtils.endsWithCaseInsensitive(resource.getPath(), ".exe") && isExeSupported()) {
+                try {
+                    final Image ret = JNAImageHelper.getImageFromExe(resource);
+                    if (ret != null) {
+                        return ret;
+                    }
+                } catch (IOException e) {
+                    LogV3.log(e);
+                }
+            }
+            if (StringUtils.endsWithCaseInsensitive(resource.getPath(), ".ico") && isIcoSupported()) {
+                try {
+                    final InputStream is = resource.openStream();
+                    try {
+                        final Image ret = loadIcon(is);
+                        if (ret != null) {
+                            return ret;
+                        }
+                    } finally {
+                        is.close();
+                    }
+                } catch (IOException e) {
+                    LogV3.log(e);
+                }
+            }
+            InputStream is = null;
+            /*
+             * workaround for http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=7166379
+             */
+            /*
+             * http://stackoverflow.com/questions/10441276/jdk-1-7-too-many-open- files-due-to-posix-semaphores
+             */
             try {
-                ret = JNAImageHelper.getImageFromExe(resource);
+                is = URLStream.openStream(resource);
+                final BufferedImage ret = ImageIO.read(is);
                 if (ret != null) {
                     return ret;
                 }
-            } catch (IOException e) {
-                LogV3.log(e);
-            }
-        }
-        if (StringUtils.endsWithCaseInsensitive(resource.getPath(), ".ico") && isIcoSupported()) {
-            try {
-                final InputStream is = resource.openStream();
+            } catch (final IOException e) {
+                org.appwork.loggingv3.LogV3.log(new IOException("URL:" + resource, e));
+            } finally {
                 try {
-                    List<BufferedImage> bufferedImages = (List<BufferedImage>) ICO_DECODER.invoke(null, is);
-                    if (bufferedImages != null && bufferedImages.size() > 0) {
-                        final ArrayList<Image> images = new ArrayList<Image>(bufferedImages);
-                        MultiResolutionImageHelper.sortImagesBySize(images);
-                        if (images.size() > 1 && MultiResolutionImageHelper.isSupported()) {
-                            // biggest one as base image
-                            return org.appwork.resources.MultiResolutionImageHelper.create(images.size() - 1, images.toArray(new Image[0]));
-                        } else {
-                            return images.get(images.size() - 1);
-                        }
-                    }
-                } finally {
                     is.close();
+                } catch (final Throwable e) {
                 }
-            } catch (InvocationTargetException e) {
-                LogV3.log(e);
-            } catch (IllegalAccessException e) {
-                LogV3.log(e);
-            } catch (IOException e) {
-                LogV3.log(e);
             }
-        }
-        InputStream is = null;
-        /*
-         * workaround for http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=7166379
-         */
-        /*
-         * http://stackoverflow.com/questions/10441276/jdk-1-7-too-many-open- files-due-to-posix-semaphores
-         */
-        try {
-            is = URLStream.openStream(resource);
-            final BufferedImage ret = ImageIO.read(is);
-            if (ret != null) {
-                return ret;
-            }
-        } catch (final IOException e) {
-            org.appwork.loggingv3.LogV3.log(new IOException("URL:" + resource, e));
         } finally {
-            try {
-                is.close();
-            } catch (final Throwable e) {
-            }
+            lock.readUnlock(readL);
         }
         return null;
     }
@@ -547,22 +606,31 @@ public class IconIO {
      * @return
      */
     public static Icon loadVectorIcon(final URL resource, final int w, int h) {
-        if (resource != null && StringUtils.endsWithCaseInsensitive(resource.getPath(), ".svg")) {
-            final SVGFactory svgFactory = getSvgFactory();
-            if (svgFactory == null) {
-                LogV3.warning("SVG Factory not found!");
-                return null;
-            }
-            try {
-                final InputStream is = resource.openStream();
-                try {
-                    return svgFactory.getIconFromSVG(is, null, w, h, null);
-                } finally {
-                    is.close();
+        if (resource == null) {
+            return null;
+        }
+        final ModifyLock lock = getLockForResource(resource);
+        final boolean readL = lock.readLock();
+        try {
+            if (StringUtils.endsWithCaseInsensitive(resource.getPath(), ".svg")) {
+                final SVGFactory svgFactory = getSvgFactory();
+                if (svgFactory == null) {
+                    LogV3.warning("SVG Factory not found!");
+                    return null;
                 }
-            } catch (IOException e) {
-                LogV3.log(e);
+                try {
+                    final InputStream is = resource.openStream();
+                    try {
+                        return svgFactory.getIconFromSVG(is, null, w, h, null);
+                    } finally {
+                        is.close();
+                    }
+                } catch (IOException e) {
+                    LogV3.log(e);
+                }
             }
+        } finally {
+            lock.readUnlock(readL);
         }
         return null;
     }
@@ -767,30 +835,28 @@ public class IconIO {
      * @return
      */
     public static boolean isIcoSupported() {
-        if (ICO_SUPPORTED != null) {
-            return ICO_SUPPORTED == Boolean.TRUE;
+        final Boolean supported = ICO_SUPPORTED;
+        if (supported != null) {
+            return supported == Boolean.TRUE;
         }
         try {
-            Class<?> cls = Class.forName("net.sf.image4j.codec.ico.ICODecoder");
-            Method method = cls.getMethod("read", new Class[] { InputStream.class });
-            ParameterizedType type = (ParameterizedType) method.getGenericReturnType();
+            final Class<?> cls = Class.forName("net.sf.image4j.codec.ico.ICODecoder");
+            final Method method = cls.getMethod("read", new Class[] { InputStream.class });
+            final ParameterizedType type = (ParameterizedType) method.getGenericReturnType();
             if (type.getRawType() == List.class) {
                 if (type.getActualTypeArguments()[0] == BufferedImage.class) {
                     ICO_DECODER = method;
-                    ICO_SUPPORTED = true;
+                    return ICO_SUPPORTED = true;
                 }
             }
         } catch (ClassNotFoundException e) {
             LogV3.info("No Image4J found. *.ico support is not available");
-            ICO_SUPPORTED = false;
         } catch (NoSuchMethodException e) {
             LogV3.log(e);
-            ICO_SUPPORTED = false;
         } catch (SecurityException e) {
             LogV3.log(e);
-            ICO_SUPPORTED = false;
         }
-        return ICO_SUPPORTED == Boolean.TRUE;
+        return ICO_SUPPORTED == Boolean.FALSE;
     }
 
     /**

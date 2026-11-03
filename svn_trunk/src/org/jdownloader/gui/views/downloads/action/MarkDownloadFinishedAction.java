@@ -4,8 +4,7 @@ import java.awt.event.ActionEvent;
 
 import jd.controlling.downloadcontroller.DownloadSession;
 import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.DownloadWatchDogJob;
-import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.downloadcontroller.DownloadWatchDog.DownloadLinkJob;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 
@@ -30,50 +29,24 @@ public class MarkDownloadFinishedAction extends CustomizableTableContextAppActio
         if (SelectionInfo.isEmpty(selectionInfo)) {
             return;
         }
-        DownloadWatchDog.getInstance().enqueueJob(new DownloadWatchDogJob() {
-            @Override
-            public boolean isHighPriority() {
-                return false;
-            }
+        for (final DownloadLink link : selectionInfo.getChildren()) {
+            DownloadWatchDog.getInstance().enqueueJob(new DownloadLinkJob(link) {
 
-            @Override
-            public void interrupt() {
-            }
-
-            private void setFinished(DownloadLink link) {
-                link.setFinalLinkState(FinalLinkState.FINISHED);
-                final long knownSize = link.getKnownDownloadSize();
-                if (knownSize >= 0) {
-                    link.setDownloadCurrent(knownSize);
-                }
-            }
-
-            @Override
-            public void execute(DownloadSession currentSession) {
-                for (final DownloadLink link : selectionInfo.getChildren()) {
-                    final DownloadWatchDogJob setFinishedJob = new DownloadWatchDogJob() {
-                        @Override
-                        public boolean isHighPriority() {
-                            return false;
-                        }
-
-                        @Override
-                        public void interrupt() {
-                        }
-
-                        @Override
-                        public void execute(DownloadSession currentSession) {
-                            setFinished(link);
-                        }
-                    };
-                    final SingleDownloadController con = link.getDownloadLinkController();
-                    if (con == null || !con.isAlive()) {
-                        setFinishedJob.execute(currentSession);
-                    } else {
-                        con.getJobsAfterDetach().add(setFinishedJob);
+                @Override
+                public void execute(DownloadLink link, DownloadSession currentSession) {
+                    link.setFinalLinkState(FinalLinkState.FINISHED);
+                    final long knownSize = link.getKnownDownloadSize();
+                    if (knownSize >= 0) {
+                        link.setDownloadCurrent(knownSize);
                     }
                 }
-            }
-        });
+
+                @Override
+                protected boolean stopDownload(DownloadLink link) {
+                    return false;
+                }
+            });
+        }
+
     }
 }

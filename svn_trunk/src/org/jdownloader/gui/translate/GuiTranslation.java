@@ -1337,11 +1337,17 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Current packagename" })
     String PackagizerFilterRuleDialog_createVariablesMenu_current_packagename();
 
-    @Default(lngs = { "en" }, values = { "Auto Start Download" })
-    String PackagizerFilterRuleDialog_layoutDialogContent_autostart2();
+    @Default(lngs = { "en" }, values = { "Move to downloadlist mode" })
+    String PackagizerFilterRuleDialog_layoutDialogContent_moveToDownloadlistMode();
 
-    @Default(lngs = { "en" }, values = { "Auto Confirm" })
-    String PackagizerFilterRuleDialog_layoutDialogContent_autoadd2();
+    @Default(lngs = { "en" }, values = { "Auto confirm" })
+    String MoveToDownloadlistMode_CONFIRM();
+
+    @Default(lngs = { "en" }, values = { "Auto confirm & start download normal" })
+    String MoveToDownloadlistMode_CONFIRM_AND_START();
+
+    @Default(lngs = { "en" }, values = { "Auto confirm & start download forced" })
+    String MoveToDownloadlistMode_CONFIRM_AND_START_FORCED();
 
     @Default(lngs = { "en" }, values = { "Settings" })
     String SettingsMenu_SettingsMenu_();
@@ -4042,9 +4048,6 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Link Source is not: %s1" })
     String OriginFilter_toString_isNot(String string);
 
-    @Default(lngs = { "en" }, values = { "Auto Forced Download Start" })
-    String PackagizerFilterRuleDialog_layoutDialogContent_force();
-
     @Default(lngs = { "en" }, values = { "Open Links in Browser" })
     String OpenInBrowserAction_actionPerformed_open_in_browser__multi();
 
@@ -5645,7 +5648,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Solver comparison table" })
     String CaptchaSolverComparison_tab_title();
 
-    @Default(lngs = { "en" }, values = { "Preselected captcha types" })
+    @Default(lngs = { "en" }, values = { "Captcha types" })
     String CaptchaSolverComparison_preselect_label();
 
     @Default(lngs = { "en" }, values = { "Selection" })
@@ -5726,13 +5729,13 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Notifications and the events they are shown for" })
     String SettingsSidebar_tooltip_Notifications();
 
-    @Default(lngs = { "en" }, values = { "Preselected captcha solvers" })
+    @Default(lngs = { "en" }, values = { "Captcha solvers" })
     String CaptchaSolverComparison_preselectSolvers_label();
 
-    @Default(lngs = { "en" }, values = { "All by selected types" })
+    @Default(lngs = { "en" }, values = { "All by selected groups" })
     String CaptchaSolverComparison_preselectSolvers_all();
 
-    @Default(lngs = { "en" }, values = { "Custom" })
+    @Default(lngs = { "en" }, values = { "Selection" })
     String CaptchaSolverComparison_preselectSolvers_custom();
 
     @Default(lngs = { "en" }, values = { "All enabled captcha solvers" })
@@ -5753,16 +5756,13 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Hide" })
     String CaptchaSolverComparison_hideFromSelection();
 
-    @Default(lngs = { "en" }, values = { "Preselected solver groups" })
+    @Default(lngs = { "en" }, values = { "Solver groups" })
     String CaptchaSolverComparison_preselectSolverTypes_label();
 
-    @Default(lngs = { "en" }, values = { "All" })
-    String CaptchaSolverComparison_preselectSolverTypes_all();
+    @Default(lngs = { "en" }, values = { "JDownloader Solvers" })
+    String CaptchaSolverComparison_preselectSolverTypes_jdownloader();
 
-    @Default(lngs = { "en" }, values = { "Manual captcha solving" })
-    String CaptchaSolverComparison_preselectSolverTypes_manual();
-
-    @Default(lngs = { "en" }, values = { "Custom" })
+    @Default(lngs = { "en" }, values = { "Selection" })
     String CaptchaSolverComparison_preselectSolverTypes_custom();
 
     @Default(lngs = { "en" }, values = { "No solver type is selected" })
@@ -5798,7 +5798,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Display only solvers that support all selected captcha types" })
     String CaptchaSolverComparison_onlyFullSupport();
 
-    @Default(lngs = { "en" }, values = { "Not available: None of the selected captcha solvers supports all selected captcha types" })
+    @Default(lngs = { "en" }, values = { "Not available: None of the selected solvers supports all selected captcha types. Select fewer captcha types and more or all solvers." })
     String CaptchaSolverComparison_fullSupportImpossible();
 
     @Default(lngs = { "en" }, values = { "You have to select at least one captcha type" })

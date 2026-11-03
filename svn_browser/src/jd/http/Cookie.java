@@ -192,6 +192,9 @@ public class Cookie {
     }
 
     public boolean isCustomCookie() {
+        if (SOURCE.MANUAL.equals(getSource())) {
+            return true;
+        }
         if (getDomain() == null) {
             return true;
         }

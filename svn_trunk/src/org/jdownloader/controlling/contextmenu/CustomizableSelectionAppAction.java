@@ -2,6 +2,11 @@ package org.jdownloader.controlling.contextmenu;
 
 import java.awt.event.ActionEvent;
 
+import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
+import jd.controlling.packagecontroller.AbstractPackageNode;
+import jd.gui.swing.jdgui.MainTabbedPane;
+import jd.gui.swing.jdgui.interfaces.View;
+
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.EDTSelectionInfoCallback;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionInfoCallback;
@@ -10,11 +15,6 @@ import org.jdownloader.gui.views.downloads.DownloadsView;
 import org.jdownloader.gui.views.downloads.table.DownloadsTable;
 import org.jdownloader.gui.views.linkgrabber.LinkGrabberTable;
 import org.jdownloader.gui.views.linkgrabber.LinkGrabberView;
-
-import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
-import jd.controlling.packagecontroller.AbstractPackageNode;
-import jd.gui.swing.jdgui.MainTabbedPane;
-import jd.gui.swing.jdgui.interfaces.View;
 
 public abstract class CustomizableSelectionAppAction<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> extends CustomizableAppAction {
     @SuppressWarnings("unchecked")
@@ -49,6 +49,7 @@ public abstract class CustomizableSelectionAppAction<PackageType extends Abstrac
     }
 
     @Override
+    @Deprecated
     public void actionPerformed(final ActionEvent e) {
         final SelectionType selectionType = getSelectionType();
         getSelection(new EDTSelectionInfoCallback<PackageType, ChildrenType>() {

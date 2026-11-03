@@ -332,7 +332,7 @@ public class AboutDialog extends AbstractDialog<Integer> {
             final File directory = Application.getResource(".");
             final String fullPath = "<html><u>" + directory + "</u></html>";
             final String anonPath = "<html><u>" + _GUI.T.jd_gui_swing_components_AboutDialog_installdir_anon() + "</u></html>";
-            stats.add(bt = createLink(anonPath));
+            stats.add(bt = createLink(anonPath, null, String.valueOf(directory)));
             final ExtButton directoryButton = bt;
             bt.addMouseListener(new MouseListener() {
                 @Override
@@ -594,6 +594,14 @@ public class AboutDialog extends AbstractDialog<Integer> {
     }
 
     private ExtButton createLink(final Object object, final String url) {
+        return createLink(object, url, null);
+    }
+
+    /**
+     * @param copyText
+     *            Text to copy to the clipboard on click. If null, the (html-stripped) button name is used.
+     */
+    private ExtButton createLink(final Object object, final String url, final String copyText) {
         final ExtButton ret = new ExtButton(new AppAction() {
             /**
              *
@@ -624,8 +632,12 @@ public class AboutDialog extends AbstractDialog<Integer> {
                         }
                     }
                 }
-                String name = getName();
-                name = name.replaceFirst("^<html><u>", "").replaceFirst("</u></html>$", "");
+                final String name;
+                if (copyText != null) {
+                    name = copyText;
+                } else {
+                    name = getName().replaceFirst("^<html><u>", "").replaceFirst("</u></html>$", "");
+                }
                 ClipboardMonitoring.getINSTANCE().setCurrentContent(name);
                 if (urlToOpen != null && urlToOpen.matches("(?i)https?://.+") && CrossSystem.isOpenBrowserSupported()) {
                     CrossSystem.openURL(urlToOpen);
@@ -633,7 +645,7 @@ public class AboutDialog extends AbstractDialog<Integer> {
                     BubbleNotify.getInstance().show(new AbstractNotifyWindowFactory() {
                         @Override
                         public AbstractNotifyWindow<?> buildAbstractNotifyWindow() {
-                            return new BasicNotify(_GUI.T.lit_clipboard(), _GUI.T.AboutDialog_actionPerformed_clipboard_(getName()), new AbstractIcon(IconKey.ICON_CLIPBOARD, 20));
+                            return new BasicNotify(_GUI.T.lit_clipboard(), _GUI.T.AboutDialog_actionPerformed_clipboard_(name), new AbstractIcon(IconKey.ICON_CLIPBOARD, 20));
                         }
                     });
                 }

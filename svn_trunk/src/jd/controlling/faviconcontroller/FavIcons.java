@@ -14,7 +14,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.ConnectException;
 import java.net.MalformedURLException;
 import java.net.SocketTimeoutException;
@@ -43,6 +42,15 @@ import javax.imageio.ImageIO;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 
+import jd.captcha.utils.GifDecoder;
+import jd.http.Browser;
+import jd.http.Browser.BlockedByException;
+import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.plugins.PluginForHost;
+
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.resources.MultiResolutionImageHelper;
 import org.appwork.shutdown.ShutdownController;
@@ -53,7 +61,9 @@ import org.appwork.utils.Application;
 import org.appwork.utils.DataURLInputStream;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.Files;
+import org.appwork.utils.Hash;
 import org.appwork.utils.IO;
+import org.appwork.utils.ModifyLock;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.ImageProvider.ImageProvider;
@@ -75,16 +85,6 @@ import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.updatev2.gui.LAFOptions;
-
-import jd.captcha.utils.GifDecoder;
-import jd.http.Browser;
-import jd.http.Browser.BlockedByException;
-import jd.http.Browser.BrowserException;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.plugins.PluginForHost;
-import net.sf.image4j.codec.ico.ICODecoder;
 
 public class FavIcons {
     private static final int                                 BASE_SIZE       = 16;
@@ -189,10 +189,10 @@ public class FavIcons {
         /*
          * TODO: cache the lookup result per host to avoid repeated file system/classpath calls. getIconURL is called without ThemeContext,
          * so nothing is cached and every call checks up to 2 keys x 5 extensions (x 2 theme paths if the current theme is not "standard"),
-         * each with a file check and a classpath lookup. This is especially wasteful for hosts without favicon (nothing found, host
-         * already in FAILED_ICONS/QUEUE) and for invalid files (file exists but cannot be loaded). Idea: session map host -> key + URL or
-         * NOT_FOUND marker, updated by writeFavIcon after a successful write, cleared if NewTheme.I().getPath() changes, optionally with a
-         * short expiry for NOT_FOUND entries in case favicons are added from outside during the session.
+         * each with a file check and a classpath lookup. This is especially wasteful for hosts without favicon (nothing found, host already
+         * in FAILED_ICONS/QUEUE) and for invalid files (file exists but cannot be loaded). Idea: session map host -> key + URL or NOT_FOUND
+         * marker, updated by writeFavIcon after a successful write, cleared if NewTheme.I().getPath() changes, optionally with a short
+         * expiry for NOT_FOUND entries in case favicons are added from outside during the session.
          */
         String key = "fav/" + host;
         URL url = NewTheme.I().getIconURL(key);
@@ -201,7 +201,9 @@ public class FavIcons {
             url = NewTheme.I().getIconURL(key);
         }
         if (url != null) {
-            refreshIfExpired(host, url, requestor, updatePermission);
+            if (updatePermission) {
+                refreshIfExpired(host, url, requestor);
+            }
             /* load favIcon from disk */
             return new AbstractIcon(key, -1);
         }
@@ -220,11 +222,7 @@ public class FavIcons {
      * timestamp in that case, otherwise a due refresh would be lost: later calls with updatePermission in the same session would skip the
      * host, and the reset timestamp would make the file look fresh for another REFRESH_TIMEOUT.
      */
-    private static void refreshIfExpired(final String host, final URL url, final FavIconRequestor requestor, final boolean updatePermission) {
-        if (!updatePermission) {
-            /* no permission to trigger a (network) refresh -> keep refresh state untouched so a later call with permission can do it */
-            return;
-        }
+    private static void refreshIfExpired(final String host, final URL url, final FavIconRequestor requestor) {
         synchronized (LOCK) {
             if (!REFRESHED_ICONS.add(host)) {
                 /* refresh already checked/enqueued in this session */
@@ -255,10 +253,11 @@ public class FavIcons {
                 return;
             }
             final long lastModified = file.lastModified();
-            if (lastModified <= 0 || System.currentTimeMillis() - lastModified <= REFRESH_TIMEOUT) {
+            final long now = System.currentTimeMillis();
+            if (lastModified <= 0 || now - lastModified <= REFRESH_TIMEOUT) {
                 return;
             }
-            file.setLastModified(System.currentTimeMillis());// avoid retry before expired
+            file.setLastModified(now);// avoid retry before expired
             add(host, requestor);
         } catch (final Throwable e) {
             e.printStackTrace();
@@ -569,9 +568,9 @@ public class FavIcons {
      * <ul>
      * <li>If the file already has exactly the same content (e.g. a favicon refresh of a plugin that always returns the same icon), nothing
      * is written at all.</li>
-     * <li>Otherwise the bytes are written to a temporary file in the same directory (file name + ".tmp"), which then replaces the file in one
-     * step (Files.move with REPLACE_EXISTING). IO.secureWrite is not used on purpose: it deletes the target file before renaming, so the
-     * file would be missing for a short moment.</li>
+     * <li>Otherwise the bytes are written to a temporary file in the same directory (file name + ".tmp"), which then replaces the file in
+     * one step (Files.move with REPLACE_EXISTING). IO.secureWrite is not used on purpose: it deletes the target file before renaming, so
+     * the file would be missing for a short moment.</li>
      * <li>On Windows the replacement fails while another thread has the file open for reading, so it is retried for a short time.</li>
      * </ul>
      * If anything fails, an existing file stays intact and the temporary file is removed. The parent directory must exist.
@@ -580,17 +579,21 @@ public class FavIcons {
      */
     private static boolean writeFileIfChanged(final File file, final byte[] bytes) throws IOException {
         /* length() is 0 for a missing file, so the file content is only read if the size matches */
+        final ModifyLock lock = IconIO.getLockForResource(file.toURI().toURL());
         if (file.length() == bytes.length) {
+            boolean readL = lock.readLock();
             try {
-                if (Arrays.equals(IO.readFile(file), bytes)) {
+                if (Hash.getSHA256(bytes).equals(Hash.getSHA256(file))) {
+                    file.setLastModified(System.currentTimeMillis());
                     return false;
                 }
-            } catch (IOException e) {
-                /* cannot compare -> simply write it again */
+            } finally {
+                lock.readUnlock(readL);
             }
         }
         final File tmpFile = new File(file.getAbsolutePath() + ".tmp");
         boolean deleteTmpFile = true;
+        lock.writeLock();
         try {
             /* leftover of an aborted write, IO.writeToFile refuses to overwrite existing files */
             tmpFile.delete();
@@ -616,6 +619,7 @@ public class FavIcons {
                 }
             }
         } finally {
+            lock.writeUnlock();
             if (deleteTmpFile) {
                 /* failed -> remove the temporary file, the existing file stays intact */
                 tmpFile.delete();
@@ -624,15 +628,15 @@ public class FavIcons {
     }
 
     private static Image createDefaultFavIcon(final LogSource logger, final String host) {
-        Image base = createDefaultFavIcon(logger, host, BASE_SIZE, BASE_SIZE);
+        final Image base = createDefaultFavIcon(logger, host, BASE_SIZE, BASE_SIZE);
         if (!MultiResolutionImageHelper.isSupported()) {
             return base;
         }
-        double highest = MultiResolutionImageHelper.getHighestMonitorScaling();
+        final double highest = MultiResolutionImageHelper.getHighestMonitorScaling();
         if (highest <= 1d) {
             return base;
         }
-        Image bigger = createDefaultFavIcon(logger, host, (int) Math.round(BASE_SIZE * highest), (int) Math.round(BASE_SIZE * highest));
+        final Image bigger = createDefaultFavIcon(logger, host, (int) Math.round(BASE_SIZE * highest), (int) Math.round(BASE_SIZE * highest));
         return MultiResolutionImageHelper.create(Arrays.asList(base, bigger));
     }
 
@@ -1053,6 +1057,9 @@ public class FavIcons {
         if (mimeType == null) {
             return null;
         }
+        if (!mimeType.startsWith("image/")) {
+            return null;
+        }
         final int parameterIndex = mimeType.indexOf(';');
         if (parameterIndex != -1) {
             mimeType = mimeType.substring(0, parameterIndex);
@@ -1069,23 +1076,31 @@ public class FavIcons {
             }
             return IconIO.toBufferedImage(img);
         }
-        if (!mimeType.startsWith("image/")) {
-            return null;
-        }
         final byte[] dataURL_data = IO.readStream(-1, is);
-        if (CompiledFiletypeFilter.ImageExtensions.ICO.matchesMagic(new ByteArrayInputStream(dataURL_data))) {
-            /* ImageIO cannot read ico */
-            return returnBestImage(ICODecoder.read(new ByteArrayInputStream(dataURL_data)));
+        final ByteArrayInputStream bis = new ByteArrayInputStream(dataURL_data);
+        if (CompiledFiletypeFilter.ImageExtensions.ICO.matchesMagic(bis)) {
+            final Image img = IconIO.loadIcon(bis);
+            if (img == null) {
+                return null;
+            }
+            return IconIO.toBufferedImage(img);
         }
-        final BufferedImage ret = ImageIO.read(new ByteArrayInputStream(dataURL_data));
+        bis.reset();
+        if (CompiledFiletypeFilter.ImageExtensions.GIF.matchesMagic(bis)) {
+            final GifDecoder gifDecoder = new GifDecoder();
+            bis.reset();
+            if (gifDecoder.read(bis) == 0) {
+                return gifDecoder.getImage();
+            }
+            // ImageIO may be able to read GIF
+        }
+        bis.reset();
+        final BufferedImage ret = ImageIO.read(bis);
         if (ret != null) {
             return ret;
         }
-        final GifDecoder gifDecoder = new GifDecoder();
-        if (gifDecoder.read(new ByteArrayInputStream(dataURL_data)) != 0) {
-            return null;
-        }
-        return gifDecoder.getImage();
+        return null;
+
     }
 
     public static BufferedImage download_FavIconTag(Browser favBr, String host) throws IOException {
@@ -1197,47 +1212,61 @@ public class FavIcons {
                 favBr.getLogger().info("could not load:" + con.getURL() + "|responseCode=" + con.getResponseCode() + "|contentType=" + con.getContentType() + "|bytes=" + (bytes == null ? -1 : bytes.length));
                 return null;
             }
+            final ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
             try {
-                if (CompiledFiletypeFilter.ImageExtensions.PNG.matchesMagic(new ByteArrayInputStream(bytes))) {
+                if (CompiledFiletypeFilter.ImageExtensions.PNG.matchesMagic(bis)) {
                     // PNG magic
-                    return downloadImage(con, logger, new ByteArrayInputStream(bytes));
+                    return downloadImage(con, logger, bis);
                 }
-                if (CompiledFiletypeFilter.ImageExtensions.ICO.matchesMagic(new ByteArrayInputStream(bytes))) {
+                bis.reset();
+                if (CompiledFiletypeFilter.ImageExtensions.ICO.matchesMagic(bis)) {
                     // ICO magic
-                    return returnBestImage(ICODecoder.read(new ByteArrayInputStream(bytes)));
+                    bis.reset();
+                    final Image img = IconIO.loadIcon(bis);
+                    if (img == null) {
+                        return null;
+                    }
+                    return IconIO.toBufferedImage(img);
                 }
-                if (CompiledFiletypeFilter.ImageExtensions.SVG.matchesMagic(new ByteArrayInputStream(bytes)) || CompiledFiletypeFilter.ImageExtensions.SVG.matchesMimeType(con.getContentType()) > 0) {
+                bis.reset();
+                if (CompiledFiletypeFilter.ImageExtensions.SVG.matchesMagic(bis) || CompiledFiletypeFilter.ImageExtensions.SVG.matchesMimeType(con.getContentType()) > 0) {
                     // SVG magic
-                    return downloadImage(con, logger, new ByteArrayInputStream(bytes));
+                    return downloadImage(con, logger, bis);
                 }
-                if (CompiledFiletypeFilter.ImageExtensions.JPG.matchesMagic(new ByteArrayInputStream(bytes))) {
+                bis.reset();
+                if (CompiledFiletypeFilter.ImageExtensions.JPG.matchesMagic(bis)) {
                     // JPG magic
-                    return downloadImage(con, logger, new ByteArrayInputStream(bytes));
+                    return downloadImage(con, logger, bis);
                 }
-                if (CompiledFiletypeFilter.ImageExtensions.GIF.matchesMagic(new ByteArrayInputStream(bytes))) {
+                bis.reset();
+                if (CompiledFiletypeFilter.ImageExtensions.GIF.matchesMagic(bis)) {
                     // smalltest single pixel gif has 35 bytes with GIF magic
                     final GifDecoder gifDecoder = new GifDecoder();
                     /* reset bufferedinputstream to begin from start */
-                    if (gifDecoder.read(new ByteArrayInputStream(bytes)) == 0) {
+                    bis.reset();
+                    if (gifDecoder.read(bis) == 0) {
                         return getValidImage(gifDecoder.getImage());
                     }
                 }
                 /* try first with iconloader */
                 if (bytes.length < 70) {
                     // smallest single pixel icon has 70 bytes
-                    return downloadImage(con, logger, new ByteArrayInputStream(bytes));
+                    return downloadImage(con, logger, bis);
                 }
                 List<BufferedImage> ret = null;
                 try {
-                    ret = ICODecoder.read(new ByteArrayInputStream(bytes));
+                    bis.reset();
+                    final Image img = IconIO.loadIcon(bis);
+                    if (img != null) {
+                        ret = new ArrayList<BufferedImage>();
+                        ret.add(IconIO.toBufferedImage(img));
+                    }
                 } catch (final IOException e) {
                     final String max = new Regex(e.getMessage(), "Failed to read image #\\s*(\\d+)").getMatch(0);
                     if (max == null || Integer.parseInt(max) <= 1) {
                         throw e;
                     }
-                    final byte[] copy = bytes.clone();
                     // TODO: modify icon header to stop at last okay image
-                    ret = ICODecoder.read(new ByteArrayInputStream(copy));
                 }
                 final BufferedImage img = returnBestImage(ret);
                 if (img == null) {
@@ -1246,7 +1275,7 @@ public class FavIcons {
                 return img;
             } catch (Throwable e) {
                 /* maybe redirect to different icon format? */
-                final BufferedImage img = downloadImage(con, logger, new ByteArrayInputStream(bytes));
+                final BufferedImage img = downloadImage(con, logger, bis);
                 if (img != null) {
                     return img;
                 }
@@ -1322,7 +1351,7 @@ public class FavIcons {
      *
      * @return the image, or null if it cannot be decoded or is not a valid favicon (see getValidImage)
      */
-    private static BufferedImage downloadImage(URLConnectionAdapter con, LogInterface logger, InputStream is) {
+    private static BufferedImage downloadImage(URLConnectionAdapter con, LogInterface logger, ByteArrayInputStream is) {
         try {
             if (StringUtils.endsWithCaseInsensitive(con.getURL().getPath(), ".svg")) {
                 try {
@@ -1330,6 +1359,7 @@ public class FavIcons {
                     if (svgFactory == null) {
                         return null;
                     }
+                    is.reset();
                     final Image img = svgFactory.getImageFromSVG(is, null, 64, 64, null);
                     if (img == null) {
                         return null;
@@ -1343,6 +1373,7 @@ public class FavIcons {
                     return null;
                 }
             }
+            is.reset();
             final BufferedImage ret = ImageIO.read(is);
             if (ret != null) {
                 return getValidImage(ret);

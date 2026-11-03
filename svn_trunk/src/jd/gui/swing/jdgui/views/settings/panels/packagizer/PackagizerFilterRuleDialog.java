@@ -42,6 +42,7 @@ import org.appwork.swing.components.pathchooser.PathChooser;
 import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.uio.CloseReason;
 import org.appwork.uio.UIOManager;
+import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.swing.EDTRunner;
 import org.appwork.utils.swing.SwingUtils;
@@ -65,6 +66,7 @@ import org.jdownloader.gui.views.DownloadFolderChooserDialog;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
 
+import jd.controlling.linkcollector.LinkCollector.MoveToDownloadlistMode;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.gui.swing.jdgui.JDGui;
 import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.ConditionDialog;
@@ -167,7 +169,6 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
         }.start();
     }
 
-    private ExtCheckBox    cbAdd;
     private JToggleButton  cbAlways;
     private JToggleButton  cbStopAfterThisRule;
     private ExtCheckBox    cbChunks;
@@ -175,30 +176,25 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
     private ExtCheckBox    cbEnable;
     private ExtCheckBox    cbExtract;
     private ExtCheckBox    cbComment;
-    private ExtCheckBox    cbForce;
+    private ExtCheckBox    cbDownloadlistMode;
     private ExtCheckBox    cbMove;
     private ExtCheckBox    cbName;
     private ExtCheckBox    cbPackagename;
     private ExtCheckBox    cbPackagekey;
     private ExtCheckBox    cbPriority;
     private ExtCheckBox    cbRename;
-    private ExtCheckBox    cbStart;
-    private JComboBox      cobAutoAdd;
-    private JComboBox      cobAutostart;
+    private JComboBox      cobDownloadlistMode;
     private JComboBox      cobEnable;
     private JComboBox      cobExtract;
-    private JComboBox      cobForce;
     private PathChooser    fpDest;
     private PathChooser    fpMove;
-    private JLabel         lblautoadd;
-    private JLabel         lblAutostart;
     private JLabel         lblChunks;
     private JLabel         lblDest;
+    private JLabel         lblDownloadlistMode;
     private JLabel         lblEnable;
     private JLabel         lblExtract;
     private JLabel         lblFilename;
     private JLabel         lblComment;
-    private JLabel         lblForce;
     private JLabel         lblMove;
     private JLabel         lblPackagename;
     private JLabel         lblPackagekey;
@@ -257,6 +253,19 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
                     r.setIcon(NewTheme.I().getDisabledIcon(r.getIcon()));
                 }
                 return r;
+            }
+        });
+        return ret;
+    }
+
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    private JComboBox createDownloadlistModeBox() {
+        /* UNCHANGED is not offered: "unchanged" is expressed by the unchecked checkbox */
+        final JComboBox ret = new JComboBox(new MoveToDownloadlistMode[] { MoveToDownloadlistMode.CONFIRM, MoveToDownloadlistMode.CONFIRM_AND_START, MoveToDownloadlistMode.CONFIRM_AND_START_FORCED });
+        final ListCellRenderer org = ret.getRenderer();
+        ret.setRenderer(new ListCellRenderer() {
+            public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                return org.getListCellRendererComponent(list, value instanceof LabelInterface ? ((LabelInterface) value).getLabel() : value, index, isSelected, cellHasFocus);
             }
         });
         return ret;
@@ -432,16 +441,12 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
         lblFilename = createLbl(_GUI.T.PackagizerFilterRuleDialog_layoutDialogContent_filename());
         lblComment = createLbl(_GUI.T.PackagizerFilterRuleDialog_layoutDialogContent_comment());
         lblExtract = createLbl(_GUI.T.PackagizerFilterRuleDialog_layoutDialogContent_extract());
-        lblAutostart = createLbl(_GUI.T.PackagizerFilterRuleDialog_layoutDialogContent_autostart2());
-        lblautoadd = createLbl(_GUI.T.PackagizerFilterRuleDialog_layoutDialogContent_autoadd2());
+        lblDownloadlistMode = createLbl(_GUI.T.PackagizerFilterRuleDialog_layoutDialogContent_moveToDownloadlistMode());
         lblChunks = createLbl(_GUI.T.PackagizerFilterRuleDialog_layoutDialogContent_chunks());
         lblEnable = createLbl(_GUI.T.PackagizerFilterRuleDialog_layoutDialogContent_enable());
-        lblForce = createLbl(_GUI.T.PackagizerFilterRuleDialog_layoutDialogContent_force());
         cobExtract = createEnabledBox();
-        cobAutostart = createEnabledBox();
-        cobAutoAdd = createEnabledBox();
+        cobDownloadlistMode = createDownloadlistModeBox();
         cobEnable = createEnabledBox();
-        cobForce = createEnabledBox();
         fpDest = new PathChooser("PackagizerDest", true) {
             /**
              *
@@ -579,9 +584,7 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
         cbPackagename = new ExtCheckBox(txtPackagename);
         cbPackagekey = new ExtCheckBox(txtPackagekey);
         cbExtract = new ExtCheckBox(cobExtract);
-        cbStart = new ExtCheckBox(cobAutostart);
-        cbForce = new ExtCheckBox(cobForce);
-        cbAdd = new ExtCheckBox(cobAutoAdd);
+        cbDownloadlistMode = new ExtCheckBox(cobDownloadlistMode);
         cbChunks = new ExtCheckBox(spChunks);
         cbName = new ExtCheckBox(txtNewFilename);
         cbEnable = new ExtCheckBox(cobEnable);
@@ -618,22 +621,23 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
         ret.add(lblExtract, "spanx 2");
         ret.add(cobExtract, "spanx,growx,pushx");
         link(cbExtract, lblExtract, cobExtract);
-        ret.add(cbAdd);
-        ret.add(lblautoadd, "spanx 2");
-        ret.add(cobAutoAdd, "spanx,growx,pushx");
-        link(cbAdd, lblautoadd, cobAutoAdd);
-        ret.add(cbStart);
-        ret.add(lblAutostart, "spanx 2");
-        ret.add(cobAutostart, "spanx,growx,pushx");
-        link(cbStart, lblAutostart, cobAutostart);
-        ret.add(cbForce);
-        ret.add(lblForce, "spanx 2");
-        ret.add(cobForce, "spanx,growx,pushx");
-        link(cbForce, lblForce, cobForce);
+        ret.add(cbDownloadlistMode);
+        ret.add(lblDownloadlistMode, "spanx 2");
+        ret.add(cobDownloadlistMode, "spanx,growx,pushx");
+        link(cbDownloadlistMode, lblDownloadlistMode, cobDownloadlistMode);
         ret.add(cbEnable);
         ret.add(lblEnable, "spanx 2");
         ret.add(cobEnable, "spanx,growx,pushx");
         link(cbEnable, lblEnable, cobEnable);
+        final ItemListener downloadStartListener = new ItemListener() {
+            @Override
+            public void itemStateChanged(ItemEvent e) {
+                updateLinkEnabledState();
+            }
+        };
+        cbDownloadlistMode.addItemListener(downloadStartListener);
+        cobDownloadlistMode.addItemListener(downloadStartListener);
+        cbEnable.addItemListener(downloadStartListener);
         /* THEN DO */
         ret.add(createHeader(_GUI.T.PackagizerFilterRuleDialog_layoutDialogContent_do2()), "gaptop 10, spanx,growx,pushx");
         lblMove = createLbl(_GUI.T.PackagizerFilterRuleDialog_layoutDialogContent_move());
@@ -723,6 +727,39 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
         JScrollPane sp = new JScrollPane(ret);
         sp.setBorder(null);
         return sp;
+    }
+
+    /**
+     * @return true if the rule moves the link to the downloadlist and starts its download (normal or forced)
+     */
+    private boolean isDownloadStartSelected() {
+        if (!cbDownloadlistMode.isSelected()) {
+            return false;
+        }
+        final MoveToDownloadlistMode mode = (MoveToDownloadlistMode) cobDownloadlistMode.getSelectedItem();
+        if (mode == null) {
+            return false;
+        }
+        switch (mode) {
+        case CONFIRM_AND_START:
+        case CONFIRM_AND_START_FORCED:
+            return true;
+        case CONFIRM:
+        case UNCHANGED:
+        default:
+            return false;
+        }
+    }
+
+    /**
+     * A download that shall be started must not be disabled: While the rule starts downloads, the "enable download" row is greyed out
+     * (it keeps showing its current state) and is not stored in the rule.
+     */
+    private void updateLinkEnabledState() {
+        final boolean blocked = isDownloadStartSelected();
+        cbEnable.setEnabled(!blocked);
+        lblEnable.setEnabled(!blocked);
+        cobEnable.setEnabled(!blocked && cbEnable.isSelected());
     }
 
     private void link(final ExtCheckBox cb, JComponent... components) {
@@ -829,16 +866,14 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
                 }
                 rule.setPackageKey(cbPackagekey.isSelected() ? txtPackagekey.getText() : null);
                 rule.setRename(cbRename.isSelected() ? txtRename.getText() : null);
-                rule.setLinkEnabled(cbEnable.isSelected() ? cobEnable.getSelectedIndex() == 0 : null);
+                rule.setLinkEnabled(cbEnable.isSelected() && !isDownloadStartSelected() ? cobEnable.getSelectedIndex() == 0 : null);
                 rule.setChunks(cbChunks.isSelected() ? ((Number) spChunks.getValue()).intValue() : -1);
                 rule.setPriority(cbPriority.isSelected() ? prio : null);
                 rule.setPackageName(cbPackagename.isSelected() ? txtPackagename.getText() : null);
                 rule.setFilename(cbName.isSelected() ? txtNewFilename.getText() : null);
                 rule.setComment(cbComment.isSelected() ? txtComment.getText() : null);
                 rule.setAutoExtractionEnabled(cbExtract.isSelected() ? cobExtract.getSelectedIndex() == 0 : null);
-                rule.setAutoAddEnabled(cbAdd.isSelected() ? cobAutoAdd.getSelectedIndex() == 0 : null);
-                rule.setAutoStartEnabled(cbStart.isSelected() ? cobAutostart.getSelectedIndex() == 0 : null);
-                rule.setAutoForcedStartEnabled(cbForce.isSelected() ? cobForce.getSelectedIndex() == 0 : null);
+                rule.setMoveToDownloadlistMode(cbDownloadlistMode.isSelected() ? (MoveToDownloadlistMode) cobDownloadlistMode.getSelectedItem() : null);
                 rule.setIconKey(getIconKey());
                 rule.setTestUrl(getTxtTestUrl());
                 rule.setOnlineStatusFilter(getOnlineStatusFilter());
@@ -905,13 +940,10 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
         if (rule.getChunks() > 0) {
             spChunks.setValue(rule.getChunks());
         }
-        cbStart.setSelected(rule.isAutoStartEnabled() != null);
-        cbForce.setSelected(rule.isAutoForcedStartEnabled() != null);
-        cobForce.setSelectedIndex((rule.isAutoForcedStartEnabled() == null || rule.isAutoForcedStartEnabled()) ? 0 : 1);
-        cbAdd.setSelected(rule.isAutoAddEnabled() != null);
+        cbDownloadlistMode.setSelected(rule.getMoveToDownloadlistMode() != null);
+        cobDownloadlistMode.setSelectedItem(rule.getMoveToDownloadlistMode() != null ? rule.getMoveToDownloadlistMode() : MoveToDownloadlistMode.CONFIRM);
+        updateLinkEnabledState();
         cbAlways.setSelected(rule.getMatchAlwaysFilter() != null && rule.getMatchAlwaysFilter().isEnabled());
-        cobAutoAdd.setSelectedIndex((rule.isAutoAddEnabled() == null || rule.isAutoAddEnabled()) ? 0 : 1);
-        cobAutostart.setSelectedIndex((rule.isAutoStartEnabled() == null || rule.isAutoStartEnabled()) ? 0 : 1);
         cobExtract.setSelectedIndex((rule.isAutoExtractionEnabled() == null || rule.isAutoExtractionEnabled()) ? 0 : 1);
         cbChunks.setSelected(rule.getChunks() > 0);
         cbComment.setSelected(!StringUtils.isEmpty(rule.getComment()));

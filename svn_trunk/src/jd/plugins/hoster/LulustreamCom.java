@@ -32,7 +32,7 @@ import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
-@HostPlugin(revision = "$Revision: 53504 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53849 $", interfaceVersion = 3, names = {}, urls = {})
 public class LulustreamCom extends XFileSharingProBasic {
     public LulustreamCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -49,7 +49,7 @@ public class LulustreamCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "lulustream.com", "luluvdo.com", "luluvid.com", "lulu.st", "tnmr.org", "lulu0.ovh", "luluvdoo.com", "cdn1.site", "lulust.com" });
+        ret.add(new String[] { "lulustream.com", "luluvdo.com", "luluvid.com", "lulu.st", "tnmr.org", "lulu0.ovh", "luluvdoo.com", "cdn1.site", "lulust.com", "luluvido.com" });
         return ret;
     }
 

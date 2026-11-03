@@ -17,6 +17,7 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.SelectionInfo.PackageView;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTableModel;
 import org.jdownloader.gui.views.downloads.DownloadsView;
 import org.jdownloader.gui.views.downloads.table.DownloadsTable;
@@ -32,26 +33,25 @@ public class SortAction<PackageType extends AbstractPackageNode<ChildrenType, Pa
     private ExtColumn<AbstractNode> column;
 
     @Override
-    public void requestUpdate(Object requestor) {
-        super.requestUpdate(requestor);
+    protected void onRequestUpdateSelection(Object requestor, SelectionType selectionType, SelectionInfo<PackageType, ChildrenType> selectionInfo) {
+        super.onRequestUpdateSelection(requestor, selectionType, selectionInfo);
         final View view = MainTabbedPane.getInstance().getSelectedView();
         if (view instanceof DownloadsView) {
             this.column = DownloadsTable.getInstance().getMouseOverColumn();
         } else if (view instanceof LinkGrabberView) {
             this.column = LinkGrabberTable.getInstance().getMouseOverColumn();
+        } else {
+            this.column = null;
         }
-        if (getSelection() != null && this.column != null) {
+        if (SelectionInfo.isNotEmpty(selectionInfo) && this.column != null) {
             setIconKey(IconKey.ICON_SORT);
             setName(_GUI.T.SortAction_SortAction_object_(column.getName()));
         } else {
             setIconKey(IconKey.ICON_SORT);
             setName(_GUI.T.SortAction_SortAction_object_empty());
+            /* Sorting needs selected packages and a column below the mouse, otherwise there is nothing to do. */
+            setEnabled(false);
         }
-    }
-
-    @Override
-    public void setEnabled(boolean newValue) {
-        super.setEnabled(true);
     }
 
     public SortAction() {
@@ -60,7 +60,9 @@ public class SortAction<PackageType extends AbstractPackageNode<ChildrenType, Pa
         setName(_GUI.T.SortAction_SortAction_object_empty());
     }
 
-    public void actionPerformed(ActionEvent e) {
+    @Override
+    protected void onActionPerformed(ActionEvent e, SelectionType selectionType, final SelectionInfo<PackageType, ChildrenType> selection) {
+        final ExtColumn<AbstractNode> column = this.column;
         if (!isEnabled()) {
             return;
         } else if (column == null) {
@@ -68,7 +70,6 @@ public class SortAction<PackageType extends AbstractPackageNode<ChildrenType, Pa
         } else if (!(column.getModel() instanceof PackageControllerTableModel)) {
             return;
         }
-        final SelectionInfo<PackageType, ChildrenType> selection = getSelection();
         final PackageControllerTableModel model = (PackageControllerTableModel) column.getModel();
         model.getController().getQueue().add(new QueueAction<Void, RuntimeException>(QueuePriority.HIGH) {
             @SuppressWarnings({ "rawtypes", "unchecked" })
@@ -100,4 +101,5 @@ public class SortAction<PackageType extends AbstractPackageNode<ChildrenType, Pa
             }
         });
     }
+
 }

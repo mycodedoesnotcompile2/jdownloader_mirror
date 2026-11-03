@@ -12,11 +12,13 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -526,6 +528,8 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
     protected volatile CrawledPackage                                  variousPackage;
     protected volatile CrawledPackage                                  permanentofflinePackage;
     private final CopyOnWriteArrayList<File>                           linkcollectorLists    = new CopyOnWriteArrayList<File>();
+    /* SHA-1 of the uncompressed JSON of the last list written by this session, null until the first save. */
+    private volatile byte[]                                            lastSavedDigest       = null;
     private final HashMap<CrawledPackageMappingID, List<CrawledLink>>  offlineMap            = new HashMap<CrawledPackageMappingID, List<CrawledLink>>();
     private final HashMap<CrawledPackageMappingID, List<CrawledLink>>  variousMap            = new HashMap<CrawledPackageMappingID, List<CrawledLink>>();
     private final HashMap<CrawledPackageMappingID, List<CrawledLink>>  badMappingMap         = new HashMap<CrawledPackageMappingID, List<CrawledLink>>();
@@ -1842,17 +1846,25 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
         return null;
     }
 
-    private CrawledPackageMappingID getIDFromMap(final Map<CrawledPackageMappingID, List<CrawledLink>> idListMap, final CrawledLink l) {
-        final Iterator<Entry<CrawledPackageMappingID, List<CrawledLink>>> it = idListMap.entrySet().iterator();
-        while (it.hasNext()) {
-            final Entry<CrawledPackageMappingID, List<CrawledLink>> elem = it.next();
-            final CrawledPackageMappingID identifier = elem.getKey();
+    /**
+     * Builds a reverse lookup (link -> mapping ID) for the given map in one pass. Looking up every link with a linear search through all
+     * lists would be O(links * list entries). If a link is contained in several entries, the first one in iteration order wins, same as
+     * the former linear search.
+     */
+    private Map<CrawledLink, CrawledPackageMappingID> createIDLookup(final Map<CrawledPackageMappingID, List<CrawledLink>> idListMap) {
+        final Map<CrawledLink, CrawledPackageMappingID> ret = new IdentityHashMap<CrawledLink, CrawledPackageMappingID>();
+        for (final Entry<CrawledPackageMappingID, List<CrawledLink>> elem : idListMap.entrySet()) {
             final List<CrawledLink> mapElems = elem.getValue();
-            if (mapElems != null && mapElems.contains(l)) {
-                return identifier;
+            if (mapElems == null) {
+                continue;
+            }
+            for (final CrawledLink link : mapElems) {
+                if (!ret.containsKey(link)) {
+                    ret.put(link, elem.getKey());
+                }
             }
         }
-        return null;
+        return ret;
     }
 
     private ArrayList<File> findAvailableCollectorLists() {
@@ -2162,7 +2174,22 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
 
     private LinkedList<CrawledPackage> load(File file, HashMap<CrawledPackage, CrawledPackageStorable> restoreMap) {
         try {
-            return loadFile(file, restoreMap, false);
+            MessageDigest digest = null;
+            try {
+                digest = MessageDigest.getInstance("SHA-1");
+            } catch (final Exception e) {
+                /* optional optimization only, a missing digest must never make the load fail (and the list get renamed) */
+                logger.log(e);
+            }
+            final LinkedList<CrawledPackage> ret = loadFile(file, restoreMap, false, digest);
+            if (ret != null && digest != null && linkcollectorLists.size() > 0 && file.equals(linkcollectorLists.get(0))) {
+                /*
+                 * Same fingerprint save() builds for this content: if the list is unchanged until the next save, nothing needs to be
+                 * written. Only valid for the newest list: otherwise the skip would keep a missing/renamed file as the current list.
+                 */
+                lastSavedDigest = digest.digest();
+            }
+            return ret;
         } catch (Throwable e) {
             logger.log(e);
             if (file == null) {
@@ -2204,6 +2231,14 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
     }
 
     public LinkedList<CrawledPackage> loadFile(File file, Map<CrawledPackage, CrawledPackageStorable> restoreMap, boolean rescueMode) throws IOException {
+        return loadFile(file, restoreMap, rescueMode, null);
+    }
+
+    /**
+     * @param digest
+     *            optional: receives the raw JSON of all package/link entries in file order (without extraInfo), see save()
+     */
+    private LinkedList<CrawledPackage> loadFile(File file, Map<CrawledPackage, CrawledPackageStorable> restoreMap, boolean rescueMode, final MessageDigest digest) throws IOException {
         if (file == null || !file.exists()) {
             return null;
         }
@@ -2292,6 +2327,9 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
                             }
                             bos.reset();
                             IO.readStream((int) entry.getSize(), entryInputStream, bos);
+                            if (digest != null) {
+                                digest.update(bos.toByteArray(), 0, bos.size());
+                            }
                             final CrawledLinkStorable storable = mapper.stringToObject(new String(bos.toByteArray(), 0, bos.size(), UTF8), crawledLinkStorable);
                             if (storable != null) {
                                 final CrawledLink crawledLink = storable._getCrawledLink();
@@ -2305,6 +2343,9 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
                             final Integer packageIndex = Integer.valueOf(entry.getName());
                             bos.reset();
                             IO.readStream((int) entry.getSize(), entryInputStream, bos);
+                            if (digest != null) {
+                                digest.update(bos.toByteArray(), 0, bos.size());
+                            }
                             final CrawledPackageStorable storable = mapper.stringToObject(new String(bos.toByteArray(), 0, bos.size(), UTF8), crawledPackageStorable);
                             if (storable != null) {
                                 LoadedPackage loadedPackage = packageMap.get(packageIndex);
@@ -2510,11 +2551,14 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
                     } else {
                         packageFormat = "%02d";
                     }
+                    /* Set when the content equals the last saved list: the new file is thrown away, so the expensive fsync is skipped. */
+                    final AtomicBoolean unchanged = new AtomicBoolean(false);
+                    final MessageDigest digest = MessageDigest.getInstance("SHA-1");
                     fos = new FileOutputStream(file) {
                         @Override
                         public void close() throws IOException {
                             try {
-                                if (getChannel().isOpen()) {
+                                if (!unchanged.get() && getChannel().isOpen()) {
                                     getChannel().force(true);
                                 }
                             } finally {
@@ -2527,11 +2571,13 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
                     final OutputStream entryOutputStream = new OutputStream() {
                         @Override
                         public void write(int b) throws IOException {
+                            digest.update((byte) b);
                             finalZos.write(b);
                         }
 
                         @Override
                         public void write(byte[] b, int off, int len) throws IOException {
+                            digest.update(b, off, len);
                             finalZos.write(b, off, len);
                         }
 
@@ -2545,6 +2591,9 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
                             finalZos.flush();
                         }
                     };
+                    /* one pass instead of a linear search through all mapping lists for every single link */
+                    final Map<CrawledLink, CrawledPackageMappingID> variousIDs = createIDLookup(variousMap);
+                    final Map<CrawledLink, CrawledPackageMappingID> offlineIDs = createIDLookup(offlineMap);
                     int packageIndex = 0;
                     for (final CrawledPackage pkg : packages) {
                         final boolean readL = pkg.getModifyLock().readLock();
@@ -2586,10 +2635,10 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
                                     CrawledPackageMappingID id = null;
                                     switch (pkg.getType()) {
                                     case VARIOUS:
-                                        id = getIDFromMap(variousMap, link);
+                                        id = variousIDs.get(link);
                                         break;
                                     case OFFLINE:
-                                        id = getIDFromMap(offlineMap, link);
+                                        id = offlineIDs.get(link);
                                         break;
                                     default:
                                         break;
@@ -2621,15 +2670,34 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
                         /* the method above can throw exceptions, eg in SVN */
                         logger.log(e);
                     }
+                    /*
+                     * The fingerprint must be taken before the extraInfo entry: it contains a timestamp that differs on every save and would
+                     * make every list look changed.
+                     */
+                    final byte[] currentDigest = digest.digest();
                     final ZipEntry linkCollectorEntry = new ZipEntry("extraInfo");
                     linkCollectorEntry.setMethod(ZipEntry.DEFLATED);
                     zos.putNextEntry(linkCollectorEntry);
                     mapper.writeObject(entryOutputStream, lcs);
                     zos.closeEntry();
+                    if (destFile == null && linkcollectorLists.size() > 0 && lastSavedDigest != null && MessageDigest.isEqual(lastSavedDigest, currentDigest)) {
+                        /*
+                         * Nothing changed since the last save: keep the existing lists untouched. Rotating now would only push an identical copy
+                         * in and drop the oldest real backup.
+                         */
+                        unchanged.set(true);
+                        logger.info("CollectorList unchanged since last save, nothing written: " + linkcollectorLists.get(0));
+                        zos.close();
+                        zos = null;
+                        fos = null;
+                        /* deleteFile stays true, the finally block removes the redundant file */
+                        return null;
+                    }
                     zos.close();
                     zos = null;
                     fos = null;
                     deleteFile = false;
+                    lastSavedDigest = currentDigest;
                     try {
                         final int keepXOld = Math.max(JsonConfig.create(GeneralSettings.class).getKeepXOldLists(), 0);
                         while (linkcollectorLists.size() > keepXOld) {
@@ -2777,6 +2845,69 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
     public static enum MoveLinksMode {
         MANUAL,
         AUTO
+    }
+
+    /**
+     * Defines how a link is moved from the linkgrabber to the downloadlist, e.g. by a Packagizer rule or the "add links" action. Every
+     * mode except UNCHANGED implies that the link is confirmed (moved to the downloadlist) - starting a download is only possible once the
+     * link is in the downloadlist.
+     */
+    public static enum MoveToDownloadlistMode implements LabelInterface {
+        /* Do not touch the link, the global settings apply. Not offered where "unchanged" is expressed differently (e.g. Packagizer). */
+        UNCHANGED {
+            @Override
+            public String getLabel() {
+                return _GUI.T.do_not_change_use_global_settings();
+            }
+        },
+        /* Only move the link to the downloadlist */
+        CONFIRM {
+            @Override
+            public String getLabel() {
+                return _GUI.T.MoveToDownloadlistMode_CONFIRM();
+            }
+        },
+        /* Move the link to the downloadlist and start the downloads normally */
+        CONFIRM_AND_START {
+            @Override
+            public String getLabel() {
+                return _GUI.T.MoveToDownloadlistMode_CONFIRM_AND_START();
+            }
+        },
+        /* Move the link to the downloadlist and start its download forced */
+        CONFIRM_AND_START_FORCED {
+            @Override
+            public String getLabel() {
+                return _GUI.T.MoveToDownloadlistMode_CONFIRM_AND_START_FORCED();
+            }
+        };
+
+        /**
+         * Sets the auto confirm / auto start / forced auto start flags of the link according to this mode. The flags are set explicitly,
+         * so a mode replaces the flags set by an earlier rule or action.
+         */
+        public void applyTo(final CrawledLink link) {
+            switch (this) {
+            case CONFIRM:
+                link.setAutoConfirmEnabled(true);
+                link.setAutoStartEnabled(false);
+                link.setForcedAutoStartEnabled(false);
+                break;
+            case CONFIRM_AND_START:
+                link.setAutoConfirmEnabled(true);
+                link.setAutoStartEnabled(true);
+                link.setForcedAutoStartEnabled(false);
+                break;
+            case CONFIRM_AND_START_FORCED:
+                link.setAutoConfirmEnabled(true);
+                link.setAutoStartEnabled(false);
+                link.setForcedAutoStartEnabled(true);
+                break;
+            case UNCHANGED:
+            default:
+                break;
+            }
+        }
     }
 
     /**
