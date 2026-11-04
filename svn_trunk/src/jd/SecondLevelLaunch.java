@@ -134,6 +134,8 @@ import org.jdownloader.settings.GraphicalUserInterfaceSettings.CLIPBOARD_SKIP_MO
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.RlyWarnLevel;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
+import org.jdownloader.settings.SilentModeController;
+import org.jdownloader.settings.SilentModeSettings.SilentModeSetting;
 import org.jdownloader.settings.staticreferences.CFG_SILENTMODE;
 import org.jdownloader.translate._JDT;
 import org.jdownloader.updatev2.InternetConnectionSettings;
@@ -736,7 +738,17 @@ public class SecondLevelLaunch {
         Locale.setDefault(TranslationFactory.getDesiredLocale());
         // Disable silentmode on each session start
         if (CFG_SILENTMODE.AUTO_RESET_ON_STARTUP_ENABLED.isEnabled()) {
-            CFG_SILENTMODE.MANUAL_ENABLED.setValue(false);
+            /* Only the manual silent mode is reset on startup, the automatic ones stay. */
+            switch (SilentModeController.getInstance().getSetting()) {
+            case ENABLED:
+                SilentModeController.getInstance().setSetting(SilentModeSetting.DISABLED);
+                break;
+            case AUTO_JD_IN_TASKBAR:
+            case AUTO_JD_IN_TRAY:
+            case DISABLED:
+            default:
+                break;
+            }
         }
         // reset speed limit enabled on start
         if (!CFG_GENERAL.DOWNLOAD_SPEED_LIMIT_REMEMBERED_ENABLED.isEnabled()) {

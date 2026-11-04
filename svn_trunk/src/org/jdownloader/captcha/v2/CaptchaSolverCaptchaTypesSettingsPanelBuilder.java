@@ -160,6 +160,20 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
                     });
                     popup.add(testAndDebug);
                 }
+                if (column instanceof CaptchaHistoryColumn) {
+                    /* Only in the columns which show data of the local captcha usage history. Greyed out if there is no history. */
+                    popup.addSeparator();
+                    final JMenuItem clearHistory = new JMenuItem(_GUI.T.CaptchaTypesTable_context_clearHistory(), new AbstractIcon(IconKey.ICON_RESET, 18));
+                    clearHistory.setEnabled(!CaptchaHistoryManager.getInstance().getAllEntries().isEmpty());
+                    clearHistory.addActionListener(new ActionListener() {
+                        @Override
+                        public void actionPerformed(final ActionEvent e) {
+                            CaptchaHistoryManager.getInstance().clear();
+                            getModel().fireTableDataChanged();
+                        }
+                    });
+                    popup.add(clearHistory);
+                }
                 return popup;
             }
         };
@@ -213,6 +227,16 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
         @Override
         public boolean isEnabled(final CAPTCHA_TYPE ctype) {
             return accessor.isEnabled(ctype);
+        }
+    }
+
+    /**
+     * Base of all columns which show data from the local captcha usage history ({@link CaptchaHistoryManager}). Only these columns offer
+     * the "Clear local captcha usage history" action in their context menu.
+     */
+    private abstract class CaptchaHistoryColumn extends DisabledAwareTextColumn {
+        public CaptchaHistoryColumn(final String name) {
+            super(name);
         }
     }
 
@@ -379,7 +403,7 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
     private ExtTextColumn<CAPTCHA_TYPE> createEverNeededColumn() {
         final Icon icon_okay = NewTheme.I().getIcon(IconKey.ICON_OK, 16);
         final Icon icon_error = NewTheme.I().getIcon(IconKey.ICON_ERROR, 16);
-        return new DisabledAwareTextColumn(_GUI.T.CaptchaTypesTable_column_everUsed()) {
+        return new CaptchaHistoryColumn(_GUI.T.CaptchaTypesTable_column_everUsed()) {
             private boolean wasEverNeeded(final CAPTCHA_TYPE ctype) {
                 final List<CaptchaHistoryEntry> entries = CaptchaHistoryManager.getInstance().getEntriesByCaptchaType(ctype);
                 return entries != null && !entries.isEmpty();
@@ -416,7 +440,7 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
 
     /** "number of captchas ever used" column: total captchas (download + login) used for this type by this JD instance. */
     private ExtTextColumn<CAPTCHA_TYPE> createNumberOfCaptchasColumn() {
-        return new DisabledAwareTextColumn(_GUI.T.CaptchaTypesTable_column_numberOfCaptchas()) {
+        return new CaptchaHistoryColumn(_GUI.T.CaptchaTypesTable_column_numberOfCaptchas()) {
             {
                 setRowSorter(new ExtDefaultRowSorter<CAPTCHA_TYPE>() {
                     @Override
@@ -470,7 +494,7 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
     }
 
     private ExtTextColumn<CAPTCHA_TYPE> createLastUsedColumn() {
-        return new DisabledAwareTextColumn(_GUI.T.CaptchaTypesTable_column_lastUsed()) {
+        return new CaptchaHistoryColumn(_GUI.T.CaptchaTypesTable_column_lastUsed()) {
             {
                 setRowSorter(new ExtDefaultRowSorter<CAPTCHA_TYPE>() {
                     @Override
@@ -544,7 +568,7 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
     }
 
     private ExtTextColumn<CAPTCHA_TYPE> createUsedForServicesColumn() {
-        return new DisabledAwareTextColumn(_GUI.T.CaptchaTypesTable_column_usedForServices()) {
+        return new CaptchaHistoryColumn(_GUI.T.CaptchaTypesTable_column_usedForServices()) {
             @Override
             public String getStringValue(final CAPTCHA_TYPE ctype) {
                 final List<CaptchaHistoryEntry> entries = CaptchaHistoryManager.getInstance().getEntriesByCaptchaType(ctype);

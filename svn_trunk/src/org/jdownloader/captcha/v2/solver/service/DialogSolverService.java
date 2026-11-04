@@ -53,6 +53,12 @@ public class DialogSolverService extends AbstractSolverService {
         return EnumSet.of(CAPTCHA_TYPE.IMAGE, CAPTCHA_TYPE.IMAGE_SINGLE_CLICK_CAPTCHA, CAPTCHA_TYPE.IMAGE_MULTI_CLICK_CAPTCHA);
     }
 
+    /** The user has to solve the captchas on this computer, which the silent mode prevents. */
+    @Override
+    protected String getInfoStatusIssue() {
+        return getSilentModeStatusText();
+    }
+
     @Override
     public DialogCaptchaSolverConfigV3 getConfigV3() {
         if (config == null) {

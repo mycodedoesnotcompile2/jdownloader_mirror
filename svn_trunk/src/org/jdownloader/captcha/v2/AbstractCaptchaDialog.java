@@ -409,6 +409,10 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
         }
     }
 
+    /** Hook for subclasses to add further buttons to the button panel, right before the sound toggle. */
+    protected void addAdditionalButtons(final DefaultButtonPanel buttonPanel) {
+    }
+
     /** True if the dialog shows the toggle for the (global) captcha sound. Not the case for dialogs that are no real captchas. */
     protected boolean isSoundToggleVisible() {
         return true;
@@ -544,6 +548,7 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
             }
         };
         ret.setOpaque(false);
+        addAdditionalButtons(ret);
         if (isSoundToggleVisible()) {
             ret.add(createSoundToggle(), "width 28!");
         }

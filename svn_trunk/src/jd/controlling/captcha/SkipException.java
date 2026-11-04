@@ -9,9 +9,15 @@ public class SkipException extends Exception {
     private static final long  serialVersionUID = 1L;
     private final SkipRequest  skipRequest;
     private final Challenge<?> challenge;
+    private final String       reason;
 
     public Challenge<?> getChallenge() {
         return challenge;
+    }
+
+    /** Why the challenge is skipped (e.g. "Silent mode"), or null if there is no further information. */
+    public String getReason() {
+        return reason;
     }
 
     public SkipException(Challenge<?> challenge, SkipRequest skipRequest) {
@@ -27,6 +33,7 @@ public class SkipException extends Exception {
         super(skipRequest.name() + (message != null ? (":" + message) : ""));
         this.skipRequest = skipRequest;
         this.challenge = challenge;
+        this.reason = message;
     }
 
     public SkipRequest getSkipRequest() {

@@ -1,5 +1,6 @@
 package org.jdownloader.plugins.components.captchasolver;
 
+import java.util.ArrayList;
 import java.util.Set;
 import java.util.Currency;
 import java.util.List;
@@ -21,6 +22,8 @@ import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
 import org.jdownloader.DomainInfo;
 import org.jdownloader.captcha.v2.CaptchaSolverConfigV3;
+import org.jdownloader.captcha.v2.CaptchaSolverLimitRule;
+import org.jdownloader.captcha.v2.ChallengeResponseController;
 import org.jdownloader.captcha.v2.ChallengeSolver.SolverFeature;
 import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
 import org.jdownloader.captcha.v2.solver.service.AbstractSolverService;
@@ -39,6 +42,29 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
             throw new IllegalArgumentException();
         }
         this.plugin = plugin;
+    }
+
+    /**
+     * The enabled custom limit rules of this solver (they apply to the solver as a whole, i.e. to all of its accounts together), or null if
+     * the user has not switched custom limits on or no rule is enabled. The rule list in the config is the very list the settings table
+     * edits, so it is copied (as a snapshot) before it gets iterated.
+     */
+    public List<CaptchaSolverLimitRule> getEnabledCustomLimitRules() {
+        final CaptchaSolverPluginConfig cfg = getPluginConfig();
+        if (!cfg.isCustomLimitsEnabled()) {
+            return null;
+        }
+        final ArrayList<CaptchaSolverLimitRule> stored = cfg.getLimitRules();
+        if (stored == null) {
+            return null;
+        }
+        final List<CaptchaSolverLimitRule> ret = new ArrayList<CaptchaSolverLimitRule>();
+        for (final CaptchaSolverLimitRule rule : stored.toArray(new CaptchaSolverLimitRule[0])) {
+            if (rule.isEnabled()) {
+                ret.add(rule);
+            }
+        }
+        return ret.isEmpty() ? null : ret;
     }
 
     /** Returns the captcha types supported by the underlying plugin, used e.g. for the "Supported by this service" overview. */
@@ -94,14 +120,33 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
 
     /**
      * The states the Status column can be in for this solver, in priority order: having no account at all (routine "Add Account" case),
-     * followed by having accounts that all exist but are unusable (disabled or invalid; needs the user's attention, unlike the routine "no
-     * account yet" case), and finally the normal ready state. A globally disabled usage-of-solver-accounts setting is not part of this
-     * state: it is shown by a separate warning button (see {@link #getStatusWarningButtonTooltip()}).
+     * followed by having accounts that all exist but are unusable (needs the user's attention, unlike the routine "no account yet" case),
+     * and finally the normal ready state. The unusable accounts are told apart: all of them disabled, all of them in an error state
+     * (invalid) or a mix of both. A globally disabled usage-of-solver-accounts setting is not part of this state: it is shown by a
+     * separate warning button (see {@link #getStatusWarningButtonTooltip()}).
      */
     private enum Status {
         NO_ACCOUNT,
+        ACCOUNTS_DISABLED,
+        ACCOUNTS_INVALID,
         ACCOUNTS_UNUSABLE,
         READY
+    }
+
+    /** The solver is ready, but has a problem which makes it unusable right now: the custom limit is used up, see the base class. */
+    @Override
+    protected String getBlockingStatusIssue() {
+        final String issue = super.getBlockingStatusIssue();
+        if (issue != null) {
+            return issue;
+        }
+        if (getResolvedStatus() == Status.READY) {
+            final ChallengeResponseController.ExhaustedCustomLimit exhausted = ChallengeResponseController.getInstance().getExhaustedCustomLimit(getID(), getEnabledCustomLimitRules());
+            if (exhausted != null) {
+                return _GUI.T.CaptchaSolverService_status_limitReached(exhausted.usableAgainIn, exhausted.rule);
+            }
+        }
+        return null;
     }
 
     /**
@@ -140,7 +185,21 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
         }
         final List<Account> validAccounts = AccountController.getInstance().getValidAccounts(plugin.getHost());
         if (validAccounts == null || validAccounts.isEmpty()) {
-            /* Accounts exist, but every single one is currently disabled or invalid (error state). */
+            /* Accounts exist, but every single one is currently unusable: disabled by the user, in an error state (invalid) or both. */
+            boolean anyDisabled = false;
+            boolean anyEnabled = false;
+            for (final Account account : allAccounts) {
+                if (account.isEnabled()) {
+                    anyEnabled = true;
+                } else {
+                    anyDisabled = true;
+                }
+            }
+            if (anyDisabled && !anyEnabled) {
+                return Status.ACCOUNTS_DISABLED;
+            } else if (anyEnabled && !anyDisabled) {
+                return Status.ACCOUNTS_INVALID;
+            }
             return Status.ACCOUNTS_UNUSABLE;
         }
         return Status.READY;
@@ -151,6 +210,10 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
         if (getResolvedStatus() != Status.READY) {
             /* Not ready -> an action button (see getStatusActionName()) is shown instead. */
             return null;
+        }
+        final String blocking = getBlockingStatusIssue();
+        if (blocking != null) {
+            return blocking;
         }
         final List<Account> validAccounts = AccountController.getInstance().getValidAccounts(plugin.getHost());
         final Double balance = getBalance();
@@ -165,7 +228,7 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
         }
         /* Single account: keep the established "Ready | Balance: <localized amount>" layout. */
         final String statusText = _GUI.T.CaptchaSolverService_status_ready_balance(balanceText);
-        if (isStatusTextWarning()) {
+        if (isLowBalance()) {
             return statusText + validAccounts.get(0).getLowBalanceStatusSuffix();
         }
         return statusText;
@@ -176,10 +239,15 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
      * {@link Account#isLowBalance()}). With several accounts the status text only shows the total balance, which says
      * nothing about the single accounts, so no warning is shown then.
      */
-    @Override
-    public boolean isStatusTextWarning() {
+    private boolean isLowBalance() {
         final List<Account> validAccounts = AccountController.getInstance().getValidAccounts(plugin.getHost());
         return validAccounts != null && validAccounts.size() == 1 && validAccounts.get(0).isLowBalance();
+    }
+
+    /** Warning for a low balance (see {@link #isLowBalance()}) and for the problems of the base class and a used up custom limit. */
+    @Override
+    public boolean isStatusTextWarning() {
+        return getBlockingStatusIssue() != null || isLowBalance();
     }
 
     @Override
@@ -187,6 +255,10 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
         switch (getResolvedStatus()) {
         case NO_ACCOUNT:
             return _GUI.T.lit_add_account();
+        case ACCOUNTS_DISABLED:
+            return _GUI.T.SolverOrderTableModel_status_accountsDisabled();
+        case ACCOUNTS_INVALID:
+            return _GUI.T.SolverOrderTableModel_status_accountsInvalid();
         case ACCOUNTS_UNUSABLE:
             return _GUI.T.SolverOrderTableModel_status_accountsUnusable();
         case READY:
@@ -198,6 +270,8 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
     @Override
     public boolean isStatusActionWarning() {
         switch (getResolvedStatus()) {
+        case ACCOUNTS_DISABLED:
+        case ACCOUNTS_INVALID:
         case ACCOUNTS_UNUSABLE:
             return true;
         case NO_ACCOUNT:
@@ -211,6 +285,8 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
     @Override
     public void onStatusAction() {
         switch (getResolvedStatus()) {
+        case ACCOUNTS_DISABLED:
+        case ACCOUNTS_INVALID:
         case ACCOUNTS_UNUSABLE:
             openAccountManager(getFirstAccountOrNull());
             return;

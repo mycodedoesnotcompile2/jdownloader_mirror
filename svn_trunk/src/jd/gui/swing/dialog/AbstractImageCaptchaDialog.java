@@ -2,6 +2,7 @@ package jd.gui.swing.dialog;
 
 import java.awt.AlphaComposite;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Composite;
 import java.awt.Dimension;
 import java.awt.Graphics;
@@ -10,6 +11,7 @@ import java.awt.Image;
 import java.awt.Point;
 import java.awt.BorderLayout;
 import java.awt.Rectangle;
+import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.image.BufferedImage;
@@ -21,8 +23,10 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
 
+import javax.swing.Icon;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
+import javax.swing.JToggleButton;
 import javax.swing.Scrollable;
 import javax.swing.SwingConstants;
 import javax.swing.Timer;
@@ -31,9 +35,11 @@ import org.appwork.utils.URLStream;
 import org.appwork.utils.ImageProvider.ImageProvider;
 import org.appwork.utils.images.IconIO;
 import org.appwork.utils.images.Interpolation;
+import org.appwork.utils.swing.dialog.DefaultButtonPanel;
 import org.jdownloader.DomainInfo;
 import org.jdownloader.captcha.v2.AbstractCaptchaDialog;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
+import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.appwork.swing.MigPanel;
 import org.jdownloader.gui.views.components.HeaderScrollPane;
@@ -89,6 +95,9 @@ public abstract class AbstractImageCaptchaDialog<T> extends AbstractCaptchaDialo
     Timer               paintTimer;
     protected Rectangle bounds;
     protected double    scaleFaktor;
+    private boolean     greyscale = false;
+    private Image       greyscaleSource;
+    private Image       greyscaleImage;
 
     public AbstractImageCaptchaDialog(ImageCaptchaChallenge<T> challenge, int flags, String title, DialogType type, DomainInfo domainInfo, String explain, Image... images) {
         super(challenge, flags, title, type, domainInfo, explain);
@@ -152,7 +161,7 @@ public abstract class AbstractImageCaptchaDialog<T> extends AbstractCaptchaDialo
                 offset = new Point((getWidth() - scaled.getWidth(null)) / 2, (getHeight() - scaled.getHeight(null)) / 2);
                 AbstractImageCaptchaDialog.this.bounds = new Rectangle((getWidth() - scaled.getWidth(null)) / 2, (getHeight() - scaled.getHeight(null)) / 2, scaled.getWidth(null), scaled.getHeight(null));
                 g.setClip(bounds);
-                g.drawImage(scaled, (getWidth() - scaled.getWidth(null)) / 2, (getHeight() - scaled.getHeight(null)) / 2, col, null);
+                g.drawImage(greyscale ? getGreyscaleImage(scaled) : scaled, (getWidth() - scaled.getWidth(null)) / 2, (getHeight() - scaled.getHeight(null)) / 2, col, null);
                 paintIconComponent(g, getWidth(), getHeight(), (getWidth() - scaled.getWidth(null)) / 2, (getHeight() - scaled.getHeight(null)) / 2, scaled);
             }
         };
@@ -210,6 +219,84 @@ public abstract class AbstractImageCaptchaDialog<T> extends AbstractCaptchaDialo
     }
 
     protected void paintIconComponent(Graphics g, int width, int height, int xOsset, int yOffset, Image scaled) {
+    }
+
+    /**
+     * Returns a greyscale copy of the given (already scaled) image. The last result is cached, because the same scaled image is painted
+     * again and again as long as the dialog is not resized.
+     */
+    private Image getGreyscaleImage(final Image scaled) {
+        if (greyscaleSource == scaled && greyscaleImage != null) {
+            return greyscaleImage;
+        }
+        final int w = scaled.getWidth(null);
+        final int h = scaled.getHeight(null);
+        final BufferedImage ret = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        final Graphics2D g2 = ret.createGraphics();
+        try {
+            g2.drawImage(scaled, 0, 0, null);
+        } finally {
+            g2.dispose();
+        }
+        final int[] pixels = ret.getRGB(0, 0, w, h, null, 0, w);
+        for (int i = 0; i < pixels.length; i++) {
+            final int argb = pixels[i];
+            final int grey = (int) Math.round(0.299 * ((argb >> 16) & 0xFF) + 0.587 * ((argb >> 8) & 0xFF) + 0.114 * (argb & 0xFF));
+            pixels[i] = (argb & 0xFF000000) | (grey << 16) | (grey << 8) | grey;
+        }
+        ret.setRGB(0, 0, w, h, pixels, 0, w);
+        greyscaleSource = scaled;
+        greyscaleImage = ret;
+        return ret;
+    }
+
+    @Override
+    protected void addAdditionalButtons(final DefaultButtonPanel buttonPanel) {
+        buttonPanel.add(createGreyscaleToggle(), "width 28!");
+    }
+
+    /**
+     * Creates the toggle that shows the captcha image in greyscale. It only changes the display, the image that is sent to solvers is not
+     * touched.
+     */
+    protected JToggleButton createGreyscaleToggle() {
+        final JToggleButton ret = new JToggleButton(new Icon() {
+            @Override
+            public void paintIcon(final Component c, final Graphics g, final int x, final int y) {
+                final Graphics2D g2 = (Graphics2D) g.create();
+                try {
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    g2.setColor(c.getForeground());
+                    g2.drawOval(x + 1, y + 1, getIconWidth() - 3, getIconHeight() - 3);
+                    g2.fillArc(x + 1, y + 1, getIconWidth() - 3, getIconHeight() - 3, 90, 180);
+                } finally {
+                    g2.dispose();
+                }
+            }
+
+            @Override
+            public int getIconWidth() {
+                return 18;
+            }
+
+            @Override
+            public int getIconHeight() {
+                return 18;
+            }
+        });
+        ret.setSelected(greyscale);
+        ret.setFocusable(false);
+        ret.setToolTipText(_GUI.T.AbstractImageCaptchaDialog_greyscaleToggle_tooltip());
+        ret.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(final ActionEvent e) {
+                greyscale = ret.isSelected();
+                if (iconPanel != null) {
+                    iconPanel.repaint();
+                }
+            }
+        });
+        return ret;
     }
 
     @Override

@@ -86,13 +86,16 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
 
     /** Sets of solvers the "preselected captcha solvers" dropdown can select. */
     private enum SolverPreselect {
-        /** All solvers of the selected solver types. Greyed out if no solver is enabled. */
+        /** All solvers of the selected solver types. */
         ALL,
         /** The manual selection of the user, all solvers as long as the user never changed the selection. */
         CUSTOM,
         /** All solvers which are enabled. */
         ENABLED,
-        /** All solvers which are enabled and ready to be used, see {@link SolverService#isReady()}. Greyed out if there is none. */
+        /**
+         * All solvers which are enabled and ready to be used, see {@link SolverService#isReady()}. If there is none, the table shows an
+         * error message, see {@link SolverComparisonContainer#getEmptyHint()}.
+         */
         USABLE
     }
 
@@ -143,8 +146,6 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
     private final Set<SolverService>             selectedSolvers     = new LinkedHashSet<SolverService>();
     /** True while the solver dropdown/multi-select is modified programmatically so that its listener does not reset the selection. */
     private boolean                              adjustingSolvers    = false;
-    /** True if at least one solver is enabled and usable, i.e. the "usable" solver preset can be selected (otherwise it is greyed out). */
-    private boolean                              solverUsableAvailable = false;
     /** The solvers of the "Custom" preset, remembered for the running session only. null = the user never populated it, then all solvers. */
     private Set<SolverService>                   rememberedSolverSelection = null;
     /**
@@ -157,25 +158,31 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
         super("ins 0, wrap 1", "[grow,fill]", "[][][grow,fill][]");
         allTypes = CaptchaType.getProcessableCaptchaTypes();
         model = new SolverComparisonTableModel();
+        /* Renderer of the large red hint which is painted inside the table, see paintComponent below. */
         emptyLabel = new JLabel();
         emptyLabel.setForeground(Color.RED);
         emptyLabel.setFont(emptyLabel.getFont().deriveFont(Font.BOLD, 20f));
         table = new BasicJDTable<SolverService>(model) {
             private static final long serialVersionUID = 1L;
 
-            /* Large red hint inside the table if no captcha type is selected. */
+            /*
+             * Large red hint in the top left corner of the table's visible area. The table can have many columns and scroll horizontally,
+             * so the hint is anchored to the visible rectangle (not to the table) and wrapped to its width: it is never partly out of sight.
+             */
             @Override
             public void paintComponent(final Graphics g) {
                 super.paintComponent(g);
                 final String hint = getEmptyHint();
                 if (hint != null) {
-                    final int width = Math.max(100, getWidth() - 40);
-                    emptyLabel.setText("<html><body style='width:" + width + "px;text-align:center'>" + hint + "</body></html>");
+                    final Rectangle visible = getVisibleRect();
+                    final int margin = 10;
+                    final int width = Math.max(100, visible.width - 2 * margin);
+                    emptyLabel.setText("<html><body style='width:" + width + "px'>" + hint + "</body></html>");
                     final Dimension size = emptyLabel.getPreferredSize();
                     emptyLabel.setSize(size);
                     final Graphics2D g2 = (Graphics2D) g.create();
                     try {
-                        g2.translate((getWidth() - size.width) / 2, getTableHeader().getHeight() + 30);
+                        g2.translate(visible.x + margin, visible.y + margin);
                         emptyLabel.paint(g2);
                     } finally {
                         g2.dispose();
@@ -201,16 +208,6 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
                         }
                     });
                     popup.add(hide);
-                    /* Deselects every solver except the selected ones. Greyed out for the same reason as "Hide". */
-                    final JMenuItem hideOthers = new JMenuItem(_GUI.T.CaptchaSolverComparison_hideAllOthers(), NewTheme.I().getIcon(IconKey.ICON_REMOVE, 16));
-                    hideOthers.setEnabled(selection.size() != SolverComparisonContainer.this.model.getRowCount());
-                    hideOthers.addActionListener(new ActionListener() {
-                        @Override
-                        public void actionPerformed(final ActionEvent e) {
-                            hideAllOthers(new ArrayList<SolverService>(selection));
-                        }
-                    });
-                    popup.add(hideOthers);
                 }
                 if (contextObject instanceof PluginForCaptchaSolverSolverService) {
                     final PluginForCaptchaSolverSolverService external = (PluginForCaptchaSolverSolverService) contextObject;
@@ -399,26 +396,8 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
                 onManualSolverSelectionChange();
             }
         };
-        solverPresetCombo = new JComboBox() {
-            private static final long serialVersionUID = 1L;
-
-            @Override
-            public void setSelectedItem(final Object anObject) {
-                if (isPresetDisabled(anObject)) {
-                    /* Greyed out entries cannot be selected. */
-                    return;
-                }
-                super.setSelectedItem(anObject);
-            }
-
-            /* The popup list is recreated whenever the look and feel changes, so the guard has to be installed again then. */
-            @Override
-            public void updateUI() {
-                super.updateUI();
-                installDisabledItemGuard(this);
-            }
-        };
-        installDisabledItemGuard(solverPresetCombo);
+        /* All entries can be selected. If one of them leaves no solver, a red error message is shown in the table, see getEmptyHint(). */
+        solverPresetCombo = new JComboBox();
         solverPresetCombo.setRenderer(new DefaultListCellRenderer() {
             private static final long serialVersionUID = 1L;
 
@@ -427,10 +406,6 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
                 final JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
                 if (value instanceof SolverPreselect) {
                     label.setText(getSolverPresetName((SolverPreselect) value));
-                    if (isPresetDisabled(value)) {
-                        label.setEnabled(false);
-                        label.setForeground(Color.GRAY);
-                    }
                 }
                 return label;
             }
@@ -527,7 +502,8 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
         selectionBar.add(solverPresetCombo, "height 26!");
         selectionBar.add(solversCombo, "height 26!");
         add(selectionBar, "growx");
-        onlyFullSupportCheckBox = new JCheckBox(_GUI.T.CaptchaSolverComparison_onlyFullSupport());
+        /* The text contains the number of matching solvers, see updateFullSupportCheckBox. */
+        onlyFullSupportCheckBox = new JCheckBox(_GUI.T.CaptchaSolverComparison_onlyFullSupport("0"));
         onlyFullSupportCheckBox.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(final ActionEvent e) {
@@ -714,14 +690,9 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
         disclaimerLabel.setVisible(externalSolverShown);
     }
 
-    /** True if the given dropdown entry is greyed out, i.e. it cannot be selected: "Used by me" and the solver presets "All" / "usable". */
+    /** True if the given dropdown entry of the captcha type presets is greyed out, i.e. it cannot be selected: "Used by me" without history. */
     private boolean isPresetDisabled(final Object preset) {
-        if (preset == Preselect.USED) {
-            return !usedAvailable;
-        } else if (preset == SolverPreselect.USABLE) {
-            return !solverUsableAvailable;
-        }
-        return false;
+        return preset == Preselect.USED && !usedAvailable;
     }
 
     /** True if the mouse event is on a greyed out entry of the given popup list. */
@@ -800,17 +771,6 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
         }
     }
 
-    /** The "usable" preset needs at least one enabled and usable solver; otherwise it is greyed out. */
-    private void updateSolverPresetAvailability() {
-        boolean anyUsable = false;
-        for (final SolverService solver : allSolvers) {
-            if (solver.getConfigV3().isEnabled() && solver.isReady()) {
-                anyUsable = true;
-            }
-        }
-        solverUsableAvailable = anyUsable;
-    }
-
     /** Returns the solvers the given preset selects. */
     private Set<SolverService> getSolverPresetSolvers(final SolverPreselect preset) {
         final Set<SolverService> ret = new LinkedHashSet<SolverService>();
@@ -874,14 +834,6 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
     /** Context menu "Hide from selection": deselects the given solvers, which turns the preset into "Custom". */
     private void hideFromSelection(final List<SolverService> solvers) {
         selectedSolvers.removeAll(solvers);
-        switchToCustomSolverSelection();
-        syncSolversCombo();
-        onSolverSelectionChanged();
-    }
-
-    /** Context menu "Hide all others": keeps only the given solvers selected, which turns the preset into "Custom". */
-    private void hideAllOthers(final List<SolverService> solvers) {
-        selectedSolvers.retainAll(solvers);
         switchToCustomSolverSelection();
         syncSolversCombo();
         onSolverSelectionChanged();
@@ -970,13 +922,12 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
             adjustingSolvers = false;
         }
         model.setSolvers(typedSolvers);
-        updateSolverPresetAvailability();
         final Object currentSolverPreset = solverPresetCombo.getSelectedItem();
-        if (!resetToAll && currentSolverPreset instanceof SolverPreselect && !isPresetDisabled(currentSolverPreset)) {
+        if (!resetToAll && currentSolverPreset instanceof SolverPreselect) {
             applySolverPreset((SolverPreselect) currentSolverPreset);
             return;
         }
-        /* Solver types changed or the chosen preset is not available anymore: all solvers of the selected types. */
+        /* Solver types changed: all solvers of the selected types. */
         adjustingSolvers = true;
         try {
             solverPresetCombo.setSelectedItem(SolverPreselect.ALL);
@@ -1187,8 +1138,11 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
      * hide every solver. The check box keeps its state, the filter applies again as soon as the selection allows it.
      */
     private void updateFullSupportCheckBox() {
+        /* No rows or columns (nothing selected): the filter is meaningless then, so the check box is greyed out (it keeps its state). */
+        onlyFullSupportCheckBox.setText(_GUI.T.CaptchaSolverComparison_onlyFullSupport(String.valueOf(model.getFullSupportCount())));
+        final boolean empty = getEmptyHint() != null;
         final boolean impossible = model.isFullSupportImpossible();
-        onlyFullSupportCheckBox.setEnabled(!impossible);
+        onlyFullSupportCheckBox.setEnabled(!impossible && !empty);
         fullSupportHintLabel.setVisible(impossible);
         final boolean warning = impossible && onlyFullSupportCheckBox.isSelected();
         fullSupportHintLabel.setForeground(warning ? Color.RED : hintColor);

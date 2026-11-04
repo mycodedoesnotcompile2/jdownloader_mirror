@@ -17,7 +17,11 @@ import javax.swing.Icon;
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
+import org.jdownloader.captcha.v2.solver.service.AbstractSolverService;
+import org.jdownloader.captcha.v2.solverjob.ChallengeSolverJobListener;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
+import org.jdownloader.captcha.v2.solverjob.SolverJob.SolverJobStatus;
+import org.jdownloader.captcha.v2.solverjob.SolverJob.SolverOutcome;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
@@ -25,6 +29,7 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 
 import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 public abstract class ChallengeSolver<T> {
@@ -172,7 +177,13 @@ public abstract class ChallengeSolver<T> {
          * The user globally disabled external (plugin based) captcha solver accounts, see
          * GeneralSettings#isUseAvailableCaptchaSolverAccounts.
          */
-        EXTERNAL_SOLVER_ACCOUNTS_DISABLED
+        EXTERNAL_SOLVER_ACCOUNTS_DISABLED,
+        /**
+         * The silent mode is active and set so that captchas must not be solved by the user ("Skip the Captcha" or "Do not show a dialog,
+         * but try auto solver"): Solvers which need the user (dialog, browser) are not used. Depends on the state of the silent mode, so it
+         * is a temporary reason and not an "unsupported" one, see {@link ChallengeSolver#getUnsupportedReason(Challenge)}.
+         */
+        SILENT_MODE
     }
 
     protected ChallengeSolver() {
@@ -340,6 +351,68 @@ public abstract class ChallengeSolver<T> {
                 threadPool.execute(jr);
             }
         }
+    }
+
+    /**
+     * For solvers which need the user to solve the challenge on this computer (dialog, browser): Has to be called before the user is
+     * asked, because the silent mode may have been activated after the job was created (a solver is not used for a job created during such
+     * a silent mode at all, see {@link ChallengeVetoReason#SILENT_MODE}). <br>
+     * If the silent mode does not allow to ask the user, only this solver is skipped, it must end without asking: The job is not aborted,
+     * the other solvers can still solve the challenge. If none of them does, all captchas are skipped (BLOCK_ALL_CAPTCHAS) as soon as all solvers
+     * are done.
+     *
+     * @return true if the solver must not ask the user
+     */
+    protected final boolean isAskingUserBlockedBySilentMode(final SolverJob<T> job) throws InterruptedException {
+        if (!AbstractSolverService.isManualSolvingBlockedBySilentMode()) {
+            checkInterruption();
+            return false;
+        }
+        endBecauseOfSilentMode(job, "The silent mode does not allow to ask the user");
+        return true;
+    }
+
+    /**
+     * Marks this solver as ended because of the silent mode (the user was not asked): The solver must end without an answer afterwards.
+     * The job is not aborted, the other solvers can still solve the challenge. If none of them does, all captchas are skipped
+     * (BLOCK_ALL_CAPTCHAS) as soon as all solvers are done (if all of them ended because of the silent mode, the job status is {@link SolverJobStatus#SILENT_MODE}).
+     */
+    protected final void endBecauseOfSilentMode(final SolverJob<T> job, final String reason) {
+        job.setSolverResult(this, SolverOutcome.SILENT_MODE, reason);
+        job.getLogger().info("Silent mode: " + this + " does not ask the user, the other solvers can still solve the challenge");
+        job.getEventSender().addListener(new ChallengeSolverJobListener() {
+            @Override
+            public void onSolverTimedOut(final ChallengeSolver<?> parameter) {
+            }
+
+            @Override
+            public void onSolverStarts(final ChallengeSolver<?> parameter) {
+            }
+
+            @Override
+            public void onSolverJobReceivedNewResponse(final AbstractResponse<?> response) {
+            }
+
+            @Override
+            public void onSolverDone(final ChallengeSolver<?> solver) {
+                if (job.isDone()) {
+                    if (!job.isSolved()) {
+                        /* BLOCK_ALL_CAPTCHAS like in ChallengeResponseController#handle: The next captchas run into the same situation. */
+                        ChallengeResponseController.getInstance().setSkipRequest(SkipRequest.BLOCK_ALL_CAPTCHAS, ChallengeSolver.this, job.getChallenge());
+                    }
+                    job.getEventSender().removeListener(this);
+                }
+            }
+        });
+    }
+
+    /**
+     * For solvers which showed a dialog: The user chose an external solver in it ("use external solver instead"), so the dialog was closed
+     * without an answer and without a skip. Records that for this solver: Without a result a solver that ended without an answer looks
+     * like it is still working until the whole job is done, e.g. in the captcha test panel. The job goes on with the chosen solver.
+     */
+    protected final void endBecauseUserChoseExternalSolver(final SolverJob<T> job, final ChallengeSolver<?> externalSolver) {
+        job.setSolverResult(this, SolverOutcome.ABORTED_USER_CHOSE_OTHER_SOLVER, "The user chose the external solver " + externalSolver.getService().getName() + " in the dialog instead");
     }
 
     protected static void checkInterruption() throws InterruptedException {

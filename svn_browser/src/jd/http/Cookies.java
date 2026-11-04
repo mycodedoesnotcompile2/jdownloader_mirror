@@ -419,6 +419,7 @@ public class Cookies {
 
     public synchronized void add(final Cookie newCookie) {
         if (newCookie.getKey() == null) {
+            DebugMode.debugger();
             return;
         }
         for (final Cookie cookie : this.getCookies()) {
@@ -468,7 +469,8 @@ public class Cookies {
     private static final Comparator<Cookie> BEST_MATCH_COMPARATOR = new Comparator<Cookie>() {
         @Override
         public int compare(Cookie c1, Cookie c2) {
-            // 0. Custom-Cookie Check
+            // 0. Custom-Cookie Check, gewollt, Custom-Cookie haben immer
+            // Vorrang
             final boolean custom1 = c1.isCustomCookie();
             final boolean custom2 = c2.isCustomCookie();
             if (custom1 != custom2) {
@@ -497,7 +499,7 @@ public class Cookies {
     };
 
     protected boolean removeExpired(Cookie cookie) {
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && cookie.isExpired()) {
+        if (cookie.isExpired()) {
             getCookies().remove(cookie);
             return true;
         }
@@ -580,15 +582,17 @@ public class Cookies {
         for (final Cookie cookie : this.getCookies()) {
             if (removeExpired(cookie)) {
                 continue;
-            } else if (key.equals(cookie.getKey()) && (url == null || cookie.matches(url))) {
+            } else if (key.equals(cookie.getKey()) && url == null || cookie.matches(url)) {
                 ret.add(cookie);
             }
         }
-        for (final Cookie cookie : this.getCookies()) {
-            if (removeExpired(cookie)) {
-                continue;
-            } else if (key.equalsIgnoreCase(cookie.getKey()) && (url == null || cookie.matches(url)) && !ret.contains(cookie)) {
-                ret.add(cookie);
+        if (ret.size() == 0) {
+            for (final Cookie cookie : this.getCookies()) {
+                if (removeExpired(cookie)) {
+                    continue;
+                } else if (key.equalsIgnoreCase(cookie.getKey()) && (url == null || cookie.matches(url)) && !ret.contains(cookie)) {
+                    ret.add(cookie);
+                }
             }
         }
         if (ret.isEmpty()) {

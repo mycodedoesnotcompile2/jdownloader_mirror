@@ -6,33 +6,64 @@ import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DefaultLongValue;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
-import org.appwork.storage.config.annotations.EnumLabel;
+import org.appwork.storage.config.annotations.LabelInterface;
+import org.jdownloader.gui.translate._GUI;
 
 public interface SilentModeSettings extends ConfigInterface {
-    public static enum AutoSilentModeTrigger {
-        @EnumLabel("Auto Mode Disabled")
-        NEVER,
-        @EnumLabel("Auto-Enable Silentmode when JD is in Tray")
-        JD_IN_TRAY,
-        @EnumLabel("Auto-Enable Silentmode when JD is minimized to Taskbar")
-        JD_IN_TASKBAR
+    /** The silent mode setting, see {@link SilentModeController#getState()} for whether it is effectively active. */
+    public static enum SilentModeSetting implements LabelInterface {
+        DISABLED {
+            @Override
+            public String getLabel() {
+                return _GUI.T.GUISettings_GUISettings_sielntMode_disabled();
+            }
+        },
+        ENABLED {
+            @Override
+            public String getLabel() {
+                return _GUI.T.GUISettings_GUISettings_sielntMode_enabled();
+            }
+        },
+        AUTO_JD_IN_TRAY {
+            @Override
+            public String getLabel() {
+                return _GUI.T.GUISettings_GUISettings_sielntMode_autoTray();
+            }
+        },
+        AUTO_JD_IN_TASKBAR {
+            @Override
+            public String getLabel() {
+                return _GUI.T.GUISettings_GUISettings_sielntMode_autoTaskbar();
+            }
+        };
     }
 
-    void setAutoTrigger(AutoSilentModeTrigger action);
+    void setSilentMode(SilentModeSetting mode);
 
-    @DefaultEnumValue("NEVER")
-    @DescriptionForConfigEntry("Activate Silent Mode Based on Frame Status")
+    @DefaultEnumValue("DISABLED")
+    @DescriptionForConfigEntry("Silent Mode: Disabled, enabled or enabled automatically depending on the state of the JDownloader window")
     @AboutConfig
-    AutoSilentModeTrigger getAutoTrigger();
+    SilentModeSetting getSilentMode();
 
-    public static enum DialogDuringSilentModeAction {
-        @EnumLabel("Wait in Background until window gets focus")
-        WAIT_IN_BACKGROUND_UNTIL_WINDOW_GETS_FOCUS,
-        @EnumLabel("Wait in Background until window gets focus or timeout is reached")
-        WAIT_IN_BACKGROUND_UNTIL_WINDOW_GETS_FOCUS_OR_TIMEOUT,
-        @EnumLabel("Cancel the dialog")
-        CANCEL_DIALOG;
-
+    public static enum DialogDuringSilentModeAction implements LabelInterface {
+        WAIT_IN_BACKGROUND_UNTIL_WINDOW_GETS_FOCUS {
+            @Override
+            public String getLabel() {
+                return _GUI.T.SilentModeSettings_dialogAction_waitUntilFocus();
+            }
+        },
+        WAIT_IN_BACKGROUND_UNTIL_WINDOW_GETS_FOCUS_OR_TIMEOUT {
+            @Override
+            public String getLabel() {
+                return _GUI.T.SilentModeSettings_dialogAction_waitUntilFocusOrTimeout();
+            }
+        },
+        CANCEL_DIALOG {
+            @Override
+            public String getLabel() {
+                return _GUI.T.SilentModeSettings_dialogAction_cancel();
+            }
+        };
     }
 
     void setOnDialogDuringSilentModeAction(DialogDuringSilentModeAction action);
@@ -54,14 +85,25 @@ public interface SilentModeSettings extends ConfigInterface {
     @AboutConfig
     long isOnDialogDuringSilentModeActionTimeout();
 
-    public static enum CaptchaDuringSilentModeAction {
-        @EnumLabel("Skip the Captcha")
-        SKIP_LINK,
-        @EnumLabel("Wait in Background until window gets focus or timeout is reached")
-        WAIT_IN_BACKGROUND_UNTIL_WINDOW_GETS_FOCUS_OR_TIMEOUT,
-        @EnumLabel("Do not show a dialog, but try auto solver (AntiCaptcha, Exchange Services,...)")
-        DISABLE_DIALOG_SOLVER;
-
+    public static enum CaptchaDuringSilentModeAction implements LabelInterface {
+        SKIP_LINK {
+            @Override
+            public String getLabel() {
+                return _GUI.T.SilentModeSettings_captchaAction_skip();
+            }
+        },
+        WAIT_IN_BACKGROUND_UNTIL_WINDOW_GETS_FOCUS_OR_TIMEOUT {
+            @Override
+            public String getLabel() {
+                return _GUI.T.SilentModeSettings_captchaAction_waitUntilFocusOrTimeout();
+            }
+        },
+        DISABLE_DIALOG_SOLVER {
+            @Override
+            public String getLabel() {
+                return _GUI.T.SilentModeSettings_captchaAction_autoSolversOnly();
+            }
+        };
     }
 
     void setOnCaptchaDuringSilentModeAction(CaptchaDuringSilentModeAction action);
@@ -69,13 +111,6 @@ public interface SilentModeSettings extends ConfigInterface {
     @DefaultEnumValue("DISABLE_DIALOG_SOLVER")
     @AboutConfig
     CaptchaDuringSilentModeAction getOnCaptchaDuringSilentModeAction();
-
-    void setManualEnabled(boolean b);
-
-    @DefaultBooleanValue(false)
-    @DescriptionForConfigEntry("Activate the Silent Mode")
-    @AboutConfig
-    boolean isManualEnabled();
 
     @DescriptionForConfigEntry("[ms] After the given time without user interaction, JDownloader will autoactivate the silent mode, and disable it if there is user interaction again.")
     @DefaultLongValue(0)

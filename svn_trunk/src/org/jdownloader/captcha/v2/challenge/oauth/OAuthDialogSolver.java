@@ -119,6 +119,10 @@ public class OAuthDialogSolver extends ChallengeSolver<Boolean> {
                 checkInterruption();
                 job.getChallenge().sendStatsSolving(this);
                 handler.run();
+                if (handler.isSilentModeTimeout()) {
+                    /* The dialog was never shown because of the silent mode: Like before, the whole OAuth challenge is skipped (timeout). */
+                    throw new SkipException(job.getChallenge(), SkipRequest.TIMEOUT);
+                }
             } catch (SkipException e) {
                 throw e;
             } catch (Exception e) {

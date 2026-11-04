@@ -21,6 +21,7 @@ import org.jdownloader.gui.mainmenu.container.OptionalContainer;
 import org.jdownloader.gui.mainmenu.container.SettingsMenuContainer;
 import org.jdownloader.gui.toolbar.action.CaptchaModeChangeAction;
 import org.jdownloader.gui.toolbar.action.CaptchaToggleSolverServicesAction;
+import org.jdownloader.gui.toolbar.action.ToggleAllAccountTypesAction;
 import org.jdownloader.gui.toolbar.action.CaptchaToggleUseAvailableSolverAccountsAction;
 import org.jdownloader.gui.toolbar.action.CollapseExpandAllAction;
 import org.jdownloader.gui.toolbar.action.GenericDeleteFromTableToolbarAction;
@@ -171,6 +172,7 @@ public class MenuManagerMainToolbar extends ContextMenuManager<FilePackage, Down
         ocr.add(CaptchaModeChangeAction.class);
         ocr.add(CaptchaToggleSolverServicesAction.class);
         ocr.add(CaptchaToggleUseAvailableSolverAccountsAction.class);
+        opt.add(ToggleAllAccountTypesAction.class);
         opt.add(setIconKey(new ActionData(GenericDeleteFromTableToolbarAction.class).putSetup(GenericDeleteFromTableToolbarAction.DELETE_ALL, true).putSetup(GenericDeleteFromTableToolbarAction.ONLY_SELECTED_ITEMS, true), IconKey.ICON_DELETE));
         opt.add(CleanupDownloadFolderAction.class);
         opt.add(createDeleteMenu());

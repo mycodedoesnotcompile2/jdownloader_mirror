@@ -39,6 +39,45 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
+import jd.config.Property;
+import jd.controlling.TaskQueue;
+import jd.controlling.downloadcontroller.DownloadController;
+import jd.controlling.downloadcontroller.DownloadSession;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.downloadcontroller.DownloadWatchDogJob;
+import jd.controlling.linkchecker.LinkChecker;
+import jd.controlling.linkchecker.LinkCheckerHandler;
+import jd.controlling.linkcollector.autostart.AutoStartManager;
+import jd.controlling.linkcrawler.CheckableLink;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledLinkModifier;
+import jd.controlling.linkcrawler.CrawledLinkProperty;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.linkcrawler.CrawledPackage.TYPE;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
+import jd.controlling.linkcrawler.LinkCrawlerFilter;
+import jd.controlling.linkcrawler.LinkCrawlerHandler;
+import jd.controlling.linkcrawler.LinkCrawlerRule;
+import jd.controlling.linkcrawler.LinkCrawlerRule.RULE;
+import jd.controlling.linkcrawler.PackageInfo;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNodeFilter;
+import jd.controlling.packagecontroller.PackageController;
+import jd.controlling.packagecontroller.PackageControllerQueue.ReadOnlyQueueAction;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.WarnLevel;
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.parser.Regex;
+import jd.plugins.CrawledLinkStorable;
+import jd.plugins.CrawledPackageStorable;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import jd.plugins.Plugin;
+import jd.plugins.PluginForHost;
+import jd.utils.JDUtilities;
+
 import org.appwork.controlling.SingleReachableState;
 import org.appwork.exceptions.WTFException;
 import org.appwork.scheduler.DelayedRunnable;
@@ -115,45 +154,6 @@ import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.settings.staticreferences.CFG_LINKCOLLECTOR;
 import org.jdownloader.settings.staticreferences.CFG_LINKGRABBER;
 import org.jdownloader.translate._JDT;
-
-import jd.config.Property;
-import jd.controlling.TaskQueue;
-import jd.controlling.downloadcontroller.DownloadController;
-import jd.controlling.downloadcontroller.DownloadSession;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.DownloadWatchDogJob;
-import jd.controlling.linkchecker.LinkChecker;
-import jd.controlling.linkchecker.LinkCheckerHandler;
-import jd.controlling.linkcollector.autostart.AutoStartManager;
-import jd.controlling.linkcrawler.CheckableLink;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledLinkModifier;
-import jd.controlling.linkcrawler.CrawledLinkProperty;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.linkcrawler.CrawledPackage.TYPE;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
-import jd.controlling.linkcrawler.LinkCrawlerFilter;
-import jd.controlling.linkcrawler.LinkCrawlerHandler;
-import jd.controlling.linkcrawler.LinkCrawlerRule;
-import jd.controlling.linkcrawler.LinkCrawlerRule.RULE;
-import jd.controlling.linkcrawler.PackageInfo;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.packagecontroller.AbstractPackageChildrenNodeFilter;
-import jd.controlling.packagecontroller.PackageController;
-import jd.controlling.packagecontroller.PackageControllerQueue.ReadOnlyQueueAction;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.WarnLevel;
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.parser.Regex;
-import jd.plugins.CrawledLinkStorable;
-import jd.plugins.CrawledPackageStorable;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import jd.plugins.Plugin;
-import jd.plugins.PluginForHost;
-import jd.utils.JDUtilities;
 
 public class LinkCollector extends PackageController<CrawledPackage, CrawledLink> implements LinkCheckerHandler<CrawledLink>, LinkCrawlerHandler, ShutdownVetoListener {
     public static final String                        SOURCE_VARIANT_ID = "SOURCE_VARIANT_ID";
@@ -1424,7 +1424,10 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
         });
     }
 
-    /** Returns dupe if dupe manager is enabled and dupe exists (the enabled check lives in getExistingCrawledLinkByLinkIDOnDupeManagerEnabled). */
+    /**
+     * Returns dupe if dupe manager is enabled and dupe exists (the enabled check lives in
+     * getExistingCrawledLinkByLinkIDOnDupeManagerEnabled).
+     */
     protected CrawledLink findDupe(final CrawledLink cl) {
         String linkID = cl.getLinkID();
         CrawledLink existingLink = getExistingCrawledLinkByLinkIDOnDupeManagerEnabled(linkID);
@@ -1848,8 +1851,8 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
 
     /**
      * Builds a reverse lookup (link -> mapping ID) for the given map in one pass. Looking up every link with a linear search through all
-     * lists would be O(links * list entries). If a link is contained in several entries, the first one in iteration order wins, same as
-     * the former linear search.
+     * lists would be O(links * list entries). If a link is contained in several entries, the first one in iteration order wins, same as the
+     * former linear search.
      */
     private Map<CrawledLink, CrawledPackageMappingID> createIDLookup(final Map<CrawledPackageMappingID, List<CrawledLink>> idListMap) {
         final Map<CrawledLink, CrawledPackageMappingID> ret = new IdentityHashMap<CrawledLink, CrawledPackageMappingID>();
@@ -2182,10 +2185,11 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
                 logger.log(e);
             }
             final LinkedList<CrawledPackage> ret = loadFile(file, restoreMap, false, digest);
-            if (ret != null && digest != null && linkcollectorLists.size() > 0 && file.equals(linkcollectorLists.get(0))) {
+            if (ret != null && digest != null) {
                 /*
-                 * Same fingerprint save() builds for this content: if the list is unchanged until the next save, nothing needs to be
-                 * written. Only valid for the newest list: otherwise the skip would keep a missing/renamed file as the current list.
+                 * Same fingerprint save() builds for this content. The lists are tried newest first and the first loadable one wins, so
+                 * this is the content a restart would load again. If it is unchanged until the next save, nothing needs to be written. This
+                 * also holds if a newer list was broken and moved away: the content is still on disk.
                  */
                 lastSavedDigest = digest.digest();
             }
@@ -2489,6 +2493,7 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
             @Override
             protected Void run() throws RuntimeException {
                 final boolean isShuttingDown = ShutdownController.getInstance().isShuttingDown();
+                final boolean isLinkCollectorFile = destFile == null;
                 File file = destFile;
                 if (file == null) {
                     if (linkcollectorLists.size() > 0) {
@@ -2671,8 +2676,8 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
                         logger.log(e);
                     }
                     /*
-                     * The fingerprint must be taken before the extraInfo entry: it contains a timestamp that differs on every save and would
-                     * make every list look changed.
+                     * The fingerprint must be taken before the extraInfo entry: it contains a timestamp that differs on every save and
+                     * would make every list look changed.
                      */
                     final byte[] currentDigest = digest.digest();
                     final ZipEntry linkCollectorEntry = new ZipEntry("extraInfo");
@@ -2680,10 +2685,10 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
                     zos.putNextEntry(linkCollectorEntry);
                     mapper.writeObject(entryOutputStream, lcs);
                     zos.closeEntry();
-                    if (destFile == null && linkcollectorLists.size() > 0 && lastSavedDigest != null && MessageDigest.isEqual(lastSavedDigest, currentDigest)) {
+                    if (isLinkCollectorFile && linkcollectorLists.size() > 0 && MessageDigest.isEqual(lastSavedDigest, currentDigest)) {
                         /*
-                         * Nothing changed since the last save: keep the existing lists untouched. Rotating now would only push an identical copy
-                         * in and drop the oldest real backup.
+                         * Nothing changed since the last save: keep the existing lists untouched. Rotating now would only push an identical
+                         * copy in and drop the oldest real backup.
                          */
                         unchanged.set(true);
                         logger.info("CollectorList unchanged since last save, nothing written: " + linkcollectorLists.get(0));
@@ -2848,9 +2853,9 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
     }
 
     /**
-     * Defines how a link is moved from the linkgrabber to the downloadlist, e.g. by a Packagizer rule or the "add links" action. Every
-     * mode except UNCHANGED implies that the link is confirmed (moved to the downloadlist) - starting a download is only possible once the
-     * link is in the downloadlist.
+     * Defines how a link is moved from the linkgrabber to the downloadlist, e.g. by a Packagizer rule or the "add links" action. Every mode
+     * except UNCHANGED implies that the link is confirmed (moved to the downloadlist) - starting a download is only possible once the link
+     * is in the downloadlist.
      */
     public static enum MoveToDownloadlistMode implements LabelInterface {
         /* Do not touch the link, the global settings apply. Not offered where "unchanged" is expressed differently (e.g. Packagizer). */
@@ -2883,8 +2888,8 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
         };
 
         /**
-         * Sets the auto confirm / auto start / forced auto start flags of the link according to this mode. The flags are set explicitly,
-         * so a mode replaces the flags set by an earlier rule or action.
+         * Sets the auto confirm / auto start / forced auto start flags of the link according to this mode. The flags are set explicitly, so
+         * a mode replaces the flags set by an earlier rule or action.
          */
         public void applyTo(final CrawledLink link) {
             switch (this) {
@@ -2911,11 +2916,10 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
     }
 
     /**
-     * This class describes, how a "move links to downloadlist" action shall behave. </br>
-     * Examples of what it can influence: </br>
-     * - define specific properties that should be set on the items to move e.g. set highest priority </br>
-     * - define what should happen afterwards such as "force download-start of added items" </br>
-     * - define what happens in linkgrabber afterwards such as "clean all remaining items in linkgrabber"
+     * This class describes, how a "move links to downloadlist" action shall behave. </br> Examples of what it can influence: </br> - define
+     * specific properties that should be set on the items to move e.g. set highest priority </br> - define what should happen afterwards
+     * such as "force download-start of added items" </br> - define what happens in linkgrabber afterwards such as
+     * "clean all remaining items in linkgrabber"
      */
     public final static class ConfirmLinksSettings {
         public static enum SwitchToDownloadlistBehavior implements LabelInterface {
@@ -3594,7 +3598,10 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
                 final LinkVariant oldVariant = link.getDefaultPlugin().getActiveVariantByLink(link);
                 link.getDefaultPlugin().setActiveVariantByLink(link, variant);
                 final String newLinkID = link.getLinkID();
-                /* getExistingCrawledLinkByLinkIDOnDupeManagerEnabled returns null while the dupe manager is disabled -> any variant is allowed */
+                /*
+                 * getExistingCrawledLinkByLinkIDOnDupeManagerEnabled returns null while the dupe manager is disabled -> any variant is
+                 * allowed
+                 */
                 final CrawledLink existing = getExistingCrawledLinkByLinkIDOnDupeManagerEnabled(newLinkID);
                 if (existing != null && link != existing.getDownloadLink()) {
                     logger.info("Dupecheck Filtered Variant");
@@ -3632,8 +3639,8 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
     /**
      * Whether the dupe manager is enabled. It controls duplicate <b>avoidance</b> only, not duplicate detection: when enabled, duplicates
      * are kept out of the linkgrabber (the avoidance consumers funnel through
-     * {@link #getExistingCrawledLinkByLinkIDOnDupeManagerEnabled(String)}); when disabled, duplicates are allowed in and merely surfaced via
-     * {@link #isLinkgrabberDupe(CrawledLink)}. <br>
+     * {@link #getExistingCrawledLinkByLinkIDOnDupeManagerEnabled(String)}); when disabled, duplicates are allowed in and merely surfaced
+     * via {@link #isLinkgrabberDupe(CrawledLink)}. <br>
      * The value is read once from the config at construction time and stays fixed for the lifetime of this LinkCollector.
      */
     public boolean isDupeManagerEnabled() {
@@ -3702,7 +3709,10 @@ public class LinkCollector extends PackageController<CrawledPackage, CrawledLink
         return getExistingCrawledLinkByLinkID(linkID);
     }
 
-    /** Returns the first still-registered link sharing the given linkID (or null), pruning GC'd/re-homed entries. Ignores the dupe manager mode. */
+    /**
+     * Returns the first still-registered link sharing the given linkID (or null), pruning GC'd/re-homed entries. Ignores the dupe manager
+     * mode.
+     */
     private CrawledLink getExistingCrawledLinkByLinkID(final String linkID) {
         final Set<CrawledLink> set = getLinkgrabberDupes(linkID);
         if (set == null) {

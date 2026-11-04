@@ -14,6 +14,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.HierarchyEvent;
 import java.awt.event.HierarchyListener;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
@@ -74,6 +76,7 @@ import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.Challenge.CaptchaRequestType;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
 import org.jdownloader.captcha.v2.ChallengeSolver;
+import org.jdownloader.captcha.v2.ChallengeSolver.ChallengeVetoReason;
 import org.jdownloader.captcha.v2.ChallengeSolver.SolverFeature;
 import org.jdownloader.captcha.v2.SolverService;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
@@ -165,6 +168,12 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     private final JCheckBox                 selectAllBox       = new JCheckBox("Select/Deselect all");
     private final List<JCheckBox>           typeCheckBoxes     = new ArrayList<JCheckBox>();
     private final List<CAPTCHA_TYPE>        typeCheckBoxTypes  = new ArrayList<CAPTCHA_TYPE>();
+    /*
+     * The captcha type selection of the user, independent of which types are listed right now (that depends on the selected solvers): The
+     * selected types, and whether all listed types were selected the last time. See rememberTypeSelection().
+     */
+    private final Set<CAPTCHA_TYPE>         selectedTypeMemory = java.util.EnumSet.noneOf(CAPTCHA_TYPE.class);
+    private boolean                         allTypesSelectedMemory = true;
     private final JButton                   multiStartButton;
     private final JButton                   multiCancelButton;
     /* Result table: one row per test. */
@@ -198,6 +207,13 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     /* True while the sort order is changed by the panel itself (not by a click of the user on a column header). */
     private boolean                     internalSortChange = false;
     private volatile TestRun                selectedRun;
+    /* The test data which the form shows since a test was chosen in the result table, see showRunInForm. */
+    private Map<String, Object>             lastFormData;
+    /*
+     * True after a new test was started if all its tests are of the same captcha type, until the first of them is finished: Then the result
+     * of that test is chosen once, which shows its captcha type, values and clicked positions in the form.
+     */
+    private volatile boolean                autoShowFirstResult = false;
     /* The tests of the current/last batch are executed one after another by this thread. */
     private final JSpinner                  parallelSpinner;
     /* True once the user changed the max simultaneous tests himself: The spinner does not follow the solver selection any more. */
@@ -261,7 +277,10 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
 
             @Override
             public Component getListCellRendererComponent(final JList list, final Object value, final int index, final boolean isSelected, final boolean cellHasFocus) {
-                return super.getListCellRendererComponent(list, ((CAPTCHA_TYPE) value).getDisplayName(), index, isSelected, cellHasFocus);
+                final JLabel label = (JLabel) super.getListCellRendererComponent(list, ((CAPTCHA_TYPE) value).getDisplayName(), index, isSelected, cellHasFocus);
+                /* Same icons as in the captcha type selections of the other captcha tables. */
+                label.setIcon(((CAPTCHA_TYPE) value).getIcon());
+                return label;
             }
         });
         siteUrlField = new JTextField();
@@ -397,6 +416,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                 for (final JCheckBox box : typeCheckBoxes) {
                     box.setSelected(selectAllBox.isSelected());
                 }
+                rememberTypeSelection();
                 updateTypesButtonText();
             }
         });
@@ -472,6 +492,36 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                     selectedRun = row < 0 ? null : runModel.getObjectbyRow(row);
                     syncMarkers();
                     refreshDetails();
+                }
+            }
+        });
+        /*
+         * Choosing a test with the mouse or the keyboard shows it in the form (captcha type, test values, image with the clicked positions).
+         * This is deliberately not done in the selection listener above: the table also changes its selection by itself (new rows, sorting),
+         * which must not touch the form.
+         */
+        runTable.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseReleased(final MouseEvent e) {
+                if (e.getButton() == MouseEvent.BUTTON1 && !e.isPopupTrigger()) {
+                    showSelectedRunInForm();
+                }
+            }
+        });
+        runTable.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyReleased(final KeyEvent e) {
+                switch (e.getKeyCode()) {
+                case KeyEvent.VK_UP:
+                case KeyEvent.VK_DOWN:
+                case KeyEvent.VK_PAGE_UP:
+                case KeyEvent.VK_PAGE_DOWN:
+                case KeyEvent.VK_HOME:
+                case KeyEvent.VK_END:
+                    showSelectedRunInForm();
+                    break;
+                default:
+                    break;
                 }
             }
         });
@@ -704,6 +754,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         for (int i = 0; i < typeCheckBoxes.size(); i++) {
             typeCheckBoxes.get(i).setSelected(types.contains(typeCheckBoxTypes.get(i)));
         }
+        rememberTypeSelection();
         updateTypesButtonText();
         for (final CAPTCHA_TYPE type : types) {
             if (type.hasTestChallenges()) {
@@ -918,6 +969,112 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         renderPreview();
     }
 
+    /** The user chose a test in the result table: the form shows that test. */
+    private void showSelectedRunInForm() {
+        if (showRunInForm(selectedRun)) {
+            syncMarkers();
+        }
+    }
+
+    /**
+     * Shows the given test in the form: the captcha type and the test values (including the image) it was started with, so the clicked
+     * positions of its result are marked in the right image. Does nothing if the form already shows this test (all rows of a test share
+     * the values and the captcha type), so that choosing another row of the same test does not discard what the user changed in the form
+     * meanwhile. If the user changed the captcha type, the test is shown again.
+     *
+     * @return true if the form was changed
+     */
+    private boolean showRunInForm(final TestRun run) {
+        if (run == null || (run.data == lastFormData && typeBox.getSelectedItem() == run.type)) {
+            /* Already shown. If the user changed the captcha type meanwhile, the test is shown again. */
+            return false;
+        }
+        lastFormData = run.data;
+        if (typeBox.getSelectedItem() != run.type) {
+            /* Shows the fields of the type and fills them with its defaults, which are replaced by the values of the test below. */
+            typeBox.setSelectedItem(run.type);
+            if (typeBox.getSelectedItem() != run.type) {
+                return true;
+            }
+        }
+        final Map<String, Object> data = run.data;
+        /* Only the values the captcha type uses are part of the data (like in buildFormData). */
+        if (data.containsKey(CaptchaTestChallengeFactory.KEY_SITE_URL)) {
+            siteUrlField.setText(text(data.get(CaptchaTestChallengeFactory.KEY_SITE_URL)));
+        }
+        if (data.containsKey(CaptchaTestChallengeFactory.KEY_SITE_KEY)) {
+            siteKeyField.setText(text(data.get(CaptchaTestChallengeFactory.KEY_SITE_KEY)));
+        }
+        if (data.containsKey(CaptchaTestChallengeFactory.KEY_CHALLENGE_URL)) {
+            challengeUrlField.setText(text(data.get(CaptchaTestChallengeFactory.KEY_CHALLENGE_URL)));
+        }
+        if (data.containsKey(CaptchaTestChallengeFactory.KEY_PROXY)) {
+            proxyField.setText(text(data.get(CaptchaTestChallengeFactory.KEY_PROXY)));
+        }
+        if (data.containsKey(CaptchaTestChallengeFactory.KEY_ACTION)) {
+            actionField.setText(text(data.get(CaptchaTestChallengeFactory.KEY_ACTION)));
+        }
+        if (data.containsKey(CaptchaTestChallengeFactory.KEY_EXPECTED_RESULT)) {
+            expectedResultField.setText(text(data.get(CaptchaTestChallengeFactory.KEY_EXPECTED_RESULT)));
+        }
+        if (data.containsKey(CaptchaTestChallengeFactory.KEY_DESCRIPTION)) {
+            descriptionField.setText(text(data.get(CaptchaTestChallengeFactory.KEY_DESCRIPTION)));
+        }
+        if (data.containsKey(CaptchaTestChallengeFactory.KEY_IMAGE_FILE)) {
+            setImageSource(data.get(CaptchaTestChallengeFactory.KEY_IMAGE_FILE));
+        }
+        if (data.containsKey(CaptchaTestChallengeFactory.KEY_MIN_CLICKS)) {
+            minClicksSpinner.setValue(data.get(CaptchaTestChallengeFactory.KEY_MIN_CLICKS));
+        }
+        if (data.containsKey(CaptchaTestChallengeFactory.KEY_CASE_SENSITIVE)) {
+            final Boolean caseSensitive = (Boolean) data.get(CaptchaTestChallengeFactory.KEY_CASE_SENSITIVE);
+            caseSensitiveBox.setSelectedIndex(caseSensitive == null ? 0 : (caseSensitive.booleanValue() ? 1 : 2));
+        }
+        if (data.containsKey(CaptchaTestChallengeFactory.KEY_MIN_SCORE)) {
+            final Double minScore = (Double) data.get(CaptchaTestChallengeFactory.KEY_MIN_SCORE);
+            minScoreCheckBox.setSelected(minScore != null);
+            minScoreSpinner.setEnabled(minScore != null);
+            if (minScore != null) {
+                minScoreSpinner.setValue(minScore);
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Selects the result of the given test in the result table and shows it in the form (see {@link #showRunInForm(TestRun)}). If the test
+     * has several rows, the one with clicked positions (the one of the solver which answered) is chosen.
+     */
+    private void showRunResult(final TestRun run) {
+        TestRun target = run;
+        for (final TestRun row : run.rows) {
+            if (!row.markers.isEmpty()) {
+                target = row;
+                break;
+            }
+        }
+        final int index = runModel.getRowforObject(target);
+        if (index < 0) {
+            return;
+        }
+        runTable.setRowSelectionInterval(index, index);
+        /* The listener of the table does this as well if the selection changed, but not if the row was already selected. */
+        selectedRun = target;
+        showRunInForm(target);
+        syncMarkers();
+        refreshDetails();
+    }
+
+    /** True if all given tests are of the same captcha type. */
+    private static boolean isSingleType(final List<TestRun> runs) {
+        for (final TestRun run : runs) {
+            if (run.type != runs.get(0).type) {
+                return false;
+            }
+        }
+        return !runs.isEmpty();
+    }
+
     /** Lets the user pick an own captcha image. The pre-filled expected result belongs to the default image, so it is cleared. */
     private void chooseImage() {
         final File currentFile = getImageAsFile();
@@ -1068,13 +1225,13 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
      * challenges.
      *
      * @param keepSelection
-     *            true: types which were deselected stay deselected (new types are selected), false: all types are selected
+     *            true: the selection of the user stays as it is, even if it is empty because the types which he selected are not
+     *            supported by the selected solvers. Only if all listed types were selected, all types are selected again (also new
+     *            ones). false: all types are selected
      */
     private void rebuildTypeList(final boolean keepSelection) {
-        final Map<CAPTCHA_TYPE, Boolean> previous = new java.util.EnumMap<CAPTCHA_TYPE, Boolean>(CAPTCHA_TYPE.class);
-        for (int i = 0; i < typeCheckBoxes.size(); i++) {
-            previous.put(typeCheckBoxTypes.get(i), Boolean.valueOf(typeCheckBoxes.get(i).isSelected()));
-        }
+        /* Take over the current state before the check boxes are replaced. */
+        rememberTypeSelection();
         typesPopup.removeAll();
         typeCheckBoxes.clear();
         typeCheckBoxTypes.clear();
@@ -1092,8 +1249,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
             for (final CAPTCHA_TYPE type : CAPTCHA_TYPE.values()) {
                 if (type.hasTestChallenges() && supported.contains(type)) {
                     /* The check box itself has no text: the captcha type icon and name are a separate label (click toggles the check box). */
-                    final Boolean wasSelected = previous.get(type);
-                    final JCheckBox box = new JCheckBox("", !keepSelection || wasSelected == null || wasSelected.booleanValue());
+                    final JCheckBox box = new JCheckBox("", !keepSelection || allTypesSelectedMemory || selectedTypeMemory.contains(type));
                     final JLabel typeLabel = new JLabel(type.getDisplayName(), type.getIcon(), SwingConstants.LEADING);
                     typeLabel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
                     typeLabel.addMouseListener(new MouseAdapter() {
@@ -1108,6 +1264,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                     box.addActionListener(new ActionListener() {
                         @Override
                         public void actionPerformed(final ActionEvent e) {
+                            rememberTypeSelection();
                             updateTypesButtonText();
                         }
                     });
@@ -1117,7 +1274,29 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                 }
             }
         }
+        rememberTypeSelection();
         updateTypesButtonText();
+    }
+
+    /**
+     * Remembers the selection of the captcha type check boxes: The types which are selected, and whether all listed types are selected.
+     * Types which are not listed (no selected solver supports them) keep what was remembered for them, so the selection of the user does
+     * not change when he (de)selects solvers. Does nothing while no type is listed.
+     */
+    private void rememberTypeSelection() {
+        if (typeCheckBoxes.isEmpty()) {
+            return;
+        }
+        boolean all = true;
+        for (int i = 0; i < typeCheckBoxes.size(); i++) {
+            if (typeCheckBoxes.get(i).isSelected()) {
+                selectedTypeMemory.add(typeCheckBoxTypes.get(i));
+            } else {
+                selectedTypeMemory.remove(typeCheckBoxTypes.get(i));
+                all = false;
+            }
+        }
+        allTypesSelectedMemory = all;
     }
 
     private void updateTypesButtonText() {
@@ -1205,6 +1384,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         updateRunScrollHeight();
         runScroll.setVisible(true);
         liveSortBox.setVisible(true);
+        autoShowFirstResult = replaceTable && isSingleType(runs);
         batchCancelled = false;
         batchRunning = true;
         batchRuns = runs;
@@ -1366,9 +1546,16 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         run.challenge = newChallenge;
         run.statusText = "Waiting for a solver...";
         try {
-            final List<ChallengeSolver<Object>> solvers = ChallengeResponseController.getInstance().getTestSolvers(newChallenge, run.service);
+            final Set<ChallengeVetoReason> vetoReasons = new java.util.HashSet<ChallengeVetoReason>();
+            final Map<String, ChallengeVetoReason> reasonsByServiceID = new java.util.HashMap<String, ChallengeVetoReason>();
+            final List<ChallengeSolver<Object>> solvers = ChallengeResponseController.getInstance().getTestSolvers(newChallenge, run.service, vetoReasons, reasonsByServiceID);
+            if (solvers.isEmpty()) {
+                /* The solver column tells why: the test cannot be solved by anyone. */
+                run.noSolverReason = getNoSolverReason(run.service, vetoReasons, reasonsByServiceID);
+                runChanged(run, false);
+            }
             createSolverRows(run, solvers);
-            final SolverJob<Object> job = ChallengeResponseController.getInstance().handleTest(newChallenge, solvers);
+            final SolverJob<Object> job = ChallengeResponseController.getInstance().handleTest(newChallenge, solvers, vetoReasons);
             run.finishedJob = job;
             if (batchCancelled) {
                 finishTest(run, RunState.FAILED, "Cancelled", null);
@@ -1383,7 +1570,9 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
             finishTest(run, RunState.FAILED, batchCancelled ? "Cancelled" : "Aborted", null);
         } catch (final SkipException e) {
             syncLiveJobBeforeFinish(run);
-            finishTest(run, RunState.FAILED, batchCancelled ? "Cancelled" : (run.aborted ? "Aborted" : "Skipped: " + e.getSkipRequest()), null);
+            /* The reason tells why (e.g. the silent mode), not only what (e.g. all captchas are blocked). */
+            final String skipText = "Skipped: " + e.getSkipRequest() + (e.getReason() != null ? " (" + e.getReason() + ")" : "");
+            finishTest(run, RunState.FAILED, batchCancelled ? "Cancelled" : (run.aborted ? "Aborted" : skipText), null);
         } catch (final Throwable e) {
             LogController.CL().log(e);
             finishTest(run, RunState.FAILED, batchCancelled ? "Cancelled" : "Failed: " + e.getClass().getSimpleName() + ": " + e.getMessage(), null);
@@ -1392,6 +1581,35 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
             run.challenge = null;
             run.liveJob = null;
         }
+    }
+
+    /**
+     * Why no solver is available for a test, as precise as possible: The reason of the chosen solver service, or (all solvers) the reasons
+     * of all solvers, e.g. "No solver available because: SILENT_MODE".
+     */
+    private static String getNoSolverReason(final SolverService service, final Set<ChallengeVetoReason> vetoReasons, final Map<String, ChallengeVetoReason> reasonsByServiceID) {
+        final String prefix = "No solver available because: ";
+        if (service != null) {
+            final ChallengeVetoReason reason = reasonsByServiceID.get(service.getID());
+            if (reason != null) {
+                return prefix + reason.name();
+            }
+            /* No solver and no veto: An external solver without a usable account is never asked. */
+            return prefix + (service instanceof PluginForCaptchaSolverSolverService ? "NO_USABLE_ACCOUNT" : "NOT_USABLE_FOR_THIS_CAPTCHA");
+        }
+        if (vetoReasons.isEmpty()) {
+            return prefix + "NO_SOLVER_FOR_THIS_CAPTCHA";
+        }
+        final StringBuilder sb = new StringBuilder(prefix);
+        boolean first = true;
+        for (final ChallengeVetoReason reason : vetoReasons) {
+            if (!first) {
+                sb.append(", ");
+            }
+            sb.append(reason.name());
+            first = false;
+        }
+        return sb.toString();
     }
 
     /** A job that ended by itself (e.g. timeout) without an exception of the user: the solver rows get the results of their solvers. */
@@ -1514,6 +1732,12 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                     } else {
                         setRowFinal(row, RunState.FAILED, job.getStatusDetail());
                     }
+                } else if (!job.getUnfinishedSolvers().contains(solver)) {
+                    /*
+                     * The solver is done, but without an answer and without a recorded result (e.g. it gave up): It must not look like it
+                     * is still working until the whole job is done (the other solvers may take a long time).
+                     */
+                    setRowFinal(row, RunState.NOT_USED, "Ended without an answer");
                 } else if (job.isSolverSolving(solver)) {
                     row.state = RunState.RUNNING;
                     row.statusText = "Solving (timeout: " + formatTimeout(row.maxTimeoutMillis) + ")";
@@ -1610,6 +1834,14 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
             state = RunState.NOT_USED;
             text = "Not started";
             break;
+        case ABORTED_USER_CHOSE_OTHER_SOLVER:
+            state = RunState.NOT_USED;
+            text = "User chose another solver";
+            break;
+        case SILENT_MODE:
+            state = RunState.NOT_USED;
+            text = "Silent mode";
+            break;
         case TIMED_OUT:
             text = "Timeout";
             break;
@@ -1642,6 +1874,12 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
                 if (finished && liveSortBox.isSelected()) {
                     /* Passed first, then failed, running, pending. */
                     runModel.refreshSort();
+                }
+                if (finished && autoShowFirstResult && !batchCancelled && !run.aborted) {
+                    /* The first finished test of a single or same-type batch: choose its result once. */
+                    autoShowFirstResult = false;
+                    showRunResult(run);
+                    return;
                 }
                 final TestRun selected = selectedRun;
                 if (selected != null && selected.lead == run) {
@@ -2093,6 +2331,8 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         /* The job while the test is handled. */
         private volatile SolverJob<?>             liveJob;
         private final List<Point>                 markers = new CopyOnWriteArrayList<Point>();
+        /* Why there is no solver for this test (shown in the solver column), e.g. "No solver available because: SILENT_MODE"; null if there is one. */
+        private volatile String                   noSolverReason;
 
         private TestRun(final CAPTCHA_TYPE type, final CaptchaRequestType source, final Map<String, Object> data, final SolverService service) {
             this.type = type;
@@ -2129,6 +2369,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         }
 
         private void resetRow() {
+            noSolverReason = null;
             state = RunState.PENDING;
             startTime = 0;
             endTime = 0;
@@ -2276,10 +2517,25 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
             /* The solver of the row; as long as it is not known the chosen solver (empty if there is none). */
             addColumn(new ExtTextColumn<TestRun>("Solver") {
                 private static final long serialVersionUID = 1L;
+                /* The renderer is reused for all rows, so the color has to be set (or reset) for every row. */
+                private final Color       defaultForeground = rendererField.getForeground();
 
                 @Override
                 public String getStringValue(final TestRun value) {
-                    return getSolverName(value);
+                    /* Without a solver the reason is shown (in red) instead of the name. */
+                    final String noSolverReason = value.noSolverReason;
+                    return noSolverReason != null ? noSolverReason : getSolverName(value);
+                }
+
+                @Override
+                public void configureRendererComponent(final TestRun value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
+                    super.configureRendererComponent(value, isSelected, hasFocus, row, column);
+                    rendererField.setForeground(value.noSolverReason != null ? Color.RED : defaultForeground);
+                }
+
+                @Override
+                protected String getTooltipText(final TestRun value) {
+                    return value.noSolverReason;
                 }
 
                 @Override

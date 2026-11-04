@@ -2,12 +2,14 @@ package jd.gui.swing.jdgui.components.toolbar.actions;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
+import java.util.List;
 
 import javax.swing.AbstractButton;
 import javax.swing.Action;
 import javax.swing.Icon;
 
 import jd.controlling.TaskQueue;
+import jd.controlling.downloadcontroller.DownloadController;
 import jd.controlling.downloadcontroller.DownloadLinkCandidate;
 import jd.controlling.downloadcontroller.DownloadLinkCandidateResult;
 import jd.controlling.downloadcontroller.DownloadSession;
@@ -16,15 +18,25 @@ import jd.controlling.downloadcontroller.DownloadWatchDogJob;
 import jd.controlling.downloadcontroller.DownloadWatchDogProperty;
 import jd.controlling.downloadcontroller.SingleDownloadController;
 import jd.controlling.downloadcontroller.event.DownloadWatchdogListener;
+import jd.controlling.linkcollector.LinkCollectingJob;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcollector.LinkCollectorCrawler;
+import jd.controlling.linkcollector.LinkCollectorEvent;
+import jd.controlling.linkcollector.LinkCollectorListener;
 import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings;
 import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings.SwitchToDownloadlistBehavior;
 import jd.controlling.linkcollector.LinkCollector.MoveLinksMode;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.packagecontroller.AbstractNode;
 import jd.gui.swing.jdgui.JDGui;
 import jd.gui.swing.jdgui.JDGui.Panels;
 import jd.gui.swing.jdgui.MainTabbedPane;
 import jd.gui.swing.jdgui.interfaces.View;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLinkProperty;
+import jd.plugins.FilePackage;
+import jd.plugins.FilePackageProperty;
 
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
@@ -34,6 +46,7 @@ import org.appwork.utils.event.queue.QueueAction;
 import org.appwork.utils.swing.EDTRunner;
 import org.jdownloader.controlling.contextmenu.ActionContext;
 import org.jdownloader.controlling.contextmenu.Customizer;
+import org.jdownloader.controlling.download.DownloadControllerListener;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.event.GUIEventSender;
 import org.jdownloader.gui.event.GUIListener;
@@ -60,10 +73,131 @@ public class StartDownloadsAction extends AbstractToolBarAction implements Downl
         DownloadWatchDog.getInstance().notifyCurrentState(this);
         CFG_GUI.START_BUTTON_ACTION_IN_LINKGRABBER_CONTEXT.getEventSender().addListener(this, true);
         GUIEventSender.getInstance().addListener(this, true);
+        /* Needed to update the enabled state when the downloadlist/linkgrabber becomes empty or gets filled */
+        DownloadController.getInstance().getEventSender().addListener(downloadListListener, true);
+        LinkCollector.getInstance().getEventsender().addListener(linkgrabberListener, true);
         onGuiMainTabSwitch(null, MainTabbedPane.getInstance().getSelectedView());
         setAccelerator(KeyEvent.VK_S);
         updateEnableState();
     }
+
+    /**
+     * Re-evaluates the enabled state when packages are added to or removed from the downloadlist, because an empty downloadlist disables
+     * the button. All other events are irrelevant here.<br>
+     * Held in a field because the listeners are registered weakly and would otherwise be garbage collected.
+     */
+    private final DownloadControllerListener downloadListListener = new DownloadControllerListener() {
+        @Override
+        public void onDownloadControllerAddedPackage(FilePackage pkg) {
+            updateEnableState();
+        }
+
+        @Override
+        public void onDownloadControllerStructureRefresh(FilePackage pkg) {
+        }
+
+        @Override
+        public void onDownloadControllerStructureRefresh() {
+            /* The initial load of the saved downloadlist only fires a structure refresh, no "package added" events */
+            updateEnableState();
+        }
+
+        @Override
+        public void onDownloadControllerStructureRefresh(AbstractNode node, Object param) {
+        }
+
+        @Override
+        public void onDownloadControllerRemovedPackage(FilePackage pkg) {
+            updateEnableState();
+        }
+
+        @Override
+        public void onDownloadControllerRemovedLinklist(List<DownloadLink> list) {
+            updateEnableState();
+        }
+
+        @Override
+        public void onDownloadControllerUpdatedData(DownloadLink downloadlink, DownloadLinkProperty property) {
+        }
+
+        @Override
+        public void onDownloadControllerUpdatedData(FilePackage pkg, FilePackageProperty property) {
+        }
+
+        @Override
+        public void onDownloadControllerUpdatedData(DownloadLink downloadlink) {
+        }
+
+        @Override
+        public void onDownloadControllerUpdatedData(FilePackage pkg) {
+        }
+    };
+    /**
+     * Re-evaluates the enabled state when content is added to or removed from the linkgrabber, because in the linkgrabber context the
+     * button is only disabled if both the linkgrabber and the downloadlist are empty. All other events are irrelevant here.<br>
+     * Held in a field because the listeners are registered weakly and would otherwise be garbage collected.
+     */
+    private final LinkCollectorListener     linkgrabberListener   = new LinkCollectorListener() {
+        @Override
+        public void onLinkCollectorAbort(LinkCollectorEvent event) {
+        }
+
+        @Override
+        public void onLinkCollectorFilteredLinksAvailable(LinkCollectorEvent event) {
+        }
+
+        @Override
+        public void onLinkCollectorFilteredLinksEmpty(LinkCollectorEvent event) {
+        }
+
+        @Override
+        public void onLinkCollectorDataRefresh(LinkCollectorEvent event) {
+        }
+
+        @Override
+        public void onLinkCollectorStructureRefresh(LinkCollectorEvent event) {
+            /* Covers structure changes that are not reported as content added/removed, e.g. when the linkgrabber list gets loaded */
+            updateEnableState();
+        }
+
+        @Override
+        public void onLinkCollectorContentRemoved(LinkCollectorEvent event) {
+            updateEnableState();
+        }
+
+        @Override
+        public void onLinkCollectorContentAdded(LinkCollectorEvent event) {
+            updateEnableState();
+        }
+
+        @Override
+        public void onLinkCollectorLinkAdded(LinkCollectorEvent event, CrawledLink link) {
+        }
+
+        @Override
+        public void onLinkCollectorDupeAdded(LinkCollectorEvent event, CrawledLink link) {
+        }
+
+        @Override
+        public void onLinkCrawlerAdded(LinkCollectorCrawler crawler) {
+        }
+
+        @Override
+        public void onLinkCrawlerStarted(LinkCollectorCrawler crawler) {
+        }
+
+        @Override
+        public void onLinkCrawlerStopped(LinkCollectorCrawler crawler) {
+        }
+
+        @Override
+        public void onLinkCrawlerFinished() {
+        }
+
+        @Override
+        public void onLinkCrawlerNewJob(LinkCollectingJob job) {
+        }
+    };
 
     @Override
     public void initContextDefaults() {
@@ -173,6 +307,36 @@ public class StartDownloadsAction extends AbstractToolBarAction implements Downl
         return null;
     }
 
+    /**
+     * Returns whether the button has anything to do in the given view. The list contents are passed in so that the (lock-guarded) size
+     * lookups can be done outside the EDT.<br>
+     * The button has a different function depending on the view:
+     * <ul>
+     * <li>Downloadlist (and every other view): it starts the downloads, so it is only useful if the downloadlist is not empty.</li>
+     * <li>Linkgrabber: its function is configurable ({@link StartButtonAction}). It is never useful if that function is disabled.
+     * Otherwise it can either start the downloads or first add the linkgrabber links to the downloadlist and start them, so it is useful if
+     * the downloadlist or the linkgrabber has content.</li>
+     * </ul>
+     * Note: A list that only contains disabled links/packages still counts as having content.
+     */
+    private boolean isStartPossible(final View view, final boolean downloadListHasContent, final boolean linkgrabberHasContent) {
+        if (!(view instanceof LinkGrabberView)) {
+            /* Downloadlist or any other view: the button can only start the existing downloads */
+            return downloadListHasContent;
+        }
+        switch (CFG_GUI.CFG.getStartButtonActionInLinkgrabberContext()) {
+        case DISABLED:
+            /* The user disabled the start button function in the linkgrabber, regardless of any content */
+            return false;
+        default:
+            /*
+             * The button can still add the linkgrabber links to the downloadlist and start them, so linkgrabber content is enough even if
+             * the downloadlist is empty
+             */
+            return downloadListHasContent || linkgrabberHasContent;
+        }
+    }
+
     private void updateEnableState() {
         DownloadWatchDog.getInstance().enqueueJob(new DownloadWatchDogJob() {
             @Override
@@ -186,6 +350,9 @@ public class StartDownloadsAction extends AbstractToolBarAction implements Downl
 
             @Override
             public void execute(final DownloadSession session) {
+                /* Size lookups take read locks, so they are done here and not in the EDT */
+                final boolean downloadListHasContent = DownloadController.getInstance().size() > 0;
+                final boolean linkgrabberHasContent = LinkCollector.getInstance().size() > 0;
                 new EDTRunner() {
                     @Override
                     protected void runInEDT() {
@@ -214,11 +381,8 @@ public class StartDownloadsAction extends AbstractToolBarAction implements Downl
                         } else {
                             setTooltipText(_JDT.T.StartDownloadsAction_createTooltip_());
                         }
-                        final View view = JDGui.getInstance().getMainTabbedPane().getSelectedView();
-                        if (enable && view instanceof LinkGrabberView) {
-                            if (CFG_GUI.CFG.getStartButtonActionInLinkgrabberContext() == StartButtonAction.DISABLED) {
-                                enable = false;
-                            }
+                        if (enable) {
+                            enable = isStartPossible(JDGui.getInstance().getMainTabbedPane().getSelectedView(), downloadListHasContent, linkgrabberHasContent);
                         }
                         setEnabled(enable);
                         if (isHideIfDownloadsAreRunning()) {

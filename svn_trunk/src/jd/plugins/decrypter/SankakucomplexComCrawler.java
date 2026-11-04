@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-@DecrypterPlugin(revision = "$Revision: 52980 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53883 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -210,16 +210,6 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         br.getPage(startPageURL);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (StringUtils.containsIgnoreCase(br.getURL(), "/premium")) {
-            if (StringUtils.containsIgnoreCase(br.getURL(), "state=8")) {
-                /*
-                 * Website error [DE]: Ihre Suchanfrage enthält zu viele Tags. Wenn Sie mehr verwenden möchten, erstellen Sie bitte ein
-                 * Konto.
-                 */
-                throw new AccountRequiredException(ERROR_MSG_ACCOUNT_REQUIRED_TOO_MANY_SEARCH_TAGS);
-            }
-            /* Account required (most times due to adult content so free account is enough). */
-            throw new AccountRequiredException();
         }
         if (account != null && !hosterplugin.isLoggedin(br)) {
             hosterplugin.login(account, "https://chan.sankakucomplex.com/" + langPart + "posts?tags=" + tagsUrlEncoded, true);
@@ -249,6 +239,25 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         final HashSet<String> dupes = new HashSet<String>();
         int position = 1;
         pagination: do {
+            if (StringUtils.containsIgnoreCase(br.getURL(), "/premium")) {
+                if (StringUtils.containsIgnoreCase(br.getURL(), "state=1")) {
+                    /*
+                     * 2026-07-09: Typically page 100 -> URL to page 101 exists but redirects to:
+                     * https://chan.sankakucomplex.com/de/posts/premium?state=1
+                     */
+                    throw new AccountRequiredException("You have reached the limit on the amount of pages you can view for R18+ tags. To remove these limits entirely, sign up for Plus today!");
+                } else if (StringUtils.containsIgnoreCase(br.getURL(), "state=8")) {
+                    /*
+                     * Website error [DE]: Ihre Suchanfrage enthält zu viele Tags. Wenn Sie mehr verwenden möchten, erstellen Sie bitte ein
+                     * Konto.
+                     */
+                    throw new AccountRequiredException(ERROR_MSG_ACCOUNT_REQUIRED_TOO_MANY_SEARCH_TAGS);
+                }
+                throw new AccountRequiredException("Account required - Most times due to adult content so a free account might be enough");
+            } else if (br.containsHTML(">\\s*You have reached the limit on the amount of pages you can view for R18")) {
+                /* 2026-11-04: same as "state=1" in URL but just a fallback via html-code */
+                throw new AccountRequiredException("You have reached the limit on the amount of pages you can view for R18+ tags. To remove these limits entirely, sign up for Plus today!");
+            }
             String html = br.getRequest().getHtmlCode();
             /**
              * Remove unwanted items / ads from html source. Typically this is only relevant for the html code of the first page. </br>
@@ -316,13 +325,6 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             } else if (page == maxPageUserLimit) {
                 logger.info("Stopping because: Reached user defined max page limit of " + maxPageUserLimit);
                 this.displayBubbleNotification("Tags: " + tags, "Stopping early because: Reached max user defined page: " + maxPageUserLimit + "\r\nYou can adjust this limit in the plugin settings.");
-                break pagination;
-            } else if (StringUtils.containsIgnoreCase(br.getURL(), "/premium?state=1")) {
-                /*
-                 * 2026-07-09: Typically page 100 -> URL to page 101 exists but redirects to:
-                 * https://chan.sankakucomplex.com/de/posts/premium?state=1
-                 */
-                logger.info("Stopping because: Reached max number of pages accessible for free users");
                 break pagination;
             } else if (nextPageURL == null) {
                 logger.info("Stopping because: Reached end(?)");

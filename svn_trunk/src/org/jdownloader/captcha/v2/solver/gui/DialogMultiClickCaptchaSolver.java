@@ -72,11 +72,24 @@ public class DialogMultiClickCaptchaSolver extends AbstractDialogSolver<MultiCli
                 solverJob.getLogger().info("Waiting for JAC (Click/Mouse)");
                 solverJob.waitFor(9, JACSolver.getInstance());
                 solverJob.getLogger().info("JAC (Click/Mouse) is done. Response so far: " + solverJob.getResponse());
-                checkSilentMode(solverJob);
+                if (checkSilentMode(solverJob)) {
+                    /* Silent mode: Do not ask the user, the other solvers continue. */
+                    return;
+                }
                 MultiClickCaptchaChallenge captchaChallenge = (MultiClickCaptchaChallenge) solverJob.getChallenge();
                 checkInterruption();
                 handler = new MultiClickCaptchaDialogHandler(captchaChallenge);
                 handler.run();
+                if (handler.isSilentModeTimeout()) {
+                    /* The dialog was never shown because of the silent mode: Only this solver ends, the other solvers continue. */
+                    endBecauseOfSilentMode(solverJob, "The dialog was not shown because of the silent mode");
+                    return;
+                }
+                if (handler.getExternalSolverToUse() != null) {
+                    /* The user chose an external solver in the dialog: No answer from this solver, the chosen solver takes over. */
+                    endBecauseUserChoseExternalSolver(solverJob, handler.getExternalSolverToUse());
+                    return;
+                }
                 final MultiClickedPoint result = handler.getResult();
                 if (result != null) {
                     solverJob.addAnswer(new AbstractResponse<MultiClickedPoint>(captchaChallenge, this, result));

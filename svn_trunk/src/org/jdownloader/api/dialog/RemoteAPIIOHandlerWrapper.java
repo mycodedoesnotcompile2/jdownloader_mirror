@@ -29,6 +29,7 @@ import org.appwork.utils.swing.dialog.DialogClosedException;
 import org.appwork.utils.swing.dialog.ExceptionDialog;
 import org.appwork.utils.swing.dialog.MessageDialogImpl;
 import org.jdownloader.logging.LogController;
+import org.jdownloader.settings.SilentModeController;
 import org.jdownloader.settings.SilentModeSettings.DialogDuringSilentModeAction;
 import org.jdownloader.settings.staticreferences.CFG_SILENTMODE;
 
@@ -76,171 +77,152 @@ public class RemoteAPIIOHandlerWrapper implements UserIOHandlerInterface {
         show(MessageDialogInterface.class, new MessageDialogImpl(0, message));
     }
 
+    /** True if the "do not show again" flag of the dialog is set, so the dialog must not be shown. */
+    private boolean isDontShowAgain(final AbstractDialog<?> dialog) {
+        try {
+            return dialog.evaluateDontShowAgainFlag();
+        } catch (Exception e) {
+            // Dialogs are not initialized.... nullpointers are very likly
+            // These nullpointers should be fixed
+            // in this case, we should continue normal
+            logger.log(e);
+            return false;
+        }
+    }
+
+    /**
+     * Blocks the calling thread while the silent mode is active: The dialog is enqueued for the remote side (MyJDownloader), but must not
+     * appear locally until the silent mode ends, the dialog was answered remotely or its countdown/timeout is over.
+     *
+     * @param handle
+     *            the handle of the enqueued dialog, may be null (then only the end of the silent mode or the timeout ends the waiting)
+     * @return true if the countdown/timeout was reached
+     */
+    private boolean waitWhileSilentMode(final AbstractDialog<?> dialog, final ApiHandle handle) throws InterruptedException {
+        long countdown = -1;
+        if (dialog.isCountdownFlagEnabled()) {
+            countdown = System.currentTimeMillis() + dialog.getCountdown();
+        }
+        if (countdown < 0 && CFG_SILENTMODE.ON_DIALOG_DURING_SILENT_MODE_ACTION.getValue() == DialogDuringSilentModeAction.WAIT_IN_BACKGROUND_UNTIL_WINDOW_GETS_FOCUS_OR_TIMEOUT) {
+            countdown = System.currentTimeMillis() + CFG_SILENTMODE.ON_DIALOG_DURING_SILENT_MODE_ACTION_TIMEOUT.getValue();
+        }
+        if (!org.appwork.utils.Application.isHeadless()) {
+            JDGui.getInstance().flashTaskbar();
+        }
+        while ((handle == null || !handle.isDisposed()) && SilentModeController.getInstance().isActive()) {
+            if (countdown <= 0) {
+                Thread.sleep(250);
+                continue;
+            }
+            Thread.sleep(Math.min(Math.max(1, countdown - System.currentTimeMillis()), 250));
+            if (System.currentTimeMillis() > countdown) {
+                dialog.onTimeout();
+                // clear interrupt
+                Thread.interrupted();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @SuppressWarnings("unchecked")
     public <T extends UserIODefinition> T showModeless(Class<T> class1, T impl) {
-        // synchronized (this) {
-
-        if (impl instanceof AbstractDialog) {
-            final AbstractDialog dialog = (AbstractDialog) impl;
-            ApiHandle handle = null;
-            try {
-                dialog.forceDummyInit();
-                try {
-                    if (dialog.evaluateDontShowAgainFlag()) {
-
-                        return impl;
-                        //
-                    }
-
-                } catch (Exception e) {
-                    // Dialogs are not initialized.... nullpointers are very likly
-                    // These nullpointers should be fixed
-                    // in this case, we should continue normal
-                    logger.log(e);
-                }
-
-                boolean silentModeActive = org.appwork.utils.Application.isHeadless() ? true : JDGui.getInstance().isSilentModeActive();
-
-                if (silentModeActive && !org.appwork.utils.Application.isHeadless()) {
-
-                    if (CFG_SILENTMODE.ON_DIALOG_DURING_SILENT_MODE_ACTION.getValue() == DialogDuringSilentModeAction.CANCEL_DIALOG) {
-                        // Cancel dialog
-                        throw new DialogClosedException(Dialog.RETURN_CLOSED);
-                    }
-                }
-                handle = remoteHandler.enqueue(class1, impl);
-                //
-                // if (!Application.isJared(RemoteAPIIOHandlerWrapper.class)) {
-                // ((AbstractDialog<?>) impl).setTitle(((AbstractDialog<?>) impl).getTitle() + " DialogID: " + handle.getId());
-                // }
-
-                if (silentModeActive) {
-
-                    // if this is the edt, we should not block it.. NEVER
-                    if (!SwingUtilities.isEventDispatchThread()) {
-                        // block dialog calls... the shall appear as soon as isSilentModeActive is false.
-                        long countdown = -1;
-
-                        if (dialog.isCountdownFlagEnabled()) {
-                            long countdownDif = dialog.getCountdown();
-                            countdown = System.currentTimeMillis() + countdownDif;
-                        }
-                        if (countdown < 0 && CFG_SILENTMODE.ON_DIALOG_DURING_SILENT_MODE_ACTION.getValue() == DialogDuringSilentModeAction.WAIT_IN_BACKGROUND_UNTIL_WINDOW_GETS_FOCUS_OR_TIMEOUT) {
-                            countdown = System.currentTimeMillis() + CFG_SILENTMODE.ON_DIALOG_DURING_SILENT_MODE_ACTION_TIMEOUT.getValue();
-
-                        }
-                        if (!org.appwork.utils.Application.isHeadless()) {
-                            JDGui.getInstance().flashTaskbar();
-                        }
-                        while (!handle.isDisposed() && (org.appwork.utils.Application.isHeadless() || JDGui.getInstance().isSilentModeActive())) {
-                            if (countdown > 0) {
-
-                                Thread.sleep(Math.min(Math.max(1, countdown - System.currentTimeMillis()), 250));
-                                if (System.currentTimeMillis() > countdown) {
-                                    dialog.onTimeout();
-                                    // clear interrupt
-                                    Thread.interrupted();
-
-                                    return impl;
-
-                                }
-                            } else {
-                                Thread.sleep(250);
-                            }
-                        }
-                    }
-                }
-                if (handle != null && handle.isDisposed()) {
-                    return (T) (handle.getAnswer() != null ? handle.getAnswer() : impl);
-                }
-                dialog.resetDummyInit();
-
-                new EDTRunner() {
-
-                    @Override
-                    protected void runInEDT() {
-                        dialog.displayDialog();
-
-                        dialog.getDialog().addWindowListener(new WindowListener() {
-
-                            @Override
-                            public void windowOpened(WindowEvent e) {
-                            }
-
-                            @Override
-                            public void windowIconified(WindowEvent e) {
-                            }
-
-                            @Override
-                            public void windowDeiconified(WindowEvent e) {
-                            }
-
-                            @Override
-                            public void windowDeactivated(WindowEvent e) {
-                            }
-
-                            @Override
-                            public void windowClosing(WindowEvent e) {
-                                synchronized (dialog) {
-
-                                    dialog.notifyAll();
-                                }
-
-                            }
-
-                            @Override
-                            public void windowClosed(WindowEvent e) {
-                                synchronized (dialog) {
-
-                                    dialog.notifyAll();
-                                }
-
-                            }
-
-                            @Override
-                            public void windowActivated(WindowEvent e) {
-                            }
-                        });
-                    }
-                }.waitForEDT();
-
-                while (dialog.getDialog().isDisplayable()) {
-                    synchronized (dialog) {
-                        dialog.wait(10000);
-                    }
-                }
-
-            } catch (InterruptedException e) {
-                dialog.setInterrupted();
-                // throw new DialogClosedException(Dialog.RETURN_INTERRUPT, e);
-                // throw new DialogClosedException(Dialog.RETURN_INTERRUPT);
-            } catch (DialogClosedException e) {
-                dialog.fillReturnMask(e);
-            } catch (Exception e) {
-                logger.log(e);
-
-            } finally {
-                try {
-                    dialog.dispose();
-                } catch (Exception e) {
-
-                }
-                try {
-                    if (handle != null) {
-                        handle.dispose();
-                    }
-                } catch (Exception e) {
-
-                }
-            }
-
-            if (handle == null) {
-                return impl;
-            }
-            return (T) (handle.getAnswer() != null ? handle.getAnswer() : impl);
-        } else {
+        if (!(impl instanceof AbstractDialog)) {
             throw new WTFException("Dialog Type not supported");
         }
+        final AbstractDialog dialog = (AbstractDialog) impl;
+        ApiHandle handle = null;
+        try {
+            dialog.forceDummyInit();
+            if (isDontShowAgain(dialog)) {
+                return impl;
+            }
+            /* Headless mode counts as silent mode: nobody sits in front of the computer, the dialog is answered remotely. */
+            final boolean silentModeActive = SilentModeController.getInstance().isActive();
+            if (silentModeActive && !org.appwork.utils.Application.isHeadless() && CFG_SILENTMODE.ON_DIALOG_DURING_SILENT_MODE_ACTION.getValue() == DialogDuringSilentModeAction.CANCEL_DIALOG) {
+                // Cancel dialog
+                throw new DialogClosedException(Dialog.RETURN_CLOSED);
+            }
+            handle = remoteHandler.enqueue(class1, impl);
+            // if this is the edt, we should not block it.. NEVER
+            if (silentModeActive && !SwingUtilities.isEventDispatchThread() && waitWhileSilentMode(dialog, handle)) {
+                return impl;
+            }
+            /* The handle can be null, e.g. if the remote side cannot take the dialog: Then it is shown here. */
+            if (handle != null && handle.isDisposed()) {
+                return (T) (handle.getAnswer() != null ? handle.getAnswer() : impl);
+            }
+            dialog.resetDummyInit();
+            new EDTRunner() {
+                @Override
+                protected void runInEDT() {
+                    dialog.displayDialog();
+                    dialog.getDialog().addWindowListener(new WindowListener() {
+                        @Override
+                        public void windowOpened(WindowEvent e) {
+                        }
 
+                        @Override
+                        public void windowIconified(WindowEvent e) {
+                        }
+
+                        @Override
+                        public void windowDeiconified(WindowEvent e) {
+                        }
+
+                        @Override
+                        public void windowDeactivated(WindowEvent e) {
+                        }
+
+                        @Override
+                        public void windowClosing(WindowEvent e) {
+                            synchronized (dialog) {
+                                dialog.notifyAll();
+                            }
+                        }
+
+                        @Override
+                        public void windowClosed(WindowEvent e) {
+                            synchronized (dialog) {
+                                dialog.notifyAll();
+                            }
+                        }
+
+                        @Override
+                        public void windowActivated(WindowEvent e) {
+                        }
+                    });
+                }
+            }.waitForEDT();
+            while (dialog.getDialog().isDisplayable()) {
+                synchronized (dialog) {
+                    dialog.wait(10000);
+                }
+            }
+        } catch (InterruptedException e) {
+            dialog.setInterrupted();
+            // throw new DialogClosedException(Dialog.RETURN_INTERRUPT, e);
+            // throw new DialogClosedException(Dialog.RETURN_INTERRUPT);
+        } catch (DialogClosedException e) {
+            dialog.fillReturnMask(e);
+        } catch (Exception e) {
+            logger.log(e);
+        } finally {
+            try {
+                dialog.dispose();
+            } catch (Exception e) {
+            }
+            try {
+                if (handle != null) {
+                    handle.dispose();
+                }
+            } catch (Exception e) {
+            }
+        }
+        if (handle == null) {
+            return impl;
+        }
+        return (T) (handle.getAnswer() != null ? handle.getAnswer() : impl);
     }
 
     @SuppressWarnings("unchecked")

@@ -121,7 +121,6 @@ import org.appwork.utils.swing.windowmanager.WindowManager.FrameState;
 import org.appwork.utils.swing.windowmanager.WindowManager.WindowExtendedState;
 import org.jdownloader.actions.AppAction;
 import org.jdownloader.controlling.FileCreationManager;
-import org.jdownloader.crosssystem.idlegetter.IdleGetter;
 import org.jdownloader.gui.GuiUtils;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.KeyObserver;
@@ -144,6 +143,7 @@ import org.jdownloader.settings.FrameStatus.ExtendedState;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.RlyWarnLevel;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.ShowSpeedInWindowTitleTrigger;
+import org.jdownloader.settings.SilentModeController;
 import org.jdownloader.settings.SilentModeSettings.DialogDuringSilentModeAction;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.settings.staticreferences.CFG_SILENTMODE;
@@ -1057,75 +1057,47 @@ public class JDGui implements UpdaterListener, OwnerFinder {
         }.getReturnValue();
     }
 
+    /**
+     * True if the silent mode is effectively active right now, see {@link SilentModeController#isActive()}.
+     */
     public boolean isSilentModeActive() {
-        final long idleTime = IdleGetter.getInstance().getIdleTimeSinceLastUserInput();
-        final long maxIdleTime = CFG_SILENTMODE.CFG.getAutoSilentModeInIdleState();
-        if (maxIdleTime > 0) {
-            if (idleTime >= maxIdleTime) {
-                System.out.println("Silent mode:Idle:" + idleTime + "|Max:" + maxIdleTime);
-                return true;
-            }
-            System.out.println("No idle:" + idleTime + "|Max:" + maxIdleTime);
+        return SilentModeController.getInstance().isActive();
+    }
+
+    /**
+     * Tells why JDownloader is in use by the user right now: One of its windows (or the updater, or the tray) is active. Used by the
+     * {@link SilentModeController}, nothing is blocked while the user works with JDownloader. Has to be called in the EDT.
+     *
+     * @return the reason, or null if JDownloader is not in use
+     */
+    public String getInUseReason() {
+        // don't block anthing if the frame is active anyway
+        if ((getMainFrame().hasFocus() || getMainFrame().isActive())/* && getMainFrame().isVisible() */) {
+            return "Mainframe has focus";
         }
-        Boolean ret = new EDTHelper<Boolean>() {
-            @Override
-            public Boolean edtRun() {
-                // don't block anthing if the frame is active anyway
-                if ((getMainFrame().hasFocus() || getMainFrame().isActive())/* && getMainFrame().isVisible() */) {
-                    logger.info("SilentMode: Mainframe has Focus: ");
-                    return false;
-                }
-                if (UpdateController.getInstance().getHandler() != null && GuiUtils.isActiveWindow(UpdateController.getInstance().getHandler().getGuiFrame())) {
-                    logger.info("SilentMode: Updater Frame is Active");
-                    return false;
-                }
-                for (Window w : Window.getWindows()) {
-                    if ((w.hasFocus() || w.isActive())/* && w.isVisible() */) {
-                        logger.info("SilentMode: No SilentMode. Active Window: " + w);
-                        return false;
-                    }
-                }
-                // don't block anything if the tray is active
-                if (tray.isEnabled() && tray.isActive()) {
-                    logger.info("SilentMode: Tray");
-                    return false;
-                }
-                if (CFG_SILENTMODE.MANUAL_ENABLED.isEnabled()) {
-                    logger.info("SilentMode: MANUEL true");
-                    return true;
-                }
-                switch (CFG_SILENTMODE.CFG.getAutoTrigger()) {
-                case JD_IN_TASKBAR:
-                    if (getMainFrame().getState() == JFrame.ICONIFIED && getMainFrame().isVisible()) {
-                        logger.info("SilentMode: auto task true");
-                        return true;
-                    }
-                    break;
-                case JD_IN_TRAY:
-                    if (!getMainFrame().isVisible()) {
-                        logger.info("SilentMode: auto tray true");
-                        return true;
-                    }
-                    break;
-                default:
-                    logger.info("SilentMode: auto false");
-                    return false;
-                }
-                logger.info("SilentMode: else false");
-                return false;
-            }
-        }.getReturnValue();
-        // 75|Gui 18.06.13 16:32:43 - SEVERE [ Gui ] -> java.lang.NullPointerException
-        // at jd.gui.swing.jdgui.JDGui.isSilentModeActive(JDGui.java:986)
-        // at jd.gui.swing.jdgui.JDGui$9.showDialog(JDGui.java:398)
-        // at org.appwork.utils.swing.dialog.Dialog.showDialog(Dialog.java:561)
-        // at org.appwork.utils.logging2.sendlogs.AbstractLogAction.create(AbstractLogAction.java:132)
-        // at org.appwork.utils.logging2.sendlogs.AbstractLogAction$1.run(AbstractLogAction.java:68)
-        // at org.appwork.utils.swing.dialog.ProgressDialog$3.run(ProgressDialog.java:217)
-        if (ret == Boolean.TRUE) {
-            return true;
+        if (UpdateController.getInstance().getHandler() != null && GuiUtils.isActiveWindow(UpdateController.getInstance().getHandler().getGuiFrame())) {
+            return "Updater frame is active";
         }
-        return false;
+        for (Window w : Window.getWindows()) {
+            if ((w.hasFocus() || w.isActive())/* && w.isVisible() */) {
+                return "A window of JDownloader is active: " + w.getClass().getName();
+            }
+        }
+        // don't block anything if the tray is active
+        if (tray.isEnabled() && tray.isActive()) {
+            return "Tray is active";
+        }
+        return null;
+    }
+
+    /** True if the main window is minimized to the taskbar. Has to be called in the EDT. */
+    public boolean isMinimizedToTaskbar() {
+        return getMainFrame().getState() == JFrame.ICONIFIED && getMainFrame().isVisible();
+    }
+
+    /** True if the main window is hidden, i.e. JDownloader only lives in the tray. Has to be called in the EDT. */
+    public boolean isHiddenInTray() {
+        return !getMainFrame().isVisible();
     }
 
     private boolean initFlatLafMacToolbar() {

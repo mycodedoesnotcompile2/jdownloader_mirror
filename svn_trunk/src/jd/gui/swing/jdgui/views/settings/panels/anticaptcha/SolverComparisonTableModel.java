@@ -128,6 +128,20 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
         };
     }
 
+    /** Number of the selected solvers which support all selected captcha types, i.e. the rows shown while the "only full support" filter is active. */
+    public int getFullSupportCount() {
+        if (isEmptyDueToNoTypes()) {
+            return 0;
+        }
+        int count = 0;
+        for (final SolverService solver : getCandidateSolvers()) {
+            if (supportsAllSelected(solver)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     /**
      * True if there are solvers but none of them supports all selected captcha types. Then "only services supporting all selected types"
      * cannot be applied (it would hide every solver): it is not applied, and the container greys out its check box.

@@ -32,12 +32,14 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JComponent;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
 
 import jd.gui.swing.dialog.AbstractImageCaptchaDialog;
 import jd.gui.swing.dialog.DialogType;
 import jd.gui.swing.jdgui.JDGui;
 import jd.gui.swing.jdgui.views.settings.components.Checkbox;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import net.miginfocom.swing.MigLayout;
 
 import org.appwork.storage.config.JsonConfig;
@@ -267,6 +269,18 @@ public class BrowserCaptchaDialog extends AbstractCaptchaDialog<String> {
             public void updateContents() {
             }
         };
+        final CAPTCHA_TYPE captchaType = CAPTCHA_TYPE.getCaptchaTypeForChallenge(challenge);
+        if (captchaType != null) {
+            /* Show the captcha type together with its icon above the explanation */
+            final JLabel typeLabel = new JLabel(captchaType.getDisplayName());
+            SwingUtils.toBold(typeLabel);
+            try {
+                typeLabel.setIcon(captchaType.getIcon());
+            } catch (final Throwable e) {
+                /* Icon is optional */
+            }
+            iconPanel.add(typeLabel, "spanx,growx,pushx,gapbottom 5,wmin 10");
+        }
         iconPanel.addDescriptionPlain(_GUI.T.BrowserCaptchaDialog_layoutDialogContent_explain_());
         iconPanel.addPair(_GUI.T.BrowserCaptchaDialog_layoutDialogContent_autoclick(), null, new Checkbox(CFG_BROWSER_CAPTCHA_SOLVER.AUTO_CLICK_ENABLED));
         iconPanel.addPair(_GUI.T.BrowserCaptchaDialog_layoutDialogContent_autoopen(), null, new Checkbox(CFG_BROWSER_CAPTCHA_SOLVER.AUTO_OPEN_BROWSER_ENABLED));

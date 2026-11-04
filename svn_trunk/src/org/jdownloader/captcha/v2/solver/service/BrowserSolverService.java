@@ -77,7 +77,13 @@ public class BrowserSolverService extends AbstractSolverService {
             /* Guard Clause for headless installations though headless shouldn't even try to use this service anyways. */
             return false;
         }
-        return isOpenBrowserSupported() && getMissingBrowserPath() == null;
+        return isOpenBrowserSupported() && getMissingBrowserPath() == null && getBlockingStatusIssue() == null;
+    }
+
+    /** The user has to solve the captchas in the browser on this computer, which the silent mode prevents. */
+    @Override
+    protected String getInfoStatusIssue() {
+        return getSilentModeStatusText();
     }
 
     /**
@@ -139,7 +145,7 @@ public class BrowserSolverService extends AbstractSolverService {
     /** The "Not ready" status text is shown as a warning, see {@link #getStatusText()}. */
     @Override
     public boolean isStatusTextWarning() {
-        return !isReady();
+        return !isReady() || getInfoStatusIssue() != null;
     }
 
     @Override
@@ -150,6 +156,14 @@ public class BrowserSolverService extends AbstractSolverService {
         }
         if (!isOpenBrowserSupported()) {
             return _GUI.T.BrowserSolverService_status_notReady_openUrlsUnsupported();
+        }
+        final String blocking = getBlockingStatusIssue();
+        if (blocking != null) {
+            return blocking;
+        }
+        final String info = getInfoStatusIssue();
+        if (info != null) {
+            return info;
         }
         final String[] commandline = getConfig().getBrowserCommandline();
         if (commandline != null && commandline.length > 0) {

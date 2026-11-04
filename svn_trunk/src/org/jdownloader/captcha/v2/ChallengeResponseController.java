@@ -53,6 +53,7 @@ import org.jdownloader.captcha.v2.solver.browser.BrowserSolver;
 import org.jdownloader.captcha.v2.solver.gui.DialogBasicCaptchaSolver;
 import org.jdownloader.captcha.v2.solver.gui.DialogMultiClickCaptchaSolver;
 import org.jdownloader.captcha.v2.solver.jac.JACSolver;
+import org.jdownloader.captcha.v2.solver.service.AbstractSolverService;
 import org.jdownloader.captcha.v2.solverjob.ResponseList;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.controlling.UniqueAlltimeID;
@@ -76,8 +77,8 @@ import jd.controlling.captcha.SkipException;
 import jd.controlling.captcha.SkipRequest;
 import jd.controlling.downloadcontroller.FileNameField;
 import jd.controlling.downloadcontroller.PackageNameField;
-import jd.gui.swing.jdgui.views.settings.panels.anticaptcha.CaptchaConfigPanel;
 import jd.controlling.linkcrawler.CrawledLink;
+import jd.gui.swing.jdgui.views.settings.panels.anticaptcha.CaptchaConfigPanel;
 import jd.plugins.Account;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.DownloadLink;
@@ -288,6 +289,24 @@ public class ChallengeResponseController {
      * times that are older than the longest rule interval. The caller must hold {@link #CAPTCHA_SLOT_LOCK}.
      */
     private String getExhaustedCustomLimit(final String serviceID, final List<CaptchaSolverLimitRule> rules, final long now) {
+        final ExhaustedCustomLimit exhausted = findExhaustedCustomLimit(serviceID, rules, now);
+        return exhausted == null ? null : exhausted.rule + ", usable again in " + exhausted.usableAgainIn;
+    }
+
+    /**
+     * A used up custom limit rule: what it is (e.g. "rule "x": 3/3 captchas in the last 1 hours") and how long until it is usable again.
+     */
+    public static final class ExhaustedCustomLimit {
+        public final String rule;
+        public final String usableAgainIn;
+
+        private ExhaustedCustomLimit(final String rule, final String usableAgainIn) {
+            this.rule = rule;
+            this.usableAgainIn = usableAgainIn;
+        }
+    }
+
+    private ExhaustedCustomLimit findExhaustedCustomLimit(final String serviceID, final List<CaptchaSolverLimitRule> rules, final long now) {
         final ArrayList<Long> startTimes = captchaStartTimesByServiceID.get(serviceID);
         if (startTimes == null) {
             return null;
@@ -313,9 +332,22 @@ public class ChallengeResponseController {
             /* The rule is usable again as soon as enough of the oldest captchas in the interval have left it. */
             final long usableAgainAt = startTimes.get(startTimes.size() - rule.getMaxCaptchas()).longValue() + intervalMillis;
             final String name = rule.getName() != null && rule.getName().length() > 0 ? " \"" + rule.getName() + "\"" : "";
-            return "rule" + name + ": " + startedInInterval + "/" + rule.getMaxCaptchas() + " captchas in the last " + rule.getInterval() + " " + rule.getUnit().name().toLowerCase(Locale.ENGLISH) + ", usable again in " + TimeFormatter.formatMilliSeconds(Math.max(0, usableAgainAt - now), 0);
+            return new ExhaustedCustomLimit("rule" + name + ": " + startedInInterval + "/" + rule.getMaxCaptchas() + " captchas in the last " + rule.getInterval() + " " + rule.getUnit().name().toLowerCase(Locale.ENGLISH), TimeFormatter.formatMilliSeconds(Math.max(0, usableAgainAt - now), 0));
         }
         return null;
+    }
+
+    /**
+     * Returns the first used up custom limit rule of the given solver service, or null if there is none. Unlike
+     * {@link #isCustomLimitReached(ChallengeSolver)} this does not log, it is meant for status displays.
+     */
+    public ExhaustedCustomLimit getExhaustedCustomLimit(final String serviceID, final List<CaptchaSolverLimitRule> rules) {
+        if (rules == null || rules.isEmpty()) {
+            return null;
+        }
+        synchronized (CAPTCHA_SLOT_LOCK) {
+            return findExhaustedCustomLimit(serviceID, rules, System.currentTimeMillis());
+        }
     }
 
     /**
@@ -434,10 +466,28 @@ public class ChallengeResponseController {
     }
 
     public <T> SolverJob<T> handle(final Challenge<T> c) throws InterruptedException, SkipException {
-        final List<ChallengeSolver<T>> solvers = createList(c);
+        final Set<ChallengeVetoReason> vetoReasons = new HashSet<ChallengeVetoReason>();
+        final List<ChallengeSolver<T>> solvers = createList(c, vetoReasons);
         applyLoginCaptchaPolicy(c, solvers);
         reSortByOverThreadsLimit(c, solvers);
-        return handleInternal(c, solvers, true);
+        reSortBySilentMode(c, solvers);
+        final SolverJob<T> job = handleInternal(c, solvers, vetoReasons, true);
+        if (vetoReasons.contains(ChallengeVetoReason.SILENT_MODE) && job.getResponse() == null) {
+            /*
+             * The silent mode kept the manual solvers away and the others did not solve the challenge: The link is skipped, as the user set
+             * up the silent mode ("Skip the Captcha" / "Do not show a dialog, but try auto solver").
+             */
+            logger.info("Challenge not solved and the silent mode kept the manual solvers away -> Skip all captchas: " + c.getId());
+            /**
+             * 2026-11-04: TODO: I chose BLOCK_ALL_CAPTCHAS here because we assume that all other links from this hoster will run into the
+             * same situation. <br>
+             * We could also check if other solvers are available and then only do a BLOCK_HOSTER here. <br>
+             * While this should be reviewed, this is an edge case anyways.
+             */
+            showNoSolverInfoDialog(c, true);
+            throw new SkipException(c, SkipRequest.BLOCK_ALL_CAPTCHAS, "Silent mode: Not solved by the solvers which work without the user");
+        }
+        return job;
     }
 
     /**
@@ -447,7 +497,21 @@ public class ChallengeResponseController {
      * to {@link #handleTest(Challenge, List)}.
      */
     public <T> List<ChallengeSolver<T>> getTestSolvers(final Challenge<T> c, final SolverService service) {
-        final List<ChallengeSolver<T>> solvers = createList(c);
+        return getTestSolvers(c, service, new HashSet<ChallengeVetoReason>(), new HashMap<String, ChallengeVetoReason>());
+    }
+
+    /**
+     * Like {@link #getTestSolvers(Challenge, SolverService)}, but tells why solvers were not returned.
+     *
+     * @param vetoReasons
+     *            receives the reasons why solvers were not used (of all solvers), pass it to
+     *            {@link #handleTest(Challenge, List, Set)}
+     * @param reasonsByServiceID
+     *            receives the reason why the solvers of a solver service (key: {@link SolverService#getID()}) were not used. A service
+     *            without a solver and without a reason has no usable account (external solver) or does not take part for another reason.
+     */
+    public <T> List<ChallengeSolver<T>> getTestSolvers(final Challenge<T> c, final SolverService service, final Set<ChallengeVetoReason> vetoReasons, final Map<String, ChallengeVetoReason> reasonsByServiceID) {
+        final List<ChallengeSolver<T>> solvers = createList(c, vetoReasons, reasonsByServiceID);
         for (final Iterator<ChallengeSolver<T>> it = solvers.iterator(); service != null && it.hasNext();) {
             final SolverService solverService = it.next().getService();
             if (solverService == null || !service.getID().equals(solverService.getID())) {
@@ -464,10 +528,23 @@ public class ChallengeResponseController {
      * purpose.
      */
     public <T> SolverJob<T> handleTest(final Challenge<T> c, final List<ChallengeSolver<T>> solvers) throws InterruptedException, SkipException {
-        return handleInternal(c, solvers, false);
+        return handleTest(c, solvers, new HashSet<ChallengeVetoReason>());
     }
 
-    private final <T> SolverJob<T> handleInternal(final Challenge<T> c, final List<ChallengeSolver<T>> solvers, final boolean showNoSolverDialogs) throws InterruptedException, SkipException {
+    /**
+     * @param vetoReasons
+     *            the reasons why solvers were not used, see {@link #getTestSolvers(Challenge, SolverService, Set, Map)}: Without a solver the
+     *            test is skipped with the matching reason (e.g. the silent mode)
+     */
+    public <T> SolverJob<T> handleTest(final Challenge<T> c, final List<ChallengeSolver<T>> solvers, final Set<ChallengeVetoReason> vetoReasons) throws InterruptedException, SkipException {
+        return handleInternal(c, solvers, vetoReasons, false);
+    }
+
+    /**
+     * @param vetoReasons
+     *            the reasons why solvers were not used for this challenge, see {@link #createList(Challenge, Set)}
+     */
+    private final <T> SolverJob<T> handleInternal(final Challenge<T> c, final List<ChallengeSolver<T>> solvers, final Set<ChallengeVetoReason> vetoReasons, final boolean showNoSolverDialogs) throws InterruptedException, SkipException {
         if (c instanceof AbstractBrowserChallenge) {
             if (c instanceof RecaptchaV2Challenge) {
                 UpdateController.getInstance().addFeedback("rc");
@@ -487,8 +564,25 @@ public class ChallengeResponseController {
         logger.info("Solver: " + solvers);
         if (solvers == null || solvers.size() == 0) {
             logger.info("No solver available!");
+            if (vetoReasons.contains(ChallengeVetoReason.SILENT_MODE)) {
+                /*
+                 * The silent mode kept the only possible solvers (the manual ones) away. The user is told with a dialog of its own (it is
+                 * shown as soon as the silent mode is over, the dialog handler holds it back until then). BLOCK_ALL_CAPTCHAS: See the
+                 * comment in handle().
+                 */
+                logger.info("No solver available because of the silent mode -> Skip all captchas");
+                if (showNoSolverDialogs) {
+                    showNoSolverInfoDialog(c, true);
+                }
+                throw new SkipException(c, SkipRequest.BLOCK_ALL_CAPTCHAS, "Silent mode: No solver left which works without the user");
+            }
             if (showNoSolverDialogs) {
-                showNoSolverInfoDialog(c);
+                if (AbstractSolverService.isSilentModeActive()) {
+                    /* No dialog during the silent mode, it would show up in front of the user's other work. */
+                    logger.info("No info dialog about the missing solver because the silent mode is active");
+                } else {
+                    showNoSolverInfoDialog(c, false);
+                }
             }
             /* See: https://support.jdownloader.org/knowledgebase/article/error-skipped-captcha-is-required */
             throw new SkipException(c, SkipRequest.BLOCK_HOSTER, "No solver available!");
@@ -538,7 +632,17 @@ public class ChallengeResponseController {
                 keepAlivePendingChallenges(c);
             }
             if (job.getSkipRequest() != null) {
-                throw new SkipException(c, job.getSkipRequest());
+                /* The silent mode is not the user's decision for this challenge: Tell it (the job status says why, see SolverJobStatus). */
+                final String reason;
+                switch (job.getStatus()) {
+                case SILENT_MODE:
+                    reason = job.getStatusDetail();
+                    break;
+                default:
+                    reason = null;
+                    break;
+                }
+                throw new SkipException(c, job.getSkipRequest(), reason);
             }
             final ResponseList<T> response = job.getResponseAndKill();
             logger.info("Solving Done. Result: " + response + " | All responses: " + job.getResponses());
@@ -633,21 +737,24 @@ public class ChallengeResponseController {
     private static final int                   TEXT_REASONS_HEADING         = 18;
     private static final int                   TEXT_ORIGIN_FILENAME         = 19;
     private static final int                   TEXT_ORIGIN_PACKAGE          = 20;
+    /* The captcha was skipped because of the silent mode. */
+    private static final int                   TEXT_TITLE_SILENT_MODE       = 21;
+    private static final int                   TEXT_INTRO_SILENT_MODE       = 22;
     private static final String                HELP_URL_PREMIUM_MODE        = "https://support.jdownloader.org/knowledgebase/article/captchas-in-premium-mode-and-during-account-login";
     private static final String                HELP_URL_DOWNLOADS_NOT_START = "https://support.jdownloader.org/knowledgebase/article/warum-starten-meine-downloads-nicht";
     private static final Map<String, String[]> NO_SOLVER_DIALOG_TEXTS       = new HashMap<String, String[]>();
     static {
         NO_SOLVER_DIALOG_TEXTS.put("en", new String[] { "External solver required for this captcha challenge", "No enabled captcha solver available", "The interactive type of captcha challenge '{type}' cannot currently be solved locally in your browser.<br><br>" + "Therefore, in JD your only option is to use a captcha solving service that may require payment and is capable of handling this type of captcha.<br><br>", "No solver is currently available for the captcha challenge '{type}', although there are solvers that could solve this captcha type.<br><br>", "The usage of captcha solver accounts is globally disabled in the settings.<br><br>", "Ensure that at least one of the following {count} solvers is configured and enabled:", "For more detailed information, please read the help article below:<br>", "Disabled captcha solvers: {disabled}", "Go to captcha settings",
-                "Enabled but not ready captcha solvers: {notReady}", "Origin: This captcha was triggered by a download process.", "Origin: This captcha was triggered by an account check (adding or checking an account).", "Origin: This captcha was triggered by a crawler plugin.", "Plugin: {plugin}", "Link: {link}", "Read more about captchas during account add/check or in premium mode:", "If you are a premium user, read this:", "Otherwise, read this:", "This captcha cannot be solved at the moment for the following reasons:", "Filename:", "Package:" });
+                "Enabled but not ready captcha solvers: {notReady}", "Origin: This captcha was triggered by a download process.", "Origin: This captcha was triggered by an account check (adding or checking an account).", "Origin: This captcha was triggered by a crawler plugin.", "Plugin: {plugin}", "Link: {link}", "Read more about captchas during account add/check or in premium mode:", "If you are a premium user, read this:", "Otherwise, read this:", "This captcha cannot be solved at the moment for the following reasons:", "Filename:", "Package:", "Captcha skipped because of the silent mode", "The silent mode is active and keeps the solvers away which need you in front of the computer (captcha dialog and browser). The captcha challenge '{type}' could not be solved in another way and was skipped. Disable the silent mode or use a captcha solving service which works without you.<br><br>" });
         NO_SOLVER_DIALOG_TEXTS.put("de", new String[] { "Externer Solver erforderlich für diese Captcha-Challenge", "Kein aktivierter Captcha-Solver verfügbar", "Die interaktive Art der Captcha-Herausforderung '{type}', die gelöst werden muss, kann derzeit nicht lokal in deinem Browser gelöst werden.<br><br>" + "Daher bleibt dir in JD nur die Möglichkeit, einen möglicherweise kostenpflichtigen Captcha-Lösungsdienst zu nutzen, der diesen Captcha-Typ verarbeiten kann.<br><br>", "Für die Captcha-Challenge '{type}' steht aktuell kein Solver zur Verfügung, obwohl es Solver gibt, die diesen Captcha-Typ lösen könnten.<br><br>", "Die Nutzung von Captcha-Solver-Accounts ist in den Einstellungen global deaktiviert.<br><br>", "Stelle sicher, dass mindestens einer der folgenden {count} Solver konfiguriert und aktiviert ist:",
-                "Für detailliertere Informationen lies bitte den folgenden Hilfe-Artikel:<br>", "Deaktivierte Captcha Solver: {disabled}", "Zu den Captcha-Einstellungen", "Aktivierte, aber nicht bereite Captcha Solver: {notReady}", "Herkunft: Dieses Captcha wurde durch einen Download-Vorgang ausgelöst.", "Herkunft: Dieses Captcha wurde durch eine Account-Prüfung ausgelöst (Account hinzufügen oder prüfen).", "Herkunft: Dieses Captcha wurde durch ein Crawler-Plugin ausgelöst.", "Plugin: {plugin}", "Link: {link}", "Mehr zu Captchas beim Hinzufügen/Prüfen von Accounts oder im Premium-Modus:", "Wenn du Premium-Nutzer bist, lies dies:", "Ansonsten lies dies:", "Dieses Captcha ist momentan aus folgenden Gründen nicht lösbar:", "Dateiname:", "Paket:" });
+                "Für detailliertere Informationen lies bitte den folgenden Hilfe-Artikel:<br>", "Deaktivierte Captcha Solver: {disabled}", "Zu den Captcha-Einstellungen", "Aktivierte, aber nicht bereite Captcha Solver: {notReady}", "Herkunft: Dieses Captcha wurde durch einen Download-Vorgang ausgelöst.", "Herkunft: Dieses Captcha wurde durch eine Account-Prüfung ausgelöst (Account hinzufügen oder prüfen).", "Herkunft: Dieses Captcha wurde durch ein Crawler-Plugin ausgelöst.", "Plugin: {plugin}", "Link: {link}", "Mehr zu Captchas beim Hinzufügen/Prüfen von Accounts oder im Premium-Modus:", "Wenn du Premium-Nutzer bist, lies dies:", "Ansonsten lies dies:", "Dieses Captcha ist momentan aus folgenden Gründen nicht lösbar:", "Dateiname:", "Paket:", "Captcha wegen des Silent Modes übersprungen", "Der Silent Mode ist aktiv und hält die Solver fern, die dich am Rechner brauchen (Captcha-Dialog und Browser). Die Captcha-Challenge '{type}' konnte auf anderem Weg nicht gelöst werden und wurde übersprungen. Deaktiviere den Silent Mode oder nutze einen Captcha-Lösungsdienst, der ohne dich auskommt.<br><br>" });
         NO_SOLVER_DIALOG_TEXTS.put("es", new String[] { "Se requiere un solucionador externo para este desafío de CAPTCHA", "No hay ningún solucionador de CAPTCHA activado", "El tipo interactivo de desafío CAPTCHA '{type}' no puede resolverse actualmente de forma local en tu navegador.<br><br>" + "Por lo tanto, en JD solo tienes la opción de utilizar un servicio de resolución de captchas posiblemente de pago que pueda manejar este tipo de CAPTCHA.<br><br>", "Actualmente no hay ningún solucionador disponible para el desafío CAPTCHA '{type}', aunque existen solucionadores que podrían resolver este tipo de CAPTCHA.<br><br>", "El uso de cuentas de solucionadores de CAPTCHA está desactivado globalmente en los ajustes.<br><br>", "Asegúrate de que al menos uno de los siguientes {count} solucionadores esté configurado y activado:",
-                "Para obtener información más detallada, lee el siguiente artículo de ayuda:<br>", "Solucionadores de CAPTCHA desactivados: {disabled}", "Ir a la configuración de CAPTCHA", "Solucionadores de CAPTCHA activados pero no listos: {notReady}", "Origen: Este CAPTCHA fue activado por un proceso de descarga.", "Origen: Este CAPTCHA fue activado por una comprobación de cuenta (añadir o comprobar una cuenta).", "Origen: Este CAPTCHA fue activado por un plugin de crawler.", "Plugin: {plugin}", "Enlace: {link}", "Más información sobre los CAPTCHAs al añadir/comprobar cuentas o en el modo premium:", "Si eres usuario premium, lee esto:", "De lo contrario, lee esto:", "Este CAPTCHA no se puede resolver en este momento por los siguientes motivos:", "Nombre de archivo:", "Paquete:" });
+                "Para obtener información más detallada, lee el siguiente artículo de ayuda:<br>", "Solucionadores de CAPTCHA desactivados: {disabled}", "Ir a la configuración de CAPTCHA", "Solucionadores de CAPTCHA activados pero no listos: {notReady}", "Origen: Este CAPTCHA fue activado por un proceso de descarga.", "Origen: Este CAPTCHA fue activado por una comprobación de cuenta (añadir o comprobar una cuenta).", "Origen: Este CAPTCHA fue activado por un plugin de crawler.", "Plugin: {plugin}", "Enlace: {link}", "Más información sobre los CAPTCHAs al añadir/comprobar cuentas o en el modo premium:", "Si eres usuario premium, lee esto:", "De lo contrario, lee esto:", "Este CAPTCHA no se puede resolver en este momento por los siguientes motivos:", "Nombre de archivo:", "Paquete:", "CAPTCHA omitido por el modo silencioso", "El modo silencioso está activo y mantiene alejados a los solucionadores que necesitan que estés frente al ordenador (diálogo de CAPTCHA y navegador). El desafío CAPTCHA '{type}' no pudo resolverse de otra forma y se omitió. Desactiva el modo silencioso o utiliza un servicio de resolución de CAPTCHAs que funcione sin ti.<br><br>" });
         NO_SOLVER_DIALOG_TEXTS.put("fr", new String[] { "Solveur externe requis pour ce défi CAPTCHA", "Aucun solveur CAPTCHA activé disponible", "Le type interactif de défi CAPTCHA '{type}' ne peut actuellement pas être résolu localement dans votre navigateur.<br><br>" + "Par conséquent, dans JD, votre seule option est d’utiliser un service de résolution de CAPTCHA potentiellement payant capable de traiter ce type de CAPTCHA.<br><br>", "Aucun solveur n’est actuellement disponible pour le défi CAPTCHA '{type}', bien que des solveurs puissent résoudre ce type de CAPTCHA.<br><br>", "L’utilisation des comptes de solveurs CAPTCHA est désactivée globalement dans les paramètres.<br><br>", "Assurez-vous qu’au moins l’un des {count} solveurs suivants est configuré et activé :", "Pour plus d’informations détaillées, veuillez consulter l’article d’aide ci-dessous :<br>",
-                "Solveurs CAPTCHA désactivés : {disabled}", "Aller aux paramètres CAPTCHA", "Solveurs CAPTCHA activés mais pas prêts : {notReady}", "Origine : ce CAPTCHA a été déclenché par un processus de téléchargement.", "Origine : ce CAPTCHA a été déclenché par une vérification de compte (ajout ou vérification d’un compte).", "Origine : ce CAPTCHA a été déclenché par un plugin de crawler.", "Plugin : {plugin}", "Lien : {link}", "Pour en savoir plus sur les CAPTCHA lors de l’ajout/vérification de comptes ou en mode premium :", "Si vous êtes utilisateur premium, lisez ceci :", "Sinon, lisez ceci :", "Ce CAPTCHA ne peut pas être résolu pour le moment pour les raisons suivantes :", "Nom du fichier :", "Paquet :" });
-        NO_SOLVER_DIALOG_TEXTS.put("hi",
-                new String[] { "इस CAPTCHA चुनौती के लिए बाहरी सॉल्वर आवश्यक है", "कोई सक्षम CAPTCHA सॉल्वर उपलब्ध नहीं", "CAPTCHA चुनौती '{type}' की इंटरएक्टिव प्रकृति को आपके ब्राउज़र में वर्तमान में स्थानीय रूप से हल नहीं किया जा सकता।<br><br>" + "इसलिए JD में आपका एकमात्र विकल्प एक संभावित सशुल्क CAPTCHA समाधान सेवा का उपयोग करना है जो इस प्रकार के CAPTCHA को संभाल सके।<br><br>", "CAPTCHA चुनौती '{type}' के लिए वर्तमान में कोई सॉल्वर उपलब्ध नहीं है, जबकि ऐसे सॉल्वर मौजूद हैं जो इस प्रकार के CAPTCHA को हल कर सकते हैं।<br><br>", "सेटिंग्स में CAPTCHA सॉल्वर खातों का उपयोग वैश्विक रूप से अक्षम है।<br><br>", "सुनिश्चित करें कि निम्न {count} सॉल्वर में से कम से कम एक कॉन्फ़िगर और सक्षम है:", "अधिक विस्तृत जानकारी के लिए कृपया नीचे दिया गया सहायता लेख पढ़ें:<br>", "अक्षम CAPTCHA सॉल्वर: {disabled}", "CAPTCHA सेटिंग्स पर जाएँ", "सक्षम लेकिन तैयार नहीं CAPTCHA सॉल्वर: {notReady}", "मूल: यह CAPTCHA एक डाउनलोड प्रक्रिया द्वारा ट्रिगर किया गया था।", "मूल: यह CAPTCHA एक खाता जाँच (खाता जोड़ना या जाँचना) द्वारा ट्रिगर किया गया था।", "मूल: यह CAPTCHA एक क्रॉलर प्लगइन द्वारा ट्रिगर किया गया था।", "प्लगइन: {plugin}", "लिंक: {link}", "खाता जोड़ने/जाँचने या प्रीमियम मोड के दौरान CAPTCHA के बारे में अधिक पढ़ें:", "यदि आप प्रीमियम उपयोगकर्ता हैं, तो यह पढ़ें:", "अन्यथा, यह पढ़ें:", "इस CAPTCHA को फिलहाल निम्नलिखित कारणों से हल नहीं किया जा सकता:", "फ़ाइल नाम:", "पैकेज:" });
-        NO_SOLVER_DIALOG_TEXTS.put("zh", new String[] { "此验证码挑战需要外部解答服务", "没有可用的已启用验证码解答服务", "交互式验证码挑战 '{type}' 当前无法在您的浏览器中本地完成。<br><br>" + "因此，在 JD 中，您只能使用能够处理此类验证码的可能需要付费的验证码解答服务。<br><br>", "当前没有可用于验证码挑战 '{type}' 的解答服务，但存在可以解决此类验证码的服务。<br><br>", "验证码解答服务账户的使用已在设置中被全局禁用。<br><br>", "请确保至少配置并启用以下 {count} 个服务中的一个：", "有关更详细的信息，请阅读以下帮助文章：<br>", "已禁用的验证码解答服务：{disabled}", "前往验证码设置", "已启用但未就绪的验证码解答服务：{notReady}", "来源：此验证码由下载过程触发。", "来源：此验证码由账户检查（添加或检查账户）触发。", "来源：此验证码由爬虫插件触发。", "插件：{plugin}", "链接：{link}", "有关添加/检查账户或高级模式期间验证码的更多信息：", "如果您是高级用户，请阅读此文：", "否则，请阅读此文：", "目前由于以下原因无法解决此验证码：", "文件名：", "包：" });
+                "Solveurs CAPTCHA désactivés : {disabled}", "Aller aux paramètres CAPTCHA", "Solveurs CAPTCHA activés mais pas prêts : {notReady}", "Origine : ce CAPTCHA a été déclenché par un processus de téléchargement.", "Origine : ce CAPTCHA a été déclenché par une vérification de compte (ajout ou vérification d’un compte).", "Origine : ce CAPTCHA a été déclenché par un plugin de crawler.", "Plugin : {plugin}", "Lien : {link}", "Pour en savoir plus sur les CAPTCHA lors de l’ajout/vérification de comptes ou en mode premium :", "Si vous êtes utilisateur premium, lisez ceci :", "Sinon, lisez ceci :", "Ce CAPTCHA ne peut pas être résolu pour le moment pour les raisons suivantes :", "Nom du fichier :", "Paquet :", "CAPTCHA ignoré à cause du mode silencieux", "Le mode silencieux est actif et écarte les solveurs qui nécessitent votre présence devant l’ordinateur (boîte de dialogue CAPTCHA et navigateur). Le défi CAPTCHA '{type}' n’a pas pu être résolu autrement et a été ignoré. Désactivez le mode silencieux ou utilisez un service de résolution de CAPTCHA qui fonctionne sans vous.<br><br>" });
+        NO_SOLVER_DIALOG_TEXTS.put("hi", new String[] { "इस CAPTCHA चुनौती के लिए बाहरी सॉल्वर आवश्यक है", "कोई सक्षम CAPTCHA सॉल्वर उपलब्ध नहीं", "CAPTCHA चुनौती '{type}' की इंटरएक्टिव प्रकृति को आपके ब्राउज़र में वर्तमान में स्थानीय रूप से हल नहीं किया जा सकता।<br><br>" + "इसलिए JD में आपका एकमात्र विकल्प एक संभावित सशुल्क CAPTCHA समाधान सेवा का उपयोग करना है जो इस प्रकार के CAPTCHA को संभाल सके।<br><br>", "CAPTCHA चुनौती '{type}' के लिए वर्तमान में कोई सॉल्वर उपलब्ध नहीं है, जबकि ऐसे सॉल्वर मौजूद हैं जो इस प्रकार के CAPTCHA को हल कर सकते हैं।<br><br>", "सेटिंग्स में CAPTCHA सॉल्वर खातों का उपयोग वैश्विक रूप से अक्षम है।<br><br>", "सुनिश्चित करें कि निम्न {count} सॉल्वर में से कम से कम एक कॉन्फ़िगर और सक्षम है:", "अधिक विस्तृत जानकारी के लिए कृपया नीचे दिया गया सहायता लेख पढ़ें:<br>", "अक्षम CAPTCHA सॉल्वर: {disabled}", "CAPTCHA सेटिंग्स पर जाएँ",
+                "सक्षम लेकिन तैयार नहीं CAPTCHA सॉल्वर: {notReady}", "मूल: यह CAPTCHA एक डाउनलोड प्रक्रिया द्वारा ट्रिगर किया गया था।", "मूल: यह CAPTCHA एक खाता जाँच (खाता जोड़ना या जाँचना) द्वारा ट्रिगर किया गया था।", "मूल: यह CAPTCHA एक क्रॉलर प्लगइन द्वारा ट्रिगर किया गया था।", "प्लगइन: {plugin}", "लिंक: {link}", "खाता जोड़ने/जाँचने या प्रीमियम मोड के दौरान CAPTCHA के बारे में अधिक पढ़ें:", "यदि आप प्रीमियम उपयोगकर्ता हैं, तो यह पढ़ें:", "अन्यथा, यह पढ़ें:", "इस CAPTCHA को फिलहाल निम्नलिखित कारणों से हल नहीं किया जा सकता:", "फ़ाइल नाम:", "पैकेज:", "साइलेंट मोड के कारण CAPTCHA छोड़ा गया", "साइलेंट मोड सक्रिय है और उन सॉल्वरों को दूर रखता है जिन्हें आपके कंप्यूटर के सामने होने की आवश्यकता है (CAPTCHA डायलॉग और ब्राउज़र)। CAPTCHA चुनौती '{type}' को किसी अन्य तरीके से हल नहीं किया जा सका और छोड़ दिया गया। साइलेंट मोड बंद करें या ऐसी CAPTCHA समाधान सेवा का उपयोग करें जो आपके बिना काम करती है।<br><br>" });
+        NO_SOLVER_DIALOG_TEXTS.put("zh", new String[] { "此验证码挑战需要外部解答服务", "没有可用的已启用验证码解答服务", "交互式验证码挑战 '{type}' 当前无法在您的浏览器中本地完成。<br><br>" + "因此，在 JD 中，您只能使用能够处理此类验证码的可能需要付费的验证码解答服务。<br><br>", "当前没有可用于验证码挑战 '{type}' 的解答服务，但存在可以解决此类验证码的服务。<br><br>", "验证码解答服务账户的使用已在设置中被全局禁用。<br><br>", "请确保至少配置并启用以下 {count} 个服务中的一个：", "有关更详细的信息，请阅读以下帮助文章：<br>", "已禁用的验证码解答服务：{disabled}", "前往验证码设置", "已启用但未就绪的验证码解答服务：{notReady}", "来源：此验证码由下载过程触发。", "来源：此验证码由账户检查（添加或检查账户）触发。", "来源：此验证码由爬虫插件触发。", "插件：{plugin}", "链接：{link}", "有关添加/检查账户或高级模式期间验证码的更多信息：", "如果您是高级用户，请阅读此文：", "否则，请阅读此文：", "目前由于以下原因无法解决此验证码：", "文件名：", "包：", "因静默模式跳过了验证码", "静默模式已启用，因此不会使用需要您在电脑前操作的解答方式（验证码对话框和浏览器）。验证码挑战 '{type}' 无法通过其他方式解决，已被跳过。请关闭静默模式，或使用无需您参与的验证码解答服务。<br><br>" });
     }
 
     /** The intro texts consist of several sentences separated by line breaks: one list entry has no trailing line break. */
@@ -665,15 +772,32 @@ public class ChallengeResponseController {
         return texts != null ? texts : NO_SOLVER_DIALOG_TEXTS.get("en");
     }
 
+    /** True for the solver types which need the user in front of the computer (dialog, browser). */
+    private static boolean isManualSolverType(final SolverType type) {
+        switch (type) {
+        case JD_LOCAL_DIALOG:
+        case JD_LOCAL_BROWSER:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     /**
      * Called if no solver at all is available for the given challenge. Informs the user why (if it is something the user can change), lists
      * the solvers which could solve the challenge and offers a button to the captcha settings.
+     *
+     * @param silentMode
+     *            true if the captcha was skipped because the silent mode kept the solvers away which need the user (dialog, browser): The
+     *            dialog then explains that instead of a missing solver setup, and lists the solvers which work without the user.
      */
-    private <T> void showNoSolverInfoDialog(final Challenge<T> c) {
+    private <T> void showNoSolverInfoDialog(final Challenge<T> c, final boolean silentMode) {
         final CAPTCHA_TYPE captcha_type = CAPTCHA_TYPE.getCaptchaTypeForChallenge(c);
         final boolean externalSolverRequired = isExternalSolverRequired(c);
         /* Solvers which could solve this captcha type if they were configured and enabled. */
         final List<SolverService> candidates = new ArrayList<SolverService>();
+        /* Silent mode only: All solvers of the captcha type, if all of them need the user. */
+        final List<SolverService> manualCandidates = new ArrayList<SolverService>();
         boolean readyAndEnabledExternalSolverExists = false;
         if (captcha_type != null) {
             for (final SolverService service : listServices()) {
@@ -685,6 +809,11 @@ public class ChallengeResponseController {
                 if (external && service.isReady() && service.getConfigV3().isEnabled()) {
                     readyAndEnabledExternalSolverExists = true;
                 }
+                if (silentMode && isManualSolverType(service.getType())) {
+                    /* The solvers which need the user are no option during the silent mode. */
+                    manualCandidates.add(service);
+                    continue;
+                }
                 if (externalSolverRequired && !external) {
                     /* The local solvers are no option for this challenge. */
                     continue;
@@ -692,11 +821,16 @@ public class ChallengeResponseController {
                 candidates.add(service);
             }
         }
+        if (silentMode && candidates.size() == 0) {
+            /* Only solvers which need the user can solve this captcha type: They are listed, the user has to leave the silent mode. */
+            candidates.addAll(manualCandidates);
+        }
         /*
          * Case 1: The challenge cannot be solved locally and the user has no usable external solver -> Explain that one is needed. Case 2:
-         * There are solvers for this captcha type but all of them are disabled/unconfigured/vetoed.
+         * There are solvers for this captcha type but all of them are disabled/unconfigured/vetoed. Case 3 (silent mode): The captcha was
+         * skipped because of the silent mode, see the parameter.
          */
-        final boolean explainExternalSolverRequired = externalSolverRequired && !readyAndEnabledExternalSolverExists;
+        final boolean explainExternalSolverRequired = !silentMode && externalSolverRequired && !readyAndEnabledExternalSolverExists;
         if (!explainExternalSolverRequired && candidates.size() == 0) {
             logger.info("No solver supports this captcha type at all: " + captcha_type);
             return;
@@ -707,15 +841,35 @@ public class ChallengeResponseController {
         final String captchaType = getCaptchaTypeDisplayName(c);
         final Challenge.CaptchaRequestType requestType = c.getCaptchaRequestType();
         /* The texts depend on the origin of the captcha, so a "do not show again" choice only counts for the same origin. */
-        final String dialogKey = (explainExternalSolverRequired ? "showNoBrowserSolverInfoDialog." + captchaType : "showNoEnabledSolverInfoDialog." + captchaType) + "." + (requestType != null ? requestType.name() : "UNKNOWN");
+        final String dialogKeyPrefix;
+        if (silentMode) {
+            dialogKeyPrefix = "showNoSolverSilentModeInfoDialog.";
+        } else if (explainExternalSolverRequired) {
+            dialogKeyPrefix = "showNoBrowserSolverInfoDialog.";
+        } else {
+            dialogKeyPrefix = "showNoEnabledSolverInfoDialog.";
+        }
+        final String dialogKey = dialogKeyPrefix + captchaType + "." + (requestType != null ? requestType.name() : "UNKNOWN");
         if (!allowDialogNow(dialogKey)) {
             return;
         }
         final String[] texts = getNoSolverDialogTexts();
-        final String title = (explainExternalSolverRequired ? texts[TEXT_TITLE_EXTERNAL_REQUIRED] : texts[TEXT_TITLE_NO_ENABLED_SOLVER]) + " (" + captchaType + ")";
+        final String titleText;
+        final String introText;
+        if (silentMode) {
+            titleText = texts[TEXT_TITLE_SILENT_MODE];
+            introText = texts[TEXT_INTRO_SILENT_MODE];
+        } else if (explainExternalSolverRequired) {
+            titleText = texts[TEXT_TITLE_EXTERNAL_REQUIRED];
+            introText = texts[TEXT_INTRO_EXTERNAL_REQUIRED];
+        } else {
+            titleText = texts[TEXT_TITLE_NO_ENABLED_SOLVER];
+            introText = texts[TEXT_INTRO_NO_ENABLED_SOLVER];
+        }
+        final String title = titleText + " (" + captchaType + ")";
         /* The reasons why the captcha cannot be solved right now, shown as a list. */
         final List<String> reasons = new ArrayList<String>();
-        reasons.add(toReasonText((explainExternalSolverRequired ? texts[TEXT_INTRO_EXTERNAL_REQUIRED] : texts[TEXT_INTRO_NO_ENABLED_SOLVER]).replace("{type}", captchaType)));
+        reasons.add(toReasonText(introText.replace("{type}", captchaType)));
         if (!CFG_GENERAL.CFG.isUseAvailableCaptchaSolverAccounts()) {
             reasons.add(toReasonText(texts[TEXT_ACCOUNTS_DISABLED]));
         }
@@ -869,7 +1023,7 @@ public class ChallengeResponseController {
 
     private static class NoSolverAvailableDialog extends ConfirmDialog {
         private final String              dontShowAgainKey;
-        private final List<OriginLine>     originLines;
+        private final List<OriginLine>    originLines;
         private final String              reasonsHeading;
         private final List<String>        reasons;
         private final String              solverPrompt;
@@ -1014,16 +1168,33 @@ public class ChallengeResponseController {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private <T> List<ChallengeSolver<T>> createList(final Challenge<T> c) {
+        return createList(c, new HashSet<ChallengeVetoReason>());
+    }
+
+    private <T> List<ChallengeSolver<T>> createList(final Challenge<T> c, final Set<ChallengeVetoReason> vetoReasons) {
+        return createList(c, vetoReasons, null);
+    }
+
+    /**
+     * @param vetoReasons
+     *            receives the reasons why solvers were not added to the list (all of them, not only the ones of the last solver)
+     * @param reasonsByServiceID
+     *            optional, receives the reason why the solvers of a solver service (key: {@link SolverService#getID()}) were not added
+     *            to the list, see {@link #getTestSolvers(Challenge, SolverService, Map)}
+     */
+    @SuppressWarnings("unchecked")
+    private <T> List<ChallengeSolver<T>> createList(final Challenge<T> c, final Set<ChallengeVetoReason> vetoReasons, final Map<String, ChallengeVetoReason> reasonsByServiceID) {
         final List<ChallengeSolver<T>> ret = new ArrayList<ChallengeSolver<T>>();
-        final HashSet<ChallengeVetoReason> vetoReasons = new HashSet<ChallengeVetoReason>();
         /* Process our own default/local solvers */
         for (final ChallengeSolver<?> solver : solverList) {
             try {
                 final ChallengeVetoReason veto = solver.getChallengeVetoReason(c);
                 if (veto != null) {
                     vetoReasons.add(veto);
+                    if (reasonsByServiceID != null) {
+                        reasonsByServiceID.put(solver.getService().getID(), veto);
+                    }
                     continue;
                 }
                 ret.add((ChallengeSolver<T>) solver);
@@ -1036,6 +1207,13 @@ public class ChallengeResponseController {
                 /* User has globally disabled usage of solver accounts -> Don't even fetch accounts */
                 logger.info("User has globally disabled usage of solver accounts");
                 vetoReasons.add(ChallengeVetoReason.EXTERNAL_SOLVER_ACCOUNTS_DISABLED);
+                if (reasonsByServiceID != null) {
+                    for (final SolverService service : serviceList) {
+                        if (service.getType() == SolverType.EXTERNAL) {
+                            reasonsByServiceID.put(service.getID(), ChallengeVetoReason.EXTERNAL_SOLVER_ACCOUNTS_DISABLED);
+                        }
+                    }
+                }
                 break add_solver_accounts;
             }
             final AccountFilter af = new AccountFilter().setFeature(FEATURE.CAPTCHA_SOLVER);
@@ -1064,12 +1242,18 @@ public class ChallengeResponseController {
                     if (!service.getConfigV3().isEnabled()) {
                         // TODO: Move this into getChallengeVetoReason
                         vetoReasons.add(ChallengeVetoReason.SOLVER_DISABLED);
+                        if (reasonsByServiceID != null) {
+                            reasonsByServiceID.put(service.getID(), ChallengeVetoReason.SOLVER_DISABLED);
+                        }
                         unavailableSolverDomainVetoReasons.put(solverAccount.getHoster(), ChallengeVetoReason.SOLVER_DISABLED);
                         continue;
                     }
                     final ChallengeVetoReason veto = solver.getChallengeVetoReason(c);
                     if (veto != null) {
                         vetoReasons.add(veto);
+                        if (reasonsByServiceID != null) {
+                            reasonsByServiceID.put(service.getID(), veto);
+                        }
                         unavailableSolverDomainVetoReasons.put(solverAccount.getHoster(), veto);
                         continue;
                     }
@@ -1137,7 +1321,8 @@ public class ChallengeResponseController {
      */
     private <T> void applyLoginCaptchaPolicy(final Challenge<T> c, final List<ChallengeSolver<T>> ret) {
         int avoidedAutoSolversForLoginCaptcha = 0;
-        avoidAutoSolver: if (c.isAccountLogin() && CAPTCHA_SETTINGS.isAvoidAutoSolverForLoginCaptchas()) {
+        /* Not during the silent mode: The user is not at the computer, waiting for him instead of using the auto solvers makes no sense. */
+        avoidAutoSolver: if (c.isAccountLogin() && CAPTCHA_SETTINGS.isAvoidAutoSolverForLoginCaptchas() && !AbstractSolverService.isSilentModeActive()) {
             /*
              * Special handling for login captchas: Solve them locally if possible and wished in order to solve them faster since account
              * logins in JDownloader are supposed to happen fast.
@@ -1185,6 +1370,36 @@ public class ChallengeResponseController {
             ret.addAll(overCaptchaThreadsLimit);
         }
         logger.info("Eligible solvers for challenge " + c.getId() + ": " + ret);
+    }
+
+    /**
+     * Silent mode with "Wait in Background until window gets focus or timeout is reached": The manual solvers (dialog, browser) have to
+     * wait for the user anyway, so the other solvers (external, local auto solvers) are moved in front of them. The order is otherwise
+     * kept.
+     */
+    private <T> void reSortBySilentMode(final Challenge<T> c, final List<ChallengeSolver<T>> ret) {
+        if (!AbstractSolverService.isManualSolvingDelayedBySilentMode()) {
+            return;
+        }
+        final List<ChallengeSolver<T>> others = new ArrayList<ChallengeSolver<T>>(ret.size());
+        final List<ChallengeSolver<T>> manual = new ArrayList<ChallengeSolver<T>>();
+        for (final ChallengeSolver<T> solver : ret) {
+            switch (solver.getSolverType()) {
+            case JD_LOCAL_DIALOG:
+            case JD_LOCAL_BROWSER:
+                manual.add(solver);
+                break;
+            default:
+                others.add(solver);
+                break;
+            }
+        }
+        if (manual.size() > 0 && others.size() > 0) {
+            logger.info("Silent mode: The manual solvers are moved to the end for challenge " + c.getId() + ": " + manual);
+            ret.clear();
+            ret.addAll(others);
+            ret.addAll(manual);
+        }
     }
 
     public SolverJob<?> getJobByChallengeId(long id) {

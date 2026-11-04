@@ -77,6 +77,16 @@ public class SolverJob<T> {
                 return _GUI.T.SolverJobStatus_UNSOLVED();
             }
         },
+        /**
+         * All solvers are done, none solved the challenge and every one of them ended because of the silent mode (the user was not asked:
+         * the window had no focus, or the dialog was never shown), see {@link SolverOutcome#SILENT_MODE}.
+         */
+        SILENT_MODE {
+            @Override
+            public String getLabel() {
+                return _GUI.T.SolverJobStatus_SILENT_MODE();
+            }
+        },
         /** All solvers are done and every one of them delivered an answer that was rejected (see ValidationResult for the reasons). */
         ANSWER_REJECTED {
             @Override
@@ -117,7 +127,17 @@ public class SolverJob<T> {
         /** The solver failed for any other reason (e.g. error of the solver service). */
         SOLVER_ERROR,
         /** The solver was not started at all (e.g. custom limit reached, no free captcha slot). */
-        NOT_STARTED
+        NOT_STARTED,
+        /**
+         * The user chose another solver in the captcha dialog ("use external solver instead"), so this solver was stopped or ended without
+         * an answer. The result message tells which solver.
+         */
+        ABORTED_USER_CHOSE_OTHER_SOLVER,
+        /**
+         * The solver needs the user (dialog, browser) but the silent mode did not allow to ask him: Either the silent mode started after
+         * the job was created, or the dialog was not shown because the window got no focus until the silent mode timeout.
+         */
+        SILENT_MODE
     }
 
     /** Outcome of a single solver plus the (optional) detailed message, e.g. the error text of the solver service. */
@@ -546,6 +566,7 @@ public class SolverJob<T> {
         final SolverJobStatus status = getStatus();
         switch (status) {
         case UNSOLVED:
+        case SILENT_MODE:
         case ANSWER_REJECTED:
         case SOLVER_ACCOUNT_ERROR:
             break;
@@ -617,7 +638,7 @@ public class SolverJob<T> {
             }
         }
         for (final ChallengeSolver<T> solver : abortList) {
-            setSolverResult(solver, SolverOutcome.ABORTED, "Another external solver was chosen by the user");
+            setSolverResult(solver, SolverOutcome.ABORTED_USER_CHOSE_OTHER_SOLVER, "The user chose another external solver: " + keep.getService().getName());
             logSolverStatus(solver, "KILLED (user chose the external solver " + keep + ")");
             solver.kill(this);
         }
@@ -739,7 +760,11 @@ public class SolverJob<T> {
             case REFRESH:
                 return SolverJobStatus.REFRESHED;
             default:
-                return SolverJobStatus.ABORTED_BY_USER;
+                /*
+                 * The skip request may have been set by the system because only solvers were left which could not ask the user (see
+                 * ChallengeSolver#isAskingUserBlockedBySilentMode), that is no abort by the user.
+                 */
+                return getUniformOutcome() == SolverOutcome.SILENT_MODE ? SolverJobStatus.SILENT_MODE : SolverJobStatus.ABORTED_BY_USER;
             }
         }
         if (isSolved()) {
@@ -758,6 +783,8 @@ public class SolverJob<T> {
                      * or the solvers were faster), but from the outside this is still a timeout.
                      */
                     return SolverJobStatus.TIMEOUT;
+                case SILENT_MODE:
+                    return SolverJobStatus.SILENT_MODE;
                 case ANSWER_REJECTED:
                     return SolverJobStatus.ANSWER_REJECTED;
                 case SOLVER_ERROR_ACCOUNT:

@@ -1,6 +1,5 @@
 package org.jdownloader.captcha.v2;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -10,7 +9,6 @@ import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.captcha.v2.solverjob.SolverJob.SolverOutcome;
 import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSolverService;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
-import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
 
 import jd.controlling.captcha.SkipException;
 import jd.plugins.Account;
@@ -95,21 +93,7 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
      */
     @Override
     public List<CaptchaSolverLimitRule> getCustomLimitRules() {
-        final CaptchaSolverPluginConfig cfg = ((PluginForCaptchaSolverSolverService) service).getPluginConfig();
-        if (!cfg.isCustomLimitsEnabled()) {
-            return null;
-        }
-        final ArrayList<CaptchaSolverLimitRule> stored = cfg.getLimitRules();
-        if (stored == null) {
-            return null;
-        }
-        final List<CaptchaSolverLimitRule> ret = new ArrayList<CaptchaSolverLimitRule>();
-        for (final CaptchaSolverLimitRule rule : stored.toArray(new CaptchaSolverLimitRule[0])) {
-            if (rule.isEnabled()) {
-                ret.add(rule);
-            }
-        }
-        return ret.isEmpty() ? null : ret;
+        return ((PluginForCaptchaSolverSolverService) service).getEnabledCustomLimitRules();
     }
 
     /*

@@ -919,6 +919,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Unsolved" })
     String SolverJobStatus_UNSOLVED();
 
+    @Default(lngs = { "en" }, values = { "Skipped because of the silent mode" })
+    String SolverJobStatus_SILENT_MODE();
+
     @Default(lngs = { "en" }, values = { "Answer rejected" })
     String SolverJobStatus_ANSWER_REJECTED();
 
@@ -2824,9 +2827,6 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Tray Menu" })
     String gui_config_menumanager_traymenu();
 
-    @Default(lngs = { "en" }, values = { "Enable & disable the Silent Mode - Avoid Popups" })
-    String action_silentmode_tooltip();
-
     @Default(lngs = { "en" }, values = { "Restart required for %s1" })
     String AdvancedConfigEntry_setValue_restart_warning_title(String key);
 
@@ -2864,10 +2864,25 @@ public interface GuiTranslation extends TranslateInterface {
     String GlobalPremiumSwitchToggleAction_getNameWhenEnabled_();
 
     @Default(lngs = { "en" }, values = { "Silent Mode" })
-    String SilentModeToggleAction_getNameWhenDisabled_();
+    String SilentModeToggleAction_name();
 
-    @Default(lngs = { "en" }, values = { "Silent Mode" })
-    String SilentModeToggleAction_getNameWhenEnabled_();
+    @Default(lngs = { "en" }, values = { "Enable & disable the Silent Mode - Avoid Popups\r\nSilent Mode: %s1" })
+    String SilentModeToggleAction_tooltip(String mode);
+
+    @Default(lngs = { "en" }, values = { "Silent Mode when switched on" })
+    String SilentModeToggleAction_setting_switchedOnMode();
+
+    @Default(lngs = { "en" }, values = { "off" })
+    String SilentModeToggleAction_mode_off();
+
+    @Default(lngs = { "en" }, values = { "on (manual)" })
+    String SilentModeToggleAction_mode_on();
+
+    @Default(lngs = { "en" }, values = { "auto (when JDownloader is in the tray)" })
+    String SilentModeToggleAction_mode_autoTray();
+
+    @Default(lngs = { "en" }, values = { "auto (when JDownloader is minimized to the taskbar)" })
+    String SilentModeToggleAction_mode_autoTaskbar();
 
     @Default(lngs = { "en" }, values = { "More..." })
     String premiumaccounttablemodel_column_info();
@@ -3085,6 +3100,36 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Silent Mode" })
     String GUISettings_GUISettings_sielntMode();
 
+    @Default(lngs = { "en" }, values = { "Wait in Background until window gets focus" })
+    String SilentModeSettings_dialogAction_waitUntilFocus();
+
+    @Default(lngs = { "en" }, values = { "Wait in Background until window gets focus or timeout is reached" })
+    String SilentModeSettings_dialogAction_waitUntilFocusOrTimeout();
+
+    @Default(lngs = { "en" }, values = { "Cancel the dialog" })
+    String SilentModeSettings_dialogAction_cancel();
+
+    @Default(lngs = { "en" }, values = { "Skip the Captcha" })
+    String SilentModeSettings_captchaAction_skip();
+
+    @Default(lngs = { "en" }, values = { "Wait in Background until window gets focus or timeout is reached" })
+    String SilentModeSettings_captchaAction_waitUntilFocusOrTimeout();
+
+    @Default(lngs = { "en" }, values = { "Do not show a dialog, but try auto solver (AntiCaptcha, Exchange Services,...)" })
+    String SilentModeSettings_captchaAction_autoSolversOnly();
+
+    @Default(lngs = { "en" }, values = { "Disabled" })
+    String GUISettings_GUISettings_sielntMode_disabled();
+
+    @Default(lngs = { "en" }, values = { "Enabled" })
+    String GUISettings_GUISettings_sielntMode_enabled();
+
+    @Default(lngs = { "en" }, values = { "Auto-Enable Silentmode when JD is in Tray" })
+    String GUISettings_GUISettings_sielntMode_autoTray();
+
+    @Default(lngs = { "en" }, values = { "Auto-Enable Silentmode when JD is minimized to Taskbar" })
+    String GUISettings_GUISettings_sielntMode_autoTaskbar();
+
     @Default(lngs = { "en" }, values = { "If the Silentmode is enabled, you will not get any Popup, Dialogs, Captcharequests or other notifications unless JDownloader is your active Window." })
     String GUISettings_GUISettings_sielntMode_description();
 
@@ -3240,6 +3285,9 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Play sound when a captcha dialog opens (%s1). Click: on/off. Right click: change volume." })
     String AbstractCaptchaDialog_soundToggle_tooltip(String state);
+
+    @Default(lngs = { "en", "de" }, values = { "Show captcha image in greyscale", "Captcha-Bild in Graustufen anzeigen" })
+    String AbstractImageCaptchaDialog_greyscaleToggle_tooltip();
 
     @Default(lngs = { "en" }, values = { "Visit the Website" })
     String lit_open_website();
@@ -5474,6 +5522,15 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Toggle the captcha solvers configured in this action's settings" })
     String CaptchaToggleSolverServicesAction_tooltip();
 
+    @Default(lngs = { "en" }, values = { "Toggle accounts" })
+    String ToggleAllAccountTypesAction_name();
+
+    @Default(lngs = { "en" }, values = { "Enable/disable the accounts of the hosts configured in this action's settings (all account types)" })
+    String ToggleAllAccountTypesAction_tooltip();
+
+    @Default(lngs = { "en" }, values = { "Comma separated list of hosts/domains whose accounts shall be toggled. All account types (free, premium, ...) are affected.<br>Empty targets none.<br>Each account is toggled only once, even if several domains of the same plugin are listed." })
+    String ToggleAllAccountTypesAction_hosts_hint();
+
     @Default(lngs = { "en" }, values = { "Automated external captcha solver service" })
     String CaptchaSolverService_type();
 
@@ -5504,7 +5561,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Ready | %s1 Accounts | Balance: %s2" })
     String CaptchaSolverService_status_ready_accounts(String accounts, String balance);
 
-    @Default(lngs = { "en" }, values = { "Comma separated list of captcha solver ids to toggle.<br>Empty or \"*\" targets all solvers.<br>Available ids:" })
+    @Default(lngs = { "en" }, values = { "Comma separated list of captcha solver ids to toggle.<br>Empty targets no solver.<br>Available ids:" })
     String CaptchaToggleSolverServicesAction_solverIDs_hint();
 
     @Default(lngs = { "en" }, values = { "Add rule..." })
@@ -5585,6 +5642,21 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Usage of download accounts is globally disabled, click here to enable" })
     String PremiumAccountTableModel_status_enableAccounts();
 
+    @Default(lngs = { "en" }, values = { "Account disabled, check in account manager" })
+    String SolverOrderTableModel_status_accountsDisabled();
+
+    @Default(lngs = { "en" }, values = { "Account invalid, check in account manager" })
+    String SolverOrderTableModel_status_accountsInvalid();
+
+    @Default(lngs = { "en" }, values = { "All captcha types disabled" })
+    String CaptchaSolverService_status_allCaptchaTypesDisabled();
+
+    @Default(lngs = { "en" }, values = { "Custom limit reached, usable again in %s1 | Check solver settings | %s2" })
+    String CaptchaSolverService_status_limitReached(String usableAgainIn, String rule);
+
+    @Default(lngs = { "en" }, values = { "Silent mode on, captcha dialogs may not show up" })
+    String CaptchaSolverService_status_silentMode();
+
     @Default(lngs = { "en" }, values = { "Accounts disabled or invalid, check in account manager" })
     String SolverOrderTableModel_status_accountsUnusable();
 
@@ -5602,6 +5674,9 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Select browser" })
     String SolverOrderTable_context_selectBrowser();
+
+    @Default(lngs = { "en" }, values = { "Silent Mode" })
+    String SolverOrderTable_context_silentMode();
 
     @Default(lngs = { "en" }, values = { "Choose browser..." })
     String SolverOrderContainer_chooseBrowser();
@@ -5750,7 +5825,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "No captcha solver is enabled" })
     String CaptchaSolverComparison_noSolverEnabled();
 
-    @Default(lngs = { "en" }, values = { "No captcha solver is usable. A solver must be enabled and have a valid account" })
+    @Default(lngs = { "en" }, values = { "No captcha solver is usable (a solver must be enabled and ready to use)" })
     String CaptchaSolverComparison_noSolverUsable();
 
     @Default(lngs = { "en" }, values = { "Hide" })
@@ -5783,9 +5858,6 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Create captcha rule" })
     String SolverOrderTable_context_createCaptchaRule();
 
-    @Default(lngs = { "en" }, values = { "Hide all others" })
-    String CaptchaSolverComparison_hideAllOthers();
-
     @Default(lngs = { "en" }, values = { "Downloads" })
     String CaptchaRequestType_HOSTER();
 
@@ -5795,13 +5867,13 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Link crawling" })
     String CaptchaRequestType_DECRYPTER();
 
-    @Default(lngs = { "en" }, values = { "Display only solvers that support all selected captcha types" })
-    String CaptchaSolverComparison_onlyFullSupport();
+    @Default(lngs = { "en" }, values = { "Display only solvers that support all selected captcha types (%s1 results)" })
+    String CaptchaSolverComparison_onlyFullSupport(String count);
 
     @Default(lngs = { "en" }, values = { "Not available: None of the selected solvers supports all selected captcha types. Select fewer captcha types and more or all solvers." })
     String CaptchaSolverComparison_fullSupportImpossible();
 
-    @Default(lngs = { "en" }, values = { "You have to select at least one captcha type" })
+    @Default(lngs = { "en" }, values = { "No captcha type is selected" })
     String CaptchaSolverComparison_noTypeSelected();
 
     @Default(lngs = { "en" }, values = { "Please enter username and password..." })
@@ -6109,6 +6181,9 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Supported by this solver" })
     String CaptchaTypesTable_column_supportedBySolver();
+
+    @Default(lngs = { "en" }, values = { "Clear local captcha usage history" })
+    String CaptchaTypesTable_context_clearHistory();
 
     @Default(lngs = { "en" }, values = { "Ever used by me?" })
     String CaptchaTypesTable_column_everUsed();

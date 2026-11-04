@@ -17,12 +17,12 @@ package jd.plugins.hoster;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.URLHelper;
 import org.jdownloader.auth.AuthenticationController;
 import org.jdownloader.gui.IconKey;
@@ -37,6 +37,7 @@ import jd.controlling.downloadcontroller.DownloadWatchDogJob;
 import jd.http.AuthenticationFactory;
 import jd.http.Browser;
 import jd.parser.Regex;
+import jd.plugins.Account;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -44,6 +45,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
+import jd.plugins.download.DownloadInterface;
 
 /**
  * Alternative AppWork log downloader for internal use
@@ -51,8 +53,13 @@ import jd.plugins.PluginForHost;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 53409 $", interfaceVersion = 3, names = { "jdlog" }, urls = { "jdlog://(\\d+)" })
+@HostPlugin(revision = "$Revision: 53872 $", interfaceVersion = 3, names = { "jdlog" }, urls = { "jdlog://(\\d+)" })
 public class JdLog extends PluginForHost {
+    /* Logs smaller than this are read into memory and checked for an "empty log" marker */
+    private static final int LOG_CONTENT_CHECK_SIZE = 50;
+    /* Logs smaller than this (but not matching the marker) are treated as unusable */
+    private static final int MIN_VALID_LOG_SIZE     = 125;
+
     @Override
     public String getAGBLink() {
         return "https://jdownloader.org/impressum";
@@ -99,110 +106,129 @@ public class JdLog extends PluginForHost {
     }
 
     @Override
+    public boolean isResumeable(final DownloadLink link, final Account account) {
+        return false;
+    }
+
+    public int getMaxChunks(final DownloadLink link, final Account account) {
+        return 1;
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        this.setBrowserExclusive();
         final String uid = getFID(link);
+        if (uid == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         link.setFinalFileName(uid + ".log");
         return AvailableStatus.TRUE;
     }
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
-        requestFileInformation(link);
         final String uid = getFID(link);
+        if (uid == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         final String url = JDServUtils.BASE + "logunsorted?" + uid;
+        final boolean resumable = isResumeable(link, null);
+        final int maxChunks = getMaxChunks(link, null);
         final List<AuthenticationFactory> authenticationFactories = AuthenticationController.getInstance().buildAuthenticationFactories(URLHelper.createURL(url), null);
+        DownloadInterface connected = null;
         for (final AuthenticationFactory authenticationFactory : authenticationFactories) {
             br.setCustomAuthenticationFactory(authenticationFactory);
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, url, false, 1);
-            if (dl.getConnection().getResponseCode() == 401) {
-                dl.getConnection().disconnect();
-            } else {
-                break;
+            final DownloadInterface candidate = jd.plugins.BrowserAdapter.openDownload(br, link, url, resumable, maxChunks);
+            if (candidate.getConnection().getResponseCode() == 401) {
+                candidate.getConnection().disconnect();
+                continue;
             }
+            connected = candidate;
+            break;
         }
-        if (dl == null) {
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, url, false, 1);
+        if (connected == null) {
+            /* No (working) authentication available -> try without authentication */
+            br.setCustomAuthenticationFactory(null);
+            connected = jd.plugins.BrowserAdapter.openDownload(br, link, url, resumable, maxChunks);
         }
+        dl = connected;
         if (dl.getConnection().getResponseCode() == 401) {
             dl.getConnection().disconnect();
             throw new AccountRequiredException("BasicAuth needed");
+        } else if (!dl.getConnection().isOK()) {
+            dl.getConnection().disconnect();
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error " + dl.getConnection().getResponseCode());
         } else if (dl.getConnection().getCompleteContentLength() == 0) {
+            dl.getConnection().disconnect();
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Empty log");
         }
-        dl.startDownload();
-        // the following determine is its empty container.
+        if (!dl.startDownload()) {
+            /* Download failed -> Early return */
+            return;
+        }
+        /* Check if file is empty. */
         final File file = new File(dl.getDownloadable().getFileOutput());
-        if (file.exists()) {
-            final long dlsize = dl.getDownloadable().getDownloadTotalBytes();
-            // limit the check because it will use less memory than placing 100+MiB log to String
-            if (dlsize < 50) {
-                final String out = parseLocalFile(file);
-                if (StringUtils.equals(out, "LogID: " + uid + "\r\n\r\n")) {
-                    // delete unusable file
-                    link.getDownloadLinkController().getJobsAfterDetach().add(new DownloadWatchDogJob() {
-                        @Override
-                        public void interrupt() {
-                        }
-
-                        @Override
-                        public void execute(DownloadSession currentSession) {
-                            final ArrayList<DownloadLink> delete = new ArrayList<DownloadLink>();
-                            delete.add(link);
-                            DownloadWatchDog.getInstance().delete(delete, null);
-                        }
-
-                        @Override
-                        public boolean isHighPriority() {
-                            return false;
-                        }
-                    });
-                    // not set as offline! have to throw exception!!
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                }
-            } else if (dlsize < 125) {
-                // delete unusable file
-                link.getDownloadLinkController().getJobsAfterDetach().add(new DownloadWatchDogJob() {
-                    @Override
-                    public void interrupt() {
-                    }
-
-                    @Override
-                    public void execute(DownloadSession currentSession) {
-                        final ArrayList<DownloadLink> delete = new ArrayList<DownloadLink>();
-                        delete.add(link);
-                        DownloadWatchDog.getInstance().delete(delete, null);
-                    }
-
-                    @Override
-                    public boolean isHighPriority() {
-                        return false;
-                    }
-                });
-                throw new PluginException(LinkStatus.ERROR_FATAL, "Log too small (between 51 and 125 bytes)");
+        if (!file.exists()) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Downloaded file does not exist");
+        }
+        final long dlsize = dl.getDownloadable().getDownloadTotalBytes();
+        /* Limit the check because it will use less memory than placing a 100+ MiB log into a String */
+        if (dlsize < LOG_CONTENT_CHECK_SIZE) {
+            final String out = parseLocalFile(file);
+            if (("LogID: " + uid).equals(out.trim())) {
+                deleteUnusableFile(link);
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
+        } else if (dlsize < MIN_VALID_LOG_SIZE) {
+            deleteUnusableFile(link);
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Log too small (between " + LOG_CONTENT_CHECK_SIZE + " and " + (MIN_VALID_LOG_SIZE - 1) + " bytes)");
         }
     }
 
-    private String parseLocalFile(final File file) {
-        final BufferedReader f;
-        final StringBuffer buffer = new StringBuffer();
-        try {
-            f = new BufferedReader(new FileReader(file));
-            String line;
-            while ((line = f.readLine()) != null) {
-                buffer.append(line + "\r\n");
+    private void deleteUnusableFile(final DownloadLink link) {
+        link.getDownloadLinkController().getJobsAfterDetach().add(new DownloadWatchDogJob() {
+            @Override
+            public void interrupt() {
             }
-            f.close();
-            return buffer.toString();
-        } catch (IOException e) {
-            e.printStackTrace();
+
+            @Override
+            public void execute(DownloadSession currentSession) {
+                final ArrayList<DownloadLink> delete = new ArrayList<DownloadLink>();
+                delete.add(link);
+                DownloadWatchDog.getInstance().delete(delete, null);
+            }
+
+            @Override
+            public boolean isHighPriority() {
+                return false;
+            }
+        });
+    }
+
+    private String parseLocalFile(final File file) {
+        final StringBuilder sb = new StringBuilder();
+        BufferedReader reader = null;
+        try {
+            reader = new BufferedReader(new InputStreamReader(new FileInputStream(file), "UTF-8"));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line).append("\r\n");
+            }
+            return sb.toString();
+        } catch (final IOException e) {
+            logger.log(e);
+        } finally {
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (final IOException ignore) {
+                }
+            }
         }
         return "";
     }
 
     @Override
-    public boolean hasCaptcha(DownloadLink link, jd.plugins.Account acc) {
+    public boolean hasCaptcha(DownloadLink link, Account acc) {
         return false;
     }
 

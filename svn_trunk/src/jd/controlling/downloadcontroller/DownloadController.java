@@ -611,15 +611,15 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
 
         private final ArrayList<IndexedDownloadLink>         downloadLinks = new ArrayList<IndexedDownloadLink>();
         private final static Comparator<IndexedDownloadLink> COMPARATOR    = new Comparator<IndexedDownloadLink>() {
-                                                                               private final int compare(int x, int y) {
-                                                                                   return (x < y) ? -1 : ((x == y) ? 0 : 1);
-                                                                               }
+            private final int compare(int x, int y) {
+                return (x < y) ? -1 : ((x == y) ? 0 : 1);
+            }
 
-                                                                               @Override
-                                                                               public int compare(IndexedDownloadLink o1, IndexedDownloadLink o2) {
-                                                                                   return compare(o1.getIndex(), o2.getIndex());
-                                                                               }
-                                                                           };
+            @Override
+            public int compare(IndexedDownloadLink o1, IndexedDownloadLink o2) {
+                return compare(o1.getIndex(), o2.getIndex());
+            }
+        };
 
         private FilePackage getLoadedPackage() {
             final FilePackage filePackage = this.filePackage;
@@ -649,10 +649,11 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
                     logger.log(e);
                 }
                 final LinkedList<FilePackage> ret = loadFile(file, false, digest);
-                if (ret != null && digest != null && downloadLists.size() > 0 && file.equals(downloadLists.get(0))) {
+                if (ret != null && digest != null) {
                     /*
-                     * Same fingerprint save() builds for this content: if the list is unchanged until the next save, nothing needs to be
-                     * written. Only valid for the newest list: otherwise the skip would keep a missing/renamed file as the current list.
+                     * Same fingerprint save() builds for this content. The lists are tried newest first and the first loadable one wins, so
+                     * this is the content a restart would load again. If it is unchanged until the next save, nothing needs to be written.
+                     * This also holds if a newer list was broken and moved away: the content is still on disk.
                      */
                     lastSavedDigest = digest.digest();
                 }
@@ -1048,6 +1049,7 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
      */
     private boolean save(java.util.List<FilePackage> packages, File file) throws IOException {
         synchronized (SAVELOADLOCK) {
+            final boolean isDownloadListFile = file == null;
             if (file == null) {
                 if (downloadLists.size() > 0) {
                     String counter = new Regex(downloadLists.get(0).getName(), "downloadList(\\d+)\\.zip").getMatch(0);
@@ -1216,7 +1218,7 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
                 zos.putNextEntry(downloadControllerEntry);
                 JSonStorage.getMapper().writeObject(entryOutputStream, dcs);
                 zos.closeEntry();
-                if (downloadLists.size() > 0 && lastSavedDigest != null && MessageDigest.isEqual(lastSavedDigest, currentDigest)) {
+                if (isDownloadListFile && downloadLists.size() > 0 && MessageDigest.isEqual(lastSavedDigest, currentDigest)) {
                     /*
                      * Nothing changed since the last save: keep the existing lists untouched. Rotating now would only push an identical
                      * copy in and drop the oldest real backup.

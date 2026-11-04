@@ -67,13 +67,13 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.NewLinksInLinkgrabberAction;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
-import org.jdownloader.settings.staticreferences.CFG_SILENTMODE;
+import org.jdownloader.settings.SilentModeController;
+import org.jdownloader.settings.SilentModeSettings.SilentModeSetting;
 import org.jdownloader.translate.JdownloaderTranslation;
 import org.jdownloader.updatev2.RestartController;
 import org.jdownloader.updatev2.SmartRlyRestartRequest;
 
 import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.views.settings.components.Checkbox;
 import jd.gui.swing.jdgui.views.settings.components.ComboBox;
 import jd.gui.swing.jdgui.views.settings.components.SettingsButton;
 import jd.gui.swing.jdgui.views.settings.components.StateUpdateListener;
@@ -484,7 +484,13 @@ public class GUISettings extends AbstractConfigPanel implements StateUpdateListe
         // this.addHeader(_GUI.T.GUISettings_GUISettings_object_accessability(), new AbstractIcon(IconKey.ICON_barrierfreesettings", 32));
         // this.addDescription(_JDT.T.gui_settings_barrierfree_description());
         this.addDescriptionPlain(_GUI.T.GUISettings_GUISettings_sielntMode_description());
-        addPair(_GUI.T.GUISettings_GUISettings_sielntMode(), null, new Checkbox(CFG_SILENTMODE.MANUAL_ENABLED));
+        /* The labels come from the enum itself (LabelInterface), the combo box needs them as array if it is bound to a key handler. */
+        final SilentModeSetting[] silentModes = SilentModeSetting.values();
+        final String[] silentModeLabels = new String[silentModes.length];
+        for (int i = 0; i < silentModes.length; i++) {
+            silentModeLabels[i] = silentModes[i].getLabel();
+        }
+        addPair(_GUI.T.GUISettings_GUISettings_sielntMode(), null, new ComboBox<SilentModeSetting>(SilentModeController.getInstance().getSettingKeyHandler(), silentModes, silentModeLabels));
         // OS_DEFAULT,
         // TO_FRONT,
         // TO_BACK,

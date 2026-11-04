@@ -23,6 +23,7 @@ import javax.swing.table.JTableHeader;
 
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
+import org.appwork.storage.config.handler.BooleanKeyHandler;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.exttable.ExtColumn;
@@ -56,6 +57,8 @@ import org.jdownloader.updatev2.gui.LAFOptions;
 
 import jd.controlling.AccountController;
 import org.jdownloader.captcha.v2.solver.service.BrowserSolverService;
+import org.jdownloader.settings.SilentModeController;
+import org.jdownloader.settings.staticreferences.CFG_SILENTMODE;
 
 import jd.controlling.AccountControllerEvent;
 import jd.controlling.AccountControllerListener;
@@ -116,7 +119,52 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
             }
         });
         addMyJDownloaderListeners();
+        addSilentModeListeners();
+        /*
+         * The enabled state of a solver can be changed outside of this table (e.g. via CaptchaToggleSolverServicesAction), so every
+         * solver's "enabled" setting must redraw the rows, too. Weak listener: enabledListener is a field, so it lives as long as this model.
+         */
+        for (final SolverService service : ChallengeResponseController.getInstance().listServices()) {
+            final BooleanKeyHandler enabledKey = service.getConfigV3()._getStorageHandler().getKeyHandler("enabled", BooleanKeyHandler.class);
+            if (enabledKey != null) {
+                enabledKey.getEventSender().addListener(enabledListener, true);
+            }
+        }
     }
+
+    /**
+     * The status of the dialog and browser solver tells what the silent mode does to captchas, which depends on the silent mode settings,
+     * so changes of them must redraw the rows, too. Whether the silent mode is active right now cannot be observed (it depends on the
+     * window focus and the idle time), it is read whenever the rows are painted.
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    private void addSilentModeListeners() {
+        final GenericConfigEventListener<Object> listener = new GenericConfigEventListener<Object>() {
+            @Override
+            public void onConfigValueModified(final KeyHandler<Object> keyHandler, final Object newValue) {
+                refreshRows();
+            }
+
+            @Override
+            public void onConfigValidatorError(final KeyHandler<Object> keyHandler, final Object invalidValue, final ValidationException validateException) {
+            }
+        };
+        final KeyHandler[] keyHandlers = new KeyHandler[] { SilentModeController.getInstance().getSettingKeyHandler(), CFG_SILENTMODE.ON_CAPTCHA_DURING_SILENT_MODE_ACTION, CFG_SILENTMODE.ON_DIALOG_DURING_SILENT_MODE_ACTION };
+        for (final KeyHandler keyHandler : keyHandlers) {
+            keyHandler.getEventSender().addListener(listener);
+        }
+    }
+
+    private final GenericConfigEventListener<Boolean> enabledListener = new GenericConfigEventListener<Boolean>() {
+        @Override
+        public void onConfigValueModified(final KeyHandler<Boolean> keyHandler, final Boolean newValue) {
+            refreshRows();
+        }
+
+        @Override
+        public void onConfigValidatorError(final KeyHandler<Boolean> keyHandler, final Boolean invalidValue, final ValidationException validateException) {
+        }
+    };
 
     /**
      * The MyJDownloader solver's Status column depends on whether a MyJD login is configured (email/password) and on the latest MyJD
@@ -505,7 +553,7 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
                     rendererLabel.setText(value.getStatusText());
                     /* Ready solvers get a green check; solvers that need an action (button rows) never get one. */
                     /* Status texts that are warnings get a warning triangle. */
-                    rendererLabel.setIcon(value.isReady() ? NewTheme.I().getIcon(IconKey.ICON_OK, 14) : (value.isStatusTextWarning() ? warningIcon : null));
+                    rendererLabel.setIcon(value.isStatusTextWarning() ? warningIcon : (value.isReady() ? NewTheme.I().getIcon(IconKey.ICON_OK, 14) : null));
                     /* The renderer is reused for all rows, so the foreground has to be set (or reset) for every row. */
                     rendererLabel.setForeground(value.isStatusTextWarning() ? LAFOptions.getInstance().getColorForErrorForeground() : defaultStatusForeground);
                     rendererLabel.setVisible(true);

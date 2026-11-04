@@ -37,6 +37,7 @@ import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
 import org.jdownloader.captcha.v2.solver.service.DialogSolverService;
 import org.jdownloader.controlling.UniqueAlltimeID;
+import org.jdownloader.settings.SilentModeController;
 import org.jdownloader.settings.SilentModeSettings.CaptchaDuringSilentModeAction;
 import org.jdownloader.settings.staticreferences.CFG_SILENTMODE;
 
@@ -49,6 +50,11 @@ public abstract class ChallengeDialogHandler<D extends AbstractCaptchaDialog<Res
     protected volatile ResultType result;
     protected D                   dialog;
     protected Exception           resultException = null;
+    /**
+     * True if the dialog was not shown because the silent mode lasted until the countdown/timeout of the dialog ran out. Then no answer is
+     * possible, but this must not abort the whole job: The other solvers can still solve the challenge, see {@link #run()}.
+     */
+    private volatile boolean     silentModeTimeout = false;
 
     public ChallengeDialogHandler(DomainInfo instance, T captchaChallenge2) {
         this.host = instance;
@@ -60,7 +66,7 @@ public abstract class ChallengeDialogHandler<D extends AbstractCaptchaDialog<Res
                 // synchronized (this) {
                 try {
                     dialog.forceDummyInit();
-                    boolean silentModeActive = JDGui.getInstance().isSilentModeActive();
+                    boolean silentModeActive = SilentModeController.getInstance().isActive();
                     if (silentModeActive) {
                         // switch (CFG_SILENTMODE.CFG.getOnCaptchaDuringSilentModeAction()) {
                         // case WAIT_IN_BACKGROUND_UNTIL_WINDOW_GETS_FOCUS_OR_TIMEOUT
@@ -79,10 +85,12 @@ public abstract class ChallengeDialogHandler<D extends AbstractCaptchaDialog<Res
                                 countdown = System.currentTimeMillis() + CFG_SILENTMODE.ON_DIALOG_DURING_SILENT_MODE_ACTION_TIMEOUT.getValue();
                             }
                             JDGui.getInstance().flashTaskbar();
-                            while (JDGui.getInstance().isSilentModeActive()) {
+                            while (SilentModeController.getInstance().isActive()) {
                                 if (countdown > 0) {
                                     Thread.sleep(Math.min(Math.max(1, countdown - System.currentTimeMillis()), 250));
                                     if (System.currentTimeMillis() > countdown) {
+                                        /* The dialog was never shown: the silent mode lasted until the countdown ran out. */
+                                        silentModeTimeout = true;
                                         dialog.onTimeout();
                                         // clear interrupt
                                         Thread.interrupted();
@@ -269,8 +277,29 @@ public abstract class ChallengeDialogHandler<D extends AbstractCaptchaDialog<Res
         return host;
     }
 
+    /**
+     * Shows the dialog and waits for the result. If the dialog was never shown because of the silent mode (see
+     * {@link #isSilentModeTimeout()}), this returns without a result and without a SkipException, so only the solver of this handler ends:
+     * The other solvers can still solve the challenge, the solver has to report the silent mode, see
+     * {@link org.jdownloader.captcha.v2.ChallengeSolver#endBecauseOfSilentMode}.
+     */
     public void run() throws InterruptedException, SkipException {
         viaGUI();
+    }
+
+    /**
+     * The external solver the user chose in the dialog ("use external solver instead") or null. Then the dialog was closed without a
+     * result and without a skip: Only the solver of this handler ends, the chosen solver takes over. The solver has to report that, see
+     * {@link org.jdownloader.captcha.v2.ChallengeSolver#endBecauseUserChoseExternalSolver}.
+     */
+    public org.jdownloader.captcha.v2.ChallengeSolver<?> getExternalSolverToUse() {
+        final D d = dialog;
+        return d == null ? null : d.getExternalSolverToUse();
+    }
+
+    /** True if the dialog was never shown because the silent mode lasted until the countdown/timeout of the dialog ran out. */
+    public boolean isSilentModeTimeout() {
+        return silentModeTimeout;
     }
 
     protected volatile ResultType suggest;
@@ -338,6 +367,11 @@ public abstract class ChallengeDialogHandler<D extends AbstractCaptchaDialog<Res
             showDialog(dialogType, f);
             return;
         } catch (DialogNoAnswerException e) {
+            if (silentModeTimeout) {
+                /* The silent mode kept the dialog away: No skip request, which would end the job for all solvers, too. */
+                getLogger().info("The dialog was not shown because of the silent mode. Only this solver ends, no skip.");
+                return;
+            }
             /* no external response available */
             if (e.isCausedByInterrupt()) {
                 throw Exceptions.addSuppressed(new InterruptedException("Dialog Interrupted"), e);

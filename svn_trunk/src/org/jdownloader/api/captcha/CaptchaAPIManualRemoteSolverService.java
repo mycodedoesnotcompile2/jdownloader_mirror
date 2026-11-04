@@ -86,7 +86,8 @@ public class CaptchaAPIManualRemoteSolverService extends AbstractSolverService {
     public String getStatusText() {
         switch (getResolvedStatus()) {
         case CONNECTED:
-            return _GUI.T.CaptchaSolverService_status_ready();
+            final String blocking = getBlockingStatusIssue();
+            return blocking != null ? blocking : _GUI.T.CaptchaSolverService_status_ready();
         case NOT_CONFIGURED:
         case NOT_CONNECTED:
         case ERROR:
@@ -94,6 +95,12 @@ public class CaptchaAPIManualRemoteSolverService extends AbstractSolverService {
             /* Not ready -> an action button (see getStatusActionName()) is shown instead. */
             return null;
         }
+    }
+
+    /** Only the problems of the connected solver count (e.g. all captcha types disabled), the others are shown by the action button. */
+    @Override
+    protected String getBlockingStatusIssue() {
+        return getResolvedStatus() == Status.CONNECTED ? super.getBlockingStatusIssue() : null;
     }
 
     @Override

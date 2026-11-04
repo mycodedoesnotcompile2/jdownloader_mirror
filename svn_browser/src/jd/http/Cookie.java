@@ -86,8 +86,8 @@ public class Cookie {
         },
         LEGACY {
             @Override
-            public Cookie newCookieInstance() {
-                return new Cookie();
+            public LegacyCookie newCookieInstance() {
+                return new LegacyCookie();
             }
         };
         public abstract <T extends Cookie> T newCookieInstance();
@@ -231,10 +231,6 @@ public class Cookie {
             }
             return false;
         }
-        /*
-         * setting cookie via br.setCookie always has a null path, in order to allow updating of existing cookie entries we need to not
-         * analyse original path that is null! -raztoki20160506
-         */
         path: {
             if (StringUtils.equals(this.getPath(), other.getPath())) {
                 break path;
@@ -348,7 +344,7 @@ public class Cookie {
 
     @Override
     public int hashCode() {
-        return (this.getHost() + "_" + this.getKey().toLowerCase(Locale.ENGLISH)).hashCode();
+        return (this.getHost() + "_" + StringUtils.valueOrEmpty(this.getKey()).toLowerCase(Locale.ENGLISH)).hashCode();
     }
 
     public boolean isExpired() {

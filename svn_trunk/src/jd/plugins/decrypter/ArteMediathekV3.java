@@ -63,7 +63,7 @@ import org.jdownloader.plugins.components.hls.HlsContainerStorable;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 53838 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53875 $", interfaceVersion = 4, names = {}, urls = {})
 public class ArteMediathekV3 extends PluginForDecrypt {
     public ArteMediathekV3(PluginWrapper wrapper) {
         super(wrapper);
@@ -370,65 +370,34 @@ public class ArteMediathekV3 extends PluginForDecrypt {
                     // TODO: no subtitles yet
                     String audioCode = null;
                     String audioShortLabel = null;
+                    boolean enhances_speech_intelligibility = false;
                     for (String characteristic : media.getCharacteristics()) {
-                        if (characteristic.startsWith("tv.arte.audio.version.")) {
+                        if (characteristic.startsWith("public.accessibility.enhances-speech-intelligibility")) {
+                            enhances_speech_intelligibility = true;
+                        } else if (characteristic.startsWith("tv.arte.audio.version.")) {
                             final String version = characteristic.substring("tv.arte.audio.version.".length());
-                            if ("VOF-FRA".equalsIgnoreCase(version)) {
-                                // VOF = Version Originale Française (Originalton einer französischen Produktion)
-                                // FRA = Französisch (Sprachcode)
-                                // Die Sendung wurde ursprünglich auf Französisch gedreht/produziert. Es handelt sich um den nativen O-Ton.
-                                audioCode = "VOF";
-                                audioShortLabel = "FR";
-                            } else if ("VOEU-MUL".equalsIgnoreCase(version)) {
-                                // VOEU = Version Originale Européenne (Originalton der Produktion)
-                                // MUL = Multilingual / Mehrsprachig
-                                audioCode = "VOEU";
-                                audioShortLabel = "Mul";
-                            } else if ("VF-FRA".equalsIgnoreCase(version)) {
-                                // VF = Version Française (Französische Sprachfassung / Synchronisation)
-                                // FRA = Französisch (ISO-639-2 Sprachcode)
-                                // (Version Française): Eine nachträglich ins Französische synchronisierte Fassung (z. B. bei einem
-                                // deutschen oder englischen Film).
-                                audioCode = "VF";
-                                audioShortLabel = "FR";
-                            } else if ("VFAUD-FRA".equalsIgnoreCase(version)) {
-                                // VF = Version Française (Französische Sprachfassung)
-                                // AUD = Audiodescription (Ein gesprochener Kommentar beschreibt visuelle Elemente wie Gestik, Mimik oder
-                                // Schauplätze in den Sprechpausen)
-                                // FRA = Französisch (ISO-639-2 Sprachcode)
-                                audioCode = "VFAUD";
-                                audioShortLabel = "AD (frz.)";
-                            } else if ("VA-DEU".equalsIgnoreCase(version)) {
-                                // VA = Version Allemande (Deutsche Sprachfassung / Synchronisation)
-                                audioCode = "VA";
-                                audioShortLabel = "DE";
-                            } else if ("VAAUD-DEU".equalsIgnoreCase(version)) {
-                                audioCode = "VAAUD";
-                                audioShortLabel = "AD (frz.)";
-                            } else if ("VO-ENG".equalsIgnoreCase(version)) {
-                                // VO = Version Originale (Originalton)
-                                audioCode = "VOEU";
-                                audioShortLabel = "O";
-                            } else if ("VO-UND".equalsIgnoreCase(version)) {
-                                // VO = Version Originale (Originalton)
-                                // UND = Undetermined (ISO-639-2 Sprachcode und für unbestimmte/undefinierte Sprache)
-                                audioCode = "VO";
-                                audioShortLabel = "O";
-                            } else if ("VOA-DEU".equalsIgnoreCase(version)) {
-                                // VOA = Version Originale AlleMande (Deutsche Originalfassung / O-Ton)
-                                // DEU = Deutsch (ISO-639-2 Sprachcode)
-                                audioCode = "VOA";
-                                audioShortLabel = "O";
-                            } else if ("VO-HUN".equalsIgnoreCase(version) || "VOEU-HUN".equalsIgnoreCase(version)) {
-                                // VO / VOEU = Version Originale (Européenne) (Originalton der Produktion)
-                                // HUN = Hungarian / Ungarisch (ISO-639-2 Sprachcode hun / Ungarisch)
-                                audioCode = "VO";
-                                audioShortLabel = "HUN";
-                            } else if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported:" + version);
+                            final VersionType versionType = VersionType.parse(version);
+                            switch (versionType) {
+                            case UNKNOWN:
+                                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported:" + version);
+                                }
+                                break;
+                            default:
+                                audioCode = new Regex(version, "^([A-Z]+)").getMatch(0).toUpperCase(Locale.ROOT);
+                                audioShortLabel = new Regex(version, "-([A-Z]+)").getMatch(0);
+                                if (audioShortLabel != null) {
+                                    audioShortLabel = audioShortLabel.toUpperCase(Locale.ROOT);
+                                }
+                                if (StringUtils.containsIgnoreCase(audioCode, "AUD") && audioShortLabel != null) {
+                                    audioShortLabel = "AD (" + audioShortLabel.toLowerCase(Locale.ROOT) + ".)";
+                                }
+                                break;
                             }
-                            break;
                         }
+                    }
+                    if (enhances_speech_intelligibility && audioShortLabel != null) {
+                        audioShortLabel = audioShortLabel + "(comfort audio)";
                     }
                     if (audioCode == null) {
                         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
@@ -957,10 +926,14 @@ public class ArteMediathekV3 extends PluginForDecrypt {
                 // Original version neither in French nor German, with subtitles
                 return ORIGINAL;
             }
-            if (StringUtils.startsWithCaseInsensitive(apiosCode, "VOEU")) {
+            if (StringUtils.equalsIgnoreCase(apiosCode, "VOEU")) {
                 // Original european version
                 return ORIGINAL_EUROPEAN;
+            } else if (StringUtils.startsWithCaseInsensitive(apiosCode, "VOEU-")) {
+                // Original european version, with subtitles
+                return ORIGINAL_EUROPEAN;
             }
+
             if (StringUtils.equalsIgnoreCase(apiosCode, "VOF")) {
                 // Original version in French, without subtitles.
                 return ORIGINAL_FRANCAIS;
@@ -975,33 +948,46 @@ public class ArteMediathekV3 extends PluginForDecrypt {
                 // Original version in German, with subtitles
                 return ORIGINAL_GERMAN;
             }
+
             if (StringUtils.equalsIgnoreCase(apiosCode, "VF")) {
                 // Non-original French version (Post-Synchro and/or Voice Over), without subtitles
-                return NON_ORIGINAL_FRANCAIS;
-            } else if (StringUtils.equalsIgnoreCase(apiosCode, "VFAUD")) {
-                // French version, with audio description
                 return NON_ORIGINAL_FRANCAIS;
             } else if (StringUtils.startsWithCaseInsensitive(apiosCode, "VF-")) {
                 // Non-original French version (Post-Synchro and/or Voice Over), with subtitles
                 return NON_ORIGINAL_FRANCAIS;
             }
+
+            if (StringUtils.equalsIgnoreCase(apiosCode, "VFAUD")) {
+                // French version, with audio description
+                return NON_ORIGINAL_FRANCAIS;
+            } else if (StringUtils.startsWithCaseInsensitive(apiosCode, "VFAUD-")) {
+                // French version, with audio description, with subtitles
+                return NON_ORIGINAL_FRANCAIS;
+            }
+
             if (StringUtils.equalsIgnoreCase(apiosCode, "VA")) {
                 // Non-original German version (Post-Synchro and/or Voice Over),without subtitles
-                return NON_ORIGINAL_GERMAN;
-            } else if (StringUtils.equalsIgnoreCase(apiosCode, "VAAUD")) {
-                // German version, with audio description
                 return NON_ORIGINAL_GERMAN;
             } else if (StringUtils.startsWithCaseInsensitive(apiosCode, "VA-")) {
                 // Non-original German version (Post-Synchro and/or Voice Over),with subtitles
                 return NON_ORIGINAL_GERMAN;
             }
-            if (StringUtils.equalsIgnoreCase(apiosCode, "VE")) {
-                // Foreign version, dubbed in a third language, neither in French nor German, without subtitles
-                return FOREIGN;
-            } else if (StringUtils.startsWithCaseInsensitive(apiosCode, "VE-")) {
-                // Foreign version, dubbed in a third language, neither in French nor German, with subtitles
-                return FOREIGN;
-            }
+
+            if (StringUtils.equalsIgnoreCase(apiosCode, "VAAUD")) {
+                // German version, with audio description
+                return NON_ORIGINAL_GERMAN;
+            } else if (StringUtils.startsWithCaseInsensitive(apiosCode, "VAAUD-")) {
+                // German version, with audio description, with subtitles
+                return NON_ORIGINAL_GERMAN;
+            } else
+
+                if (StringUtils.equalsIgnoreCase(apiosCode, "VE")) {
+                    // Foreign version, dubbed in a third language, neither in French nor German, without subtitles
+                    return FOREIGN;
+                } else if (StringUtils.startsWithCaseInsensitive(apiosCode, "VE-")) {
+                    // Foreign version, dubbed in a third language, neither in French nor German, with subtitles
+                    return FOREIGN;
+                }
             return UNKNOWN;
         }
     }

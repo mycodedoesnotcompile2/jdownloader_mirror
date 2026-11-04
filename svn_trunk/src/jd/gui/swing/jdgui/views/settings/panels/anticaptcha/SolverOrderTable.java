@@ -7,20 +7,27 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import javax.swing.Icon;
 import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
+import org.appwork.swing.components.CheckBoxIcon;
+import org.appwork.swing.components.ExtMergedIcon;
 import org.appwork.swing.exttable.ExtColumn;
+import org.appwork.utils.images.TransparentIcon;
 import org.jdownloader.api.captcha.CaptchaAPIManualRemoteSolverService;
 import org.jdownloader.captcha.v2.SolverService;
 import org.jdownloader.captcha.v2.solver.service.BrowserSolverService;
+import org.jdownloader.captcha.v2.solver.service.DialogSolverService;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSolverService;
+import org.jdownloader.settings.SilentModeController;
+import org.jdownloader.settings.SilentModeSettings.SilentModeSetting;
 
 import jd.gui.swing.jdgui.BasicJDTable;
 import jd.gui.swing.jdgui.views.settings.components.ToggleEnabledSelectionAction;
@@ -117,6 +124,40 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
         return showInComparison;
     }
 
+    /**
+     * "Silent Mode" check box for the solvers which need the user (dialog, browser). It does only that: Checked means a silent mode is set
+     * (manual or automatic), clicking it switches the silent mode off, or on (manual) if it was off. The status of these solvers tells
+     * about the silent mode, see {@link org.jdownloader.captcha.v2.solver.service.AbstractSolverService}.
+     */
+    private JMenuItem createSilentModeItem() {
+        final boolean silentModeSet;
+        final SilentModeController controller = SilentModeController.getInstance();
+        switch (controller.getSetting()) {
+        case DISABLED:
+            silentModeSet = false;
+            break;
+        case ENABLED:
+        case AUTO_JD_IN_TASKBAR:
+        case AUTO_JD_IN_TRAY:
+        default:
+            silentModeSet = true;
+            break;
+        }
+        /*
+         * One icon like the enable/disable entry (ToggleEnabledSelectionAction): The silent mode icon small in the background and a check
+         * box in front, so no second icon column is needed on the left of the menu.
+         */
+        final Icon icon = new ExtMergedIcon(NewTheme.I().getIcon(IconKey.ICON_SILENTMODE, 18), -2, -2).add(new TransparentIcon(new CheckBoxIcon(14, silentModeSet, true), 0.75f), 6, 6);
+        final JMenuItem silentMode = new JMenuItem(_GUI.T.SolverOrderTable_context_silentMode(), icon);
+        silentMode.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(final ActionEvent e) {
+                controller.setSetting(silentModeSet ? SilentModeSetting.DISABLED : SilentModeSetting.ENABLED);
+            }
+        });
+        return silentMode;
+    }
+
     @Override
     protected JPopupMenu onContextMenu(final JPopupMenu popup, final SolverService contextObject, final List<SolverService> selection, final ExtColumn<SolverService> column, final MouseEvent mouseEvent) {
         if (contextObject != null) {
@@ -172,13 +213,19 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
             popup.add(selectBrowser);
         }
         boolean externalSelected = false;
+        boolean dialogSolverSelected = contextObject instanceof DialogSolverService || contextObject instanceof BrowserSolverService;
         if (selection != null) {
             for (final SolverService selected : selection) {
                 if (selected instanceof PluginForCaptchaSolverSolverService) {
                     externalSelected = true;
-                    break;
+                } else if (selected instanceof DialogSolverService || selected instanceof BrowserSolverService) {
+                    dialogSolverSelected = true;
                 }
             }
+        }
+        if (dialogSolverSelected) {
+            /* The solvers which need the user in front of the computer (dialog, browser): The silent mode is what keeps their dialogs away. */
+            popup.add(createSilentModeItem());
         }
         if (externalSelected) {
             /* Shown if at least one external solver is selected, it always refers to the solver that was right clicked (only if external). */

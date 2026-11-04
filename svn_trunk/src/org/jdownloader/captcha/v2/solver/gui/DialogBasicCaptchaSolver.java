@@ -105,7 +105,10 @@ public class DialogBasicCaptchaSolver extends AbstractDialogSolver<String> {
         checkInterruption();
         job.getLogger().info("Waits are done. Response so far: " + job.getResponse());
         ChallengeSolverJobListener jacListener = null;
-        checkSilentMode(job);
+        if (checkSilentMode(job)) {
+            /* Silent mode: Do not ask the user, the other solvers continue. */
+            return null;
+        }
         // we do not need another queue
         handler = new BasicCaptchaDialogHandler(captchaChallenge);
         job.getEventSender().addListener(jacListener = new ChallengeSolverJobListener() {
@@ -139,6 +142,16 @@ public class DialogBasicCaptchaSolver extends AbstractDialogSolver<String> {
                 return null;
             }
             handler.run();
+            if (handler.isSilentModeTimeout()) {
+                /* The dialog was never shown because of the silent mode: Only this solver ends, the other solvers continue. */
+                endBecauseOfSilentMode(job, "The dialog was not shown because of the silent mode");
+                return null;
+            }
+            if (handler.getExternalSolverToUse() != null) {
+                /* The user chose an external solver in the dialog: No answer from this solver, the chosen solver takes over. */
+                endBecauseUserChoseExternalSolver(job, handler.getExternalSolverToUse());
+                return null;
+            }
             return handler.getResult();
         } finally {
             job.getLogger().info("Dialog closed. Response far: " + job.getResponse());

@@ -33,7 +33,7 @@ import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 53637 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53873 $", interfaceVersion = 3, names = {}, urls = {})
 public class TerabytezOrg extends XFileSharingProBasic {
     public TerabytezOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -119,7 +119,18 @@ public class TerabytezOrg extends XFileSharingProBasic {
     public String[] scanInfo(final String html, final String[] fileInfo) {
         /* 2023-12-04 */
         super.scanInfo(html, fileInfo);
-        final String betterFilename = new Regex(html, "class=\"name\"[^>]*>\\s*<h4>([^<]+)</h4>").getMatch(0);
+        /* 2026-11-03 */
+        final String betterFilesize = br.getRegex("<span>Size\\s*<b>(\\d+[^<]+)</b>").getMatch(0);
+        if (betterFilesize != null) {
+            fileInfo[1] = betterFilesize;
+        }
+        String betterFilename = new Regex(html, "class=\"name\"[^>]*>\\s*<h4>([^<]+)</h4>").getMatch(0);
+        if (betterFilename != null) {
+            fileInfo[0] = betterFilename;
+            return fileInfo;
+        }
+        /* 2026-11-03: New and for premium users: special source with non-truncated filename. */
+        betterFilename = new Regex(html, "class=\"name\">\\s*<\\!--<h4>([^<]+)</h4>").getMatch(0);
         if (betterFilename != null) {
             fileInfo[0] = betterFilename;
         }
@@ -136,11 +147,15 @@ public class TerabytezOrg extends XFileSharingProBasic {
     }
 
     private void specialLegacyHandlingYetiToXFS(final Browser br, final DownloadLink link) {
-        if (!link.hasProperty(PROPERTY_XFS_FUID) && new Regex(link.getPluginPatternMatcher(), PATTERN_OLD).patternFind()) {
-            final String xfs_fuid = new Regex(br.getURL(), "(?:/|=)([a-z0-9]{12})$").getMatch(0);
-            if (xfs_fuid != null) {
-                link.setProperty(PROPERTY_XFS_FUID, xfs_fuid);
-            }
+        if (link.hasProperty(PROPERTY_XFS_FUID)) {
+            return;
+        }
+        if (!new Regex(link.getPluginPatternMatcher(), PATTERN_OLD).patternFind()) {
+            return;
+        }
+        final String xfs_fuid = new Regex(br.getURL(), "(?:/|=)([a-z0-9]{12})$").getMatch(0);
+        if (xfs_fuid != null) {
+            link.setProperty(PROPERTY_XFS_FUID, xfs_fuid);
         }
     }
 
