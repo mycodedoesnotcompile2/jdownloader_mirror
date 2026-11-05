@@ -61,6 +61,7 @@ import jd.http.NoGateWayException;
 import jd.http.ProxySelectorInterface;
 import jd.http.StaticProxySelector;
 import jd.plugins.Account;
+import jd.plugins.CaptchaException.CaptchaRefreshException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.DownloadLinkProperty;
@@ -508,12 +509,8 @@ public class SingleDownloadController extends BrowserSettingsThread implements D
                     break;
                 }
             } catch (PluginException pluginException) {
-                switch (pluginException.getLinkStatus()) {
-                case LinkStatus.ERROR_CAPTCHA:
+                if (pluginException.getLinkStatus() == LinkStatus.ERROR_CAPTCHA || pluginException instanceof CaptchaRefreshException) {
                     invalidateLastChallengeResponse(downloadLogger, lastPlugin);
-                    break;
-                default:
-                    break;
                 }
             } catch (Throwable unchanged) {
             }

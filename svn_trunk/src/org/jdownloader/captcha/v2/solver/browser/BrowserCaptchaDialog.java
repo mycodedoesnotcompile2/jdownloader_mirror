@@ -16,8 +16,8 @@
 package org.jdownloader.captcha.v2.solver.browser;
 
 import java.awt.Cursor;
-import java.awt.Dimension;
 import java.awt.Dialog.ModalityType;
+import java.awt.Dimension;
 import java.awt.Image;
 import java.awt.Point;
 import java.awt.Window;
@@ -34,13 +34,6 @@ import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-
-import jd.gui.swing.dialog.AbstractImageCaptchaDialog;
-import jd.gui.swing.dialog.DialogType;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.views.settings.components.Checkbox;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-import net.miginfocom.swing.MigLayout;
 
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.swing.components.ExtButton;
@@ -59,6 +52,7 @@ import org.jdownloader.DomainInfo;
 import org.jdownloader.actions.AppAction;
 import org.jdownloader.captcha.v2.AbstractCaptchaDialog;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
+import org.jdownloader.captcha.v2.ValidationResult;
 import org.jdownloader.captcha.v2.solver.service.BrowserSolverService;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.gui.IconKey;
@@ -71,11 +65,17 @@ import org.jdownloader.premium.PremiumInfoDialog;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
+import jd.gui.swing.dialog.AbstractImageCaptchaDialog;
+import jd.gui.swing.dialog.DialogType;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.views.settings.components.Checkbox;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import net.miginfocom.swing.MigLayout;
+
 /**
  * This Dialog is used to display a Inputdialog for the captchas
  */
 public class BrowserCaptchaDialog extends AbstractCaptchaDialog<String> {
-
     public BrowserCaptchaDialog(int flag, DialogType type, DomainInfo domainInfo, AbstractBrowserChallenge captchaChallenge) {
         super(captchaChallenge, flag | Dialog.STYLE_HIDE_ICON, _GUI.T.gui_captchaWindow_askForInput(domainInfo.getTld()), type, domainInfo, null);
         if (JsonConfig.create(GraphicalUserInterfaceSettings.class).isCaptchaDialogUniquePositionByHosterEnabled()) {
@@ -124,8 +124,6 @@ public class BrowserCaptchaDialog extends AbstractCaptchaDialog<String> {
 
     protected AbstractConfigPanel                          iconPanel;
     protected Point                                        offset;
-
-    protected boolean                                      refresh;
     protected final CopyOnWriteArrayList<BrowserReference> browserReferences = new CopyOnWriteArrayList<BrowserReference>();
     private volatile String                                responseCode;
     private WindowFocusListener                            openBrowserFocusListener;
@@ -184,6 +182,8 @@ public class BrowserCaptchaDialog extends AbstractCaptchaDialog<String> {
         if (isSoundToggleVisible()) {
             ret.add(createSoundToggle(), "width 28!");
         }
+        /* The refresh button always stands directly next to the sound toggle, in front of the "Hate captchas" text. */
+        ret.add(createRefreshButton(), "width 28!");
         ExtButton premium = new ExtButton(new AppAction() {
             /**
              *
@@ -331,7 +331,7 @@ public class BrowserCaptchaDialog extends AbstractCaptchaDialog<String> {
             return false;
         } else {
             final SolverJob<?> job = ChallengeResponseController.getInstance().getJobByChallengeId(challenge.getId().getID());
-            if (challenge.isSolved() || job == null || job.isDone() || BrowserSolver.getInstance().isJobDone(job)) {
+            if (ValidationResult.VALID.equals(challenge.getValidationResult()) || job == null || job.isDone() || BrowserSolver.getInstance().isJobDone(job)) {
                 return false;
             } else {
                 return true;
@@ -369,14 +369,6 @@ public class BrowserCaptchaDialog extends AbstractCaptchaDialog<String> {
     @Override
     public String getOKButtonText() {
         return _GUI.T.BrowserCaptchaDialog_getOKButtonText_open_browser();
-    }
-
-    public boolean isRefresh() {
-        return refresh;
-    }
-
-    public void setRefresh(boolean refresh) {
-        this.refresh = refresh;
     }
 
     public void mouseClicked(final MouseEvent e) {
@@ -424,5 +416,4 @@ public class BrowserCaptchaDialog extends AbstractCaptchaDialog<String> {
             UIOManager.I().showException(e1.getMessage(), e1);
         }
     }
-
 }

@@ -25,8 +25,10 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 
 import javax.swing.AbstractAction;
@@ -91,13 +93,13 @@ import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
 public class MainToolBar extends JToolBar implements MouseListener, DownloadWatchdogListener, GenericConfigEventListener<Boolean> {
-    private static final long          serialVersionUID = 922971719957349497L;
-    private static MainToolBar         INSTANCE         = null;
-    private volatile SpeedMeterPanel   speedmeter;
-    private JRootPane                  rootpane;
-    private boolean                    initDone         = false;
-    private LogSource                  logger;
-    private HashMap<KeyStroke, Action> shortCutActions;
+    private static final long            serialVersionUID = 922971719957349497L;
+    private static MainToolBar           INSTANCE         = null;
+    private volatile SpeedMeterPanel     speedmeter;
+    private JRootPane                    rootpane;
+    private boolean                      initDone         = false;
+    private LogSource                    logger;
+    private Map<Action, List<KeyStroke>> shortCutActions  = new HashMap<Action, List<KeyStroke>>();
 
     public boolean isInitDone() {
         return initDone;
@@ -264,7 +266,7 @@ public class MainToolBar extends JToolBar implements MouseListener, DownloadWatc
                     keystroke = (KeyStroke) action.getValue(Action.ACCELERATOR_KEY);
                     linkAction(input, input2, input3, actions, action, keystroke);
                     if (action instanceof CustomizableAppAction) {
-                        List<KeyStroke> moreShortCuts = ((CustomizableAppAction) action).getAdditionalShortcuts(keystroke);
+                        final List<KeyStroke> moreShortCuts = ((CustomizableAppAction) action).getAdditionalShortcuts(keystroke);
                         if (moreShortCuts != null) {
                             for (KeyStroke ks : moreShortCuts) {
                                 if (ks != null) {
@@ -312,25 +314,40 @@ public class MainToolBar extends JToolBar implements MouseListener, DownloadWatc
             input2.put(keystroke, key);
             input3.put(keystroke, key);
             actions.put(key, action);
-            shortCutActions.put(keystroke, action);
+            rememberShortCutActions(action, keystroke);
         }
     }
 
+    private void rememberShortCutActions(AppAction action, KeyStroke ks) {
+        List<KeyStroke> list = shortCutActions.get(action);
+        if (list == null) {
+            list = new ArrayList<KeyStroke>();
+            shortCutActions.put(action, list);
+        }
+        list.add(ks);
+    }
+
     public void updateContextShortcuts(MenuContainerRoot container) {
+        final InputMap root1 = this.rootpane.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT);
+        final InputMap root2 = this.rootpane.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
         final InputMap input = getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT);
         final InputMap input2 = getInputMap(JComponent.WHEN_FOCUSED);
         final InputMap input3 = getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
         final ActionMap actions = getActionMap();
         if (shortCutActions != null) {
-            for (Entry<KeyStroke, Action> ks : shortCutActions.entrySet()) {
-                Object binding = input.get(ks.getKey());
-                input.remove(ks.getKey());
-                input2.remove(ks.getKey());
-                input3.remove(ks.getKey());
-                actions.remove(binding);
+            for (Entry<Action, List<KeyStroke>> entry : shortCutActions.entrySet()) {
+                for (KeyStroke ks : entry.getValue()) {
+                    final Object binding = input.get(ks);
+                    root1.remove(ks);
+                    root2.remove(ks);
+                    input.remove(ks);
+                    input2.remove(ks);
+                    input3.remove(ks);
+                    actions.remove(binding);
+                }
             }
         }
-        shortCutActions = new HashMap<KeyStroke, Action>();
+        shortCutActions = new HashMap<Action, List<KeyStroke>>();
         fillActions(container);
     }
 
@@ -607,7 +624,7 @@ public class MainToolBar extends JToolBar implements MouseListener, DownloadWatc
                     final KeyStroke ks = (KeyStroke) value;
                     this.rootpane.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(ks, action);
                     this.rootpane.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(ks, action);
-                    this.rootpane.getActionMap().put(action, action);
+                    rememberShortCutActions(action, ks);
                 }
             } catch (Exception e) {
                 e.printStackTrace();

@@ -35,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53336 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53900 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileDitchCom extends PluginForHost {
     public FileDitchCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -56,7 +56,7 @@ public class FileDitchCom extends PluginForHost {
     protected static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "fileditchfiles.st", "fileditchfiles.me", "fileditch.com", "theditch.st" });
+        ret.add(new String[] { "fileditchfiles.st", "fileditchfiles.me", "fileditchvids.st", "fileditch.com", "new.fileditch.com", "theditch.st", "embedditch.st", "lumitakesomega3daily.xyz" });
         return ret;
     }
 
@@ -80,7 +80,7 @@ public class FileDitchCom extends PluginForHost {
     }
 
     /** New URL type e.g. https://fileditchfiles.st/balpha1/43339e614f5b3f28ebb9/00_Testdata.part3.rar */
-    protected static final Pattern PATTERN_FILE       = Pattern.compile("/[^/]+/([a-f0-9]+)/([^/\\?#]+)");
+    protected static final Pattern PATTERN_FILE       = Pattern.compile("/[^/]+/([a-f0-9]+)/([^/\\?#]+)(?:\\?fdrh=[^&]+)?");
     /** Old URL type e.g. https://fileditchfiles.me/file.php?f=/abc123/00_Testdata.part3.rar */
     protected static final Pattern PATTERN_FILE_OLD   = Pattern.compile("/file\\.php\\?f=/([a-z0-9]{3,})/([^/#\\?]+)");
     protected static final Pattern PATTERN_FILE_SHORT = Pattern.compile("/([a-z0-9]{8})");
@@ -89,7 +89,7 @@ public class FileDitchCom extends PluginForHost {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
             final String hostsPattern = buildHostsPatternPart(domains);
-            ret.add("https?://" + hostsPattern + "/(" + PATTERN_FILE.pattern().substring(1) + "|" + PATTERN_FILE_OLD.pattern().substring(1) + "|" + PATTERN_FILE_SHORT.pattern().substring(0) + ")");
+            ret.add("https?://" + hostsPattern + "/(" + PATTERN_FILE.pattern().substring(1) + "|" + PATTERN_FILE_OLD.pattern().substring(1) + "|" + PATTERN_FILE_SHORT.pattern().substring(1) + ")");
         }
         return ret.toArray(new String[0]);
     }

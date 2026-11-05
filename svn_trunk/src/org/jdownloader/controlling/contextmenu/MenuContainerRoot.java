@@ -11,6 +11,7 @@ import org.appwork.storage.Storable;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Application;
 import org.appwork.utils.StringUtils;
+import org.jdownloader.actions.AppAction;
 import org.jdownloader.extensions.ExtensionNotLoadedException;
 import org.jdownloader.logging.LogController;
 
@@ -109,7 +110,12 @@ public class MenuContainerRoot extends MenuContainer implements Storable {
                             }
                         }
                         if (lr.getActionData() != null && lr.getActionData()._isValidDataForCreatingAnAction() && !(lr instanceof MenuLink)) {
-                            lr.createAction();
+                            AppAction.setValidationMode(true);
+                            try {
+                                lr.createAction();
+                            } finally {
+                                AppAction.setValidationMode(false);
+                            }
                         }
                     } catch (ClassCurrentlyNotAvailableException e) {
                         LogController.CL().log(e);

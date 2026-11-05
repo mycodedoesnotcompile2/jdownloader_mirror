@@ -49,8 +49,8 @@ public class MultiClickCaptchaChallenge extends ImageCaptchaChallenge<MultiClick
     }
 
     /**
-     * Rejects answers whose amount of clicks does not fit the expectation: fewer than minClicks, or - if min and max are equal - any
-     * amount other than exactly that number. If only a max is set, answers with more clicks are rejected as well.
+     * Rejects answers whose amount of clicks does not fit the expectation: fewer than minClicks, or - if min and max are equal - any amount
+     * other than exactly that number. If only a max is set, answers with more clicks are rejected as well.
      */
     @Override
     public ValidationResult validateResponse(AbstractResponse<MultiClickedPoint> response) {

@@ -463,7 +463,7 @@ public class Cookie {
 
     @Override
     public String toString() {
-        return this.getKey() + "=" + this.getValue() + " @Host:" + this.getHost() + "/Domain:" + getDomain() + "/HostOnly:" + isHostOnly() + "/Path:" + getPath() + "/SameSite:" + getSameSite();
+        return this.getKey() + "=" + this.getValue() + " @Host:" + this.getHost() + "|Domain:" + getDomain() + "|HostOnly:" + isHostOnly() + "|Path:" + getPath() + "|SameSite:" + getSameSite() + "|Source:" + getSource();
     }
 
     protected synchronized void update(final Cookie source) {

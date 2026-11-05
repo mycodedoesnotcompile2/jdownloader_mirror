@@ -2,13 +2,13 @@ package org.jdownloader.captcha.v2.challenge.altcha;
 
 import java.util.Map;
 
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.ValidationResult;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
+
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
 
 /**
  * ALTCHA (https://altcha.org/): Open source proof-of-work captcha. The widget ('altcha-widget') fetches a challenge JSON from the
@@ -51,14 +51,6 @@ public abstract class AltchaChallenge extends AbstractBrowserChallenge {
      */
     public Map<String, Object> getChallengeV1() {
         return AbstractAltchaCaptcha.parseChallengeV1(challengeJson);
-    }
-
-    public boolean isCaptchaResponseValid() {
-        if (super.isCaptchaResponseValid() && AbstractAltchaCaptcha.looksLikeValidToken(getResult().getValue())) {
-            return true;
-        } else {
-            return false;
-        }
     }
 
     @Override

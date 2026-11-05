@@ -38,14 +38,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 53504 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53901 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadyIo extends XFileSharingProBasic {
     public UploadyIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -235,7 +228,7 @@ public class UploadyIo extends XFileSharingProBasic {
 
     @Override
     protected String getPremiumOnlyErrorMessage(final Browser br) {
-        String msg = br.getRegex("(As a Guest user, you can download files up to(\\s*<strong>)?\\d+ MB)").getMatch(0);
+        String msg = br.getRegex("(As a Guest user, you can download files up to(\\s*<strong>)?\\d+ (GB|MB))").getMatch(0);
         if (msg != null) {
             /* Remove html tags from msg. */
             msg = msg.replaceAll("\\s*<strong>", " ");

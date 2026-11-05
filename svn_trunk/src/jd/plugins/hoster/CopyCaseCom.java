@@ -35,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52122 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53890 $", interfaceVersion = 2, names = {}, urls = {})
 public class CopyCaseCom extends PluginForHost {
     public CopyCaseCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -303,9 +303,6 @@ public class CopyCaseCom extends PluginForHost {
                         }
                     };
                     final String recaptchaV2Response = rc2.getToken();
-                    if (StringUtils.isEmpty(recaptchaV2Response)) {
-                        throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                    }
                     postData.put("g-recaptcha-response", recaptchaV2Response);
                 }
                 if (twoFARequired || (resp != null && StringUtils.equalsIgnoreCase(StringUtils.valueOfOrNull(resp.get("status")), "two_factor_auth"))) {

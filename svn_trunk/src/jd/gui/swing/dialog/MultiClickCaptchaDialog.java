@@ -26,6 +26,7 @@ import java.awt.Point;
 import java.awt.RenderingHints;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
+import java.awt.event.MouseMotionAdapter;
 import java.util.ArrayList;
 
 import javax.swing.JComponent;
@@ -42,6 +43,10 @@ import org.jdownloader.gui.translate._GUI;
  */
 public class MultiClickCaptchaDialog extends AbstractImageCaptchaDialog<MultiClickedPoint> {
 
+    /* Half size of the red X in pixels. */
+    private static final int MARKER_SIZE       = 14;
+    /* Clicking within this distance (pixels) of a marker removes it. */
+    private static final int MARKER_HIT_RADIUS = 18;
     private ArrayList<Point> rp = null;
     private final MultiClickCaptchaChallenge clickChallenge;
     private ExtTextField counterField;
@@ -66,6 +71,15 @@ public class MultiClickCaptchaDialog extends AbstractImageCaptchaDialog<MultiCli
 
             @Override
             public void mouseReleased(MouseEvent e) {
+                final Point existing = getClickAt(e.getPoint());
+                if (existing != null) {
+                    /* Click on an existing marker -> remove that click again. */
+                    rp.remove(existing);
+                    iconPanel.setCursor(Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR));
+                    updateClickCounter();
+                    iconPanel.repaint();
+                    return;
+                }
                 final Point resultPoint = e.getPoint();
                 resultPoint.x -= getOffset().x;
                 resultPoint.y -= getOffset().y;
@@ -74,12 +88,16 @@ public class MultiClickCaptchaDialog extends AbstractImageCaptchaDialog<MultiCli
                 if (rp == null) {
                     rp = new ArrayList<Point>();
                 }
+                final int maxClicks = clickChallenge.getMaxClicks();
+                if (maxClicks > 0 && rp.size() >= maxClicks) {
+                    /* Maximum reached: the user has to remove a click first. */
+                    return;
+                }
                 rp.add(resultPoint);
                 updateClickCounter();
                 iconPanel.repaint();
-                final int maxClicks = clickChallenge.getMaxClicks();
-                if (maxClicks > 0 && rp.size() >= maxClicks) {
-                    /* Expected amount of clicks reached -> confirm automatically. */
+                if (maxClicks == 1) {
+                    /* Single click captcha -> confirm automatically. Otherwise the user must be able to remove wrong clicks first. */
                     setReturnmask(true);
                     dispose();
                 }
@@ -101,34 +119,69 @@ public class MultiClickCaptchaDialog extends AbstractImageCaptchaDialog<MultiCli
             public void mouseClicked(MouseEvent e) {
             }
         });
+        iconPanel.addMouseMotionListener(new MouseMotionAdapter() {
+            @Override
+            public void mouseMoved(MouseEvent e) {
+                /* Hand cursor over a click marker = clicking removes it. */
+                final boolean overMarker = getClickAt(e.getPoint()) != null;
+                iconPanel.setCursor(Cursor.getPredefinedCursor(overMarker ? Cursor.HAND_CURSOR : Cursor.CROSSHAIR_CURSOR));
+                iconPanel.setToolTipText(overMarker ? _GUI.T.MultiClickCaptchaDialog_marker_tooltip() : getHelpText());
+            }
+        });
         return ret;
+    }
+
+    /** Returns the nearest already placed click whose marker (hit area) contains the given display position, or null. */
+    private Point getClickAt(final Point displayPoint) {
+        if (rp == null || rp.isEmpty()) {
+            return null;
+        }
+        final double scale = getScaleFaktor();
+        if (scale <= 0) {
+            return null;
+        }
+        Point best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (final Point p : rp) {
+            final double dx = p.x / scale + getOffset().x - displayPoint.x;
+            final double dy = p.y / scale + getOffset().y - displayPoint.y;
+            final double distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance <= MARKER_HIT_RADIUS && distance < bestDistance) {
+                best = p;
+                bestDistance = distance;
+            }
+        }
+        return best;
     }
 
     @Override
     protected JComponent createInputComponent() {
-        final ExtTextField ret = new ExtTextField();
-        ret.setEditable(false);
-        counterField = ret;
+        /* Click info below the image as plain text. The challenge description is shown above the image, see addBeforeImage. */
+        counterField = new ExtTextField();
+        counterField.setEditable(false);
         updateClickCounter();
-        return ret;
+        return counterField;
     }
 
-    /**
-     * Shows the amount of clicks done so far, e.g. "3/8 Klicks" (or "3 Klicks" if there is no maximum), followed by the help text.
-     */
+    /** Shows the amount of clicks done so far and how many are allowed. */
     private void updateClickCounter() {
         if (counterField == null) {
             return;
         }
         final int clicks = rp == null ? 0 : rp.size();
         final int maxClicks = clickChallenge.getMaxClicks();
+        final int minClicks = clickChallenge.getMinClicks();
         final String counter;
-        if (maxClicks > 0) {
-            counter = clicks + "/" + maxClicks + " Klicks";
+        if (maxClicks > 0 && minClicks == maxClicks) {
+            /* Exact amount required */
+            counter = _GUI.T.MultiClickCaptchaDialog_clicks_exact(clicks, maxClicks);
+        } else if (maxClicks > 0) {
+            /* Optional amount: anything between min and max is allowed */
+            counter = _GUI.T.MultiClickCaptchaDialog_clicks_range(clicks, maxClicks, Math.max(minClicks, 0));
         } else {
-            counter = clicks + " Klicks";
+            counter = _GUI.T.MultiClickCaptchaDialog_clicks_unlimited(clicks, Math.max(minClicks, 0));
         }
-        counterField.setText(counter + " - " + getHelpText());
+        counterField.setText(counter);
         updateOkButton();
     }
 
@@ -159,12 +212,17 @@ public class MultiClickCaptchaDialog extends AbstractImageCaptchaDialog<MultiCli
         final Graphics2D g2 = (Graphics2D) g.create();
         try {
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setColor(Color.RED);
-            g2.setStroke(new BasicStroke(2.5f));
-            final int size = 6;
+            final int size = MARKER_SIZE;
             for (final Point p : rp) {
                 final int x = (int) Math.round(p.x / scale) + xOffset;
                 final int y = (int) Math.round(p.y / scale) + yOffset;
+                /* White outline first so the marker is visible on any background. */
+                g2.setColor(Color.WHITE);
+                g2.setStroke(new BasicStroke(7f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawLine(x - size, y - size, x + size, y + size);
+                g2.drawLine(x - size, y + size, x + size, y - size);
+                g2.setColor(Color.RED);
+                g2.setStroke(new BasicStroke(4f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
                 g2.drawLine(x - size, y - size, x + size, y + size);
                 g2.drawLine(x - size, y + size, x + size, y - size);
             }

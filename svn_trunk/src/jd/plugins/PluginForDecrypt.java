@@ -50,7 +50,6 @@ import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
-import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 import org.jdownloader.gui.IconKey;
@@ -85,6 +84,7 @@ import jd.http.Browser.BrowserException;
 import jd.http.Request;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
+import jd.plugins.CaptchaException.CaptchaRefreshException;
 import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.utils.JDUtilities;
 
@@ -456,7 +456,6 @@ public abstract class PluginForDecrypt extends Plugin {
             ArrayList<DownloadLink> results = null;
             Throwable controlledThrown = null;
             try {
-                challenges = null;
                 setCurrentLink(link);
                 /*
                  * we now lets log into plugin specific loggers with all verbose/debug on
@@ -537,8 +536,8 @@ public abstract class PluginForDecrypt extends Plugin {
                 }
                 return results;
             } finally {
+                /* clean() also removes the challenges (see Plugin#cleanupChallenges), the challenges map must never be null. */
                 clean();
-                challenges = null;
                 if (logger instanceof LogSource) {
                     if (controlledThrown != null) {
                         ((LogSource) logger).clear();
@@ -702,19 +701,20 @@ public abstract class PluginForDecrypt extends Plugin {
             switch (e.getSkipRequest()) {
             case BLOCK_ALL_CAPTCHAS:
                 CaptchaBlackList.getInstance().add(new BlockAllCrawlerCaptchasEntry(getCrawler()));
-                break;
+                throw new CaptchaException(e.getSkipRequest());
             case BLOCK_HOSTER:
                 CaptchaBlackList.getInstance().add(new BlockCrawlerCaptchasByHost(getCrawler(), getHost()));
-                break;
+                throw new CaptchaException(e.getSkipRequest());
             case BLOCK_PACKAGE:
                 CaptchaBlackList.getInstance().add(new BlockCrawlerCaptchasByPackage(getCrawler(), getCurrentLink()));
-                break;
+                throw new CaptchaException(e.getSkipRequest());
             case TIMEOUT:
                 onCaptchaTimeout(getCurrentLink(), c);
                 // TIMEOUT may fallthrough to SINGLE
             case SINGLE:
-                break;
+                throw new CaptchaException(e.getSkipRequest());
             default:
+                // handled in next switch
                 break;
             }
         }
@@ -732,21 +732,17 @@ public abstract class PluginForDecrypt extends Plugin {
                 }
                 CaptchaBlackList.getInstance().add(new BlockAllCrawlerCaptchasEntry(getCrawler()));
             }
-            break;
+            throw new CaptchaException(e.getSkipRequest());
         case REFRESH:
-            // refresh is not supported from the pluginsystem right now.
-            return c.getRefreshTrigger();
+            if (getChallengeRefreshVeto(c) == null) {
+                throw new CaptchaRefreshException();
+            }
         default:
-            break;
+            throw new CaptchaException(e.getSkipRequest());
         }
-        throw new CaptchaException(e.getSkipRequest());
     }
 
     public <ReturnType> ReturnType handleCaptchaChallenge(Challenge<ReturnType> c) throws PluginException, CaptchaException, InterruptedException {
-        if (c instanceof ImageCaptchaChallenge) {
-            final File captchaFile = ((ImageCaptchaChallenge) c).getImageFile();
-            cleanUpCaptchaFiles.addIfAbsent(captchaFile);
-        }
         c.setTimeout(getChallengeTimeout(c));
         invalidateLastChallengeResponse();
         try {
@@ -760,13 +756,12 @@ public abstract class PluginForDecrypt extends Plugin {
                 logger.warning("Cancel. Blacklist Matching");
                 throw new CaptchaException(blackListEntry);
             }
-            final SolverJob<ReturnType> job =ChallengeResponseController.getInstance().handle(c);
-            if (!c.isSolved()) {
-                throw new PluginException(LinkStatus.ERROR_CAPTCHA, job.getStatusDetail());
-            } else if (!c.isCaptchaResponseValid()) {
-                throw new PluginException(LinkStatus.ERROR_CAPTCHA, "Captcha reponse value did not validate!");
-            } else {
+            final SolverJob<ReturnType> job = ChallengeResponseController.getInstance().handle(c);
+            switch (c.getValidationResult()) {
+            case VALID:
                 return c.getResult().getValue();
+            default:
+                throw new PluginException(LinkStatus.ERROR_CAPTCHA, job.getStatusDetail());
             }
         } catch (InterruptedException e) {
             LogSource.exception(logger, e);

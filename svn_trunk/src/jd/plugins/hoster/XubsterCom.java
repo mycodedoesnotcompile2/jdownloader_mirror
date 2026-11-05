@@ -32,7 +32,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51680 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53890 $", interfaceVersion = 3, names = {}, urls = {})
 public class XubsterCom extends XFileSharingProBasic {
     public XubsterCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -43,7 +43,7 @@ public class XubsterCom extends XFileSharingProBasic {
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
      * mods: See overridden functions<br />
      * limit-info: 2019-06-27: Premium untested, set FREE account limits <br />
-     * captchatype-info: 2019-06-27: reCaptchaV2<br />
+     * captchatype-info: 2026-11-04: null <br />
      * other:<br />
      */
     public static String[] getAnnotationNames() {

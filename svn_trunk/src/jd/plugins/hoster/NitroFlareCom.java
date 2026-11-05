@@ -62,7 +62,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 53021 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53890 $", interfaceVersion = 3, names = {}, urls = {})
 public class NitroFlareCom extends PluginForHost {
     /* Documentation | docs: https://nitroflare.com/member?s=api */
     /* Don't touch the following! */
@@ -461,10 +461,6 @@ public class NitroFlareCom extends PluginForHost {
                     this.sleep(prePrePreDownloadWait, link);
                 }
                 final String c = rc2.getToken();
-                if (StringUtils.isEmpty(c)) {
-                    // fixes timeout issues or client refresh, we have no idea at this stage
-                    throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                }
                 // remove one second from past, to prevent returning too quickly.
                 final long passedTime = (System.currentTimeMillis() - timestampBeforeCaptchaSolving) - 1500;
                 wait -= passedTime;
@@ -576,10 +572,6 @@ public class NitroFlareCom extends PluginForHost {
                                 this.sleep(prePrePreDownloadWait, link);
                             }
                             final String reCaptchaV2Response = rc2.getToken();
-                            if (StringUtils.isEmpty(reCaptchaV2Response)) {
-                                // fixes timeout issues or client refresh, we have no idea at this stage
-                                throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                            }
                             query.add("captcha", Encoding.urlEncode(reCaptchaV2Response));
                             query.add("g-recaptcha-response", Encoding.urlEncode(reCaptchaV2Response));
                         }

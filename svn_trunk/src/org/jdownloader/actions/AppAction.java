@@ -23,6 +23,20 @@ import org.jdownloader.images.NewTheme;
  */
 public abstract class AppAction extends BasicAction {
 
+    private final static ThreadLocal<Boolean> VALIDATION = new ThreadLocal<Boolean>();
+
+    public final static boolean isValidationMode() {
+        return Boolean.TRUE.equals(VALIDATION.get());
+    }
+
+    public final static void setValidationMode(final boolean mode) {
+        if (mode) {
+            VALIDATION.set(mode);
+        } else {
+            VALIDATION.remove();
+        }
+    }
+
     protected String           iconKey;
 
     protected int              size;

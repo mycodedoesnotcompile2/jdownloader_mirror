@@ -5,7 +5,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
-import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
@@ -22,7 +21,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 51944 $", interfaceVersion = 3, names = { "5eurousenet.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53890 $", interfaceVersion = 3, names = { "5eurousenet.com" }, urls = { "" })
 public class FiveEuroUseNetCom extends UseNet {
     public FiveEuroUseNetCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -71,11 +70,7 @@ public class FiveEuroUseNetCom extends UseNet {
             if (login.containsHTML("g-recaptcha")) {
                 final CaptchaHelperHostPluginRecaptchaV2 rc2 = new CaptchaHelperHostPluginRecaptchaV2(this, br);
                 final String code = rc2.getToken();
-                if (StringUtils.isEmpty(code)) {
-                    throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                } else {
-                    login.put("g-recaptcha-response", Encoding.urlEncode(code));
-                }
+                login.put("g-recaptcha-response", Encoding.urlEncode(code));
             }
             br.submitForm(login);
             login = br.getFormbyActionRegex(".*?user/login");

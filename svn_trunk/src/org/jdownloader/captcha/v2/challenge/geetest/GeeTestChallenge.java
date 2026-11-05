@@ -3,10 +3,6 @@ package org.jdownloader.captcha.v2.challenge.geetest;
 import java.io.IOException;
 import java.net.URL;
 
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
@@ -22,6 +18,10 @@ import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.ValidationResult;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
 import org.jdownloader.captcha.v2.solver.browser.BrowserReference;
+
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
 
 public abstract class GeeTestChallenge extends AbstractBrowserChallenge {
     private String siteKey;
@@ -74,22 +74,17 @@ public abstract class GeeTestChallenge extends AbstractBrowserChallenge {
         return "geetest";
     }
 
+    public static boolean looksLikeValidToken(final String str) {
+        return str != null && str.matches("[\\w-]{30,}");
+    }
+
     @Override
     public ValidationResult validateResponse(AbstractResponse<String> response) {
         final ValidationResult result = super.validateResponse(response);
         if (result != ValidationResult.VALID) {
             return result;
         }
-        return isCaptchaResponseValid() ? ValidationResult.VALID : ValidationResult.INVALID;
-    }
-
-    @Override
-    public boolean isCaptchaResponseValid() {
-        if (super.isCaptchaResponseValid() && getResult().getValue().matches("[\\w-]{30,}")) {
-            return true;
-        } else {
-            return false;
-        }
+        return looksLikeValidToken(response.getValue()) ? ValidationResult.VALID : ValidationResult.INVALID;
     }
 
     protected final String getChallengeID() {

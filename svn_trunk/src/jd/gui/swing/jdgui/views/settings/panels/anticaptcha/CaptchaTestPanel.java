@@ -148,6 +148,10 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
     private final JSpinner                  minScoreSpinner;
     private final JLabel                    minClicksLabel;
     private final JSpinner                  minClicksSpinner;
+    private final JLabel                    minLengthLabel;
+    private final JSpinner                  minLengthSpinner;
+    private final JLabel                    maxLengthLabel;
+    private final JSpinner                  maxLengthSpinner;
     private final JTextField                expectedResultField;
     /* Multi test: the solvers to test. Only enabled and ready solvers are listed. */
     private final JButton                   solversButton;
@@ -381,6 +385,14 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         minClicksSpinner = new JSpinner(new SpinnerNumberModel(8, 1, 100, 1));
         add(minClicksLabel, "hidemode 3");
         add(minClicksSpinner, "growx, hidemode 3");
+        minLengthLabel = new JLabel("Min length (image captcha)");
+        minLengthSpinner = new JSpinner(new SpinnerNumberModel(1, 1, 100, 1));
+        add(minLengthLabel, "hidemode 3");
+        add(minLengthSpinner, "growx, hidemode 3");
+        maxLengthLabel = new JLabel("Max length (image captcha, 0 = no limit)");
+        maxLengthSpinner = new JSpinner(new SpinnerNumberModel(0, 0, 100, 1));
+        add(maxLengthLabel, "hidemode 3");
+        add(maxLengthSpinner, "growx, hidemode 3");
         add(new JLabel("Expected result"));
         add(expectedResultField, "growx");
         startButton = new JButton("Start Single Challenge Auto Test");
@@ -828,6 +840,15 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         minClicksSpinner.setVisible(usesMinClicks);
         final Integer defaultMinClicks = (Integer) defaults.get(CaptchaTestChallengeFactory.KEY_MIN_CLICKS);
         minClicksSpinner.setValue(defaultMinClicks != null ? defaultMinClicks : Integer.valueOf(1));
+        final boolean usesLength = defaults.containsKey(CaptchaTestChallengeFactory.KEY_MIN_LENGTH);
+        minLengthLabel.setVisible(usesLength);
+        minLengthSpinner.setVisible(usesLength);
+        maxLengthLabel.setVisible(usesLength);
+        maxLengthSpinner.setVisible(usesLength);
+        final Integer defaultMinLength = (Integer) defaults.get(CaptchaTestChallengeFactory.KEY_MIN_LENGTH);
+        minLengthSpinner.setValue(defaultMinLength != null ? defaultMinLength : Integer.valueOf(1));
+        final Integer defaultMaxLength = (Integer) defaults.get(CaptchaTestChallengeFactory.KEY_MAX_LENGTH);
+        maxLengthSpinner.setValue(defaultMaxLength != null ? defaultMaxLength : Integer.valueOf(0));
         revalidate();
         repaint();
         syncMarkers();
@@ -1026,6 +1047,12 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         if (data.containsKey(CaptchaTestChallengeFactory.KEY_MIN_CLICKS)) {
             minClicksSpinner.setValue(data.get(CaptchaTestChallengeFactory.KEY_MIN_CLICKS));
         }
+        if (data.containsKey(CaptchaTestChallengeFactory.KEY_MIN_LENGTH)) {
+            minLengthSpinner.setValue(data.get(CaptchaTestChallengeFactory.KEY_MIN_LENGTH));
+        }
+        if (data.containsKey(CaptchaTestChallengeFactory.KEY_MAX_LENGTH)) {
+            maxLengthSpinner.setValue(data.get(CaptchaTestChallengeFactory.KEY_MAX_LENGTH));
+        }
         if (data.containsKey(CaptchaTestChallengeFactory.KEY_CASE_SENSITIVE)) {
             final Boolean caseSensitive = (Boolean) data.get(CaptchaTestChallengeFactory.KEY_CASE_SENSITIVE);
             caseSensitiveBox.setSelectedIndex(caseSensitive == null ? 0 : (caseSensitive.booleanValue() ? 1 : 2));
@@ -1112,6 +1139,8 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         putIfUsed(data, CaptchaTestChallengeFactory.KEY_IMAGE_FILE, imageSource);
         putIfUsed(data, CaptchaTestChallengeFactory.KEY_DESCRIPTION, descriptionField.getText());
         putIfUsed(data, CaptchaTestChallengeFactory.KEY_MIN_CLICKS, Integer.valueOf(((Number) minClicksSpinner.getValue()).intValue()));
+        putIfUsed(data, CaptchaTestChallengeFactory.KEY_MIN_LENGTH, Integer.valueOf(((Number) minLengthSpinner.getValue()).intValue()));
+        putIfUsed(data, CaptchaTestChallengeFactory.KEY_MAX_LENGTH, Integer.valueOf(((Number) maxLengthSpinner.getValue()).intValue()));
         switch (caseSensitiveBox.getSelectedIndex()) {
         case 1:
             putIfUsed(data, CaptchaTestChallengeFactory.KEY_CASE_SENSITIVE, Boolean.TRUE);

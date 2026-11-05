@@ -15,6 +15,7 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,9 +30,10 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
 import org.appwork.utils.StringUtils;
+import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
-@HostPlugin(revision = "$Revision: 53838 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53890 $", interfaceVersion = 3, names = {}, urls = {})
 public class FreedlInk extends XFileSharingProBasic {
     public FreedlInk(final PluginWrapper wrapper) {
         super(wrapper);
@@ -174,6 +176,16 @@ public class FreedlInk extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
+    }
+
+    /** This website uses a numeric captcha with 5 digits. It uses its own method id, see {@link #getCaptchaCode(String, String, DownloadLink)}. */
+    @Override
+    protected BasicCaptchaChallenge createChallenge(final String method, final File file, final int flag, final DownloadLink link, final String defaultValue, final String explain) {
+        final BasicCaptchaChallenge ret = super.createChallenge(method, file, flag, link, defaultValue, explain);
+        ret.setNumeric(Boolean.TRUE);
+        ret.setMinLength(5);
+        ret.setMaxLength(5);
+        return ret;
     }
 
     @Override

@@ -65,6 +65,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.net.URI;
 import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -475,7 +476,9 @@ public class IconIO {
                 try {
                     Path path = Paths.get(url.toURI()).normalize();
                     key = path;
-                    path = path.toRealPath();
+                    if (Files.exists(path)) {
+                        path = path.toRealPath();
+                    }
                     key = path;
                 } catch (IOException ignore) {
                     ignore.printStackTrace();
@@ -484,7 +487,7 @@ public class IconIO {
                 }
             } else {
                 try {
-                    URI uri = url.toURI().normalize();
+                    final URI uri = url.toURI().normalize();
                     key = uri;
                 } catch (Exception ignore) {
                     ignore.printStackTrace();

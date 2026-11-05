@@ -29,6 +29,16 @@ import java.util.Random;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Files;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.CumStConfig;
+import org.jdownloader.plugins.components.config.CumStConfig.TextCrawlMode;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -47,17 +57,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.CumSt;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Files;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.CumStConfig;
-import org.jdownloader.plugins.components.config.CumStConfig.TextCrawlMode;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 53518 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53897 $", interfaceVersion = 3, names = {}, urls = {})
 public class CumStCrawler extends PluginForDecrypt {
     public CumStCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -127,7 +127,7 @@ public class CumStCrawler extends PluginForDecrypt {
 
     private String getMediaBaseURL() {
         /* Host that serves the original media files (content-addressed by sha256). */
-        return "https://e1." + getHost();
+        return "https://cdn." + getHost();
     }
 
     private CumStConfig cfg = null;
@@ -560,13 +560,14 @@ public class CumStCrawler extends PluginForDecrypt {
     }
 
     private static Map<String, String> ID_TO_CREATORNAME = new LinkedHashMap<String, String>() {
-                                                             protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
-                                                                 return size() > 100;
-                                                             };
-                                                         };
+        protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+            return size() > 100;
+        };
+    };
 
     /**
-     * Returns the creators' username for the given service + creatorID. </br> Uses API to find the username and caches the result. </br>
+     * Returns the creators' username for the given service + creatorID. </br>
+     * Uses API to find the username and caches the result. </br>
      * Returns null if it is unable to find the username.
      */
     private String findCreatorName(final String service, final String creatorID) throws Exception {

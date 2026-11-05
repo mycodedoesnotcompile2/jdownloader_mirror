@@ -1,12 +1,12 @@
 package org.jdownloader.captcha.v2.challenge.cloudflareturnstile;
 
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.ValidationResult;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
+
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
 
 public abstract class CloudflareTurnstileChallenge extends AbstractBrowserChallenge {
     private final String siteKey;
@@ -20,14 +20,6 @@ public abstract class CloudflareTurnstileChallenge extends AbstractBrowserChalle
         this.siteKey = siteKey;
         if (!AbstractCloudflareTurnstileCaptcha.isValidSiteKey(siteKey)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Bad SiteKey:" + siteKey);
-        }
-    }
-
-    public boolean isCaptchaResponseValid() {
-        if (super.isCaptchaResponseValid() && AbstractCloudflareTurnstileCaptcha.looksLikeValidToken(getResult().getValue())) {
-            return true;
-        } else {
-            return false;
         }
     }
 

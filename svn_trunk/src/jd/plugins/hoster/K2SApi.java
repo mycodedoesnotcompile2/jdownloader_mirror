@@ -73,7 +73,7 @@ import org.jdownloader.plugins.components.config.Keep2shareConfig.LinkcheckMode;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 53521 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53890 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class K2SApi extends PluginForHost {
     private final String        lng                                                    = getLanguage();
     private final String        PROPERTY_ACCOUNT_AUTHTOKEN                             = "auth_token";
@@ -290,7 +290,7 @@ public abstract class K2SApi extends PluginForHost {
      * @author Jiaz
      */
     protected long getAPIRevision() {
-        return Math.max(0, Formatter.getRevision("$Revision: 53521 $"));
+        return Math.max(0, Formatter.getRevision("$Revision: 53890 $"));
     }
 
     /**
@@ -1039,12 +1039,7 @@ public abstract class K2SApi extends PluginForHost {
             logger.info("login-captcha_url is not https --> Changing it to https");
             captchaAddress = captchaAddress.replaceFirst("(?i)http://", "https://");
         }
-        final String code = getCaptchaCode(getHost(), captchaAddress, link);
-        if (StringUtils.isEmpty(code)) {
-            /* This should never happen(?) */
-            throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-        }
-        return code;
+        return getCaptchaCode(getHost(), captchaAddress, link);
     }
 
     @Override
@@ -1229,9 +1224,6 @@ public abstract class K2SApi extends PluginForHost {
                     cbr.getPage(captcha_url);
                     final CaptchaHelperHostPluginRecaptchaV2 rc2 = new CaptchaHelperHostPluginRecaptchaV2(this, cbr);
                     final String recaptchaV2Response = rc2.getToken();
-                    if (recaptchaV2Response == null) {
-                        throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                    }
                     postdata.put("re_captcha_challenge", challenge);
                     postdata.put("re_captcha_response", recaptchaV2Response);
                 } else {

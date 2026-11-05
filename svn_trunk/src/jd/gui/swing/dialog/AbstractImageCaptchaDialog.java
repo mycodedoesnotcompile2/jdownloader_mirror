@@ -2,6 +2,7 @@ package jd.gui.swing.dialog;
 
 import java.awt.AlphaComposite;
 import java.awt.Color;
+import java.awt.Font;
 import java.awt.Component;
 import java.awt.Composite;
 import java.awt.Dimension;
@@ -26,6 +27,7 @@ import java.util.ArrayList;
 import javax.swing.Icon;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
+import javax.swing.JTextArea;
 import javax.swing.JToggleButton;
 import javax.swing.Scrollable;
 import javax.swing.SwingConstants;
@@ -126,6 +128,28 @@ public abstract class AbstractImageCaptchaDialog<T> extends AbstractCaptchaDialo
         }
         this.images = ret.toArray(new Image[] {});
         fps = 24;
+    }
+
+    /**
+     * Shows the challenge description (explain text) as plain text above the image. Applies to all image captchas (text and click).
+     */
+    @Override
+    protected void addBeforeImage(final MigPanel field) {
+        final String explainText = getHelpText();
+        if (explainText == null || explainText.length() == 0) {
+            return;
+        }
+        /* Own first row for the description, all following rows (image) take the remaining space. */
+        field.setLayout(new MigLayout("ins 0,wrap 1", "[grow,fill]", "[]5[grow,fill]"));
+        final JTextArea description = new JTextArea(_GUI.T.AbstractImageCaptchaDialog_challengeDescription(explainText));
+        description.setEditable(false);
+        description.setFocusable(false);
+        description.setLineWrap(true);
+        description.setWrapStyleWord(true);
+        description.setOpaque(false);
+        description.setBorder(null);
+        description.setFont(description.getFont().deriveFont(Font.BOLD, description.getFont().getSize2D() * 1.3f));
+        field.add(description);
     }
 
     protected MigLayout getDialogLayout() {

@@ -3,12 +3,12 @@ package jd.gui.swing.jdgui.components.toolbar.actions;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.swing.AbstractButton;
 import javax.swing.Action;
 import javax.swing.Icon;
 
-import jd.controlling.TaskQueue;
 import jd.controlling.downloadcontroller.DownloadController;
 import jd.controlling.downloadcontroller.DownloadLinkCandidate;
 import jd.controlling.downloadcontroller.DownloadLinkCandidateResult;
@@ -18,35 +18,30 @@ import jd.controlling.downloadcontroller.DownloadWatchDogJob;
 import jd.controlling.downloadcontroller.DownloadWatchDogProperty;
 import jd.controlling.downloadcontroller.SingleDownloadController;
 import jd.controlling.downloadcontroller.event.DownloadWatchdogListener;
-import jd.controlling.linkcollector.LinkCollectingJob;
+import jd.controlling.linkcollector.DefaultLinkCollectorListener;
 import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcollector.LinkCollectorCrawler;
-import jd.controlling.linkcollector.LinkCollectorEvent;
-import jd.controlling.linkcollector.LinkCollectorListener;
 import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings;
 import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings.SwitchToDownloadlistBehavior;
 import jd.controlling.linkcollector.LinkCollector.MoveLinksMode;
+import jd.controlling.linkcollector.LinkCollectorEvent;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.packagecontroller.AbstractNode;
 import jd.gui.swing.jdgui.JDGui;
 import jd.gui.swing.jdgui.JDGui.Panels;
 import jd.gui.swing.jdgui.MainTabbedPane;
 import jd.gui.swing.jdgui.interfaces.View;
 import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLinkProperty;
 import jd.plugins.FilePackage;
-import jd.plugins.FilePackageProperty;
 
+import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.swing.components.ExtButton;
-import org.appwork.utils.event.queue.QueueAction;
 import org.appwork.utils.swing.EDTRunner;
 import org.jdownloader.controlling.contextmenu.ActionContext;
 import org.jdownloader.controlling.contextmenu.Customizer;
-import org.jdownloader.controlling.download.DownloadControllerListener;
+import org.jdownloader.controlling.download.DefaultDownloadControllerListener;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.event.GUIEventSender;
 import org.jdownloader.gui.event.GUIListener;
@@ -63,22 +58,100 @@ import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.translate._JDT;
 
 public class StartDownloadsAction extends AbstractToolBarAction implements DownloadWatchdogListener, GUIListener, GenericConfigEventListener<Enum>, ActionContext {
+    private final DelayedRunnable delayedUpdateEnableState;
+
     /**
      * Create a new instance of StartDownloadsAction. This is a singleton class. Access the only existing instance by using
      * {@link #getInstance()}.
      */
     public StartDownloadsAction() {
         setName(_JDT.T.StartDownloadsAction_createTooltip_());
-        DownloadWatchDog.getInstance().getEventSender().addListener(this, true);
-        DownloadWatchDog.getInstance().notifyCurrentState(this);
-        CFG_GUI.START_BUTTON_ACTION_IN_LINKGRABBER_CONTEXT.getEventSender().addListener(this, true);
-        GUIEventSender.getInstance().addListener(this, true);
-        /* Needed to update the enabled state when the downloadlist/linkgrabber becomes empty or gets filled */
-        DownloadController.getInstance().getEventSender().addListener(downloadListListener, true);
-        LinkCollector.getInstance().getEventsender().addListener(linkgrabberListener, true);
-        onGuiMainTabSwitch(null, MainTabbedPane.getInstance().getSelectedView());
+        if (!isValidationMode()) {
+            delayedUpdateEnableState = new DelayedRunnable(100) {
+                final AtomicLong jobID = new AtomicLong(0);
+
+                @Override
+                public void delayedrun() {
+                    final long finalJobID = jobID.incrementAndGet();
+                    System.out.println("update " + finalJobID + " " + StartDownloadsAction.this);
+                    DownloadWatchDog.getInstance().enqueueJob(new DownloadWatchDogJob() {
+                        @Override
+                        public boolean isHighPriority() {
+                            return true;
+                        }
+
+                        @Override
+                        public void interrupt() {
+                        }
+
+                        @Override
+                        public void execute(final DownloadSession session) {
+                            if (finalJobID != jobID.get()) {
+                                return;
+                            }
+                            System.out.println("update 1:" + finalJobID + "\t" + jobID.get() + " " + StartDownloadsAction.this);
+                            final boolean downloadListHasContent = DownloadController.getInstance().size() > 0;
+                            final boolean linkgrabberHasContent = LinkCollector.getInstance().size() > 0;
+                            final boolean isRunning = DownloadWatchDog.getInstance().isRunning();
+                            /*
+                             * Size lookups take read locks, so they are done here and not in the EDT
+                             */
+                            new EDTRunner() {
+                                @Override
+                                protected void runInEDT() {
+                                    if (finalJobID != jobID.get()) {
+                                        return;
+                                    }
+                                    System.out.println("update 2 :" + finalJobID + "\t" + jobID.get() + " " + StartDownloadsAction.this);
+                                    boolean enable = (!isRunning);
+                                    Icon newSmall = normalSmall;
+                                    if (session != null && isRunning) {
+                                        enable |= session.isForcedOnlyModeEnabled();
+                                        if (session.isForcedOnlyModeEnabled()) {
+                                            newSmall = forcedSmall;
+                                        }
+                                    }
+                                    if (newSmall != smallIcon) {
+                                        if (newSmall == forcedSmall) {
+                                            smallIcon = forcedSmall;
+                                            largeIcon = forcedLarge;
+                                        } else {
+                                            smallIcon = normalSmall;
+                                            largeIcon = normalLarge;
+                                        }
+                                        firePropertyChange(Action.SMALL_ICON, new Object(), new Object());
+                                        firePropertyChange(Action.LARGE_ICON_KEY, new Object(), new Object());
+                                    }
+                                    if (smallIcon == forcedSmall) {
+                                        setTooltipText(_JDT.T.StartDownloadsAction_forced_createTooltip_());
+                                    } else {
+                                        setTooltipText(_JDT.T.StartDownloadsAction_createTooltip_());
+                                    }
+                                    if (enable) {
+                                        enable = isStartPossible(JDGui.getInstance().getMainTabbedPane().getSelectedView(), downloadListHasContent, linkgrabberHasContent);
+                                    }
+                                    setEnabled(enable);
+                                    if (isHideIfDownloadsAreRunning()) {
+                                        setVisible(enable);
+                                    }
+                                }
+                            };
+                        }
+                    });
+                };
+            };
+            DownloadWatchDog.getInstance().getEventSender().addListener(this, true);
+            DownloadWatchDog.getInstance().notifyCurrentState(this);
+            CFG_GUI.START_BUTTON_ACTION_IN_LINKGRABBER_CONTEXT.getEventSender().addListener(this, true);
+            GUIEventSender.getInstance().addListener(this, true);
+            /* Needed to update the enabled state when the downloadlist/linkgrabber becomes empty or gets filled */
+            DownloadController.getInstance().getEventSender().addListener(downloadListListener, true);
+            LinkCollector.getInstance().getEventsender().addListener(linkgrabberListener, true);
+            onGuiMainTabSwitch(null, MainTabbedPane.getInstance().getSelectedView());
+        } else {
+            delayedUpdateEnableState = null;
+        }
         setAccelerator(KeyEvent.VK_S);
-        updateEnableState();
     }
 
     /**
@@ -86,117 +159,60 @@ public class StartDownloadsAction extends AbstractToolBarAction implements Downl
      * the button. All other events are irrelevant here.<br>
      * Held in a field because the listeners are registered weakly and would otherwise be garbage collected.
      */
-    private final DownloadControllerListener downloadListListener = new DownloadControllerListener() {
-        @Override
-        public void onDownloadControllerAddedPackage(FilePackage pkg) {
-            updateEnableState();
-        }
+    private final DefaultDownloadControllerListener downloadListListener = new DefaultDownloadControllerListener() {
 
         @Override
-        public void onDownloadControllerStructureRefresh(FilePackage pkg) {
+        public void onDownloadControllerAddedPackage(FilePackage pkg) {
+            updateEnableState(true, false);
         }
 
         @Override
         public void onDownloadControllerStructureRefresh() {
-            /* The initial load of the saved downloadlist only fires a structure refresh, no "package added" events */
-            updateEnableState();
-        }
-
-        @Override
-        public void onDownloadControllerStructureRefresh(AbstractNode node, Object param) {
+            /*
+             * The initial load of the saved downloadlist only fires a
+             * structure refresh, no "package added" events
+             */
+             updateEnableState(null, null);
         }
 
         @Override
         public void onDownloadControllerRemovedPackage(FilePackage pkg) {
-            updateEnableState();
+            updateEnableState(false, null);
         }
 
         @Override
         public void onDownloadControllerRemovedLinklist(List<DownloadLink> list) {
-            updateEnableState();
+            updateEnableState(false, null);
         }
 
-        @Override
-        public void onDownloadControllerUpdatedData(DownloadLink downloadlink, DownloadLinkProperty property) {
-        }
-
-        @Override
-        public void onDownloadControllerUpdatedData(FilePackage pkg, FilePackageProperty property) {
-        }
-
-        @Override
-        public void onDownloadControllerUpdatedData(DownloadLink downloadlink) {
-        }
-
-        @Override
-        public void onDownloadControllerUpdatedData(FilePackage pkg) {
-        }
     };
     /**
      * Re-evaluates the enabled state when content is added to or removed from the linkgrabber, because in the linkgrabber context the
      * button is only disabled if both the linkgrabber and the downloadlist are empty. All other events are irrelevant here.<br>
      * Held in a field because the listeners are registered weakly and would otherwise be garbage collected.
      */
-    private final LinkCollectorListener     linkgrabberListener   = new LinkCollectorListener() {
-        @Override
-        public void onLinkCollectorAbort(LinkCollectorEvent event) {
-        }
-
-        @Override
-        public void onLinkCollectorFilteredLinksAvailable(LinkCollectorEvent event) {
-        }
-
-        @Override
-        public void onLinkCollectorFilteredLinksEmpty(LinkCollectorEvent event) {
-        }
-
-        @Override
-        public void onLinkCollectorDataRefresh(LinkCollectorEvent event) {
-        }
+    private final DefaultLinkCollectorListener      linkgrabberListener  = new DefaultLinkCollectorListener() {
 
         @Override
         public void onLinkCollectorStructureRefresh(LinkCollectorEvent event) {
-            /* Covers structure changes that are not reported as content added/removed, e.g. when the linkgrabber list gets loaded */
-            updateEnableState();
+            /*
+             * Covers structure changes that are not reported as
+             * content added/removed, e.g. when the linkgrabber list
+             * gets loaded
+             */
+            updateEnableState(null, null);
         }
 
         @Override
         public void onLinkCollectorContentRemoved(LinkCollectorEvent event) {
-            updateEnableState();
+            updateEnableState(null, false);
         }
 
         @Override
         public void onLinkCollectorContentAdded(LinkCollectorEvent event) {
-            updateEnableState();
+            updateEnableState(null, true);
         }
 
-        @Override
-        public void onLinkCollectorLinkAdded(LinkCollectorEvent event, CrawledLink link) {
-        }
-
-        @Override
-        public void onLinkCollectorDupeAdded(LinkCollectorEvent event, CrawledLink link) {
-        }
-
-        @Override
-        public void onLinkCrawlerAdded(LinkCollectorCrawler crawler) {
-        }
-
-        @Override
-        public void onLinkCrawlerStarted(LinkCollectorCrawler crawler) {
-        }
-
-        @Override
-        public void onLinkCrawlerStopped(LinkCollectorCrawler crawler) {
-        }
-
-        @Override
-        public void onLinkCrawlerFinished() {
-        }
-
-        @Override
-        public void onLinkCrawlerNewJob(LinkCollectingJob job) {
-        }
     };
 
     @Override
@@ -210,39 +226,33 @@ public class StartDownloadsAction extends AbstractToolBarAction implements Downl
 
     public void actionPerformed(final ActionEvent e) {
         if (JDGui.getInstance().isCurrentPanel(Panels.LINKGRABBER)) {
-            TaskQueue.getQueue().add(new QueueAction<Void, RuntimeException>() {
-                @Override
-                protected Void run() throws RuntimeException {
-                    switch (CFG_GUI.CFG.getStartButtonActionInLinkgrabberContext()) {
-                    case ADD_ALL_LINKS_AND_START_DOWNLOADS:
-                        LinkGrabberTable.getInstance().getSelectionInfo(new SelectionInfoCallback<CrawledPackage, CrawledLink>() {
+            switch (CFG_GUI.CFG.getStartButtonActionInLinkgrabberContext()) {
+            case ADD_ALL_LINKS_AND_START_DOWNLOADS:
+                LinkGrabberTable.getInstance().getSelectionInfo(new SelectionInfoCallback<CrawledPackage, CrawledLink>() {
 
-                            @Override
-                            public void onSelectionInfo(SelectionInfo<CrawledPackage, CrawledLink> selectionInfo) {
-                                final ConfirmLinksSettings cls = new ConfirmLinksSettings(MoveLinksMode.MANUAL);
-                                cls.setAutoStartDownloads(true);
-                                cls.setClearLinkgrabberlistOnConfirm(false);
-                                cls.setSwitchToDownloadlistBehavior(SwitchToDownloadlistBehavior.ALWAYS);
-                                cls.setForceDownloads(false);
-                                ConfirmLinksContextAction.confirmSelection(selectionInfo, cls);
-                            }
-
-                            @Override
-                            public boolean isCancelled() {
-                                return false;
-                            }
-                        }, SelectionType.ALL);
-
-                        break;
-                    case START_DOWNLOADS_ONLY:
-                        DownloadWatchDog.getInstance().startDownloads();
-                        break;
-                    case DISABLED:
-                        break;
+                    @Override
+                    public void onSelectionInfo(SelectionInfo<CrawledPackage, CrawledLink> selectionInfo) {
+                        final ConfirmLinksSettings cls = new ConfirmLinksSettings(MoveLinksMode.MANUAL);
+                        cls.setAutoStartDownloads(true);
+                        cls.setClearLinkgrabberlistOnConfirm(false);
+                        cls.setSwitchToDownloadlistBehavior(SwitchToDownloadlistBehavior.ALWAYS);
+                        cls.setForceDownloads(false);
+                        ConfirmLinksContextAction.confirmSelection(selectionInfo, cls);
                     }
-                    return null;
-                }
-            });
+
+                    @Override
+                    public boolean isCancelled() {
+                        return false;
+                    }
+                }, SelectionType.ALL);
+
+                break;
+            case START_DOWNLOADS_ONLY:
+                DownloadWatchDog.getInstance().startDownloads();
+                break;
+            case DISABLED:
+                return;
+            }
         } else {
             DownloadWatchDog.getInstance().startDownloads();
         }
@@ -256,7 +266,7 @@ public class StartDownloadsAction extends AbstractToolBarAction implements Downl
                 @Override
                 public void execute(DownloadSession currentSession) {
                     currentSession.setForcedOnlyModeEnabled(false);
-                    updateEnableState();
+                    updateEnableState(null, null);
                 }
 
                 @Override
@@ -290,7 +300,7 @@ public class StartDownloadsAction extends AbstractToolBarAction implements Downl
 
     public void setHideIfDownloadsAreRunning(boolean showIfDownloadsAreRunning) {
         this.hideIfDownloadsAreRunning = showIfDownloadsAreRunning;
-        updateEnableState();
+        updateEnableState(null, null);
     }
 
     @Override
@@ -299,7 +309,7 @@ public class StartDownloadsAction extends AbstractToolBarAction implements Downl
 
     @Override
     public void onDownloadWatchdogStateIsIdle() {
-        updateEnableState();
+        updateEnableState(null, null);
     }
 
     @Override
@@ -313,9 +323,9 @@ public class StartDownloadsAction extends AbstractToolBarAction implements Downl
      * The button has a different function depending on the view:
      * <ul>
      * <li>Downloadlist (and every other view): it starts the downloads, so it is only useful if the downloadlist is not empty.</li>
-     * <li>Linkgrabber: its function is configurable ({@link StartButtonAction}). It is never useful if that function is disabled.
-     * Otherwise it can either start the downloads or first add the linkgrabber links to the downloadlist and start them, so it is useful if
-     * the downloadlist or the linkgrabber has content.</li>
+     * <li>Linkgrabber: its function is configurable ({@link StartButtonAction}). It is never useful if that function is disabled. Otherwise
+     * it can either start the downloads or first add the linkgrabber links to the downloadlist and start them, so it is useful if the
+     * downloadlist or the linkgrabber has content.</li>
      * </ul>
      * Note: A list that only contains disabled links/packages still counts as having content.
      */
@@ -337,61 +347,12 @@ public class StartDownloadsAction extends AbstractToolBarAction implements Downl
         }
     }
 
-    private void updateEnableState() {
-        DownloadWatchDog.getInstance().enqueueJob(new DownloadWatchDogJob() {
-            @Override
-            public boolean isHighPriority() {
-                return false;
-            }
-
-            @Override
-            public void interrupt() {
-            }
-
-            @Override
-            public void execute(final DownloadSession session) {
-                /* Size lookups take read locks, so they are done here and not in the EDT */
-                final boolean downloadListHasContent = DownloadController.getInstance().size() > 0;
-                final boolean linkgrabberHasContent = LinkCollector.getInstance().size() > 0;
-                new EDTRunner() {
-                    @Override
-                    protected void runInEDT() {
-                        final boolean isRunning = DownloadWatchDog.getInstance().isRunning();
-                        boolean enable = (!isRunning);
-                        Icon newSmall = normalSmall;
-                        if (session != null && isRunning) {
-                            enable |= session.isForcedOnlyModeEnabled();
-                            if (session.isForcedOnlyModeEnabled()) {
-                                newSmall = forcedSmall;
-                            }
-                        }
-                        if (newSmall != smallIcon) {
-                            if (newSmall == forcedSmall) {
-                                smallIcon = forcedSmall;
-                                largeIcon = forcedLarge;
-                            } else {
-                                smallIcon = normalSmall;
-                                largeIcon = normalLarge;
-                            }
-                            firePropertyChange(Action.SMALL_ICON, new Object(), new Object());
-                            firePropertyChange(Action.LARGE_ICON_KEY, new Object(), new Object());
-                        }
-                        if (smallIcon == forcedSmall) {
-                            setTooltipText(_JDT.T.StartDownloadsAction_forced_createTooltip_());
-                        } else {
-                            setTooltipText(_JDT.T.StartDownloadsAction_createTooltip_());
-                        }
-                        if (enable) {
-                            enable = isStartPossible(JDGui.getInstance().getMainTabbedPane().getSelectedView(), downloadListHasContent, linkgrabberHasContent);
-                        }
-                        setEnabled(enable);
-                        if (isHideIfDownloadsAreRunning()) {
-                            setVisible(enable);
-                        }
-                    }
-                };
-            }
-        });
+    private void updateEnableState(final Boolean downloadListEvent, final Boolean linkCollectorEvent) {
+        final DelayedRunnable delayedUpdateEnableState = this.delayedUpdateEnableState;
+        if (delayedUpdateEnableState == null) {
+            return;
+        }
+        delayedUpdateEnableState.resetAndStart();
     }
 
     private final Icon normalSmall = new AbstractIcon(IconKey.ICON_MEDIA_PLAYBACK_START, 18);
@@ -433,12 +394,12 @@ public class StartDownloadsAction extends AbstractToolBarAction implements Downl
 
     @Override
     public void onDownloadWatchdogStateIsRunning() {
-        updateEnableState();
+        updateEnableState(null, null);
     }
 
     @Override
     public void onDownloadWatchdogStateIsStopped() {
-        updateEnableState();
+        updateEnableState(null, null);
     }
 
     @Override

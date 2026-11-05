@@ -46,7 +46,7 @@ import jd.plugins.PluginException;
 /**
  * Captcha solver plugin for anti-captcha.com: https://anti-captcha.com/apidoc
  */
-@HostPlugin(revision = "$Revision: 53733 $", interfaceVersion = 3, names = { "anti-captcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53890 $", interfaceVersion = 3, names = { "anti-captcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverAntiCaptchaCom extends abstractPluginForCaptchaSolver {
     /**
      * Task types with proxy, see https://anti-captcha.com/apidoc/task-types/RecaptchaV2Task, RecaptchaV2EnterpriseTask, TurnstileTask
@@ -259,6 +259,14 @@ public class PluginForCaptchaSolverAntiCaptchaCom extends abstractPluginForCaptc
             if (numeric != null) {
                 /* 0 = no requirements, 1 = digits only */
                 task.put("numeric", numeric.booleanValue() ? 1 : 0);
+            }
+            if (challenge.getMinLength() > 1) {
+                /* >0 = minimum length of the answer, 0 = no requirement */
+                task.put("minLength", challenge.getMinLength());
+            }
+            if (challenge.getMaxLength() > 0) {
+                /* >0 = maximum length of the answer, 0 = no requirement */
+                task.put("maxLength", challenge.getMaxLength());
             }
             if (captchachallenge.getExplain() != null) {
                 task.put("comment", captchachallenge.getExplain());

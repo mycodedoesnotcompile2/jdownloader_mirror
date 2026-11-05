@@ -87,7 +87,7 @@ import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 53381 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53890 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -655,9 +655,6 @@ public class RapidGatorNet extends PluginForHost {
                                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                                 }
                                 challenge = getCaptchaCode(challenge, link);
-                                if (StringUtils.isEmpty(challenge)) {
-                                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                                }
                                 captchaform.put("adscaptcha_response_field", Encoding.urlEncode(challenge));
                                 captchaform.put("adscaptcha_challenge_field", Encoding.urlEncode(code));
                             } else {

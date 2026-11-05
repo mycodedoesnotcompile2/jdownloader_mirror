@@ -60,7 +60,7 @@ import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPlugin
 import org.jdownloader.gui.InputChangedCallbackInterface;
 import org.jdownloader.plugins.accounts.AccountBuilderInterface;
 
-@HostPlugin(revision = "$Revision: 51817 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53890 $", interfaceVersion = 3, names = {}, urls = {})
 public class NexusmodsCom extends PluginForHost {
     public NexusmodsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -414,9 +414,6 @@ public class NexusmodsCom extends PluginForHost {
                 try {
                     /* 2019-11-20: Invisible reCaptchaV2 is always required */
                     final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br, reCaptchaKey).getToken();
-                    if (recaptchaV2Response == null) {
-                        throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                    }
                     loginform.put("g-recaptcha-response%5Blogin%5D", Encoding.urlEncode(recaptchaV2Response));
                 } finally {
                     if (original == null) {

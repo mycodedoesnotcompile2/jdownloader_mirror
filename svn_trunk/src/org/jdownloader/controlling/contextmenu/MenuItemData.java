@@ -21,8 +21,6 @@ import javax.swing.JComponent;
 import javax.swing.JMenuItem;
 import javax.swing.Timer;
 
-import jd.controlling.TaskQueue;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.Storable;
 import org.appwork.utils.StringUtils;
@@ -34,6 +32,8 @@ import org.jdownloader.extensions.AbstractExtension;
 import org.jdownloader.extensions.ExtensionController;
 import org.jdownloader.extensions.ExtensionNotLoadedException;
 import org.jdownloader.images.NewTheme;
+
+import jd.controlling.TaskQueue;
 
 public class MenuItemData implements Storable {
     public static final String      EMPTY      = "<EMPTY>";
@@ -106,7 +106,7 @@ public class MenuItemData implements Storable {
         CONTAINER;
     }
 
-    private Type              type    = Type.ACTION;
+    private Type              type             = Type.ACTION;
     private boolean           validated;
     private Exception         validateException;
     private MenuContainerRoot root;
@@ -279,7 +279,6 @@ public class MenuItemData implements Storable {
         final JMenuItem ret;
         if (action.isToggle()) {
             ret = new JCheckBoxMenuItem(action) {
-
                 @Override
                 protected void processMouseEvent(final MouseEvent e) {
                     if (!MenuItemData.this.processHideOnClickMouseEvent(this, menuBuilder == null || menuBuilder.isHideOnClick(), e)) {
@@ -289,14 +288,12 @@ public class MenuItemData implements Storable {
             };
         } else {
             ret = new JMenuItem(action) {
-
                 @Override
                 protected void processMouseEvent(final MouseEvent e) {
                     if (!MenuItemData.this.processHideOnClickMouseEvent(this, menuBuilder == null || menuBuilder.isHideOnClick(), e)) {
                         super.processMouseEvent(e);
                     }
                 }
-
             };
         }
         ret.getAccessibleContext().setAccessibleName(action.getName());
@@ -427,8 +424,8 @@ public class MenuItemData implements Storable {
     }
 
     /**
-     * When true, the keyboard shortcut of this menu item is disabled without discarding the stored (custom) shortcut value, so
-     * enabling it again restores that value. Consumers must treat a disabled shortcut as "no hotkey".
+     * When true, the keyboard shortcut of this menu item is disabled without discarding the stored (custom) shortcut value, so enabling it
+     * again restores that value. Consumers must treat a disabled shortcut as "no hotkey".
      */
     public boolean isShortcutDisabled() {
         return shortcutDisabled;

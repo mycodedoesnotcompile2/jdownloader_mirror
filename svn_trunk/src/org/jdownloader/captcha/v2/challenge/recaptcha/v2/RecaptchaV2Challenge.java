@@ -31,8 +31,8 @@ import org.appwork.utils.net.httpserver.requests.PostRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.AbstractResponse;
-import org.jdownloader.captcha.v2.ValidationResult;
 import org.jdownloader.captcha.v2.ChallengeSolver;
+import org.jdownloader.captcha.v2.ValidationResult;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.CaptchaResponse;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
@@ -743,15 +743,6 @@ public abstract class RecaptchaV2Challenge extends AbstractBrowserChallenge {
             return "recaptchav3";
         } else {
             return "recaptchav2";
-        }
-    }
-
-    @Override
-    public boolean isCaptchaResponseValid() {
-        if (super.isCaptchaResponseValid() && isValidResponseToken(getResult().getValue())) {
-            return true;
-        } else {
-            return false;
         }
     }
 

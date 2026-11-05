@@ -21,14 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.exceptions.WTFException;
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -43,7 +35,15 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 53121 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.exceptions.WTFException;
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 53887 $", interfaceVersion = 3, names = {}, urls = {})
 public class DatanodesTo extends XFileSharingProBasic {
     public DatanodesTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -66,6 +66,12 @@ public class DatanodesTo extends XFileSharingProBasic {
 
     public static String[] getAnnotationNames() {
         return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public void init() {
+        super.init();
+        Browser.setRequestIntervalLimitGlobal(getHost(), 500);
     }
 
     @Override

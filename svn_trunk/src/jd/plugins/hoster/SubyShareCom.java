@@ -15,6 +15,7 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -28,6 +29,7 @@ import javax.script.ScriptEngineManager;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
+import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
@@ -46,7 +48,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52965 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53890 $", interfaceVersion = 3, names = {}, urls = {})
 public class SubyShareCom extends XFileSharingProBasic {
     public SubyShareCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -250,6 +252,16 @@ public class SubyShareCom extends XFileSharingProBasic {
             return waitStr;
         }
         return super.regexWaittime(br);
+    }
+
+    /** The captcha of this website has exactly 6 characters and is not numeric. */
+    @Override
+    protected BasicCaptchaChallenge createChallenge(final String method, final File file, final int flag, final DownloadLink link, final String defaultValue, final String explain) {
+        final BasicCaptchaChallenge ret = super.createChallenge(method, file, flag, link, defaultValue, explain);
+        ret.setNumeric(Boolean.FALSE);
+        ret.setMinLength(6);
+        ret.setMaxLength(6);
+        return ret;
     }
 
     @Override

@@ -429,6 +429,35 @@ public class DownloadSession extends Property {
         return candidateHistory.values();
     }
 
+    /**
+     * Returns how many finished download attempts of the given link ended with {@link DownloadLinkCandidateResult.RESULT#RETRY} in this
+     * session.<br>
+     * TODO: This is NOT the right way to know how often a captcha was refreshed. It counts every RETRY result (also those caused by e.g.
+     * connection problems) and reads the candidate history from outside the DownloadWatchDog thread. It should be replaced by a dedicated
+     * refresh counter for the link which is increased when a refresh is handled in the SingleDownloadController and reset when the link
+     * is finished or skipped.
+     */
+    public int getRetryResultCount(final DownloadLink downloadLink) {
+        if (downloadLink == null) {
+            return 0;
+        }
+        final DownloadLinkCandidateHistory history = getHistory(downloadLink);
+        if (history == null) {
+            return 0;
+        }
+        int ret = 0;
+        for (final DownloadLinkCandidateResult result : DownloadLinkCandidateHistory.selectResults(history, null)) {
+            switch (result.getResult()) {
+            case RETRY:
+                ret++;
+                break;
+            default:
+                break;
+            }
+        }
+        return ret;
+    }
+
     public DownloadLinkCandidateHistory buildHistory(DownloadLink downloadLink) {
         DownloadLinkCandidateHistory ret = candidateHistory.get(downloadLink);
         if (ret == null) {

@@ -53,7 +53,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52947 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53890 $", interfaceVersion = 3, names = {}, urls = {})
 public class UpstoRe extends antiDDoSForHost {
     public UpstoRe(PluginWrapper wrapper) {
         super(wrapper);
@@ -444,11 +444,7 @@ public class UpstoRe extends antiDDoSForHost {
             if (login.containsHTML(regexLoginCaptcha)) {
                 final String cap = br.getRegex(regexLoginCaptcha).getMatch(-1);
                 final String code = getCaptchaCode(cap, this.getDownloadLink());
-                if (code == null) {
-                    throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                } else {
-                    login.put("captcha", Encoding.urlEncode(code));
-                }
+                login.put("captcha", Encoding.urlEncode(code));
             }
             submitForm(login);
             if (br.containsHTML(">\\s*Wrong email or password\\.\\s*<")) {

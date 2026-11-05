@@ -54,7 +54,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.utils.JDUtilities;
 
-@HostPlugin(revision = "$Revision: 51155 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53890 $", interfaceVersion = 2, names = {}, urls = {})
 public class UlozTo extends PluginForHost {
     private static final String  QUICKDOWNLOAD                  = "(?i)https?://[^/]+/quickDownload/\\d+";
     /* 2017-01-02: login API seems to be broken --> Use website as workaround */
@@ -498,9 +498,6 @@ public class UlozTo extends PluginForHost {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
                     final String code = getCaptchaCode(file, link);
-                    if (code == null) {
-                        throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                    }
                     captchaForm.put("captcha_value", Encoding.urlEncode(code));
                     captchaForm.remove(null);
                     captchaForm.remove("freeDownload");

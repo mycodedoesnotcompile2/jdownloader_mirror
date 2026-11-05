@@ -27,6 +27,7 @@ public class AbstractResponse<T> {
                 case EMPTY_RESPONSE:
                 case INVALID_TOKEN:
                 case NOT_NUMERIC:
+                case WRONG_LENGTH:
                 case COORDINATES_MISMATCH:
                 case TOO_FEW_CLICKS:
                 case TOO_MANY_CLICKS:

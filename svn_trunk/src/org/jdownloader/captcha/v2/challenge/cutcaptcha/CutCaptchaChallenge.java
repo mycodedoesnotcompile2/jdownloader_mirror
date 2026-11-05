@@ -3,10 +3,6 @@ package org.jdownloader.captcha.v2.challenge.cutcaptcha;
 import java.io.IOException;
 import java.net.URL;
 
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
@@ -22,6 +18,10 @@ import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.ValidationResult;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
 import org.jdownloader.captcha.v2.solver.browser.BrowserReference;
+
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
 
 public abstract class CutCaptchaChallenge extends AbstractBrowserChallenge {
     private final String siteKey;
@@ -95,14 +95,6 @@ public abstract class CutCaptchaChallenge extends AbstractBrowserChallenge {
             return html;
         } catch (IOException e) {
             throw new WTFException(e);
-        }
-    }
-
-    public boolean isCaptchaResponseValid() {
-        if (super.isCaptchaResponseValid() && looksLikeValidToken(getResult().getValue())) {
-            return true;
-        } else {
-            return false;
         }
     }
 

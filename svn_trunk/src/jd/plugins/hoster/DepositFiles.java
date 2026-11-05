@@ -66,7 +66,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 52518 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53890 $", interfaceVersion = 3, names = {}, urls = {})
 public class DepositFiles extends antiDDoSForHost {
     public static AtomicReference<String>          MAINPAGE = new AtomicReference<String>();
     /* don't touch the following! */
@@ -732,9 +732,6 @@ public class DepositFiles extends antiDDoSForHost {
                 br.submitForm(login);
                 if (br.containsHTML("\"error\":\"CaptchaRequired\"")) {
                     final String c = new CaptchaHelperHostPluginRecaptchaV2(this, br, "6LdyfgcTAAAAAArE1fk9cGyExtKfT4a12dWcViye").getToken();
-                    if (c == null || c.equals("")) {
-                        throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                    }
                     login.put("g-recaptcha-response", Encoding.urlEncode(c));
                     br.submitForm(login);
                     if (br.containsHTML("\"error\":\"CaptchaInvalid\"")) {
@@ -839,9 +836,6 @@ public class DepositFiles extends antiDDoSForHost {
             String error = (String) entries.get("error");
             if (StringUtils.equalsIgnoreCase(error, "CaptchaRequired")) {
                 final String c = new CaptchaHelperHostPluginRecaptchaV2(this, br, "6LdyfgcTAAAAAArE1fk9cGyExtKfT4a12dWcViye").getToken();
-                if (c == null || c.equals("")) {
-                    throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                }
                 query.add("recaptcha_challenge_field", "null");
                 query.add("g-recaptcha-response", Encoding.urlEncode(c));
                 apiGetPage(API_BASE + "/user/login?" + query.toString());

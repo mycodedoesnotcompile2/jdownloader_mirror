@@ -7,9 +7,6 @@ import java.io.IOException;
 
 import javax.imageio.ImageIO;
 
-import jd.nutils.encoding.Base64;
-import jd.plugins.Plugin;
-
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.images.IconIO;
 import org.appwork.utils.net.Base64OutputStream;
@@ -17,6 +14,9 @@ import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ValidationResult;
 import org.seamless.util.io.IO;
+
+import jd.nutils.encoding.Base64;
+import jd.plugins.Plugin;
 
 public abstract class ImageCaptchaChallenge<T> extends Challenge<T> {
     protected volatile File imageFile;
@@ -50,9 +50,66 @@ public abstract class ImageCaptchaChallenge<T> extends Challenge<T> {
         this.numeric = numeric;
     }
 
+    /* Minimum number of characters of a text answer, at least 1: An empty answer is never valid. */
+    private volatile int minLength = 1;
+    /* Maximum number of characters of a text answer, 0 = no limit */
+    private volatile int maxLength = 0;
+
+    @Override
+    public void cleanup() {
+        try {
+            super.cleanup();
+        } finally {
+            final File imageFile = getImageFile();
+            if (imageFile != null && !imageFile.delete() && imageFile.exists()) {
+                imageFile.deleteOnExit();
+            }
+        }
+    }
+
     /**
-     * If the challenge is numeric, text answers may only consist of digits. Answers that are not text (e.g. click positions) are not
-     * checked here.
+     * @return Minimum number of characters of a text answer (whitespace at the start and the end is not counted). At least 1.<br>
+     *         TODO: Make the default configurable via a setting.
+     */
+    public int getMinLength() {
+        return minLength;
+    }
+
+    public void setMinLength(final int minLength) {
+        this.minLength = Math.max(1, minLength);
+    }
+
+    /** @return Maximum number of characters of a text answer (whitespace at the start and the end is not counted). 0 = no limit. */
+    public int getMaxLength() {
+        return maxLength;
+    }
+
+    public void setMaxLength(final int maxLength) {
+        this.maxLength = Math.max(0, maxLength);
+    }
+
+    /**
+     * @return true if the min. and max. length is the same, which means that the answer must have exactly this number of characters.<br>
+     *         TODO: The captcha dialog could close itself automatically as soon as the entered text has this exact length. This was not
+     *         added yet because users may want to check their input before sending it.
+     */
+    public boolean hasFixedLength() {
+        return getMaxLength() > 0 && getMinLength() == getMaxLength();
+    }
+
+    /** @return true if the given text answer has the required length, see {@link #getMinLength()} and {@link #getMaxLength()}. */
+    public boolean isValidLength(final String value) {
+        if (value == null) {
+            return false;
+        }
+        final int length = value.trim().length();
+        final int max = getMaxLength();
+        return length >= getMinLength() && (max <= 0 || length <= max);
+    }
+
+    /**
+     * Text answers must have the required length and, if the challenge is numeric, may only consist of digits. Answers that are not text
+     * (e.g. click positions) are not checked here.
      */
     @Override
     public ValidationResult validateResponse(final AbstractResponse<T> response) {
@@ -61,8 +118,15 @@ public abstract class ImageCaptchaChallenge<T> extends Challenge<T> {
             return result;
         }
         final Object value = response.getValue();
-        if (Boolean.TRUE.equals(numeric) && value instanceof String && !((String) value).matches("\\d+")) {
-            return ValidationResult.NOT_NUMERIC;
+        if (value instanceof String) {
+            final String text = (String) value;
+            if (text.trim().length() == 0) {
+                return ValidationResult.EMPTY_RESPONSE;
+            } else if (!isValidLength(text)) {
+                return ValidationResult.WRONG_LENGTH;
+            } else if (Boolean.TRUE.equals(numeric) && !text.matches("\\d+")) {
+                return ValidationResult.NOT_NUMERIC;
+            }
         }
         return ValidationResult.VALID;
     }
@@ -101,6 +165,7 @@ public abstract class ImageCaptchaChallenge<T> extends Challenge<T> {
     private final Plugin plugin;
 
     public synchronized File getImageFile() {
+        final Plugin plugin = this.getPlugin();
         if (imageFile == null && plugin != null) {
             imageFile = plugin.getLocalCaptchaFile();
         }

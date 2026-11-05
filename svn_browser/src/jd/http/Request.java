@@ -54,6 +54,8 @@ import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.os.CrossSystem.OperatingSystem;
 import org.appwork.utils.parser.UrlQuery;
 
+import jd.nutils.encoding.Encoding;
+
 public abstract class Request {
     public static class NoHTMLContentException extends IllegalStateException {
         protected NoHTMLContentException(String string) {
@@ -723,7 +725,11 @@ public abstract class Request {
     }
 
     public String getHTMLRefresh() {
-        final String refresh = new Regex(this.getHtmlCode(false), "<meta[^>]*http-equiv\\s*=\\s*(\"|')refresh\\1[^>]*content\\s*=\\s*(\"|')\\d+\\s*;\\s*URL\\s*=[\\s'\"]*(https?://[^\"']+)").getMatch(2);
+        String refresh = new Regex(this.getHtmlCode(false), "<meta[^>]*http-equiv\\s*=\\s*(\"|')refresh\\1[^>]*content\\s*=\\s*(\"|')\\d+\\s*;\\s*URL\\s*=[\\s'\"]*(https?://[^\"']+)").getMatch(2);
+        if (refresh==null) {
+            return null;
+        }
+        refresh=Encoding.htmlOnlyDecode(refresh);
         return refresh;
     }
 

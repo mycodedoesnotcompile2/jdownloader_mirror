@@ -1,10 +1,16 @@
 package jd.plugins;
 
-import jd.controlling.captcha.SkipRequest;
-
 import org.jdownloader.captcha.blacklist.BlacklistEntry;
 
+import jd.controlling.captcha.SkipRequest;
+
 public class CaptchaException extends PluginException {
+    public static class CaptchaRefreshException extends CaptchaException {
+        public CaptchaRefreshException() {
+            super(LinkStatus.ERROR_RETRY, SkipRequest.REFRESH, null);
+        }
+    }
+
     private final SkipRequest    skipRequest;
     private final BlacklistEntry blackListEntry;
 
@@ -24,10 +30,14 @@ public class CaptchaException extends PluginException {
         this(blackListEntry.getSkipRequest(), blackListEntry);
     }
 
-    protected CaptchaException(SkipRequest skipRequest, BlacklistEntry blackListEntry) {
-        super(LinkStatus.ERROR_CAPTCHA);
+    protected CaptchaException(int linkStatus, SkipRequest skipRequest, BlacklistEntry blackListEntry) {
+        super(linkStatus);
         this.skipRequest = skipRequest;
         this.blackListEntry = blackListEntry;
+    }
+
+    protected CaptchaException(SkipRequest skipRequest, BlacklistEntry blackListEntry) {
+        this(LinkStatus.ERROR_CAPTCHA, skipRequest, blackListEntry);
     }
 
     @Override
@@ -41,14 +51,5 @@ public class CaptchaException extends PluginException {
             sb.append(":BlacklistEntry=").append(blackListEntry.toString());
         }
         return sb.toString();
-    }
-
-    public void throwMeIfNoRefresh() throws CaptchaException {
-        switch (getSkipRequest()) {
-        case REFRESH:
-            return;
-        default:
-            throw this;
-        }
     }
 }

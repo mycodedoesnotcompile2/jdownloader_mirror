@@ -30,7 +30,6 @@ import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountRequiredException;
-import jd.plugins.CaptchaException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -39,7 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 52281 $", interfaceVersion = 3, names = { "pan.baidu.com" }, urls = { "https?://(?:www\\.)?pan\\.baidudecrypted\\.com/\\d+" })
+@HostPlugin(revision = "$Revision: 53890 $", interfaceVersion = 3, names = { "pan.baidu.com" }, urls = { "https?://(?:www\\.)?pan\\.baidudecrypted\\.com/\\d+" })
 public class PanBaiduCom extends PluginForHost {
     public PanBaiduCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -272,24 +271,17 @@ public class PanBaiduCom extends PluginForHost {
                     String code = null;
                     try {
                         code = getCaptchaCode(captchaLink, link);
+                    } catch (final PluginException e) {
+                        /* Skip button (CaptchaException), refresh (retry) and all other plugin exceptions must reach the core. */
+                        throw e;
+                    } catch (final InterruptedException e) {
+                        throw e;
                     } catch (final Throwable e) {
-                        if (e instanceof CaptchaException) {
-                            // JD2 reference to skip button we should abort!
-                            throw (CaptchaException) e;
-                        }
                         // failure of image download! or opening file?, retry should get new captcha image..
                         logger.info("Captcha download failed -> Retrying!");
                         throw new PluginException(LinkStatus.ERROR_RETRY, "Captcha download failed");
                     }
-                    if (code == null || "".equals(code) || code.matches("\\s+")) {
-                        // this covers users entering: empty, whitespace. usually happens by accident.
-                        if (i + 1 != repeat) {
-                            continue;
-                        } else {
-                            // exhausted retry count
-                            throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                        }
-                    }
+                    /* The captcha answer is never empty: The captcha dialog and the validation require at least one character. */
                     br2 = prepAjax(br.cloneBrowser());
                     postPage(br2, postLink, postData + "&vcode_input=" + Encoding.urlEncode(code) + "&vcode_str=" + vcode_str);
                     captchaLink = PluginJSonUtils.getJsonValue(br2, "img");

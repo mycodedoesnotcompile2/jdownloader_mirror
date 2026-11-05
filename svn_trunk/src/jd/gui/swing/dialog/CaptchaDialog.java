@@ -23,10 +23,21 @@ import java.awt.event.FocusListener;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowFocusListener;
 
+import javax.swing.JButton;
 import javax.swing.JComponent;
+import javax.swing.JPanel;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import javax.swing.text.AbstractDocument;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DocumentFilter;
+
+import net.miginfocom.swing.MigLayout;
 
 import org.appwork.swing.components.ExtTextField;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.jdownloader.DomainInfo;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
@@ -38,6 +49,7 @@ import org.jdownloader.gui.translate._GUI;
 public class CaptchaDialog extends AbstractImageCaptchaDialog<String> implements ActionListener {
 
     private ExtTextField textField;
+    private ExtTextField lengthField;
     private String       suggest;
 
     public CaptchaDialog(BasicCaptchaChallenge captchaChallenge, final int flag, DialogType type, final DomainInfo DomainInfo, final Image image, final String explain) {
@@ -108,16 +120,111 @@ public class CaptchaDialog extends AbstractImageCaptchaDialog<String> implements
                 textField.selectAll();
             }
         });
-        textField.setHelpText(getHelpText());
+        /*
+         * The user cannot enter more characters than the maximum length of the challenge. Typing is rejected, pasted text is shortened.
+         * Both play the error sound, like the dialog for too long filenames.
+         */
+        ((AbstractDocument) textField.getDocument()).setDocumentFilter(new DocumentFilter() {
+            @Override
+            public void insertString(final FilterBypass fb, final int offset, final String string, final AttributeSet attr) throws BadLocationException {
+                replace(fb, offset, 0, string, attr);
+            }
+
+            @Override
+            public void replace(final FilterBypass fb, final int offset, final int length, final String text, final AttributeSet attrs) throws BadLocationException {
+                final String inserted = text == null ? "" : text;
+                final int max = ((BasicCaptchaChallenge) challenge).getMaxLength();
+                if (max <= 0) {
+                    super.replace(fb, offset, length, inserted, attrs);
+                    return;
+                }
+                final int allowed = max - (fb.getDocument().getLength() - length);
+                if (inserted.length() <= allowed) {
+                    super.replace(fb, offset, length, inserted, attrs);
+                    return;
+                }
+                CrossSystem.playErrorSound();
+                if (allowed > 0) {
+                    super.replace(fb, offset, length, inserted.substring(0, allowed), attrs);
+                }
+            }
+        });
+        /* The send button is only enabled if the answer is long enough, see BasicCaptchaChallenge#getMinLength. */
+        textField.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                updateOkButtonEnabled();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                updateOkButtonEnabled();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                updateOkButtonEnabled();
+            }
+        });
+        /* The challenge description is shown above the image, see AbstractImageCaptchaDialog#addBeforeImage. */
         if (suggest != null) {
             textField.setText(suggest);
             // this.textField.requestFocusInWindow();
             // this.textField.selectAll();
         }
-
-        // panel.add(new JLabel("HJ dsf"));
-
+        final BasicCaptchaChallenge basicChallenge = (BasicCaptchaChallenge) challenge;
+        if (basicChallenge.getMinLength() > 1 || basicChallenge.getMaxLength() > 0) {
+            /* Length info below the image as plain text, like the click info of the click captcha. */
+            lengthField = new ExtTextField();
+            lengthField.setEditable(false);
+            updateOkButtonEnabled();
+            final JPanel panel = new JPanel(new MigLayout("ins 0,wrap 1", "[grow,fill]", "[]3[]"));
+            panel.setOpaque(false);
+            panel.add(lengthField);
+            panel.add(textField);
+            return panel;
+        }
+        updateOkButtonEnabled();
         return textField;
+    }
+
+    /**
+     * Enables the send button only if the entered text has the required length of the challenge (min. and max. length). This also blocks the enter key because it
+     * triggers the default button.
+     */
+    private void updateOkButtonEnabled() {
+        final ExtTextField textField = this.textField;
+        final JButton okButton = this.okButton;
+        if (textField == null || okButton == null || !(challenge instanceof BasicCaptchaChallenge)) {
+            return;
+        }
+        final BasicCaptchaChallenge basicChallenge = (BasicCaptchaChallenge) challenge;
+        okButton.setEnabled(basicChallenge.isValidLength(textField.getText()));
+        updateLengthInfo();
+    }
+
+    /** Shows the number of entered characters and how many are required. */
+    private void updateLengthInfo() {
+        final ExtTextField lengthField = this.lengthField;
+        if (lengthField == null || textField == null) {
+            return;
+        }
+        final BasicCaptchaChallenge basicChallenge = (BasicCaptchaChallenge) challenge;
+        final int length = textField.getText().trim().length();
+        final int min = basicChallenge.getMinLength();
+        final int max = basicChallenge.getMaxLength();
+        final String info;
+        if (basicChallenge.hasFixedLength()) {
+            /* Exact length required */
+            info = _GUI.T.CaptchaDialog_length_exact(length, max);
+        } else if (max > 0 && min > 1) {
+            info = _GUI.T.CaptchaDialog_length_range(length, max, min);
+        } else if (max > 0) {
+            info = _GUI.T.CaptchaDialog_length_max(length, max);
+        } else {
+            info = _GUI.T.CaptchaDialog_length_min(length, min);
+        }
+        lengthField.setText(info);
     }
 
     protected void initFocus(final JComponent focus) {

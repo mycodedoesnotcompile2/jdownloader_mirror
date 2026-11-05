@@ -49,6 +49,7 @@ import org.appwork.utils.processes.ProcessBuilderFactory;
 import org.jdownloader.api.DeprecatedAPIHttpServerController;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
+import org.jdownloader.captcha.v2.ValidationResult;
 import org.jdownloader.captcha.v2.solver.service.BrowserSolverService;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.controlling.UniqueAlltimeID;
@@ -429,7 +430,7 @@ public abstract class BrowserReference implements ExtendedHttpRequestHandler, Ht
                     ChallengeResponseController.getInstance().keepAlivePendingChallenges(challenge);
                 }
                 final SolverJob<?> job = ChallengeResponseController.getInstance().getJobByChallengeId(challenge.getId().getID());
-                if (challenge.isSolved() || job == null || job.isDone() || BrowserSolver.getInstance().isJobDone(job)) {
+                if (ValidationResult.VALID.equals(challenge.getValidationResult()) || job == null || job.isDone() || BrowserSolver.getInstance().isJobDone(job)) {
                     response.getOutputStream(true).write("true".getBytes("UTF-8"));
                     canClose.setReached();
                     return true;

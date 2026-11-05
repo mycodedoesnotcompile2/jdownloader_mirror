@@ -48,52 +48,6 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.SwingConstants;
 
-import jd.PluginWrapper;
-import jd.captcha.JACMethod;
-import jd.config.SubConfiguration;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.controlling.captcha.CaptchaSettings;
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.controlling.downloadcontroller.AccountCache.ACCOUNTTYPE;
-import jd.controlling.downloadcontroller.DiskSpaceManager.DISKSPACERESERVATIONRESULT;
-import jd.controlling.downloadcontroller.DiskSpaceReservation;
-import jd.controlling.downloadcontroller.DownloadSession;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.DownloadWatchDog.DownloadLinkJob;
-import jd.controlling.downloadcontroller.ExceptionRunnable;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.downloadcontroller.SingleDownloadController.WaitingQueueItem;
-import jd.controlling.linkchecker.LinkChecker;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcrawler.CheckableLink;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.linkcrawler.LinkCrawlerThread;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.proxy.AbstractProxySelectorImpl;
-import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
-import jd.controlling.reconnect.ipcheck.IPCheckException;
-import jd.controlling.reconnect.ipcheck.OfflineException;
-import jd.gui.swing.jdgui.views.settings.panels.pluginsettings.PluginConfigPanel;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.NoGateWayException;
-import jd.http.ProxySelectorInterface;
-import jd.http.Request;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.Formatter;
-import jd.nutils.JDHash;
-import jd.plugins.Account.AccountError;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.MultiHostHost.MultihosterHostStatus;
-import jd.plugins.download.DownloadInterface;
-import jd.plugins.download.DownloadInterfaceFactory;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.Downloadable;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
@@ -147,7 +101,6 @@ import org.jdownloader.captcha.v2.ChallengeResponseController;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
-import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.controlling.DefaultDownloadLinkViewImpl;
 import org.jdownloader.controlling.DownloadLinkView;
@@ -201,6 +154,53 @@ import org.jdownloader.translate._JDT;
 import org.jdownloader.updatev2.UpdateController;
 import org.jdownloader.updatev2.UpdateHandler;
 
+import jd.PluginWrapper;
+import jd.captcha.JACMethod;
+import jd.config.SubConfiguration;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.controlling.captcha.CaptchaSettings;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.controlling.downloadcontroller.AccountCache.ACCOUNTTYPE;
+import jd.controlling.downloadcontroller.DiskSpaceManager.DISKSPACERESERVATIONRESULT;
+import jd.controlling.downloadcontroller.DiskSpaceReservation;
+import jd.controlling.downloadcontroller.DownloadSession;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.downloadcontroller.DownloadWatchDog.DownloadLinkJob;
+import jd.controlling.downloadcontroller.ExceptionRunnable;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.downloadcontroller.SingleDownloadController.WaitingQueueItem;
+import jd.controlling.linkchecker.LinkChecker;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcrawler.CheckableLink;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.LinkCrawlerThread;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.proxy.AbstractProxySelectorImpl;
+import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
+import jd.controlling.reconnect.ipcheck.IPCheckException;
+import jd.controlling.reconnect.ipcheck.OfflineException;
+import jd.gui.swing.jdgui.views.settings.panels.pluginsettings.PluginConfigPanel;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.NoGateWayException;
+import jd.http.ProxySelectorInterface;
+import jd.http.Request;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.Formatter;
+import jd.nutils.JDHash;
+import jd.plugins.Account.AccountError;
+import jd.plugins.CaptchaException.CaptchaRefreshException;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
+import jd.plugins.download.DownloadInterface;
+import jd.plugins.download.DownloadInterfaceFactory;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.Downloadable;
+
 /**
  * Dies ist die Oberklasse fuer alle Plugins, die von einem Anbieter Dateien herunterladen koennen
  *
@@ -209,14 +209,13 @@ import org.jdownloader.updatev2.UpdateHandler;
 public abstract class PluginForHost extends Plugin {
     private static final String    COPY_MOVE_FILE = "CopyMoveFile";
     private static final Pattern[] PATTERNS       = new Pattern[] {
-        /**
-         * these patterns should split filename and fileextension (extension must include the
-         * point)
-         */
-        // multipart rar archives
-        Pattern.compile("(.*)(\\.pa?r?t?\\.?[0-9]+.*?\\.rar$)", Pattern.CASE_INSENSITIVE),
-        // normal files with extension
-        Pattern.compile("(.*)(\\..*?$)", Pattern.CASE_INSENSITIVE) };
+            /**
+             * these patterns should split filename and fileextension (extension must include the point)
+             */
+            // multipart rar archives
+            Pattern.compile("(.*)(\\.pa?r?t?\\.?[0-9]+.*?\\.rar$)", Pattern.CASE_INSENSITIVE),
+            // normal files with extension
+            Pattern.compile("(.*)(\\..*?$)", Pattern.CASE_INSENSITIVE) };
     private LazyHostPlugin         lazyP          = null;
     /**
      * Is true if the user has answered a captcha challenge. Does not say anything whether or not the answer was correct.
@@ -592,23 +591,24 @@ public abstract class PluginForHost extends Plugin {
             case BLOCK_ALL_CAPTCHAS:
                 CaptchaBlackList.getInstance().add(new BlockAllDownloadCaptchasEntry());
                 HelpDialog.showCaptchaSkippedDialog();
-                break;
+                throw new CaptchaException(e.getSkipRequest());
             case BLOCK_HOSTER:
                 CaptchaBlackList.getInstance().add(new BlockDownloadCaptchasByHost(link.getHost()));
                 HelpDialog.showCaptchaSkippedDialog();
-                break;
+                throw new CaptchaException(e.getSkipRequest());
             case BLOCK_PACKAGE:
                 CaptchaBlackList.getInstance().add(new BlockDownloadCaptchasByPackage(link.getParentNode()));
                 HelpDialog.showCaptchaSkippedDialog();
-                break;
+                throw new CaptchaException(e.getSkipRequest());
             case TIMEOUT:
                 onCaptchaTimeout(link, c);
                 // TIMEOUT may fallthrough to SINGLE
             case SINGLE:
                 CaptchaBlackList.getInstance().add(new BlockDownloadCaptchasByLink(e.getSkipRequest(), link));
                 HelpDialog.showCaptchaSkippedDialog();
-                break;
+                throw new CaptchaException(e.getSkipRequest());
             default:
+                // handled in next switch
                 break;
             }
         }
@@ -617,21 +617,19 @@ public abstract class PluginForHost extends Plugin {
             if (Thread.currentThread() instanceof SingleDownloadController) {
                 DownloadWatchDog.getInstance().stopDownloads();
             }
-            break;
+            throw new CaptchaException(e.getSkipRequest());
         case REFRESH:
-            // we should forward the refresh request to a new pluginstructure soon. For now. the plugin will just retry
-            return c.getRefreshTrigger();
+            if (link != null && getChallengeRefreshVeto(c) == null) {
+                throw new CaptchaRefreshException();
+            }
+            /* Other cases (e.g. login captcha) end up in the CaptchaException below. */
+            throw new CaptchaException(e.getSkipRequest());
         default:
-            break;
+            throw new CaptchaException(e.getSkipRequest());
         }
-        throw new CaptchaException(e.getSkipRequest());
     }
 
     public <T> T handleCaptchaChallenge(final DownloadLink link, Challenge<T> c) throws CaptchaException, PluginException, InterruptedException {
-        if (c instanceof ImageCaptchaChallenge) {
-            final File captchaFile = ((ImageCaptchaChallenge) c).getImageFile();
-            cleanUpCaptchaFiles.addIfAbsent(captchaFile);
-        }
         c.setTimeout(getChallengeTimeout(c));
         invalidateLastChallengeResponse();
         PluginProgress progress = null;
@@ -664,12 +662,11 @@ public abstract class PluginForHost extends Plugin {
                 throw new CaptchaException(blackListEntry);
             }
             final SolverJob<T> job = ChallengeResponseController.getInstance().handle(c);
-            if (!c.isSolved()) {
-                throw new PluginException(LinkStatus.ERROR_CAPTCHA, job.getStatusDetail());
-            } else if (!c.isCaptchaResponseValid()) {
-                throw new PluginException(LinkStatus.ERROR_CAPTCHA, "Captcha reponse value did not validate!");
-            } else {
+            switch (c.getValidationResult()) {
+            case VALID:
                 return c.getResult().getValue();
+            default:
+                throw new PluginException(LinkStatus.ERROR_CAPTCHA, job.getStatusDetail());
             }
         } catch (InterruptedException e) {
             LogSource.exception(logger, e);
@@ -1207,8 +1204,8 @@ public abstract class PluginForHost extends Plugin {
             }
             /**
              * In some cases, individual hosts can have different traffic calculation values than 100%. <br>
-             * This calculation applies for the global account-traffic and not for the individual host. </br> Example: File size is 1GB,
-             * individual host traffic calculation factor is 400% <br>
+             * This calculation applies for the global account-traffic and not for the individual host. </br>
+             * Example: File size is 1GB, individual host traffic calculation factor is 400% <br>
              * Account traffic needed: 4GB <br>
              * Individual host traffic needed: 1GB
              */
@@ -2723,8 +2720,9 @@ public abstract class PluginForHost extends Plugin {
 
     /**
      * Decides without touching the filesystem whether there is a file on disk that was downloaded for the given link and therefore belongs
-     * to it. </br> Normally this is the case as soon as bytes were loaded. Empty files are the exception: Nothing is ever "loaded" for
-     * them, but the file exists once the download finished successfully and the file size is known to be 0.
+     * to it. </br>
+     * Normally this is the case as soon as bytes were loaded. Empty files are the exception: Nothing is ever "loaded" for them, but the
+     * file exists once the download finished successfully and the file size is known to be 0.
      */
     public static boolean hasOwnFileOnDisk(final DownloadLink link) {
         if (link.getView().getBytesLoaded() > 0) {

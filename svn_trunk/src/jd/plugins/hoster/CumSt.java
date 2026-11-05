@@ -22,6 +22,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.Files;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.downloader.text.TextDownloader;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -38,12 +43,7 @@ import jd.plugins.decrypter.CumStCrawler;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 
-import org.appwork.utils.Files;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.downloader.text.TextDownloader;
-
-@HostPlugin(revision = "$Revision: 53518 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53897 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { CumStCrawler.class })
 public class CumSt extends PluginForHost {
     public CumSt(PluginWrapper wrapper) {
@@ -189,7 +189,11 @@ public class CumSt extends PluginForHost {
             link.setDownloadSize(textContent.getBytes("UTF-8").length);
         } else {
             /* Media file */
-            final String contenturl = link.getPluginPatternMatcher();
+            String contenturl = link.getPluginPatternMatcher();
+            if (new URL(contenturl).getHost().startsWith("e1.")) {
+                contenturl = contenturl.replaceFirst("(?i)//e1.", "//cdn.");
+                link.setPluginPatternMatcher(contenturl);
+            }
             /* The file hash can be used for CRC check as media is content-addressed by sha256. */
             final String sha256 = getSha256HashFromURL(contenturl);
             if (sha256 != null) {

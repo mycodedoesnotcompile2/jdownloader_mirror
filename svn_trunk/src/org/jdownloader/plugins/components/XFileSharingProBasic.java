@@ -1,5 +1,6 @@
 package org.jdownloader.plugins.components;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.SocketException;
@@ -80,6 +81,7 @@ import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudfla
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
 import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.components.config.XFSConfig;
@@ -93,7 +95,7 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.EcmaError;
 
-@HostPlugin(revision = "$Revision: 53786 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53890 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -2249,44 +2251,61 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     protected AvailableStatus massLinkcheckerParseFileInfo(final Browser br, final DownloadLink link) {
         final String fuid = this.getFUIDFromURL(link);
         boolean isNewLinkchecker = true;
-        String html_for_fuid = br.getRegex("<tr>((?!</?tr>).)*?" + fuid + "((?!</?tr>).)*?</tr>").getMatch(-1);
+        String html_for_fuid = br.getRegex("<tr[^>]*>((?!</?tr>).)*?" + fuid + "((?!</?tr>).)*?</tr>").getMatch(-1);
         if (html_for_fuid == null) {
             /*
              * 2019-07-10: E.g. for old linkcheckers which only return online/offline status in a single line and not as a html table.
              */
-            html_for_fuid = br.getRegex("<font color=\\'(?:green|red)\\'>[^>]*?" + fuid + "[^>]*?</font>").getMatch(-1);
+            html_for_fuid = br.getRegex("<font color=\\'(?:green|red)\\'[^>]*>[^>]*?" + fuid + "[^>]*?</font>").getMatch(-1);
             isNewLinkchecker = false;
         }
         if (html_for_fuid == null) {
             return AvailableStatus.UNCHECKED;
         }
-        final boolean isOffline;
-        if (isNewLinkchecker) {
-            isOffline = new Regex(html_for_fuid, "Not found").patternFind();
-        } else {
-            isOffline = new Regex(html_for_fuid, "<font color='red").patternFind();
+        Boolean isOnline = null;
+        if (new Regex(html_for_fuid, ">\\s*Found\\s*<").patternFind()) {
+            isOnline = true;
         }
-        if (isOffline) {
+        if (isOnline == null) {
+            if (isNewLinkchecker) {
+                isOnline = !new Regex(html_for_fuid, "Not found").patternFind();
+            } else {
+                isOnline = !new Regex(html_for_fuid, "<font color='red").patternFind();
+            }
+        }
+        if (Boolean.FALSE.equals(isOnline)) {
             link.setAvailable(false);
             return AvailableStatus.FALSE;
+        } else if (Boolean.TRUE.equals(isOnline)) {
+            /* We know that the file is online - let's find the filesize ... */
+            link.setAvailable(true);
         }
-        /* We know that the file is online - let's find the filesize ... */
-        link.setAvailable(true);
-        try {
-            final String[] tabla_data = new Regex(html_for_fuid, "<td>?(.*?)</td>").getColumn(0);
-            final String size = tabla_data.length >= 3 ? tabla_data[2] : null;
-            if (size != null) {
-                /*
-                 * Filesize should definitely be given - but at this stage we are quite sure that the file is online so let's not throw an
-                 * exception if the filesize cannot be found.
-                 */
-                link.setDownloadSize(parseSize(Size.TRAFFIC, size));
+        findFileSize: try {
+            final String[] tabla_data = new Regex(html_for_fuid, "<td[^>]*>(.*?)</td>").getColumn(0);
+            if (tabla_data == null) {
+                break findFileSize;
+            }
+            for (String entry : tabla_data) {
+                final String size = new Regex(entry, ">?\\s*([0-9\\. TGMKB]+)\\s*<?").getMatch(0);
+                if (size != null) {
+                    /*
+                     * Filesize should definitely be given - but at this stage we are quite sure that the file is online so let's not throw
+                     * an exception if the filesize cannot be found.
+                     */
+                    link.setDownloadSize(parseSize(Size.FILE, size));
+                    return AvailableStatus.TRUE;
+                }
             }
         } catch (final Throwable ignore) {
             logger.log(ignore);
             logger.warning("Failed to find file size for fuid: " + fuid);
         }
-        return AvailableStatus.TRUE;
+        if (Boolean.TRUE.equals(isOnline)) {
+            return AvailableStatus.TRUE;
+        } else {
+            // no filesize and not sure about online status
+            return AvailableStatus.UNCHECKED;
+        }
     }
 
     /**
@@ -3117,6 +3136,30 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 return super.getSiteKey();
             }
         };
+    }
+
+    /**
+     * Returns the number of digits of the old XFS image captcha ("4dignum"). Default: 4. Override this if the website uses a different
+     * length. The answer of this captcha always consists of digits only.
+     */
+    protected int getImageCaptchaLength() {
+        return 4;
+    }
+
+    /**
+     * The old XFS default image captchas ({@link #CAPTCHA_METHOD_ID_XFS_DEFAULT}) are numeric and have a fixed length, see
+     * {@link #getImageCaptchaLength()}. Plugins with a special captcha use their own method id and are not affected.
+     */
+    @Override
+    protected BasicCaptchaChallenge createChallenge(final String method, final File file, final int flag, final DownloadLink link, final String defaultValue, final String explain) {
+        final BasicCaptchaChallenge ret = super.createChallenge(method, file, flag, link, defaultValue, explain);
+        if (CAPTCHA_METHOD_ID_XFS_DEFAULT.equals(method)) {
+            final int length = getImageCaptchaLength();
+            ret.setNumeric(Boolean.TRUE);
+            ret.setMinLength(length);
+            ret.setMaxLength(length);
+        }
+        return ret;
     }
 
     /** Handles all kinds of captchas, also login-captcha - fills captcha answer into given captchaForm. */

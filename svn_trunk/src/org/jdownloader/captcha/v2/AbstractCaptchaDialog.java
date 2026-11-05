@@ -88,6 +88,8 @@ import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.settings.staticreferences.CFG_SOUND;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
+import jd.controlling.downloadcontroller.DownloadSession;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.gui.swing.dialog.DialogType;
 import jd.gui.swing.jdgui.JDGui;
@@ -495,40 +497,47 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
         return ret;
     }
 
+    /**
+     * Creates the refresh button. A click sets the refresh flag and closes the dialog, see {@link #isRefresh()}. It is disabled if
+     * {@link #isRefreshAllowed()} returns false.
+     */
+    protected ExtButton createRefreshButton() {
+        final boolean refreshAllowed = isRefreshAllowed();
+        final ExtButton refreshBtn = new ExtButton(new AppAction() {
+            {
+                setSmallIcon(new AbstractIcon(IconKey.ICON_REFRESH, 18));
+                /* A disabled button explains why a refresh is not possible anymore. */
+                setTooltipText(refreshAllowed ? getRefreshTooltip() : getRefreshDisabledTooltip());
+                if (refreshAllowed) {
+                    /* No shortcut (and no shortcut hint in the tooltip) if a refresh is not possible anymore. */
+                    KeyStroke ks = KeyStroke.getKeyStroke(CFG_GUI.CFG.getShortcutForCaptchaDialogRefresh());
+                    if (ks == null) {
+                        ks = KeyStroke.getKeyStroke("pressed F5");
+                    }
+                    setAccelerator(ks);
+                }
+                setEnabled(refreshAllowed);
+            }
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                refresh = true;
+                setReturnmask(false);
+                dispose();
+            }
+        }) {
+            @Override
+            public int getTooltipDelay(Point mousePositionOnScreen) {
+                return 500;
+            }
+        };
+        refreshBtn.setRolloverEffectEnabled(true);
+        return refreshBtn;
+    }
+
     @Override
     protected DefaultButtonPanel getDefaultButtonPanel() {
         final DefaultButtonPanel ret = new DefaultButtonPanel("ins 0", "[]", "0[grow,fill]0") {
-            @Override
-            public void addOKButton(JButton okButton) {
-                final ExtButton refreshBtn = new ExtButton(new AppAction() {
-                    {
-                        setSmallIcon(new AbstractIcon(IconKey.ICON_REFRESH, 18));
-                        setTooltipText(_GUI.T.CaptchaDialog_layoutDialogContent_refresh());
-                        KeyStroke ks = KeyStroke.getKeyStroke(CFG_GUI.CFG.getShortcutForCaptchaDialogRefresh());
-                        if (ks == null) {
-                            ks = KeyStroke.getKeyStroke("pressed F5");
-                        }
-                        setAccelerator(ks);
-                    }
-
-                    @Override
-                    public void actionPerformed(ActionEvent e) {
-                        refresh = true;
-                        setReturnmask(false);
-                        dispose();
-                    }
-                }) {
-                    @Override
-                    public int getTooltipDelay(Point mousePositionOnScreen) {
-                        return 500;
-                    }
-                };
-                //
-                refreshBtn.setRolloverEffectEnabled(true);
-                super.add(refreshBtn, "alignx right,width 28!");
-                super.addOKButton(okButton);
-            }
-
             @Override
             public void addCancelButton(final JButton cancelButton) {
                 super.addCancelButton(cancelButton);
@@ -552,6 +561,8 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
         if (isSoundToggleVisible()) {
             ret.add(createSoundToggle(), "width 28!");
         }
+        /* The refresh button always stands directly next to the sound toggle, in front of the "Hate captchas" text. */
+        ret.add(createRefreshButton(), "width 28!");
         ExtButton premium = new ExtButton(new AppAction() {
             /**
              *
@@ -935,6 +946,66 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
     }
 
     protected abstract JPanel createCaptchaPanel();
+
+    /** Returns true if the challenge is a login captcha of an account. These captchas cannot be refreshed with the refresh button. */
+    protected boolean isLoginCaptcha() {
+        return challenge != null && challenge.isAccountLogin();
+    }
+
+    /** Returns the tooltip of the disabled refresh button, see {@link #isRefreshAllowed()}. */
+    protected String getRefreshDisabledTooltip() {
+        /* The plugin tells why the challenge cannot be refreshed. */
+        final Plugin.ChallengeRefreshVeto veto = getRefreshVeto();
+        if (veto != null) {
+            return veto.getLabel();
+        }
+        return _GUI.T.CaptchaDialog_layoutDialogContent_refresh();
+    }
+
+    /**
+     * Returns how often the captcha was refreshed already (see {@link Plugin#getChallengeRefreshedCount()}), or -1 if there is no counter
+     * for this challenge (no plugin, no limit).
+     */
+    protected int getRefreshCount() {
+        final Plugin plugin = challenge == null ? null : challenge.getPlugin();
+        if (plugin == null) {
+            return -1;
+        }
+        return plugin.getChallengeRefreshedCount();
+    }
+
+    /** Returns the number of refreshes after which the refresh button gets disabled, see {@link Plugin#getChallengeRefreshLimit()}. */
+    protected int getRefreshLimit() {
+        final Plugin plugin = this.plugin;
+        return plugin == null ? 0 : plugin.getChallengeRefreshLimit();
+    }
+
+    /**
+     * Returns false if the refresh button must be disabled, e.g. because the captcha was refreshed too often already, see
+     * {@link Plugin#getChallengeRefreshVeto(Challenge)}.
+     */
+    protected boolean isRefreshAllowed() {
+        return plugin != null && getRefreshVeto() == null;
+    }
+
+    /** Returns the reason why the challenge cannot be refreshed, or null if the plugin allows a refresh. */
+    protected Plugin.ChallengeRefreshVeto getRefreshVeto() {
+        final Plugin plugin = this.plugin;
+        if (plugin == null) {
+            return Plugin.ChallengeRefreshVeto.REFRESH_CAPTCHA_TYPE_NOT_ALLOWED;
+        }
+        return plugin.getChallengeRefreshVeto(getChallenge());
+    }
+
+    /** Returns the tooltip of the enabled refresh button. It shows the current attempt, e.g. "Refresh (Attempt 3/5)". */
+    protected String getRefreshTooltip() {
+        final int count = getRefreshCount();
+        if (count < 0) {
+            return _GUI.T.CaptchaDialog_layoutDialogContent_refresh();
+        }
+        /* The first captcha is attempt 1, so the number of attempts is the limit of refreshes plus 1. */
+        return _GUI.T.AbstractCaptchaDialog_refreshAttempt_tooltip(String.valueOf(count + 1), String.valueOf(getRefreshLimit() + 1));
+    }
 
     public boolean isRefresh() {
         return refresh;

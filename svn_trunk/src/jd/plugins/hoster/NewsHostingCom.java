@@ -27,7 +27,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 53268 $", interfaceVersion = 3, names = { "newshosting.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53890 $", interfaceVersion = 3, names = { "newshosting.com" }, urls = { "" })
 public class NewsHostingCom extends UseNet {
     public NewsHostingCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -128,9 +128,6 @@ public class NewsHostingCom extends UseNet {
                     if (login.containsHTML("g-recaptcha")) {
                         final CaptchaHelperHostPluginRecaptchaV2 rc2 = new CaptchaHelperHostPluginRecaptchaV2(this, br);
                         final String code = rc2.getToken();
-                        if (StringUtils.isEmpty(code)) {
-                            throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                        }
                         login.put("g-recaptcha-response", Encoding.urlEncode(code));
                     }
                     br.submitForm(login);

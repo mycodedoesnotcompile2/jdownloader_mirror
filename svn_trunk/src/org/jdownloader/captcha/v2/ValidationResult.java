@@ -30,6 +30,12 @@ public enum ValidationResult implements LabelInterface {
             return _GUI.T.ValidationResult_EMPTY_RESPONSE();
         }
     },
+    WRONG_LENGTH {
+        @Override
+        public String getLabel() {
+            return _GUI.T.ValidationResult_WRONG_LENGTH();
+        }
+    },
     INVALID_TOKEN {
         @Override
         public String getLabel() {

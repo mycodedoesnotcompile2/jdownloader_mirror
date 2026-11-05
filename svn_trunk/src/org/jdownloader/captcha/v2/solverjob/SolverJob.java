@@ -221,9 +221,20 @@ public class SolverJob<T> {
         }
     }
 
+    private volatile ValidationResult rejectedValidationResult = null;
+
+    /**
+     * @return the reason why the most recent answer of a solver was rejected by {@link Challenge#validateResponse(AbstractResponse)}, or
+     *         null if no answer was rejected so far
+     */
+    public ValidationResult getRejectedValidationResult() {
+        return rejectedValidationResult;
+    }
+
     public boolean addAnswer(AbstractResponse<T> abstractResponse) {
         final ValidationResult validation = abstractResponse.getChallenge().validateResponse(abstractResponse);
         if (validation != ValidationResult.VALID) {
+            rejectedValidationResult = validation;
             if (abstractResponse.getSolver() instanceof ChallengeSolver) {
                 /* Only the first result of a solver counts, so this detailed reason wins over the generic one set by the solver later. */
                 setSolverResult((ChallengeSolver<?>) abstractResponse.getSolver(), SolverOutcome.ANSWER_REJECTED, validation.getLabel());

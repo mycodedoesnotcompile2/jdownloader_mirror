@@ -63,7 +63,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
 
-@HostPlugin(revision = "$Revision: 53733 $", interfaceVersion = 3, names = { "imagetyperz.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53890 $", interfaceVersion = 3, names = { "imagetyperz.com" }, urls = { "" })
 public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaSolver {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -271,6 +271,13 @@ public class PluginForCaptchaSolverImagetyperz extends abstractPluginForCaptchaS
                 if (Boolean.TRUE.equals(challenge.getNumeric())) {
                     /* 1 = digits only */
                     uploadQuery.appendEncoded("alphanumeric", "1");
+                }
+                /* Parameter names taken from the official API clients (PHP, Node, Java), the server documentation is not available. */
+                if (challenge.getMinLength() > 1) {
+                    uploadQuery.appendEncoded("minlength", String.valueOf(challenge.getMinLength()));
+                }
+                if (challenge.getMaxLength() > 0) {
+                    uploadQuery.appendEncoded("maxlength", String.valueOf(challenge.getMaxLength()));
                 }
             } else {
                 uploadPath = "/Forms/UploadFileAndGetTextNEW.ashx";

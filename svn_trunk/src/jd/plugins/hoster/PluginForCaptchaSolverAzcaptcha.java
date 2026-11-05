@@ -51,7 +51,7 @@ import jd.plugins.PluginException;
  * - reCAPTCHA v2 uses the task type "NoCaptchaTaskProxyless" and reCAPTCHA v3 Enterprise has its own task type <br>
  * - Negative feedback is only available via the classic API (res.php?action=reportbad), there is no "report correct" method.
  */
-@HostPlugin(revision = "$Revision: 53779 $", interfaceVersion = 3, names = { "azcaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53890 $", interfaceVersion = 3, names = { "azcaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSolver {
     /**
      * Task types with proxy of the JSON API, see https://azcaptcha.com/docs: RecaptchaV2Task, RecaptchaV2EnterpriseTask, RecaptchaV3Task,
@@ -231,6 +231,14 @@ public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSol
             if (numeric != null) {
                 /* 0 = any characters, 1 = numbers only */
                 task.put("numeric", numeric.booleanValue() ? 1 : 0);
+            }
+            if (challenge.getMinLength() > 1) {
+                /* Minimum length of the answer, 0 = no limit */
+                task.put("minLength", challenge.getMinLength());
+            }
+            if (challenge.getMaxLength() > 0) {
+                /* Maximum length of the answer, 0 = no limit */
+                task.put("maxLength", challenge.getMaxLength());
             }
             if (challenge.getExplain() != null) {
                 task.put("comment", challenge.getExplain());

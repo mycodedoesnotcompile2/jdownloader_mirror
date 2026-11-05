@@ -426,7 +426,13 @@ public class Cookies {
             if (removeExpired(cookie)) {
                 continue;
             } else if (cookie.equals(newCookie)) {
-                cookie.update(newCookie);
+                if (newCookie.isExpired()) {
+                    // new cookie is already expired (server wants to delete it), so we can remove existing one instead of update-> expire ->
+                    // remove later. Do not use removeExpired(cookie) here, it only checks the existing cookie (which we already checked above), not newCookie
+                    getCookies().remove(cookie);
+                } else {
+                    cookie.update(newCookie);
+                }
                 return;
             }
         }
@@ -498,6 +504,14 @@ public class Cookies {
         }
     };
 
+    /**
+     * Removes the given cookie from this list if it is expired. Only the given cookie is checked, not any cookie that is about to replace
+     * it.
+     *
+     * @param cookie
+     *            the cookie to check
+     * @return true if the cookie was expired and has been removed, false otherwise
+     */
     protected boolean removeExpired(Cookie cookie) {
         if (cookie.isExpired()) {
             getCookies().remove(cookie);
@@ -582,7 +596,7 @@ public class Cookies {
         for (final Cookie cookie : this.getCookies()) {
             if (removeExpired(cookie)) {
                 continue;
-            } else if (key.equals(cookie.getKey()) && url == null || cookie.matches(url)) {
+            } else if (key.equals(cookie.getKey()) && (url == null || cookie.matches(url))) {
                 ret.add(cookie);
             }
         }

@@ -6,11 +6,6 @@ import java.net.URL;
 import java.util.Locale;
 import java.util.Map;
 
-import jd.http.Browser;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
@@ -24,8 +19,8 @@ import org.appwork.utils.net.httpserver.requests.GetRequest;
 import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.jdownloader.captcha.v2.AbstractResponse;
-import org.jdownloader.captcha.v2.ValidationResult;
 import org.jdownloader.captcha.v2.ChallengeSolver;
+import org.jdownloader.captcha.v2.ValidationResult;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.CaptchaResponse;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
@@ -33,6 +28,11 @@ import org.jdownloader.captcha.v2.solver.browser.BrowserReference;
 import org.jdownloader.captcha.v2.solver.browser.BrowserViewport;
 import org.jdownloader.captcha.v2.solver.browser.BrowserWindow;
 import org.jdownloader.gui.translate._GUI;
+
+import jd.http.Browser;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
 
 public abstract class HCaptchaChallenge extends AbstractBrowserChallenge {
     public static final String             RAWTOKEN = "rawtoken";
@@ -300,15 +300,6 @@ public abstract class HCaptchaChallenge extends AbstractBrowserChallenge {
     @Override
     protected String getCaptchaNameSpace() {
         return "hcaptcha";
-    }
-
-    @Override
-    public boolean isCaptchaResponseValid() {
-        if (super.isCaptchaResponseValid() && isValidResponseToken(getResult().getValue())) {
-            return true;
-        } else {
-            return false;
-        }
     }
 
     protected boolean isValidResponseToken(String v) {

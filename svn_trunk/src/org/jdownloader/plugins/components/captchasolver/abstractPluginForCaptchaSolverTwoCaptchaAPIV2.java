@@ -226,6 +226,14 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
                 /* 0 = no requirements, 1 = digits only */
                 task.put("numeric", numeric.booleanValue() ? 1 : 0);
             }
+            if (challenge.getMinLength() > 1) {
+                /* >0 = minimum length of the answer, 0 = no preference */
+                task.put("minLength", challenge.getMinLength());
+            }
+            if (challenge.getMaxLength() > 0) {
+                /* >0 = maximum length of the answer, 0 = no preference */
+                task.put("maxLength", challenge.getMaxLength());
+            }
         } else {
             throw new IllegalArgumentException("Unexpected captcha challenge type");
         }

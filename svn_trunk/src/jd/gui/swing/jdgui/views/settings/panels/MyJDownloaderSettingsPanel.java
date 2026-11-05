@@ -62,6 +62,7 @@ import org.jdownloader.settings.staticreferences.CFG_MYJD;
 
 public class MyJDownloaderSettingsPanel extends AbstractConfigPanel implements GenericConfigEventListener<Enum>, MyJDownloaderListener {
     private static final long    serialVersionUID = 1L;
+    private final SettingsButton whatIsMyJDownloader;
     private final SettingsButton openMyJDownloader;
     private final TextInput      email;
     private final PasswordInput  passWord;
@@ -87,6 +88,17 @@ public class MyJDownloaderSettingsPanel extends AbstractConfigPanel implements G
 
     public MyJDownloaderSettingsPanel() {
         super();
+        whatIsMyJDownloader = new SettingsButton(new AppAction() {
+            {
+                setName(_GUI.T.MyJDownloaderSettingsPanel_MyJDownloaderSettingsPanel_whatIs_());
+                setSmallIcon(new AbstractIcon(IconKey.ICON_INFO, 18));
+            }
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                CrossSystem.openURL("https://support.jdownloader.org/knowledgebase/article/what-is-myjdownloader");
+            }
+        });
         openMyJDownloader = new SettingsButton(new AppAction() {
             {
                 setName(_GUI.T.MyJDownloaderSettingsPanel_MyJDownloaderSettingsPanel_open_());
@@ -228,6 +240,7 @@ public class MyJDownloaderSettingsPanel extends AbstractConfigPanel implements G
         CFG_MYJD.LATEST_ERROR.getEventSender().addListener(this, true);
         this.addHeader(getTitle(), getIcon());
         this.addDescription(_GUI.T.MyJDownloaderSettingsPanel_MyJDownloaderSettingsPanel_description());
+        add(whatIsMyJDownloader, "gapleft 37,spanx,pushx,growx");
         add(openMyJDownloader, "gapleft 37,spanx,pushx,growx");
         if (!(this instanceof MyJDownloaderSettingsPanelForTab)) {
             add(openMyJDownloaderTab, "gapleft 37,spanx,pushx,growx");

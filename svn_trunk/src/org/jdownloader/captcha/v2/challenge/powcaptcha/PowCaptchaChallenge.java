@@ -1,12 +1,12 @@
 package org.jdownloader.captcha.v2.challenge.powcaptcha;
 
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.ValidationResult;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
+
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
 
 /**
  * Proof-of-work captcha ("powCAPTCHA") as used by filecrypt.cc: The website embeds a widget which fetches a challenge from a "captcha
@@ -39,14 +39,6 @@ public abstract class PowCaptchaChallenge extends AbstractBrowserChallenge {
     @Override
     public boolean isSameIPRequired() {
         return true;
-    }
-
-    public boolean isCaptchaResponseValid() {
-        if (super.isCaptchaResponseValid() && AbstractPowCaptcha.looksLikeValidToken(getResult().getValue())) {
-            return true;
-        } else {
-            return false;
-        }
     }
 
     @Override
