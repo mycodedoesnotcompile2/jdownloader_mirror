@@ -13,6 +13,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import javax.swing.AbstractAction;
+import javax.swing.Action;
+import javax.swing.SwingUtilities;
 import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JComponent;
@@ -60,6 +62,14 @@ import net.miginfocom.swing.MigLayout;
  */
 public class SelectBrowserDialog extends AbstractDialog<InstalledBrowser> {
     private final InstalledBrowser    osDefault;
+    /*
+     * Dummy entry shown as the last row while the user has not picked a custom browser: Clicking it opens the file chooser. It is removed
+     * as soon as the user has picked a browser that way.
+     */
+    private final InstalledBrowser    browsePlaceholder;
+    private boolean                   browsePlaceholderVisible = true;
+    /* The browser that was chosen when the dialog was opened. Everything else is a change which can be saved. */
+    private final InstalledBrowser    initialBrowser;
     private final String[]            currentCommandline;
     private final BrowserTableModel   model;
     private final BasicJDTable<InstalledBrowser> table;
@@ -72,17 +82,20 @@ public class SelectBrowserDialog extends AbstractDialog<InstalledBrowser> {
     private final Map<InstalledBrowser, Icon> icons = new ConcurrentHashMap<InstalledBrowser, Icon>();
     /* Generic browser (globe) icon. */
     private final Icon                fallbackIcon = new AbstractIcon(IconKey.ICON_BROWSE, 16);
+    /* Icon of the "browse" row. */
+    private final Icon                addIcon      = new AbstractIcon(IconKey.ICON_ADD, 16);
 
     /**
      * @param currentCommandline
      *            the currently configured browser commandline, may be null. Used to preselect the matching entry.
      */
     public SelectBrowserDialog(final String[] currentCommandline) {
-        super(Dialog.STYLE_HIDE_ICON, _GUI.T.SelectBrowserDialog_title(), null, _GUI.T.SelectBrowserDialog_save(), null);
+        super(Dialog.STYLE_HIDE_ICON, _GUI.T.SelectBrowserDialog_title(), null, _GUI.T.SelectBrowserDialog_save(), _GUI.T.SelectBrowserDialog_cancel());
         this.currentCommandline = currentCommandline;
         setLocator(new RememberAbsoluteDialogLocator(getClass().getSimpleName()));
         setDimensor(new RememberLastDialogDimension(getClass().getSimpleName()));
         osDefault = new InstalledBrowser(_GUI.T.SelectBrowserDialog_osDefault(), null);
+        browsePlaceholder = new InstalledBrowser(_GUI.T.SelectBrowserDialog_browseCustom(), null);
         chosenBrowser = osDefault;
         model = new BrowserTableModel();
         final List<InstalledBrowser> initial = new ArrayList<InstalledBrowser>();
@@ -97,6 +110,7 @@ public class SelectBrowserDialog extends AbstractDialog<InstalledBrowser> {
                 missingBrowser = configured;
             }
         }
+        initialBrowser = chosenBrowser;
         model.setBrowsers(initial);
         table = new BasicJDTable<InstalledBrowser>(model) {
             /* ESC is the default "clear selection" shortcut of the table, which would swallow it before it reaches the dialog. */
@@ -118,12 +132,60 @@ public class SelectBrowserDialog extends AbstractDialog<InstalledBrowser> {
                 final int row = table.getSelectedRow();
                 /* Rebuilding the model clears the selection (row -1), which must not change the choice. */
                 if (row >= 0) {
-                    chosenBrowser = model.getObjectbyRow(row);
+                    final InstalledBrowser selected = model.getObjectbyRow(row);
+                    if (selected == browsePlaceholder) {
+                        /* Not a browser: Keep the current choice and open the file chooser (after the selection event is finished). */
+                        selectObject(chosenBrowser);
+                        SwingUtilities.invokeLater(new Runnable() {
+                            @Override
+                            public void run() {
+                                browseForCustomBrowser();
+                            }
+                        });
+                        return;
+                    }
+                    chosenBrowser = selected;
+                    updateSaveButton();
                     table.repaint();
                 }
             }
         });
-        setLeftActions(createBrowseAction());
+    }
+
+    /** True if the user has chosen a different browser than the one that was chosen when the dialog was opened. */
+    private boolean hasChanges() {
+        return chosenBrowser != initialBrowser;
+    }
+
+    /** The Save button is only enabled as long as there is something to save. */
+    private void updateSaveButton() {
+        final JButton save = getOkButton();
+        if (save != null) {
+            save.setEnabled(hasChanges());
+        }
+    }
+
+    /** ESC only closes the dialog as long as the user has not changed anything, so changes are never lost by accident. */
+    @Override
+    protected void registerEscape() {
+        super.registerEscape();
+        final JComponent target = getFocusButton();
+        if (target == null) {
+            return;
+        }
+        final Action original = target.getActionMap().get("ESCAPE");
+        if (original == null) {
+            return;
+        }
+        target.getActionMap().put("ESCAPE", new AbstractAction() {
+            @Override
+            public void actionPerformed(final ActionEvent e) {
+                if (hasChanges()) {
+                    return;
+                }
+                original.actionPerformed(e);
+            }
+        });
     }
 
     /**
@@ -166,6 +228,8 @@ public class SelectBrowserDialog extends AbstractDialog<InstalledBrowser> {
         selectObject(chosenBrowser);
         loadIconsAsync(model.getBrowsers());
         startSearch();
+        /* Nothing is changed yet -> nothing to save. */
+        updateSaveButton();
         return panel;
     }
 
@@ -291,63 +355,61 @@ public class SelectBrowserDialog extends AbstractDialog<InstalledBrowser> {
         }
     }
 
-    private AbstractAction createBrowseAction() {
-        return new AppAction() {
-            {
-                setName(_GUI.T.SelectBrowserDialog_browse());
+    /**
+     * Lets the user pick the executable of a browser which is not in the list. The picked browser becomes the chosen one and replaces the
+     * "browse" row of the table.
+     */
+    private void browseForCustomBrowser() {
+        final ExtFileChooserDialog d = new ExtFileChooserDialog(0, _GUI.T.SelectBrowserDialog_browse_title(), null, null);
+        /* Limit the selectable files to executables: ".exe" on windows, files with the executable flag elsewhere. */
+        d.setFileFilter(new FileFilter() {
+            @Override
+            public boolean accept(final File f) {
+                if (f.isDirectory()) {
+                    return true;
+                }
+                if (CrossSystem.isWindows()) {
+                    return f.getName().toLowerCase(Locale.ENGLISH).endsWith(".exe");
+                }
+                return f.canExecute();
             }
 
             @Override
-            public void actionPerformed(final ActionEvent e) {
-                final ExtFileChooserDialog d = new ExtFileChooserDialog(0, _GUI.T.SelectBrowserDialog_browse_title(), null, null);
-                /* Limit the selectable files to executables: ".exe" on windows, files with the executable flag elsewhere. */
-                d.setFileFilter(new FileFilter() {
-                    @Override
-                    public boolean accept(final File f) {
-                        if (f.isDirectory()) {
-                            return true;
-                        }
-                        if (CrossSystem.isWindows()) {
-                            return f.getName().toLowerCase(Locale.ENGLISH).endsWith(".exe");
-                        }
-                        return f.canExecute();
-                    }
-
-                    @Override
-                    public String getDescription() {
-                        return _GUI.T.SelectBrowserDialog_filter_executables();
-                    }
-                });
-                d.setAcceptAllFileFilterUsed(false);
-                d.setFileSelectionMode(FileChooserSelectionMode.FILES_ONLY);
-                d.setMultiSelection(false);
-                d.setStorageID("SelectBrowserDialog");
-                d.setType(FileChooserType.OPEN_DIALOG);
-                try {
-                    Dialog.getInstance().showDialog(d);
-                } catch (DialogClosedException e1) {
-                    return;
-                } catch (DialogCanceledException e1) {
-                    return;
-                }
-                final File file = d.getSelectedFile();
-                if (file == null || !file.isFile()) {
-                    return;
-                }
-                final List<InstalledBrowser> list = new ArrayList<InstalledBrowser>(model.getBrowsers());
-                int index = indexOfPath(list, file.getAbsolutePath());
-                if (index == -1) {
-                    list.add(new InstalledBrowser(ExternalBrowserManager.getInstance().getLazyBrowserName(file.getAbsolutePath()), file.getAbsolutePath()));
-                    model.setBrowsers(list);
-                    loadIconsAsync(list);
-                    index = list.size() - 1;
-                }
-                /* A manually picked browser becomes the chosen one. */
-                chosenBrowser = list.get(index);
-                selectObject(chosenBrowser);
-                table.repaint();
+            public String getDescription() {
+                return _GUI.T.SelectBrowserDialog_filter_executables();
             }
-        };
+        });
+        d.setAcceptAllFileFilterUsed(false);
+        d.setFileSelectionMode(FileChooserSelectionMode.FILES_ONLY);
+        d.setMultiSelection(false);
+        d.setStorageID("SelectBrowserDialog");
+        d.setType(FileChooserType.OPEN_DIALOG);
+        try {
+            Dialog.getInstance().showDialog(d);
+        } catch (DialogClosedException e1) {
+            return;
+        } catch (DialogCanceledException e1) {
+            return;
+        }
+        final File file = d.getSelectedFile();
+        if (file == null || !file.isFile()) {
+            return;
+        }
+        final List<InstalledBrowser> list = new ArrayList<InstalledBrowser>(model.getBrowsers());
+        int index = indexOfPath(list, file.getAbsolutePath());
+        if (index == -1) {
+            list.add(new InstalledBrowser(ExternalBrowserManager.getInstance().getLazyBrowserName(file.getAbsolutePath()), file.getAbsolutePath()));
+            index = list.size() - 1;
+        }
+        /* The picked browser replaces the "browse" row. */
+        browsePlaceholderVisible = false;
+        model.setBrowsers(list);
+        loadIconsAsync(list);
+        /* A manually picked browser becomes the chosen one. */
+        chosenBrowser = list.get(index);
+        selectObject(chosenBrowser);
+        updateSaveButton();
+        table.repaint();
     }
 
     /**
@@ -360,7 +422,7 @@ public class SelectBrowserDialog extends AbstractDialog<InstalledBrowser> {
 
     @Override
     protected int getPreferredWidth() {
-        return 600;
+        return 700;
     }
 
     @Override
@@ -381,9 +443,9 @@ public class SelectBrowserDialog extends AbstractDialog<InstalledBrowser> {
                 public int compare(final InstalledBrowser o1, final InstalledBrowser o2) {
                     if (o1 == o2) {
                         return 0;
-                    } else if (o1 == osDefault) {
+                    } else if (o1 == osDefault || o2 == browsePlaceholder) {
                         return -1;
-                    } else if (o2 == osDefault) {
+                    } else if (o2 == osDefault || o1 == browsePlaceholder) {
                         return 1;
                     }
                     final String s1 = BoldColumn.this.getStringValue(o1);
@@ -401,7 +463,16 @@ public class SelectBrowserDialog extends AbstractDialog<InstalledBrowser> {
         public void configureRendererComponent(final InstalledBrowser value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
             /* Set the font before super so that the text clipping uses the final font. */
             final Font font = rendererField.getFont();
-            rendererField.setFont(font.deriveFont(value == chosenBrowser ? Font.BOLD : Font.PLAIN));
+            final int fontStyle;
+            if (value == chosenBrowser) {
+                fontStyle = Font.BOLD;
+            } else if (value == browsePlaceholder) {
+                /* The "browse" row is an action and not a browser. */
+                fontStyle = Font.ITALIC;
+            } else {
+                fontStyle = Font.PLAIN;
+            }
+            rendererField.setFont(font.deriveFont(fontStyle));
             super.configureRendererComponent(value, isSelected, hasFocus, row, column);
             /* The renderer is reused for all rows, so the foreground has to be set (or reset) for every row. */
             rendererField.setForeground(value == missingBrowser ? LAFOptions.getInstance().getColorForErrorForeground() : defaultForeground);
@@ -431,6 +502,9 @@ public class SelectBrowserDialog extends AbstractDialog<InstalledBrowser> {
             final List<InstalledBrowser> all = new ArrayList<InstalledBrowser>();
             all.add(osDefault);
             all.addAll(browsers);
+            if (browsePlaceholderVisible) {
+                all.add(browsePlaceholder);
+            }
             _fireTableStructureChanged(all, true);
         }
 
@@ -440,13 +514,17 @@ public class SelectBrowserDialog extends AbstractDialog<InstalledBrowser> {
                 /* Icon of the executable. A generic browser icon is used for "OS Default" and until/unless the real icon is available. */
                 @Override
                 protected Icon getIcon(final InstalledBrowser value) {
+                    if (value == browsePlaceholder) {
+                        return addIcon;
+                    }
                     final Icon icon = icons.get(value);
                     return icon != null ? icon : fallbackIcon;
                 }
 
                 @Override
                 public int getDefaultWidth() {
-                    return 180;
+                    /* Wide enough for the text of the "browse" row. */
+                    return 330;
                 }
 
                 @Override

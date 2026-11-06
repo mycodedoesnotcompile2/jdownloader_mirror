@@ -63,7 +63,7 @@ import org.mozilla.javascript.ScriptableObject;
  *
  */
 @SuppressWarnings({ "deprecation", "unused" })
-@HostPlugin(revision = "$Revision: 53806 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53914 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class antiDDoSForHost extends PluginForHost {
     public antiDDoSForHost(PluginWrapper wrapper) {
         super(wrapper);
@@ -462,9 +462,9 @@ public abstract class antiDDoSForHost extends PluginForHost {
     }
 
     @Override
-    protected boolean isAccountLoginCaptchaChallenge(DownloadLink link, Challenge<?> c) {
+    public boolean isAccountLoginCaptchaChallenge(Challenge<?> c) {
         if (antiDDosCaptcha.get() == 0) {
-            return super.isAccountLoginCaptchaChallenge(link, c);
+            return super.isAccountLoginCaptchaChallenge(c);
         } else {
             return false;
         }

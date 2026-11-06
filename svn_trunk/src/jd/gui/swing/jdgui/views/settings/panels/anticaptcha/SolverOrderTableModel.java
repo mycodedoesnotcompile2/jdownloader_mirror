@@ -36,7 +36,6 @@ import org.appwork.swing.exttable.columns.ExtComponentColumn;
 import org.appwork.swing.exttable.columns.ExtCurrencyColumn;
 import org.appwork.swing.exttable.columns.ExtLongColumn;
 import org.appwork.swing.exttable.columns.ExtTextColumn;
-import org.appwork.uio.UIOManager;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.EDTRunner;
 import org.appwork.utils.swing.renderer.RenderLabel;
@@ -45,7 +44,6 @@ import org.jdownloader.api.myjdownloader.MyJDownloaderConnectionStatus;
 import org.jdownloader.api.myjdownloader.MyJDownloaderController;
 import org.jdownloader.api.myjdownloader.event.MyJDownloaderListener;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
-import org.jdownloader.captcha.v2.JobRunnable;
 import org.jdownloader.captcha.v2.SolverService;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
@@ -242,16 +240,8 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
             @Override
             protected void runInEDT() {
                 // make sure that this class is loaded. it contains the logic to restore old settings.
-                final List<SolverService> visible = new ArrayList<SolverService>(ChallengeResponseController.getInstance().listServices());
-                /* Default order: ready (usable) solvers first. Collections.sort is stable, so the relative order is otherwise kept. */
-                Collections.sort(visible, new Comparator<SolverService>() {
-                    @Override
-                    public int compare(final SolverService a, final SolverService b) {
-                        final int ra = a.isReady() ? 0 : 1;
-                        final int rb = b.isReady() ? 0 : 1;
-                        return ra - rb;
-                    }
-                });
+                /* The order in which the solvers are started for a captcha, the user can change it by drag and drop, see move(). */
+                final List<SolverService> visible = ChallengeResponseController.getInstance().getOrderedServices();
                 reloadPreservingSelection(new Runnable() {
                     @Override
                     public void run() {
@@ -260,6 +250,72 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
                 });
             }
         };
+    }
+
+    /**
+     * Drag and drop: Moves the dragged solvers to the given drop row (an index into the displayed rows) and stores the new order. The order
+     * is the order in which the solvers are started for a captcha, see {@link ChallengeResponseController#getOrderedServices()}. <br>
+     * The displayed rows are always in the order of the solvers, because sorting by a column stores its result as the solver order, see
+     * {@link #sort(List, ExtColumn)}.
+     */
+    @Override
+    public boolean move(final List<SolverService> transferData, final int dropRow) {
+        if (transferData == null || transferData.isEmpty()) {
+            return false;
+        }
+        final List<SolverService> displayed = new ArrayList<SolverService>(getTableData());
+        final int targetIndex = Math.max(0, Math.min(dropRow, displayed.size()));
+        final List<SolverService> newOrder = new ArrayList<SolverService>(displayed.subList(0, targetIndex));
+        final List<SolverService> after = new ArrayList<SolverService>(displayed.subList(targetIndex, displayed.size()));
+        newOrder.removeAll(transferData);
+        after.removeAll(transferData);
+        newOrder.addAll(transferData);
+        newOrder.addAll(after);
+        ChallengeResponseController.getInstance().setServiceOrder(newOrder);
+        /*
+         * Remove the active sorting: Otherwise the rows are sorted by the sort column again when the table is updated, and the moved rows
+         * would jump back to their sorted position.
+         */
+        setSortColumn(null);
+        update();
+        return true;
+    }
+
+    /**
+     * No default sorting: The rows are displayed in the order of the solvers (see {@link #move(List, int)}). Sorting by a column stores the
+     * result as the new solver order, see {@link #sort(List, ExtColumn)}.
+     */
+    @Override
+    protected ExtColumn<SolverService> getDefaultSortColumn() {
+        return null;
+    }
+
+    /**
+     * Sorting by a column (e.g. click on a column header) is a one-time rearrangement of the solvers: The resulting row order is stored as
+     * the new solver order and the sort column is reset afterwards. This way the displayed order is always the order of the solvers (timing
+     * table and order in which the solvers are used for captchas), and dragging rows afterwards works on exactly what is displayed. <br>
+     * TODO: This handling is not optimal yet: Sorting the table overwrites the order the user has saved before (by drag and drop), so
+     * that order is lost.
+     */
+    @Override
+    public List<SolverService> sort(final List<SolverService> data, final ExtColumn<SolverService> column) {
+        final List<SolverService> ret = super.sort(data, column);
+        if (column != null && ret != null) {
+            ChallengeResponseController.getInstance().setServiceOrder(ret);
+            /* Not a permanent sorting: Later updates must not re-sort the rows by this column. */
+            setSortColumn(null);
+        }
+        return ret;
+    }
+
+    /**
+     * Do not restore the sort state of a previous session: The table has to start in the order of the solvers (see
+     * {@link ChallengeResponseController#getOrderedServices()}), which is also the order of the timing table and the order in which the
+     * solvers are used for captchas. A restored sort column would display the rows in a different order.
+     */
+    @Override
+    protected boolean isSortStateSaverEnabled() {
+        return false;
     }
 
     @Override
@@ -418,8 +474,12 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
                 rendererWarnBtn = new JButton();
                 rendererWarnBtn.setIcon(warningIcon);
                 rendererWarnBtn.setMargin(new Insets(0, 2, 0, 2));
-                renderer = new RendererMigPanel("ins 0, gap 2", "[][grow,fill]", "[grow,fill]");
-                renderer.add(rendererWarnBtn, "cell 0 0, hidemode 3, height 18!");
+                /*
+                 * No gap between the columns: The gap belongs to the warning button (gapright), so rows without it start flush left instead
+                 * of being indented by the gap of an empty first column.
+                 */
+                renderer = new RendererMigPanel("ins 0, gap 0", "[][grow,fill]", "[grow,fill]");
+                renderer.add(rendererWarnBtn, "cell 0 0, hidemode 3, height 18!, gapright 2");
                 renderer.add(rendererLabel, "cell 1 0, hidemode 3");
                 renderer.add(rendererBtn, "cell 1 0, hidemode 3, height 18!");
                 editorLabel = new RenderLabel();
@@ -458,8 +518,8 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
                         }
                     }
                 });
-                editor = new MigPanel("ins 0, gap 2", "[][grow,fill]", "[grow,fill]");
-                editor.add(editorWarnBtn, "cell 0 0, hidemode 3, height 18!");
+                editor = new MigPanel("ins 0, gap 0", "[][grow,fill]", "[grow,fill]");
+                editor.add(editorWarnBtn, "cell 0 0, hidemode 3, height 18!, gapright 2");
                 editor.add(editorBtn, "cell 1 0, hidemode 3, height 18!");
                 editor.add(editorLabel, "cell 1 0, hidemode 3");
                 setClickcount(1);
@@ -542,6 +602,11 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
 
             @Override
             public void configureRendererComponent(final SolverService value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
+                /* Like all other columns, the status is greyed out for disabled solvers (also the green check of a ready solver). */
+                final boolean solverEnabled = value.getConfigV3().isEnabled();
+                rendererLabel.setEnabled(solverEnabled);
+                rendererBtn.setEnabled(solverEnabled);
+                rendererWarnBtn.setEnabled(solverEnabled);
                 rendererWarnBtn.setVisible(value.getStatusWarningButtonTooltip() != null);
                 final String action = value.getStatusActionName();
                 if (action != null) {
@@ -613,6 +678,11 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
             }
 
             @Override
+            public boolean isEnabled(final SolverService obj) {
+                return obj.getConfigV3().isEnabled();
+            }
+
+            @Override
             public void configureEditorComponent(final SolverService value, final boolean isSelected, final int row, final int column) {
                 /* Not editable, nothing to configure. */
             }
@@ -662,136 +732,6 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
             }
         };
         this.addColumn(activeJobsColumn);
-        this.addColumn(new ExtComponentColumn<SolverService>(_GUI.T.SolverOrderTableModel_initColumns_timeout()) {
-            private JButton            editorBtn;
-            private JButton            rendererBtn;
-            private SolverService      editing;
-            protected MigPanel         editor;
-            protected RendererMigPanel renderer;
-            private RenderLabel        label;
-            {
-                editorBtn = new JButton("");
-                editorBtn.addActionListener(new ActionListener() {
-                    @Override
-                    public void actionPerformed(ActionEvent e) {
-                        if (editing != null) {
-                            SolverTimingDialog d = new SolverTimingDialog(editing);
-                            UIOManager.I().show(null, d);
-                        }
-                    }
-                });
-                label = new RenderLabel();
-                rendererBtn = new JButton("");
-                this.editor = new MigPanel("ins 1", "[grow,fill]", "[grow]") {
-                    @Override
-                    public void requestFocus() {
-                    }
-                };
-                editor.add(editorBtn);
-                this.renderer = new RendererMigPanel("ins 1", "[grow,fill]", "[grow]");
-                renderer.add(rendererBtn);
-                setClickcount(1);
-                /* The cell always shows "Edit", so there is no visible per-row value; sort by the number of configured wait-for rules instead. */
-                this.setRowSorter(new ExtDefaultRowSorter<SolverService>() {
-                    @Override
-                    public int compare(final SolverService o1, final SolverService o2) {
-                        final int c1 = JobRunnable.getWaitForOverrideCount(o1);
-                        final int c2 = JobRunnable.getWaitForOverrideCount(o2);
-                        if (this.getSortOrderIdentifier() == ExtColumn.SORT_ASC) {
-                            return c1 - c2;
-                        } else {
-                            return c2 - c1;
-                        }
-                    }
-                });
-            }
-
-            public ExtTableHeaderRenderer getHeaderRenderer(final JTableHeader jTableHeader) {
-                final ExtTableHeaderRenderer ret = new ExtTableHeaderRenderer(this, jTableHeader) {
-                    @Override
-                    public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-                        super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-                        setIcon(new AbstractIcon(IconKey.ICON_WAIT, 14));
-                        setHorizontalAlignment(CENTER);
-                        setText(_GUI.T.SolverOrderTableModel_initColumns_timeout());
-                        return this;
-                    }
-                };
-                return ret;
-            }
-
-            @Override
-            public boolean isAutoWidthEnabled() {
-                return true;
-            }
-
-            @Override
-            protected boolean isDefaultResizable() {
-                return true;
-            }
-
-            protected String generateID() {
-                return "CaptchaOrderTable.timeoutbutton3";
-            }
-
-            @Override
-            public int getDefaultWidth() {
-                return 3;
-            }
-
-            public Dimension getCellSizeEstimation(SolverService element, int row) {
-                Component c = getTableCellRendererComponent(getModel().getTable(), element, false, false, row, 1);
-                rendererBtn.setMaximumSize(null);
-                return c.getPreferredSize();
-            }
-
-            @Override
-            public boolean isSortable(final SolverService obj) {
-                return true;
-            }
-
-            @Override
-            protected JComponent getInternalEditorComponent(SolverService value, boolean isSelected, int row, int column) {
-                return editor;
-            }
-
-            @Override
-            public boolean onSingleClick(MouseEvent e, SolverService obj) {
-                return super.onSingleClick(e, obj);
-            }
-
-            @Override
-            protected JComponent getInternalRendererComponent(SolverService value, boolean isSelected, boolean hasFocus, int row, int column) {
-                return renderer;
-            }
-
-            @Override
-            public boolean isEnabled(SolverService obj) {
-                return true;
-            }
-
-            @Override
-            public void configureRendererComponent(SolverService value, boolean isSelected, boolean hasFocus, int row, int column) {
-                // rendererBtn.setIcon(new AbstractIcon(IconKey.ICON_WAIT, 16));
-                rendererBtn.setText(_GUI.T.lit_edit());
-                rendererBtn.setMaximumSize(new Dimension(getWidth(), getTable().getRowHeight(row) - 2));
-            }
-
-            @Override
-            public void configureEditorComponent(SolverService value, boolean isSelected, int row, int column) {
-                editing = value;
-                editorBtn.setText(_GUI.T.lit_edit());
-                editorBtn.setMaximumSize(new Dimension(getWidth(), getTable().getRowHeight(row) - 2));
-            }
-
-            @Override
-            public void resetEditor() {
-            }
-
-            @Override
-            public void resetRenderer() {
-            }
-        });
         /* Help column: a question-mark icon linking to a knowledgebase article. Always visible, far right. */
         this.addColumn(new ExtComponentColumn<SolverService>("Help") {
             private SolverService          editing;
@@ -874,6 +814,7 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
 
             @Override
             public void configureRendererComponent(final SolverService value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
+                rendererLabel.setEnabled(value.getConfigV3().isEnabled());
                 /* Only show the help icon for solvers that actually have a help article. */
                 rendererLabel.setIcon(value.getHelpArticleURL() != null ? helpIcon : null);
             }

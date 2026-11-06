@@ -2,6 +2,7 @@ package org.jdownloader.captcha.blacklist;
 
 import java.lang.ref.WeakReference;
 
+import jd.controlling.captcha.SkipException;
 import jd.controlling.captcha.SkipRequest;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
@@ -10,14 +11,16 @@ import org.jdownloader.captcha.v2.Challenge;
 
 public class BlockDownloadCaptchasByPackage implements SessionBlackListEntry<Object> {
     private final WeakReference<FilePackage> blockedPackage;
+    private final String                     reason;
 
-    public BlockDownloadCaptchasByPackage(FilePackage parentNode) {
+    public BlockDownloadCaptchasByPackage(SkipException skipException, FilePackage parentNode) {
         if (FilePackage.isDefaultFilePackage(parentNode)) {
             /* we cannot blacklist the default filePackage */
             blockedPackage = new WeakReference<FilePackage>(null);
         } else {
             blockedPackage = new WeakReference<FilePackage>(parentNode);
         }
+        this.reason = skipException.getReason();
     }
 
     @Override
@@ -57,5 +60,10 @@ public class BlockDownloadCaptchasByPackage implements SessionBlackListEntry<Obj
     @Override
     public SkipRequest getSkipRequest() {
         return SkipRequest.BLOCK_PACKAGE;
+    }
+
+    @Override
+    public String getReason() {
+        return reason;
     }
 }

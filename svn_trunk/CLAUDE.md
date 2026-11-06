@@ -10,7 +10,7 @@ Always wrap the commit message in a fenced ```text code block so it can be copie
 
 **No manual line breaks inside the message.** Do not hard-wrap lines at a fixed width. Every paragraph and every list item is written as one single line; line breaks are only used to separate the subject, blank lines, headings and list items.
 
-**Describe the changes in the style of [Keep a Changelog 1.0.0](https://keepachangelog.com/en/1.0.0/).** After the subject line, group the body under the headings `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed` and `Security` (only the ones that apply, in that order). Each entry is a `-` list item written for a reader of the changelog: say what changed from the user's or caller's point of view, not how the code was edited. Use `Fixed` for bug fixes and `Changed` for behaviour or performance changes of existing functionality.
+**Describe the changes in the style of [Keep a Changelog 1.0.0](https://keepachangelog.com/en/1.0.0/).** After the subject line, group the body under the headings `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed` and `Security` (only the ones that apply, in that order). Each entry is a `-` list item written for a reader of the changelog: say what changed from the user's or caller's point of view, not how the code was edited. Also mention the names of the changed classes in the entries (e.g. `SelectBrowserDialog`, `ChallengeResponseController`), so the reader can tell where the change was made. Use `Fixed` for bug fixes and `Changed` for behaviour or performance changes of existing functionality.
 
 ```text
 Short subject line

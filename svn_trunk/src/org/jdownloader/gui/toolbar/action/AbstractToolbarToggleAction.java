@@ -7,9 +7,9 @@ import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.BooleanKeyHandler;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.utils.swing.EDTRunner;
+import org.jdownloader.actions.AppAction;
 
 public abstract class AbstractToolbarToggleAction extends AbstractToolBarAction implements GenericConfigEventListener<Boolean> {
-
     private final BooleanKeyHandler keyHandler;
 
     protected BooleanKeyHandler getKeyHandler() {
@@ -18,24 +18,31 @@ public abstract class AbstractToolbarToggleAction extends AbstractToolBarAction 
 
     public AbstractToolbarToggleAction(BooleanKeyHandler keyHandler) {
         this.keyHandler = keyHandler;
-
-        keyHandler.getEventSender().addListener(this, true);
-        setSelected(keyHandler.isEnabled());
+        if (!AppAction.isValidationMode()) {
+            keyHandler.getEventSender().addListener(this, true);
+            setSelected(keyHandler.isEnabled());
+        }
     }
 
     public void setSelected(final boolean selected) {
         new EDTRunner() {
-
             @Override
             protected void runInEDT() {
                 AbstractToolbarToggleAction.super.setSelected(selected);
-                if (selected) {
-                    setName(getNameWhenEnabled());
-                } else {
-                    setName(getNameWhenDisabled());
-                }
+                fireNameUpdate();
+                fireIconUpdate();
+                fireToolTipUpdate();
             }
         };
+    }
+
+    @Override
+    public String getName() {
+        if (isSelected()) {
+            return getNameWhenEnabled();
+        } else {
+            return getNameWhenDisabled();
+        }
     }
 
     abstract protected String getNameWhenDisabled();
@@ -55,5 +62,4 @@ public abstract class AbstractToolbarToggleAction extends AbstractToolBarAction 
             setSelected(newValue);
         }
     }
-
 }

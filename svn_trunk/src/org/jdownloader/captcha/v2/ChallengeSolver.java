@@ -93,7 +93,7 @@ public abstract class ChallengeSolver<T> {
 
     public enum SolverType implements LabelInterface {
         /** Local automatic solver (no user interaction), e.g. JAC. */
-        JD_LOCAL {
+        JD_LOCAL(SolverType.DEFAULT_START_NEXT_AFTER_SECONDS_JD_LOCAL) {
             @Override
             public String getLabel() {
                 return _GUI.T.JACSolver_getName_();
@@ -105,7 +105,7 @@ public abstract class ChallengeSolver<T> {
             }
         },
         /** Local dialog solver: a human solves the captcha in a JDownloader dialog. */
-        JD_LOCAL_DIALOG {
+        JD_LOCAL_DIALOG(SolverType.DEFAULT_START_NEXT_AFTER_SECONDS_JD_LOCAL_DIALOG) {
             @Override
             public String getLabel() {
                 return _GUI.T.DialogBasicCaptchaSolver_getName();
@@ -116,7 +116,7 @@ public abstract class ChallengeSolver<T> {
                 return NewTheme.I().getIcon(IconKey.ICON_EDIT, size);
             }
         },
-        JD_LOCAL_BROWSER {
+        JD_LOCAL_BROWSER(SolverType.DEFAULT_START_NEXT_AFTER_SECONDS_JD_LOCAL_BROWSER) {
             @Override
             public String getLabel() {
                 return _GUI.T.BrowserSolverService_getName();
@@ -127,7 +127,7 @@ public abstract class ChallengeSolver<T> {
                 return NewTheme.I().getIcon(IconKey.ICON_BROWSE, size);
             }
         },
-        JD_REMOTE_MYJD {
+        JD_REMOTE_MYJD(SolverType.DEFAULT_START_NEXT_AFTER_SECONDS_JD_REMOTE_MYJD) {
             @Override
             public String getLabel() {
                 return _GUI.T.SolverType_JD_REMOTE_MYJD();
@@ -138,7 +138,7 @@ public abstract class ChallengeSolver<T> {
                 return new AbstractIcon(IconKey.ICON_LOGO_MYJDOWNLOADER, size);
             }
         },
-        EXTERNAL {
+        EXTERNAL(SolverType.DEFAULT_START_NEXT_AFTER_SECONDS_EXTERNAL) {
             @Override
             public String getLabel() {
                 return _GUI.T.CaptchaSolverService_type();
@@ -149,6 +149,42 @@ public abstract class ChallengeSolver<T> {
                 return NewTheme.I().getIcon(IconKey.ICON_PREMIUM, size);
             }
         };
+
+        /*
+         * The defaults (in seconds) of "Start the next solver after" (see CaptchaSolverConfigV3#getStartNextSolverAfterSeconds()). This is
+         * the one central place for these numbers: The enum constants above use them, and the config interfaces of the solvers use them as
+         * the default of their config entry (an annotation can only use constants).
+         */
+        /** Default of every solver config which does not override it. */
+        public static final int DEFAULT_START_NEXT_AFTER_SECONDS_DEFAULT          = 60;
+        /** JAntiCaptcha: local and fast, the next solver is started soon if it has no solution. */
+        public static final int DEFAULT_START_NEXT_AFTER_SECONDS_JD_LOCAL         = 2;
+        /** Dialog in JDownloader: gives the user some time to answer. */
+        public static final int DEFAULT_START_NEXT_AFTER_SECONDS_JD_LOCAL_DIALOG  = 30;
+        /** Dialog in the browser: opening the browser and answering takes longer. */
+        public static final int DEFAULT_START_NEXT_AFTER_SECONDS_JD_LOCAL_BROWSER = 45;
+        /** Remote solver via MyJDownloader: a user answers on another device. */
+        public static final int DEFAULT_START_NEXT_AFTER_SECONDS_JD_REMOTE_MYJD   = 30;
+        /** All external (paid) solvers: gives the solver time to answer before the next paid solver is started. */
+        public static final int DEFAULT_START_NEXT_AFTER_SECONDS_EXTERNAL         = 60;
+        /** Highest value in seconds of "Start the next solver after", used by the config entries and the timing dialog. */
+        public static final int DEFAULT_START_NEXT_AFTER_SECONDS_MAX                      = 3600;
+        private final int       defaultStartNextSolverAfterSeconds;
+
+        private SolverType(final int defaultStartNextSolverAfterSeconds) {
+            this.defaultStartNextSolverAfterSeconds = defaultStartNextSolverAfterSeconds;
+        }
+
+        /**
+         * The default of the "start the next solver after" time in seconds for solvers of this type: how long a solver of this type may
+         * work on a captcha without a solution before the next solver of the job is started in parallel. The numbers are the
+         * DEFAULT_START_NEXT_AFTER_SECONDS_* constants of this enum, which the config interfaces of the solvers use as the default of their config
+         * entry. The value the running solver really has as default is the one of its config (see
+         * JobRunnable#getDefaultStartNextSolverAfterSeconds).
+         */
+        public int getDefaultStartNextSolverAfterSeconds() {
+            return defaultStartNextSolverAfterSeconds;
+        }
 
         /** Icon of this solver type, e.g. for the solver type selection of the solver comparison table. */
         public abstract Icon getIcon(int size);

@@ -2,17 +2,23 @@ package jd.plugins;
 
 import org.jdownloader.captcha.blacklist.BlacklistEntry;
 
+import jd.controlling.captcha.SkipException;
 import jd.controlling.captcha.SkipRequest;
 
 public class CaptchaException extends PluginException {
     public static class CaptchaRefreshException extends CaptchaException {
-        public CaptchaRefreshException() {
-            super(LinkStatus.ERROR_RETRY, SkipRequest.REFRESH, null);
+        public CaptchaRefreshException(SkipException skipException) {
+            super(LinkStatus.ERROR_RETRY, SkipRequest.REFRESH, null, skipException.getReason());
         }
     }
 
     private final SkipRequest    skipRequest;
     private final BlacklistEntry blackListEntry;
+    private final String         reason;
+
+    public String getReason() {
+        return reason;
+    }
 
     public BlacklistEntry getBlackListEntry() {
         return blackListEntry;
@@ -22,22 +28,27 @@ public class CaptchaException extends PluginException {
         return skipRequest;
     }
 
+    public CaptchaException(SkipException skipException) {
+        this(skipException.getSkipRequest(), null, skipException.getReason());
+    }
+
     public CaptchaException(SkipRequest skipRequest) {
-        this(skipRequest, null);
+        this(skipRequest, null, null);
     }
 
     public CaptchaException(BlacklistEntry blackListEntry) {
-        this(blackListEntry.getSkipRequest(), blackListEntry);
+        this(blackListEntry.getSkipRequest(), blackListEntry, blackListEntry.getReason());
     }
 
-    protected CaptchaException(int linkStatus, SkipRequest skipRequest, BlacklistEntry blackListEntry) {
+    protected CaptchaException(int linkStatus, SkipRequest skipRequest, BlacklistEntry blackListEntry, final String reason) {
         super(linkStatus);
         this.skipRequest = skipRequest;
         this.blackListEntry = blackListEntry;
+        this.reason = reason;
     }
 
-    protected CaptchaException(SkipRequest skipRequest, BlacklistEntry blackListEntry) {
-        this(LinkStatus.ERROR_CAPTCHA, skipRequest, blackListEntry);
+    protected CaptchaException(SkipRequest skipRequest, BlacklistEntry blackListEntry, final String reason) {
+        this(LinkStatus.ERROR_CAPTCHA, skipRequest, blackListEntry, reason);
     }
 
     @Override

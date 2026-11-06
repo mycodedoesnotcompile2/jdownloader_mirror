@@ -7,7 +7,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -23,11 +22,13 @@ import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
 import org.jdownloader.captcha.v2.ChallengeSolver;
+import org.jdownloader.captcha.v2.JobRunnable;
 import org.jdownloader.captcha.v2.ValidationResult;
 import org.jdownloader.gui.translate._GUI;
 
 import jd.controlling.captcha.CaptchaSettings;
 import jd.controlling.captcha.SkipRequest;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 public class SolverJob<T> {
     /**
@@ -186,13 +187,6 @@ public class SolverJob<T> {
     private final AtomicInteger                                       LOCK                  = new AtomicInteger();
     private final AtomicBoolean                                       alive                 = new AtomicBoolean(true);
     private long                                                      created;
-    /**
-     * Random tie-break ordinal per external solver id, drawn once per job (see {@link #getExternalTieBreakOrder(String)}). Used by
-     * {@link org.jdownloader.captcha.v2.JobRunnable#getDefaultWaitFor} to pick, at random for this one captcha, which of several equally
-     * ranked external solvers is tried first.
-     */
-    private final HashMap<String, Integer>                            externalTieBreakOrder = new HashMap<String, Integer>();
-    private static final Random                                       TIEBREAK_RANDOM       = new Random();
 
     public String toString() {
         return "CaptchaJob: " + new Date(created) + " " + challenge + " Solver: " + solverList;
@@ -200,7 +194,7 @@ public class SolverJob<T> {
 
     public SolverJob(ChallengeResponseController controller, Challenge<T> c, List<ChallengeSolver<T>> solver) {
         this.challenge = c;
-        created = System.currentTimeMillis();
+        created = Time.systemIndependentCurrentJVMTimeMillis();
         this.controller = controller;
         this.solverList = new CopyOnWriteArraySet<ChallengeSolver<T>>(solver);
         config = JsonConfig.create(CaptchaSettings.class);
@@ -341,7 +335,7 @@ public class SolverJob<T> {
                     return;
                 }
             }
-            solvingEndTimes.putIfAbsent(solver, Long.valueOf(System.currentTimeMillis()));
+            solvingEndTimes.putIfAbsent(solver, Long.valueOf(Time.systemIndependentCurrentJVMTimeMillis()));
             logSolverStatus(solver, "DONE (" + doneList.size() + "/" + solverList.size() + " solvers done) | " + getSolverTimesText(solver));
             final ChallengeSolverJobEventSender eventSender = getEventSender(false);
             if (eventSender != null) {
@@ -414,21 +408,104 @@ public class SolverJob<T> {
     }
 
     /**
-     * Returns the random tie-break ordinal for the given external solver id. The ordinal is drawn once (randomly) the first time it is
-     * needed within this job and then kept stable for the rest of this job, so the resulting "who waits for whom" direction is consistent
-     * across all solver threads of this job, its wait-loop validation and its logging. A fresh job (i.e. the next captcha) starts with an
-     * empty map and therefore draws fresh ordinals, which is what re-randomizes the external solver that goes first for every captcha that
-     * gets solved.
+     * Returns the solver which comes right before the given one in the order in which the solvers of this job are started (see
+     * {@link JobRunnable}), or null if the given solver is the first one (or not part of this job).
      */
-    public int getExternalTieBreakOrder(final String solverID) {
-        synchronized (externalTieBreakOrder) {
-            final Integer order = externalTieBreakOrder.get(solverID);
-            if (order != null) {
-                return order.intValue();
+    public ChallengeSolver<T> getPreviousSolver(final ChallengeSolver<?> solver) {
+        ChallengeSolver<T> previous = null;
+        for (final ChallengeSolver<T> candidate : solverList) {
+            if (candidate == solver) {
+                return previous;
             }
-            final int newOrder = TIEBREAK_RANDOM.nextInt();
-            externalTieBreakOrder.put(solverID, Integer.valueOf(newOrder));
-            return newOrder;
+            previous = candidate;
+        }
+        return null;
+    }
+
+    /**
+     * Returns the time (ms) at which the given solver starts or started working on this job: The real start time if it already started,
+     * otherwise the estimated one (the start of the previous solver plus the time after which the next solver is started, see
+     * {@link JobRunnable#getStartNextSolverAfterMillis(org.jdownloader.captcha.v2.SolverService, CAPTCHA_TYPE)}). If the previous solver is already done
+     * or the start of the solver was forced, the solver starts right now.
+     */
+    private long getStartTime(final ChallengeSolver<?> solver, final long now) {
+        final Long started = solvingStartTimes.get(solver);
+        if (started != null) {
+            return started.longValue();
+        } else if (isForcedStart(solver) || doneList.contains(solver)) {
+            return now;
+        }
+        final ChallengeSolver<T> previous = getPreviousSolver(solver);
+        if (previous == null || doneList.contains(previous)) {
+            return now;
+        }
+        return Math.max(now, getStartTime(previous, now) + JobRunnable.getStartNextSolverAfterMillis(previous.getService(), getCaptchaType()));
+    }
+
+    /** The captcha type of the challenge of this job, or null if the challenge has no known captcha type. */
+    public CAPTCHA_TYPE getCaptchaType() {
+        return CAPTCHA_TYPE.getCaptchaTypeForChallenge(challenge);
+    }
+
+    /**
+     * Returns how long (ms) it takes until the given solver starts working on this job, based on the time after which each solver starts
+     * the next one. 0 if it already started, is done, or starts right now.
+     */
+    public long getRemainingWaitMillis(final ChallengeSolver<?> solver) {
+        synchronized (LOCK) {
+            if (solvingSet.contains(solver)) {
+                return 0;
+            }
+            /* solvingStartTimes uses the system time, see setSolverSolving. */
+            final long now = Time.systemIndependentCurrentJVMTimeMillis();
+            return Math.max(0, getStartTime(solver, now) - now);
+        }
+    }
+
+    /**
+     * Called by the solver thread before it starts solving: Waits until the previous solver of this job (the one before it in the order of
+     * the solvers) has been working on the captcha for the given time without a solution, or is done, or the start of this solver was
+     * forced. The previous solver itself may still wait for its previous solver first, so the solvers are started one after another.
+     *
+     * @param waiter
+     *            the solver that waits
+     * @param delayMillis
+     *            how long the previous solver may work until this solver is started in parallel to it, 0 = do not wait
+     * @throws InterruptedException
+     *             if the job is solved or the thread is interrupted
+     */
+    public void waitForPreviousSolver(final ChallengeSolver<T> waiter, final long delayMillis) throws InterruptedException {
+        final ChallengeSolver<T> previous = getPreviousSolver(waiter);
+        if (previous == null) {
+            return;
+        }
+        while (true) {
+            if (isSolved()) {
+                throw new InterruptedException(this + " is Solved");
+            } else if (Thread.interrupted()) {
+                throw new InterruptedException(this + " got interrupted");
+            } else if (isForcedStart(waiter)) {
+                log(waiter + " wait aborted by force start");
+                return;
+            }
+            long toWait = -1;
+            synchronized (LOCK) {
+                if (isDone(previous)) {
+                    return;
+                }
+                final Long started = solvingStartTimes.get(previous);
+                if (started != null) {
+                    toWait = started.longValue() + delayMillis - Time.systemIndependentCurrentJVMTimeMillis();
+                    if (toWait <= 0) {
+                        return;
+                    }
+                }
+            }
+            /*
+             * The previous solver did not start yet (toWait == -1): it wakes us up when it does (see setSolverSolving). The wait is
+             * limited to one second anyway, so a wake-up that happened between the check above and the wait can never block us for long.
+             */
+            _wait((int) (toWait > 0 ? Math.min(toWait, 1000) : 1000));
         }
     }
 
@@ -508,7 +585,7 @@ public class SolverJob<T> {
      */
     public void setSolverSolving(final ChallengeSolver<?> solver) {
         if (solvingSet.add(solver)) {
-            solvingStartTimes.putIfAbsent(solver, Long.valueOf(System.currentTimeMillis()));
+            solvingStartTimes.putIfAbsent(solver, Long.valueOf(Time.systemIndependentCurrentJVMTimeMillis()));
             logSolverStatus(solver, "SOLVING (wait times over, captcha slot reserved)");
         }
         _notifyAll();
@@ -525,7 +602,7 @@ public class SolverJob<T> {
             return -1;
         }
         final Long end = solvingEndTimes.get(solver);
-        return (end != null ? end.longValue() : System.currentTimeMillis()) - start.longValue();
+        return (end != null ? end.longValue() : Time.systemIndependentCurrentJVMTimeMillis()) - start.longValue();
     }
 
     /** Text for the log: working time of the solver and how long it waited (for other solvers) before it started. */
@@ -534,7 +611,7 @@ public class SolverJob<T> {
         final Long start = solvingStartTimes.get(solver);
         if (working < 0 || start == null) {
             /* Never started: the whole time in the job was waiting. */
-            return "solver time: not started, waited " + formatSeconds(System.currentTimeMillis() - created);
+            return "solver time: not started, waited " + formatSeconds(Time.systemIndependentCurrentJVMTimeMillis() - created);
         }
         return "solver time: " + formatSeconds(working) + ", waited " + formatSeconds(start.longValue() - created) + " before start";
     }

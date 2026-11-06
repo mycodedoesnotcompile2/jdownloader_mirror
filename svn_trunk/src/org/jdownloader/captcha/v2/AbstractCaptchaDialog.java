@@ -18,8 +18,6 @@ import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -49,6 +47,15 @@ import javax.swing.JToggleButton;
 import javax.swing.KeyStroke;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.gui.swing.dialog.DialogType;
+import jd.gui.swing.jdgui.JDGui;
+import jd.plugins.DownloadLink;
+import jd.plugins.Plugin;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.PluginForHost;
+import net.miginfocom.swing.MigLayout;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.config.JsonConfig;
@@ -87,17 +94,6 @@ import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.settings.staticreferences.CFG_SOUND;
 import org.jdownloader.updatev2.gui.LAFOptions;
-
-import jd.controlling.downloadcontroller.DownloadSession;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.gui.swing.dialog.DialogType;
-import jd.gui.swing.jdgui.JDGui;
-import jd.plugins.DownloadLink;
-import jd.plugins.Plugin;
-import jd.plugins.PluginForDecrypt;
-import jd.plugins.PluginForHost;
-import net.miginfocom.swing.MigLayout;
 
 public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
     // private LocationStorage config;
@@ -502,12 +498,12 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
      * {@link #isRefreshAllowed()} returns false.
      */
     protected ExtButton createRefreshButton() {
-        final boolean refreshAllowed = isRefreshAllowed();
+        final boolean refreshAllowed = Plugin.ChallengeRefreshVeto.NONE.equals(getRefreshVeto());
         final ExtButton refreshBtn = new ExtButton(new AppAction() {
             {
                 setSmallIcon(new AbstractIcon(IconKey.ICON_REFRESH, 18));
                 /* A disabled button explains why a refresh is not possible anymore. */
-                setTooltipText(refreshAllowed ? getRefreshTooltip() : getRefreshDisabledTooltip());
+                setTooltipText(getRefreshTooltip());
                 if (refreshAllowed) {
                     /* No shortcut (and no shortcut hint in the tooltip) if a refresh is not possible anymore. */
                     KeyStroke ks = KeyStroke.getKeyStroke(CFG_GUI.CFG.getShortcutForCaptchaDialogRefresh());
@@ -847,34 +843,11 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
             return;
         }
         /*
-         * Same order in which the solvers are used: a solver that has to wait for another one (see JobRunnable#getWaitFor) comes after it.
-         * Ties are decided by the per-job tie-break order.
-         */
-        Collections.sort(solvers, new Comparator<ChallengeSolver<?>>() {
-            @Override
-            public int compare(final ChallengeSolver<?> a, final ChallengeSolver<?> b) {
-                final int aWaitsForB = JobRunnable.getWaitFor(a.getService(), b.getService(), job);
-                final int bWaitsForA = JobRunnable.getWaitFor(b.getService(), a.getService(), job);
-                if (aWaitsForB != bWaitsForA) {
-                    return aWaitsForB > bWaitsForA ? 1 : -1;
-                }
-                final int aOrder = job.getExternalTieBreakOrder(a.getService().getID());
-                final int bOrder = job.getExternalTieBreakOrder(b.getService().getID());
-                return aOrder < bOrder ? -1 : (aOrder == bOrder ? 0 : 1);
-            }
-        });
-        /*
-         * Only the wait until the captcha is sent to the first external solver is shown. It waits for all other solvers in parallel, so the
-         * longest wait counts.
+         * The pending solvers are already in the order in which they are used (the order of the solvers in the job, see
+         * SolverJob#getPreviousSolver). Only the wait until the captcha is sent to the first external solver is shown.
          */
         final ChallengeSolver<?> first = solvers.get(0);
-        long wait = 0;
-        for (final ChallengeSolver<?> other : job.getSolverList()) {
-            if (other != first) {
-                wait = Math.max(wait, JobRunnable.getWaitFor(first.getService(), other.getService(), job));
-            }
-        }
-        final long remaining = Math.max(0, wait - (System.currentTimeMillis() - job.getCreated()));
+        final long remaining = job.getRemainingWaitMillis(first);
         final MigPanel externalPanel = new MigPanel("ins 5 0 0 0,wrap 1", "[grow,fill]", "[]");
         SwingUtils.setOpaque(externalPanel, false);
         /* Fixed html width: a plain label would make the whole dialog as wide as the text. */
@@ -947,48 +920,7 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
 
     protected abstract JPanel createCaptchaPanel();
 
-    /** Returns true if the challenge is a login captcha of an account. These captchas cannot be refreshed with the refresh button. */
-    protected boolean isLoginCaptcha() {
-        return challenge != null && challenge.isAccountLogin();
-    }
-
-    /** Returns the tooltip of the disabled refresh button, see {@link #isRefreshAllowed()}. */
-    protected String getRefreshDisabledTooltip() {
-        /* The plugin tells why the challenge cannot be refreshed. */
-        final Plugin.ChallengeRefreshVeto veto = getRefreshVeto();
-        if (veto != null) {
-            return veto.getLabel();
-        }
-        return _GUI.T.CaptchaDialog_layoutDialogContent_refresh();
-    }
-
-    /**
-     * Returns how often the captcha was refreshed already (see {@link Plugin#getChallengeRefreshedCount()}), or -1 if there is no counter
-     * for this challenge (no plugin, no limit).
-     */
-    protected int getRefreshCount() {
-        final Plugin plugin = challenge == null ? null : challenge.getPlugin();
-        if (plugin == null) {
-            return -1;
-        }
-        return plugin.getChallengeRefreshedCount();
-    }
-
-    /** Returns the number of refreshes after which the refresh button gets disabled, see {@link Plugin#getChallengeRefreshLimit()}. */
-    protected int getRefreshLimit() {
-        final Plugin plugin = this.plugin;
-        return plugin == null ? 0 : plugin.getChallengeRefreshLimit();
-    }
-
-    /**
-     * Returns false if the refresh button must be disabled, e.g. because the captcha was refreshed too often already, see
-     * {@link Plugin#getChallengeRefreshVeto(Challenge)}.
-     */
-    protected boolean isRefreshAllowed() {
-        return plugin != null && getRefreshVeto() == null;
-    }
-
-    /** Returns the reason why the challenge cannot be refreshed, or null if the plugin allows a refresh. */
+    /** Returns the reason why the challenge cannot be refreshed */
     protected Plugin.ChallengeRefreshVeto getRefreshVeto() {
         final Plugin plugin = this.plugin;
         if (plugin == null) {
@@ -997,14 +929,16 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
         return plugin.getChallengeRefreshVeto(getChallenge());
     }
 
-    /** Returns the tooltip of the enabled refresh button. It shows the current attempt, e.g. "Refresh (Attempt 3/5)". */
+    /** Returns the tooltip of the refresh button */
     protected String getRefreshTooltip() {
-        final int count = getRefreshCount();
-        if (count < 0) {
+        /* The plugin tells why the challenge cannot be refreshed. */
+        final Plugin.ChallengeRefreshVeto veto = getRefreshVeto();
+        switch (veto) {
+        case NONE:
             return _GUI.T.CaptchaDialog_layoutDialogContent_refresh();
+        default:
+            return veto.getLabel();
         }
-        /* The first captcha is attempt 1, so the number of attempts is the limit of refreshes plus 1. */
-        return _GUI.T.AbstractCaptchaDialog_refreshAttempt_tooltip(String.valueOf(count + 1), String.valueOf(getRefreshLimit() + 1));
     }
 
     public boolean isRefresh() {

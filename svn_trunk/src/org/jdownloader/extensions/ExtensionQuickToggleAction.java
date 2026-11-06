@@ -6,6 +6,7 @@ import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.BooleanKeyHandler;
 import org.appwork.storage.config.handler.KeyHandler;
+import org.jdownloader.actions.AppAction;
 import org.jdownloader.controlling.contextmenu.CustomizableAppAction;
 import org.jdownloader.controlling.contextmenu.MenuItemData;
 import org.jdownloader.gui.translate._GUI;
@@ -33,8 +34,10 @@ public class ExtensionQuickToggleAction extends CustomizableAppAction implements
                 setIconKey(extension._getExtension().getIconKey());
             }
             setSelected(extension._isEnabled());
-            BooleanKeyHandler keyHandler = extension._getSettings()._getStorageHandler().getKeyHandler(ExtensionConfigInterface.KEY_ENABLED, BooleanKeyHandler.class);
-            keyHandler.getEventSender().addListener(this, true);
+            if (!AppAction.isValidationMode()) {
+                BooleanKeyHandler keyHandler = extension._getSettings()._getStorageHandler().getKeyHandler(ExtensionConfigInterface.KEY_ENABLED, BooleanKeyHandler.class);
+                keyHandler.getEventSender().addListener(this, true);
+            }
         }
     }
 

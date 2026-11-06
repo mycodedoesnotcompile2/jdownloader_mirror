@@ -2,6 +2,7 @@ package org.jdownloader.captcha.blacklist;
 
 import java.lang.ref.WeakReference;
 
+import jd.controlling.captcha.SkipException;
 import jd.controlling.captcha.SkipRequest;
 import jd.controlling.linkcrawler.LinkCrawler;
 import jd.plugins.PluginForDecrypt;
@@ -10,9 +11,15 @@ import org.jdownloader.captcha.v2.Challenge;
 
 public class BlockAllCrawlerCaptchasEntry implements BlacklistEntry {
     private final WeakReference<LinkCrawler> crawler;
+    private final String                     reason;
 
     public BlockAllCrawlerCaptchasEntry(LinkCrawler crawler) {
+        this(null, crawler);
+    }
+
+    public BlockAllCrawlerCaptchasEntry(SkipException skipException, LinkCrawler crawler) {
         this.crawler = new WeakReference<LinkCrawler>(crawler);
+        this.reason = skipException == null ? null : skipException.getReason();
     }
 
     @Override
@@ -49,5 +56,10 @@ public class BlockAllCrawlerCaptchasEntry implements BlacklistEntry {
     @Override
     public SkipRequest getSkipRequest() {
         return SkipRequest.BLOCK_ALL_CAPTCHAS;
+    }
+
+    @Override
+    public String getReason() {
+        return reason;
     }
 }

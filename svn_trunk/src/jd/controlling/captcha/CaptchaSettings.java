@@ -1,5 +1,6 @@
 package jd.controlling.captcha;
 
+import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.appwork.storage.config.ConfigInterface;
@@ -141,4 +142,11 @@ public interface CaptchaSettings extends ConfigInterface {
     INTERACTIVE_CAPTCHA_PRIVACY_LEVEL getInteractiveCaptchaPrivacyLevel();
 
     void setInteractiveCaptchaPrivacyLevel(INTERACTIVE_CAPTCHA_PRIVACY_LEVEL mode);
+
+    @AboutConfig(inGUIVisible = false)
+    @DescriptionForConfigEntry("Order of the captcha solvers (IDs of the solver services). The solvers are started in this order, see the setting 'Start the next solver after (seconds)' of each solver. Solvers which are not in this list (e.g. new ones) come last in their default order.")
+    @DefaultJsonObject("[]")
+    List<String> getSolverOrder();
+
+    void setSolverOrder(List<String> serviceIDs);
 }

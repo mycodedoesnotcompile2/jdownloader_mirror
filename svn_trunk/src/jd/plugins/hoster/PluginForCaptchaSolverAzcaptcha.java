@@ -51,7 +51,7 @@ import jd.plugins.PluginException;
  * - reCAPTCHA v2 uses the task type "NoCaptchaTaskProxyless" and reCAPTCHA v3 Enterprise has its own task type <br>
  * - Negative feedback is only available via the classic API (res.php?action=reportbad), there is no "report correct" method.
  */
-@HostPlugin(revision = "$Revision: 53890 $", interfaceVersion = 3, names = { "azcaptcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53903 $", interfaceVersion = 3, names = { "azcaptcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSolver {
     /**
      * Task types with proxy of the JSON API, see https://azcaptcha.com/docs: RecaptchaV2Task, RecaptchaV2EnterpriseTask, RecaptchaV3Task,
@@ -296,8 +296,31 @@ public class PluginForCaptchaSolverAzcaptcha extends abstractPluginForCaptchaSol
                 resp = new TokenCaptchaResponse((Challenge<String>) captchachallenge, job.getSolver(), token);
             }
             resp.setCaptchaSolverTaskID(id);
+            /* API V2 returns the cost of the task in the ready response (docs: "Cost charged for this task") -> Update balance. */
+            subtractSolveCostFromBalance(account, entries.get("cost"));
             job.setAnswer(resp);
             return;
+        }
+    }
+
+    /**
+     * Deducts the cost of a solved captcha (field "cost" of the getTaskResult response) from the balance of the given account. Does nothing
+     * if the account has no AccountInfo yet or if the cost is missing/invalid. Never throws: a failure here must not affect the already
+     * solved captcha.
+     */
+    private void subtractSolveCostFromBalance(final Account account, final Object cost) {
+        try {
+            final AccountInfo ai = account.getAccountInfo();
+            if (ai == null || cost == null) {
+                return;
+            }
+            final double costValue = Double.parseDouble(cost.toString());
+            if (costValue <= 0) {
+                return;
+            }
+            ai.setAccountBalance(Math.max(0, ai.getAccountBalance() - costValue), Currency.getInstance("USD"));
+        } catch (final Throwable e) {
+            logger.log(e);
         }
     }
 

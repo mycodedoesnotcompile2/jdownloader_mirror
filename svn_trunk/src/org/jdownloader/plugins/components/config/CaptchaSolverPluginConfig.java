@@ -20,6 +20,11 @@ import org.jdownloader.plugins.config.Order;
 public interface CaptchaSolverPluginConfig extends CaptchaSolverConfigV3 {
     public static final TRANSLATION TRANSLATION = new TRANSLATION();
 
+    /*
+     * "Start the next solver after": All external solvers use the default of the base config, which is the same as
+     * SolverType.DEFAULT_START_NEXT_AFTER_SECONDS_EXTERNAL (both are 60 seconds). If the external default ever differs from the base default, override
+     * getStartNextSolverAfterSeconds here (with all annotations repeated, they are not inherited).
+     */
     public static class TRANSLATION {
         public String getWarnOnLowBalance_label() {
             return "Warn on low balance (notification after every account check)";

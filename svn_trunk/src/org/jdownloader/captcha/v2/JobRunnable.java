@@ -1,20 +1,20 @@
 package org.jdownloader.captcha.v2;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
-import org.appwork.exceptions.WTFException;
 import org.appwork.scheduler.DelayedRunnable;
-import org.appwork.storage.JSonStorage;
+import org.appwork.storage.config.handler.IntegerKeyHandler;
 import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.Time;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.captcha.v2.solverjob.SolverJob.SolverOutcome;
 
 import jd.controlling.captcha.SkipException;
 import jd.controlling.captcha.SkipRequest;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 public class JobRunnable<T> implements Runnable {
     private SolverJob<T>                         job;
@@ -78,68 +78,20 @@ public class JobRunnable<T> implements Runnable {
                 if (timeout != null) {
                     timeout.resetAndStart();
                 }
-                long startedWaiting = System.currentTimeMillis();
-                for (ChallengeSolver<?> s : job.getSolverList()) {
-                    if (s == solver) {
-                        continue;
-                    }
-                    int waitForThisSolver = getWaitFor(solver.getService(), s.getService(), job);
-                    if (waitForThisSolver > 1000) {
-                        job.getLogger().info(solver + " will wait up to " + TimeFormatter.formatMilliSeconds(waitForThisSolver, 0) + " for " + s);
-                    }
-                }
-                System.out.println("Logged");
-                for (ChallengeSolver<?> s : job.getSolverList()) {
-                    if (s == solver) {
-                        continue;
-                    }
-                    if (job.isForcedStart(solver)) {
-                        /* Forced start (e.g. user clicked "use external solver now" in the captcha dialog) -> do not wait any longer. */
-                        break;
-                    }
-                    int waitForThisSolver = getWaitFor(solver.getService(), s.getService(), job);
-                    waitForThisSolver -= (System.currentTimeMillis() - startedWaiting);
-                    if (waitForThisSolver <= 0) {
-                        continue;
-                    }
-                    /*
-                     * Guard against wait loops before actually waiting. The defaults alone are always loop-free (rank order + strict random
-                     * tie-break), but the user's own override wait times may combine with each other or with a random default into a loop;
-                     * the same job is passed so this check sees the exact same wait directions as the waiting below. On a detected loop this
-                     * solver does not wait for s (logged below) instead of blocking.
-                     */
-                    ArrayList<SolverService> waitLoop = validateWaittimeQueue(solver.getService(), s.getService(), job);
-                    if (waitLoop == null) {
-                        if (waitForThisSolver > 1000) {
-                            long t = System.currentTimeMillis();
-                            job.getLogger().info(solver + " now waits up to " + TimeFormatter.formatMilliSeconds(waitForThisSolver, 0) + " for " + s);
-                            job.waitFor(solver, waitForThisSolver, s);
-                            job.getLogger().info(solver + " actually waited " + TimeFormatter.formatMilliSeconds(System.currentTimeMillis() - t, 0) + " for " + s);
-                        }
-                        continue;
-                    }
-                    job.getLogger().info(solver + " wait VALIDATION FAILED!" + TimeFormatter.formatMilliSeconds(waitForThisSolver, 0) + " for " + s);
-                    job.getLogger().info("Wait Loop- >" + waitLoop + "");
-                    try {
-                        SolverService lastService = null;
-                        for (SolverService le : waitLoop) {
-                            if (lastService != null) {
-                                job.getLogger().info("Wait Loop- " + le.getName() + " waits " + getWaitFor(le, lastService, job) + " for " + lastService.getName() + "");
-                            }
-                            lastService = le;
-                        }
-                        HashSet<Object> service = new HashSet<Object>();
-                        for (ChallengeSolver<?> ss : job.getSolverList()) {
-                            if (!service.add(ss.getService())) {
-                                continue;
-                            }
-                            job.getLogger().info("Debug " + ss.getService().getName());
-                            job.getLogger().info(ss.getService().getConfigV3() + "");
-                            job.getLogger().info(JSonStorage.serializeToJson(ss.getService().getConfigV3().getWaitForOthers()));
-                        }
-                    } catch (Throwable e) {
-                        job.getLogger().log(e);
-                    }
+                /*
+                 * The solvers are started one after another in the order of the solver list (see ChallengeResponseController): This solver
+                 * waits until the solver before it has been working on the captcha for the time set for that solver
+                 * (getStartNextSolverAfterMillis) without a solution. It does not stop that solver, they work in parallel then. If that
+                 * solver is done without a solution before, this solver starts right away. The user can also force the start (e.g. "use
+                 * external solver" in the captcha dialog).
+                 */
+                final ChallengeSolver<T> previous = job.getPreviousSolver(solver);
+                if (previous != null) {
+                    final long delayMillis = getStartNextSolverAfterMillis(previous.getService(), job.getCaptchaType());
+                    job.getLogger().info(solver + " starts " + TimeFormatter.formatMilliSeconds(delayMillis, 0) + " after " + previous + " started (or as soon as it is done)");
+                    final long t = Time.systemIndependentCurrentJVMTimeMillis();
+                    job.waitForPreviousSolver(solver, delayMillis);
+                    job.getLogger().info(solver + " actually waited " + TimeFormatter.formatMilliSeconds(Time.systemIndependentCurrentJVMTimeMillis() - t, 0) + " for " + previous);
                 }
                 switch (ChallengeResponseController.getInstance().reserveCaptchaSlot(solver)) {
                 case RESERVED:
@@ -210,215 +162,61 @@ public class JobRunnable<T> implements Runnable {
     }
 
     /*
-     * Wait-for timings: how long a solver waits for another solver before it starts itself (e.g. the manual dialog solver waits for the
-     * automatic solvers). The user's own values are stored per solver in CaptchaSolverConfigV3#getWaitForOthers (other solver id -> ms,
-     * overrides only). For every pair without such an override, a default derived from the SolverType of both solvers applies, so new
-     * solvers (e.g. created from accounts) need no timing configuration at all.
+     * "Start the next solver after" timings: How long a solver may work on a captcha without a solution before the next solver in the
+     * order of the solver list is started in parallel to it. The user's value is stored in the config of each solver (see
+     * CaptchaSolverConfigV3#getStartNextSolverAfterSeconds). The default is set per solver type in the config interface of the solver (see
+     * SolverType), so new solvers (e.g. created from accounts) need no configuration at all.
      */
-    /** Default wait time of any non-local-automatic solver for the local automatic solver (JAC) to solve first. */
-    private static final int    DEFAULT_WAIT_FOR_LOCAL_AUTO          = 10000;
-    /**
-     * Default wait time of the external (paid) solver for the local automatic solver (JAC) to solve first - kept short since JAC is fast.
-     */
-    private static final int    DEFAULT_WAIT_EXTERNAL_FOR_LOCAL_AUTO = 5000;
-    /** Default wait time of a lower-priority local/manual solver for a higher-priority local/manual solver to solve first. */
-    private static final int    DEFAULT_WAIT_FOR_LOCAL_MANUAL        = 10000;
-    /**
-     * Default wait time of the external (paid) solver for any local/manual solver to solve first, so paid solvers are only used as a last
-     * resort.
-     */
-    private static final int    DEFAULT_WAIT_EXTERNAL_FOR_MANUAL     = 30000;
-    /**
-     * Default wait time of one external (paid) solver for another external solver. External solvers all share the same rank, so the rank
-     * rule alone would let them all start at once; this makes them try one after another instead (see tie-breaker in
-     * {@link #getDefaultWaitFor(SolverService, SolverService)}).
-     */
-    private static final int    DEFAULT_WAIT_EXTERNAL_FOR_EXTERNAL   = 60000;
-    private static final Object WAIT_FOR_LOCK                        = new Object();
+    private static final Object START_NEXT_LOCK = new Object();
 
     /**
-     * Rank of a solver type, defining the default auto-handling order: JD_LOCAL, then JD_LOCAL_DIALOG, then JD_LOCAL_BROWSER, then
-     * JD_REMOTE_MYJD, and EXTERNAL last. A solver waits by default only for solvers with a lower rank, so the default timings can never form
-     * a wait loop.
+     * The default of the given solver service: It is the default of the config entry in the config interface of the solver (see
+     * {@link ChallengeSolver.SolverType}, where all the numbers are defined).
      */
-    private static int getRank(final ChallengeSolver.SolverType type) {
-        switch (type) {
-        case JD_LOCAL:
-            return 0;
-        case JD_LOCAL_DIALOG:
-            return 1;
-        case JD_LOCAL_BROWSER:
-            return 2;
-        case JD_REMOTE_MYJD:
-            return 3;
-        case EXTERNAL:
-            return 4;
-        default:
-            throw new WTFException();
-        }
+    public static int getDefaultStartNextSolverAfterSeconds(final SolverService service) {
+        final IntegerKeyHandler key = service.getConfigV3()._getStorageHandler().getKeyHandler("startnextsolverafterseconds", IntegerKeyHandler.class);
+        return key.getDefaultValue().intValue();
     }
 
     /**
-     * Default wait time in ms of "owner" for "other" if the user did not configure anything, outside of an actual solve (no job context,
-     * e.g. the timing config dialog). Between two equally ranked external solvers there is no fixed default (the direction is only decided
-     * randomly at solve time, see {@link #getDefaultWaitFor(SolverService, SolverService, SolverJob)}), so 0 is returned here.
-     */
-    public static int getDefaultWaitFor(final SolverService owner, final SolverService other) {
-        return getDefaultWaitFor(owner, other, null);
-    }
-
-    /**
-     * Default wait time in ms of "owner" for "other" if the user did not configure anything.
+     * Returns the time in seconds after which the given solver service starts the next solver of the job in parallel (0 = immediately).
+     * The value the user set for the given captcha type wins. Without such a value (or without a captcha type) the value of the solver is
+     * used (its default depends on the solver, see {@link ChallengeSolver.SolverType}).
      *
-     * @param job
-     *            the captcha job currently being solved, or null when there is no solve in progress (e.g. the timing config dialog). It
-     *            provides the per-job random tie-break between two equally ranked external solvers (see
-     *            {@link SolverJob#getExternalTieBreakOrder(String)}); without it, no default wait applies between two external solvers.
+     * @param type
+     *            the captcha type of the challenge, or null for the value of the solver without a captcha type
      */
-    public static int getDefaultWaitFor(final SolverService owner, final SolverService other, final SolverJob<?> job) {
-        final ChallengeSolver.SolverType ownerType = owner.getType();
-        final ChallengeSolver.SolverType otherType = other.getType();
-        if (ownerType == ChallengeSolver.SolverType.EXTERNAL && otherType == ChallengeSolver.SolverType.EXTERNAL) {
-            /*
-             * Two external (paid/remote) solvers share the same rank, so without a tie-breaker either both would start at once (paying
-             * twice for one captcha) or a symmetric wait would block both. There is no real priority between external solvers yet, so for
-             * each captcha one of them is picked to go first at random: the job draws a random ordinal per external solver (once, kept
-             * stable for that job) and the solver with the greater ordinal waits for the one with the smaller ordinal. This stays a strict
-             * total order, so it can never form a wait loop, and it is re-drawn for the next captcha. Without a job (config dialog) there is
-             * no such live decision, so no default wait applies.
-             */
-            if (job == null) {
-                return 0;
-            }
-            final int ownerOrder = job.getExternalTieBreakOrder(owner.getID());
-            final int otherOrder = job.getExternalTieBreakOrder(other.getID());
-            if (ownerOrder != otherOrder) {
-                return ownerOrder > otherOrder ? DEFAULT_WAIT_EXTERNAL_FOR_EXTERNAL : 0;
-            }
-            /* Astronomically unlikely random collision: fall back to the stable id order so exactly one direction still waits. */
-            return owner.getID().compareTo(other.getID()) > 0 ? DEFAULT_WAIT_EXTERNAL_FOR_EXTERNAL : 0;
-        }
-        if (getRank(otherType) >= getRank(ownerType)) {
-            return 0;
-        }
-        final boolean ownerIsExternal = ownerType == ChallengeSolver.SolverType.EXTERNAL;
-        switch (otherType) {
-        case JD_LOCAL:
-            return ownerIsExternal ? DEFAULT_WAIT_EXTERNAL_FOR_LOCAL_AUTO : DEFAULT_WAIT_FOR_LOCAL_AUTO;
-        case JD_LOCAL_DIALOG:
-        case JD_LOCAL_BROWSER:
-        case JD_REMOTE_MYJD:
-            return ownerIsExternal ? DEFAULT_WAIT_EXTERNAL_FOR_MANUAL : DEFAULT_WAIT_FOR_LOCAL_MANUAL;
-        case EXTERNAL:
-        default:
-            /* Unreachable: EXTERNAL has the highest rank (lowest priority), so it can never be a lower-ranked "other" here. */
-            throw new WTFException();
-        }
-    }
-
-    /**
-     * Returns how long "owner" waits for "other" in ms: the user's value if set, else the default. Variant without a job context (e.g. the
-     * timing config dialog); see {@link #getWaitFor(SolverService, SolverService, SolverJob)} for the solve-time variant.
-     */
-    public static int getWaitFor(final SolverService owner, final SolverService other) {
-        return getWaitFor(owner, other, null);
-    }
-
-    /**
-     * Returns how long "owner" waits for "other" in ms: the user's value if set, else the default.
-     *
-     * @param job
-     *            the captcha job currently being solved, or null (see {@link #getDefaultWaitFor(SolverService, SolverService, SolverJob)}).
-     */
-    public static int getWaitFor(final SolverService owner, final SolverService other, final SolverJob<?> job) {
-        synchronized (WAIT_FOR_LOCK) {
-            /*
-             * A wait time the user configured for this exact pair (owner -> other) always wins and is returned as-is: it takes precedence
-             * over every default, including the per-job random tie-break between two external solvers below. The override is per direction,
-             * so only pairs the user did not set fall through to getDefaultWaitFor. A user override in one direction combined with a random
-             * default in the other could in theory form a wait loop; that is caught at solve time by validateWaittimeQueue (same job), so no
-             * deadlock results.
-             */
-            final Map<String, Integer> overrides = owner.getConfigV3().getWaitForOthers();
-            if (overrides != null) {
-                final Integer value = overrides.get(other.getID());
-                if (value != null) {
-                    return Math.max(0, value.intValue());
+    public static int getStartNextSolverAfterSeconds(final SolverService service, final CAPTCHA_TYPE type) {
+        synchronized (START_NEXT_LOCK) {
+            if (type != null) {
+                final Map<String, Integer> byType = service.getConfigV3().getStartNextSolverAfterSecondsByCaptchaType();
+                final Integer seconds = byType == null ? null : byType.get(type.name());
+                if (seconds != null && seconds.intValue() >= 0) {
+                    return seconds.intValue();
                 }
             }
-        }
-        return getDefaultWaitFor(owner, other, job);
-    }
-
-    /** Stores the wait time in ms "owner" waits for the solver with the given id. 0 is stored, too (= explicitly do not wait). */
-    public static void setWaitFor(final SolverService owner, final String otherID, final int waitFor) {
-        synchronized (WAIT_FOR_LOCK) {
-            final Map<String, Integer> map = new HashMap<String, Integer>();
-            final Map<String, Integer> overrides = owner.getConfigV3().getWaitForOthers();
-            if (overrides != null) {
-                map.putAll(overrides);
-            }
-            map.put(otherID, Math.max(0, waitFor));
-            owner.getConfigV3().setWaitForOthers(map);
+            return Math.max(0, service.getConfigV3().getStartNextSolverAfterSeconds());
         }
     }
 
-    /** Removes all user values of "owner", so the defaults apply again. */
-    public static void resetWaitFor(final SolverService owner) {
-        synchronized (WAIT_FOR_LOCK) {
-            owner.getConfigV3().setWaitForOthers(new HashMap<String, Integer>());
-        }
-    }
-
-    /** Returns the number of wait time values the user configured for "owner". */
-    public static int getWaitForOverrideCount(final SolverService owner) {
-        synchronized (WAIT_FOR_LOCK) {
-            final Map<String, Integer> overrides = owner.getConfigV3().getWaitForOthers();
-            return overrides == null ? 0 : overrides.size();
-        }
+    /** Same as {@link #getStartNextSolverAfterSeconds(SolverService, CAPTCHA_TYPE)} in ms. */
+    public static long getStartNextSolverAfterMillis(final SolverService service, final CAPTCHA_TYPE type) {
+        return TimeUnit.SECONDS.toMillis(getStartNextSolverAfterSeconds(service, type));
     }
 
     /**
-     * Checks whether "start" waiting for "check" would result in a wait loop (A waits for B, B waits for C, C waits for A).
+     * Stores the timings of the given solver in its config (used by the timing dialog when the user saves).
      *
-     * @return the chain of solvers forming the loop, or null if there is none
+     * @param seconds
+     *            the value of the solver (all captcha types), -1 = the default of the solver type
+     * @param byCaptchaType
+     *            the values for single captcha types, key: name of the captcha type
      */
-    public static ArrayList<SolverService> validateWaittimeQueue(final SolverService start, final SolverService check) {
-        return validateWaittimeQueue(start, check, null);
-    }
-
-    /**
-     * @param job
-     *            the captcha job currently being solved, or null (see {@link #getDefaultWaitFor(SolverService, SolverService, SolverJob)}).
-     *            It must be the same job that drives the actual waiting, so the loop check sees the exact same (per-job random) wait
-     *            directions as the waiting itself.
-     */
-    public static ArrayList<SolverService> validateWaittimeQueue(final SolverService start, final SolverService check, final SolverJob<?> job) {
-        if (start == null || check == null) {
-            return null;
-        } else {
-            return validateWaittimeQueue(start, check, new ArrayList<SolverService>(), new HashSet<SolverService>(), job);
+    public static void storeStartNextSolverAfterSeconds(final SolverService service, final int seconds, final Map<String, Integer> byCaptchaType) {
+        synchronized (START_NEXT_LOCK) {
+            service.getConfigV3().setStartNextSolverAfterSeconds(seconds);
+            service.getConfigV3().setStartNextSolverAfterSecondsByCaptchaType(new HashMap<String, Integer>(byCaptchaType));
         }
-    }
-
-    private static ArrayList<SolverService> validateWaittimeQueue(final SolverService start, final SolverService check, ArrayList<SolverService> chain, HashSet<SolverService> dupe, final SolverJob<?> job) {
-        if (chain.size() == 0) {
-            chain.add(start);
-            dupe.add(start);
-        }
-        chain.add(check);
-        if (!dupe.add(check)) {
-            return chain;
-        }
-        for (final SolverService service : ChallengeResponseController.getInstance().listServices()) {
-            if (service != check && service.getConfigV3().isEnabled() && getWaitFor(check, service, job) > 0) {
-                final ArrayList<SolverService> ret = validateWaittimeQueue(start, service, new ArrayList<SolverService>(chain), new HashSet<SolverService>(dupe), job);
-                if (ret != null) {
-                    return ret;
-                }
-            }
-        }
-        return null;
     }
 
     public void cancel() {

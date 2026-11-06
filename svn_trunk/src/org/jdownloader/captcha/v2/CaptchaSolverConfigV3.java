@@ -7,11 +7,12 @@ import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.storage.config.annotations.DefaultEnumArrayValue;
 import org.appwork.storage.config.annotations.DefaultIntValue;
-import org.appwork.storage.config.annotations.DefaultLongValue;
 import org.appwork.storage.config.annotations.DefaultJsonObject;
+import org.appwork.storage.config.annotations.DefaultLongValue;
 import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.SpinnerValidator;
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 
@@ -43,6 +44,10 @@ public interface CaptchaSolverConfigV3 extends PluginConfigInterface {
 
         public String getMaxPollingTimeoutSeconds_label() {
             return "Max captcha solving time (seconds)";
+        }
+
+        public String getStartNextSolverAfterSeconds_label() {
+            return "Start the next solver after (seconds)";
         }
     }
 
@@ -105,14 +110,31 @@ public interface CaptchaSolverConfigV3 extends PluginConfigInterface {
 
     void setDisabledCaptchaTypes(Set<CAPTCHA_TYPE> enumset);
 
-    @AboutConfig(inGUIVisible = false)
-    @DescriptionForConfigEntry("Solver-timing map (other solver id -> milliseconds to wait for it). Empty means automatic.")
+    /**
+     * 2026-11-05: The old per solver settings "wait for other solvers" (a map: other solver ID -> milliseconds) are gone without a
+     * migration, because they were very confusing. See {@link ChallengeResponseController} for the order of the solvers.
+     */
+    @AboutConfig
+    @DescriptionForConfigEntry("How long (in seconds) this solver may work on a captcha without a solution before the next solver (see order in the solver table) is started in parallel to it. 0 = start the next solver immediately. If this solver is done without a solution, the next solver is started right away.")
+    @SpinnerValidator(min = 0, max = SolverType.DEFAULT_START_NEXT_AFTER_SECONDS_MAX, step = 1)
+    /*
+     * The default of the solver types is set in their own config interface, which overrides this method with its own default. All numbers
+     * are defined in ChallengeSolver.SolverType (DEFAULT_START_NEXT_AFTER_SECONDS_*). The annotations have to be repeated in the overriding method, they are not inherited.
+     */
+    @DefaultIntValue(SolverType.DEFAULT_START_NEXT_AFTER_SECONDS_DEFAULT)
     @Order(900)
+    int getStartNextSolverAfterSeconds();
+
+    void setStartNextSolverAfterSeconds(int seconds);
+
+    @AboutConfig(inGUIVisible = false)
+    @DescriptionForConfigEntry("Like 'Start the next solver after (seconds)', but for single captcha types. Key: name of the captcha type (CAPTCHA_TYPE), value: seconds (0 = start the next solver immediately). If a captcha type has no entry, 'Start the next solver after (seconds)' is used. Edited in the timing dialog of the solver table.")
     @DefaultJsonObject("{}")
     @DefaultOnNull
-    Map<String, Integer> getWaitForOthers();
+    @Order(901)
+    Map<String, Integer> getStartNextSolverAfterSecondsByCaptchaType();
 
-    void setWaitForOthers(Map<String, Integer> map);
+    void setStartNextSolverAfterSecondsByCaptchaType(Map<String, Integer> map);
 
     @AboutConfig(inGUIVisible = false)
     @DescriptionForConfigEntry("Timestamp (ms) of the successful migration of this solver's old settings (CaptchaSolverSettingsMigration). -1 = not migrated (yet) or nothing to migrate.")

@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import javax.swing.DropMode;
 import javax.swing.Icon;
 import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
@@ -16,6 +17,8 @@ import javax.swing.event.ListSelectionListener;
 import org.appwork.swing.components.CheckBoxIcon;
 import org.appwork.swing.components.ExtMergedIcon;
 import org.appwork.swing.exttable.ExtColumn;
+import org.appwork.swing.exttable.ExtTransferHandler;
+import org.appwork.utils.Application;
 import org.appwork.utils.images.TransparentIcon;
 import org.jdownloader.api.captcha.CaptchaAPIManualRemoteSolverService;
 import org.jdownloader.captcha.v2.SolverService;
@@ -49,6 +52,12 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
         setShowHorizontalLines(true);
         /* Focusable (click on a row): Without focus the table never receives keyboard shortcuts like Ctrl+A (select all). */
         setFocusable(true);
+        /* The order of the rows is the order in which the solvers are started for a captcha: Rows can be moved by drag and drop. */
+        setDragEnabled(true);
+        setTransferHandler(new ExtTransferHandler<SolverService>());
+        if (Application.getJavaVersion() >= Application.JAVA16) {
+            setDropMode(DropMode.INSERT_ROWS);
+        }
         getSelectionModel().addListSelectionListener(new ListSelectionListener() {
             @Override
             public void valueChanged(ListSelectionEvent e) {

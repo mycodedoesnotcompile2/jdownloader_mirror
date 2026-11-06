@@ -34,7 +34,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Random;
 import java.util.WeakHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -42,6 +41,34 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.swing.Icon;
+
+import jd.PluginWrapper;
+import jd.config.ConfigContainer;
+import jd.config.SubConfiguration;
+import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.linkchecker.LinkCheckerThread;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.LinkCrawler.LinkCrawlerGeneration;
+import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
+import jd.controlling.linkcrawler.LinkCrawlerThread;
+import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
+import jd.controlling.reconnect.ipcheck.IPCheckException;
+import jd.controlling.reconnect.ipcheck.OfflineException;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.BrowserSettingsThread;
+import jd.http.ProxySelectorInterface;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.SimpleFTP.ENCODING;
+import jd.nutils.encoding.Encoding;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import jd.plugins.PluginForHost.FILENAME_SOURCE;
+import jd.plugins.components.SiteType.SiteTemplate;
+import jd.utils.JDUtilities;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
@@ -101,48 +128,19 @@ import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.translate._JDT;
 
-import jd.PluginWrapper;
-import jd.config.ConfigContainer;
-import jd.config.SubConfiguration;
-import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.controlling.captcha.SkipRequest;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.linkchecker.LinkCheckerThread;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.linkcrawler.LinkCrawler.LinkCrawlerGeneration;
-import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
-import jd.controlling.linkcrawler.LinkCrawlerThread;
-import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
-import jd.controlling.reconnect.ipcheck.IPCheckException;
-import jd.controlling.reconnect.ipcheck.OfflineException;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.BrowserSettingsThread;
-import jd.http.ProxySelectorInterface;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.SimpleFTP.ENCODING;
-import jd.nutils.encoding.Encoding;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-import jd.plugins.PluginForHost.FILENAME_SOURCE;
-import jd.plugins.components.SiteType.SiteTemplate;
-import jd.utils.JDUtilities;
-
 /**
  * Diese abstrakte Klasse steuert den Zugriff auf weitere Plugins. Alle Plugins müssen von dieser Klasse abgeleitet werden.
  *
  * Alle Plugins verfügen über einen Event Mechanismus
  */
 public abstract class Plugin implements ActionListener {
-    public static final HTTPHeader      OPEN_RANGE_REQUEST = new HTTPHeader(HTTPConstants.HEADER_REQUEST_RANGE, "bytes=0-");
-    public static final String          HTTP_LINKS_HOST    = "http links";
-    public static final String          DIRECT_HTTP_HOST   = "DirectHTTP";
-    public static final String          FTP_HOST           = "ftp";
-    protected LogInterface              logger             = LogController.TRASH;
-    protected Map<Challenge<?>, Object> challenges         = new LinkedHashMap<Challenge<?>, Object>();
-    private CrawledLink                 currentLink        = null;
+    public static final HTTPHeader            OPEN_RANGE_REQUEST = new HTTPHeader(HTTPConstants.HEADER_REQUEST_RANGE, "bytes=0-");
+    public static final String                HTTP_LINKS_HOST    = "http links";
+    public static final String                DIRECT_HTTP_HOST   = "DirectHTTP";
+    public static final String                FTP_HOST           = "ftp";
+    protected LogInterface                    logger             = LogController.TRASH;
+    protected final Map<Challenge<?>, Object> challenges         = new LinkedHashMap<Challenge<?>, Object>();
+    private CrawledLink                       currentLink        = null;
 
     public void setLogger(LogInterface logger) {
         if (logger == null) {
@@ -267,13 +265,17 @@ public abstract class Plugin implements ActionListener {
         return null;
     }
 
-    protected boolean isAccountLoginCaptchaChallenge(final Challenge<?> c) {
+    public boolean isAccountLoginCaptchaChallenge(final Challenge<?> c) {
+        final Boolean isAccountLogin = c.isAccountLogin();
+        if (isAccountLogin != null) {
+            return isAccountLogin.booleanValue();
+        }
         final Account currentAccount = getCurrentAccount();
         if (currentAccount != null && Thread.holdsLock(currentAccount)) {
             // Captcha Challenge while holding lock on account heavily indicates that we're inside account login/check
             return true;
         }
-        return c.isCreatedInsideAccountChecker() || c.isAccountLogin();
+        return false;
     }
 
     protected boolean looksLikeDownloadableContent(final URLConnectionAdapter urlConnection) {
@@ -1395,6 +1397,9 @@ public abstract class Plugin implements ActionListener {
     }
 
     public void invalidateLastChallengeResponse() {
+        for (Plugin plugin : pluginInstances) {
+            plugin.invalidateLastChallengeResponse();
+        }
         final List<Challenge<?>> challenges = getChallenges();
         if (challenges == null || challenges.size() == 0) {
             return;
@@ -1457,7 +1462,6 @@ public abstract class Plugin implements ActionListener {
     private void setParentPlugin(Plugin parentPlugin) {
         if (parentPlugin != null && parentPlugin != this) {
             parentPlugin.pluginInstances.add(0, this);
-            this.challenges = parentPlugin.challenges;
             this.parent = new WeakReference<Plugin>(parentPlugin);
         } else {
             this.parent = null;
@@ -1551,6 +1555,9 @@ public abstract class Plugin implements ActionListener {
     }
 
     public void validateLastChallengeResponse() {
+        for (Plugin plugin : pluginInstances) {
+            plugin.validateLastChallengeResponse();
+        }
         final Challenge<?> last = getLastestChallengeResponse();
         if (last == null) {
             return;
@@ -1558,37 +1565,6 @@ public abstract class Plugin implements ActionListener {
         final SolverJob<?> job = last.getJob();
         if (job != null) {
             job.validate();
-        }
-    }
-
-    /**
-     * Returns how often the user refreshed a captcha (clicked the refresh button of the captcha dialog) in this plugin so far. <br>
-     * It counts the challenges of this plugin (the list is shared with the parent plugin and its child plugin instances, see
-     * {@link #getChallenges()}) whose job ended with {@link SkipRequest#REFRESH}. <br>
-     * Note: The challenges are removed by {@link #cleanupChallenges()} (called by {@link #clean()}), so the counter starts at 0 again for a
-     * new plugin instance or after the plugin has been cleaned. <br>
-     * TODO: This is probably wrong for downloads and crawlers: A refresh ends the current attempt with a retry (CaptchaRefreshException).
-     * {@link #clean()} removes the challenges after every attempt: For downloads the retry runs with a new plugin instance anyway, and the
-     * crawler calls clean() in the finally block of PluginForDecrypt#decryptLink even if it continues with "continue retry". So the counter
-     * is always 0 there and {@link ChallengeRefreshVeto#REFRESH_LIMIT_REACHED} is never reached. The counter would have to be stored
-     * outside of the plugin instance and its challenges, e.g. in the DownloadLink or CrawledLink.
-     *
-     * @return number of refreshed challenges, 0 if there was none
-     */
-    public int getChallengeRefreshedCount() {
-        synchronized (challenges) {
-            int count = 0;
-            for (final Entry<Challenge<?>, Object> entry : challenges.entrySet()) {
-                final Challenge<?> challenge = entry.getKey();
-                final SolverJob<?> job = challenge.getJob();
-                if (job == null) {
-                    continue;
-                }
-                if (SkipRequest.REFRESH.equals(job.getSkipRequest())) {
-                    count++;
-                }
-            }
-            return count;
         }
     }
 
@@ -1608,36 +1584,26 @@ public abstract class Plugin implements ActionListener {
                 return _GUI.T.AbstractCaptchaDialog_refreshDisabledCaptchaType_tooltip();
             }
         },
-        /** The captcha has been refreshed too often already, see {@link Plugin#getChallengeRefreshLimit()}. */
+        /** The captcha has been refreshed too often already, e.g. thrown by plugin that "knows" that a refresh is no longer possible */
         REFRESH_LIMIT_REACHED {
             @Override
             public String getLabel() {
                 return _GUI.T.AbstractCaptchaDialog_refreshDisabledLimit_tooltip();
             }
+        },
+        NONE {
+            @Override
+            public String getLabel() {
+                return null;
+            }
         };
     }
 
-    /**
-     * Returns how often the user may refresh the captcha of this plugin (the first captcha plus this number of refreshes = number of
-     * captchas the user gets at most). <br>
-     * Every refresh of a download captcha results in a retry of the download and the download controller blocks a link after too many
-     * retries, so the user must not be able to refresh endlessly.
-     */
-    public int getChallengeRefreshLimit() {
-        // TODO: do we really want to limit this user initiated refresh?
-        return 4;
-    }
-
-    /**
-     * Checks if the given challenge can be refreshed (the user gets a new captcha).
-     *
-     * @return null if a refresh is allowed, otherwise the reason why it is not
-     */
     public ChallengeRefreshVeto getChallengeRefreshVeto(final Challenge<?> challenge) {
         if (challenge == null) {
             return ChallengeRefreshVeto.REFRESH_CAPTCHA_TYPE_NOT_ALLOWED;
         }
-        if (challenge.isAccountLogin()) {
+        if (isAccountLoginCaptchaChallenge(challenge)) {
             // TODO: why not also allow refresh for logins?
             /**
              * 2026-11-05: psp <br>
@@ -1653,10 +1619,7 @@ public abstract class Plugin implements ActionListener {
         if (!(challenge instanceof ImageCaptchaChallenge)) {
             return ChallengeRefreshVeto.REFRESH_CAPTCHA_TYPE_NOT_ALLOWED;
         }
-        if (getChallengeRefreshedCount() >= getChallengeRefreshLimit()) {
-            return ChallengeRefreshVeto.REFRESH_LIMIT_REACHED;
-        }
-        return null;
+        return ChallengeRefreshVeto.NONE;
     }
 
     public FEATURE[] getFeatures() {

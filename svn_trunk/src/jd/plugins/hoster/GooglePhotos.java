@@ -16,13 +16,18 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.net.URL;
 
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
+import jd.http.Browser;
+import jd.http.Request;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.parser.html.Form;
+import jd.parser.html.Form.MethodType;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -31,7 +36,9 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "photos.google.com" }, urls = { "https?://photos\\.google\\.com/share/[A-Za-z0-9\\-_]+/photo/[A-Za-z0-9\\-_]+\\?key=[A-Za-z0-9\\-_]+" })
+import org.appwork.utils.StringUtils;
+
+@HostPlugin(revision = "$Revision: 53913 $", interfaceVersion = 3, names = { "photos.google.com" }, urls = { "https?://photos\\.google\\.com/share/[A-Za-z0-9\\-_]+/photo/[A-Za-z0-9\\-_]+\\?key=[A-Za-z0-9\\-_]+" })
 public class GooglePhotos extends PluginForHost {
     public GooglePhotos(PluginWrapper wrapper) {
         super(wrapper);
@@ -67,7 +74,9 @@ public class GooglePhotos extends PluginForHost {
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         final String url_title = new Regex(link.getDownloadURL(), "/photo/([A-Za-z0-9\\-_]+)").getMatch(0).replace("-", " ");
-        link.setName(url_title);
+        if (!link.isNameSet()) {
+            link.setName(url_title);
+        }
         br.getPage(link.getDownloadURL());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -89,6 +98,30 @@ public class GooglePhotos extends PluginForHost {
                     dllink = br.getRegex("(https?://video\\.googleusercontent\\.com/[A-Za-z0-9\\-_]+)").getMatch(0);
                     if (dllink == null) {
                         dllink = br.getRegex("(https?://video-downloads\\.googleusercontent\\.com/[A-Za-z0-9\\-_]+)").getMatch(0);
+                    }
+                    pLFTfd: if (dllink == null) {
+                        final String key = new Regex(link.getDownloadURL(), "key=([^&\\?#]+)").getMatch(0);
+                        final String file = new Regex(link.getDownloadURL(), "/([^/]*?)\\?key").getMatch(0);
+                        final String shareKey = new Regex(link.getDownloadURL(), "/share/([^/]+)").getMatch(0);
+                        if (!StringUtils.isAllNotEmpty(key, file)) {
+                            break pLFTfd;
+                        }
+                        String name = br.getRegex("\\d+\\s*,\\s*\"" + shareKey + "\"\\s*,\\s*\"(.*?)\"").getMatch(0);
+                        if (name != null && link.getFinalFileName() == null) {
+                            name = correctOrApplyFileNameExtension(name, ".mp4", null);
+                            link.setFinalFileName(name);
+                        }
+                        final String path = new URL(link.getDownloadURL()).getPath();
+                        final Form form = new Form();
+                        form.setMethod(MethodType.POST);
+                        form.setAction("https://photos.google.com/_/PhotosUi/data/batchexecute?rpcids=pLFTfd&source-path=" + path + "&f.sid=9080601471117455885&bl=boq_photosuiserver_20261103.05_p0&hl=de&soc-app=165&soc-platform=1&soc-device=1&_reqid=1043544&rt=c");
+                        form.put("f.req", "[[[\"pLFTfd\",\"[[\\\"" + file + "\\\"],null,\\\"" + key + "\\\"]\",null,\"generic\"]]]");
+                        final Request request = br.createFormRequest(form);
+                        request.getHeaders().put("Origin", "https://photos.google.com");
+                        final Browser brc = br.cloneBrowser();
+                        brc.setCurrentURL("https://photos.google.com/");
+                        brc.getPage(request);
+                        dllink = brc.getRegex("(https://video-downloads.*?)\\\\").getMatch(0);
                     }
                     if (dllink == null) {
                         dllink = br.getRegex("u003d(https%3A%2F%2F.*?mp4)[^\",]*?(hd720|medium|small)(\"|,)").getMatch(0);

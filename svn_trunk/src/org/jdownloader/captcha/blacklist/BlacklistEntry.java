@@ -1,8 +1,8 @@
 package org.jdownloader.captcha.blacklist;
 
-import jd.controlling.captcha.SkipRequest;
-
 import org.jdownloader.captcha.v2.Challenge;
+
+import jd.controlling.captcha.SkipRequest;
 
 public interface BlacklistEntry<T> {
     public boolean canCleanUp();
@@ -10,4 +10,6 @@ public interface BlacklistEntry<T> {
     public boolean matches(Challenge<T> c);
 
     public SkipRequest getSkipRequest();
+
+    public String getReason();
 }

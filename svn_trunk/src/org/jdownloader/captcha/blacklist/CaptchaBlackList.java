@@ -51,7 +51,7 @@ public class CaptchaBlackList implements DownloadWatchdogListener, LinkCollector
     }
 
     public BlacklistEntry matches(Challenge<?> c) {
-        if (c == null || c.isAccountLogin() || c.isCreatedInsideAccountChecker()) {
+        if (c == null || Boolean.TRUE.equals(c.isAccountLogin())) {
             return null;
         } else {
             return matches(c, false);

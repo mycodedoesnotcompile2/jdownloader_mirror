@@ -1121,7 +1121,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
     }
 
     public boolean probeJSonContent(final String post) {
-        return post != null && post.matches("(?s)^\\s*\\{.*?\\}\\s*$");
+        return post != null && (post.matches("(?s)^\\s*\\{.*\\}\\s*$") || post.matches("(?s)^\\s*\\[.*\\]\\s*$"));
     }
 
     public boolean probeJSonContent(final byte post[]) {

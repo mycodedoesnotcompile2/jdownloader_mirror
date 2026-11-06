@@ -6,22 +6,22 @@ import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.BooleanKeyHandler;
 import org.appwork.storage.config.handler.KeyHandler;
+import org.jdownloader.actions.AppAction;
 
 public abstract class AbstractExtensionGuiEnableAction<T extends AbstractExtension<?, ?>> extends AbstractExtensionAction<T> implements GenericConfigEventListener<Boolean> {
-
     /**
      *
      */
     private static final long   serialVersionUID = 1L;
-
     protected BooleanKeyHandler keyHandler;
 
     public AbstractExtensionGuiEnableAction(BooleanKeyHandler guiEnabled) {
-
         super();
         keyHandler = guiEnabled;
-        setSelected(keyHandler.isEnabled());
-        keyHandler.getEventSender().addListener(this, true);
+        if (!AppAction.isValidationMode()) {
+            setSelected(keyHandler.isEnabled());
+            keyHandler.getEventSender().addListener(this, true);
+        }
     }
 
     @Override
@@ -30,11 +30,9 @@ public abstract class AbstractExtensionGuiEnableAction<T extends AbstractExtensi
 
     @Override
     public void actionPerformed(ActionEvent e) {
-        boolean isActive = _getExtension().getGUI().isActive();
         // activate panel
-        if (isActive) {
+        if (_getExtension().getGUI().isActive()) {
             _getExtension().getGUI().setActive(false);
-
         } else {
             _getExtension().getGUI().setActive(true);
             // bring panel to front
@@ -45,14 +43,7 @@ public abstract class AbstractExtensionGuiEnableAction<T extends AbstractExtensi
 
     @Override
     public void onConfigValueModified(KeyHandler<Boolean> keyHandler, Boolean newValue) {
-
         setSelected(newValue);
-
-    }
-
-    public void setSelected(final boolean selected) {
-        super.setSelected(selected);
-
     }
 
 }

@@ -2,19 +2,22 @@ package org.jdownloader.captcha.blacklist;
 
 import java.lang.ref.WeakReference;
 
+import org.jdownloader.captcha.v2.Challenge;
+
+import jd.controlling.captcha.SkipException;
 import jd.controlling.captcha.SkipRequest;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 
-import org.jdownloader.captcha.v2.Challenge;
-
 public class BlockDownloadCaptchasByLink implements SessionBlackListEntry<Object> {
     private final WeakReference<DownloadLink> downloadLink;
     private final SkipRequest                 skipRequest;
+    private final String                      reason;
 
-    public BlockDownloadCaptchasByLink(SkipRequest skipRequest, DownloadLink downloadLink) {
+    public BlockDownloadCaptchasByLink(SkipException skipException, DownloadLink downloadLink) {
         this.downloadLink = new WeakReference<DownloadLink>(downloadLink);
-        this.skipRequest = skipRequest;
+        this.skipRequest = skipException.getSkipRequest();
+        this.reason = skipException.getReason();
     }
 
     @Override
@@ -50,5 +53,10 @@ public class BlockDownloadCaptchasByLink implements SessionBlackListEntry<Object
     @Override
     public SkipRequest getSkipRequest() {
         return skipRequest;
+    }
+
+    @Override
+    public String getReason() {
+        return reason;
     }
 }

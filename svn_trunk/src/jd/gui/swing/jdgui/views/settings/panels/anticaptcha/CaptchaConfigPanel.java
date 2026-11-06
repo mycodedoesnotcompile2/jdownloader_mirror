@@ -2,8 +2,6 @@ package jd.gui.swing.jdgui.views.settings.panels.anticaptcha;
 
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import java.awt.Component;
-import java.awt.event.ItemEvent;
-import java.awt.event.ItemListener;
 
 import javax.swing.Icon;
 import javax.swing.JLabel;
@@ -11,6 +9,10 @@ import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
 
 import org.appwork.storage.config.JsonConfig;
+import org.appwork.storage.config.ValidationException;
+import org.appwork.storage.config.events.GenericConfigEventListener;
+import org.appwork.storage.config.handler.KeyHandler;
+import org.appwork.utils.swing.EDTRunner;
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.utils.DebugMode;
@@ -37,6 +39,8 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
     private JScrollPane               solversScrollPane;
     private CaptchaTestPanel          testPanel;
     private JScrollPane               testScrollPane;
+    /* Strong reference: the listener is registered as a weak listener. */
+    private GenericConfigEventListener<Boolean> useExternalSolverAccountsListener;
 
     public String getTitle() {
         return _GUI.T.AntiCaptchaConfigPanel_getTitle();
@@ -53,23 +57,36 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
         this.addHeader(getTitle(), new AbstractIcon(IconKey.ICON_OCR, 32));
         this.addDescriptionPlain(_GUI.T.AntiCaptchaConfigPanel_onShow_description());
         /* The two general settings are part of the solver overview tab, so they do not waste space above the tabs. */
-        final Checkbox useExternalSolverAccounts = new Checkbox(CFG_GENERAL.USE_AVAILABLE_CAPTCHA_SOLVER_ACCOUNTS);
-        useExternalSolverAccounts.setText(_GUI.T.CaptchaConfigPanel_useExternalSolverAccounts());
         final Checkbox avoidAutoSolverForLoginCaptchas = new Checkbox(CFG_CAPTCHA.AVOID_AUTO_SOLVER_FOR_LOGIN_CAPTCHAS);
         avoidAutoSolverForLoginCaptchas.setText(_GUI.T.CaptchaConfigPanel_avoidAutoSolverForLoginCaptchas());
         avoidAutoSolverForLoginCaptchas.setToolTipText(_GUI.T.CaptchaConfigPanel_avoidAutoSolverForLoginCaptchas_tooltip());
-        /* Only makes sense while external solver accounts are used. Item listener: it also reacts if the setting is changed elsewhere. */
-        useExternalSolverAccounts.addItemListener(new ItemListener() {
+        /*
+         * Only makes sense while external solver accounts are used. They can be switched off globally (e.g. via the optional toolbar action),
+         * so the checkbox follows that setting, also if it is changed elsewhere.
+         */
+        avoidAutoSolverForLoginCaptchas.setEnabled(CFG_GENERAL.USE_AVAILABLE_CAPTCHA_SOLVER_ACCOUNTS.isEnabled());
+        useExternalSolverAccountsListener = new GenericConfigEventListener<Boolean>() {
             @Override
-            public void itemStateChanged(final ItemEvent e) {
-                avoidAutoSolverForLoginCaptchas.setEnabled(useExternalSolverAccounts.isSelected());
+            public void onConfigValueModified(final KeyHandler<Boolean> keyHandler, final Boolean newValue) {
+                new EDTRunner() {
+                    @Override
+                    protected void runInEDT() {
+                        avoidAutoSolverForLoginCaptchas.setEnabled(CFG_GENERAL.USE_AVAILABLE_CAPTCHA_SOLVER_ACCOUNTS.isEnabled());
+                    }
+                };
             }
-        });
-        avoidAutoSolverForLoginCaptchas.setEnabled(useExternalSolverAccounts.isSelected());
-        final MigPanel generalSettings = new MigPanel("ins 5 5 0 5, wrap 1, gapy 0", "[grow,fill]", "[][]");
+
+            @Override
+            public void onConfigValidatorError(final KeyHandler<Boolean> keyHandler, final Boolean invalidValue, final ValidationException validateException) {
+            }
+        };
+        /* Weak listener: the field keeps it alive as long as this panel exists. */
+        CFG_GENERAL.USE_AVAILABLE_CAPTCHA_SOLVER_ACCOUNTS.getEventSender().addListener(useExternalSolverAccountsListener, true);
+        final MigPanel generalSettings = new MigPanel("ins 5 5 0 5, wrap 1, gapy 0", "[grow,fill]", "[][][]");
         generalSettings.setOpaque(false);
-        generalSettings.add(useExternalSolverAccounts);
         generalSettings.add(avoidAutoSolverForLoginCaptchas);
+        /* One sentence about the solver table below: it defines the order, which can be changed by drag & drop. */
+        generalSettings.add(new JLabel(_GUI.T.CaptchaConfigPanel_solverOrderInfo()), "gaptop 5, wmin 0");
         /* Tabbed area at the top: solver overview and captcha rules (similar to the Linkgrabber Filter panel). */
         final SolverOrderTable table = this.solverOrderTable = new SolverOrderTable();
         final SolverOrderContainer container = new SolverOrderContainer(table);

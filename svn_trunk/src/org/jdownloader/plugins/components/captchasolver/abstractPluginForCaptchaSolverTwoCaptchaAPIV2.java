@@ -294,6 +294,8 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
                 resp = new CaptchaResponse((Challenge<String>) captchachallenge, job.getSolver(), solutionmap.get("text").toString());
             }
             resp.setCaptchaSolverTaskID(id);
+            /* API V2: The ready response contains the cost of the task, e.g. "cost":"0.00299" -> Update balance. */
+            subtractSolveCostFromBalance(account, entries.get("cost"));
             job.setAnswer(resp);
             return;
         }
@@ -411,6 +413,27 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
          * Proxy: see PROXY_TASK_TYPES and solvePowCaptcha.
          */
         return EnumSet.of(SolverFeature.REPORT_INVALID_CAPTCHAS, SolverFeature.REPORT_VALID_CAPTCHAS, SolverFeature.PROXY);
+    }
+
+    /**
+     * Deducts the cost of a solved captcha (field "cost" of the getTaskResult response) from the balance of the given account. Does nothing
+     * if the account has no AccountInfo yet or if the cost is missing/invalid. Never throws: a failure here must not affect the already
+     * solved captcha.
+     */
+    private void subtractSolveCostFromBalance(final Account account, final Object cost) {
+        try {
+            final AccountInfo ai = account.getAccountInfo();
+            if (ai == null || cost == null) {
+                return;
+            }
+            final double costValue = Double.parseDouble(cost.toString());
+            if (costValue <= 0) {
+                return;
+            }
+            ai.setAccountBalance(Math.max(0, ai.getAccountBalance() - costValue), Currency.getInstance("USD"));
+        } catch (final Throwable e) {
+            logger.log(e);
+        }
     }
 
     @Override

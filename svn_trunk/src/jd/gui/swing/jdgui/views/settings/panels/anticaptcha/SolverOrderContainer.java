@@ -18,6 +18,8 @@ import javax.swing.JLabel;
 import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
+import javax.swing.event.TableModelEvent;
+import javax.swing.event.TableModelListener;
 
 import org.appwork.storage.config.ConfigInterface;
 import org.appwork.storage.config.ValidationException;
@@ -31,6 +33,7 @@ import org.jdownloader.actions.AppAction;
 import org.jdownloader.captcha.v2.CaptchaSolverCaptchaTypesSettingsPanelBuilder;
 import org.jdownloader.captcha.v2.CaptchaSolverCaptchaTypesSettingsPanelBuilder.SolverServiceCaptchaTypeAccessor;
 import org.jdownloader.captcha.v2.CaptchaSolverLimitRule;
+import org.jdownloader.captcha.v2.ChallengeResponseController;
 import org.jdownloader.captcha.v2.ChallengeSolver.SolverFeature;
 import org.jdownloader.captcha.v2.SolverService;
 import org.jdownloader.captcha.v2.solver.service.BrowserSolverService;
@@ -49,6 +52,8 @@ import jd.plugins.PluginConfigPanelNG;
 
 public class SolverOrderContainer extends org.appwork.swing.MigPanel implements SettingsComponent {
     private final SolverOrderTable     solverOrder;
+    /** Opens the timing dialog, shown directly below the solver table. */
+    private final JButton              timingButton;
     private BasicJDTable<CAPTCHA_TYPE> detailTable;
     private JScrollPane                detailScrollPane;
     private JLabel                     detailLabel;
@@ -93,12 +98,37 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
 
     public SolverOrderContainer(SolverOrderTable urlOrder) {
         /* gapy 0: no implicit inter-row gaps, so the height reserved in getConstraints() stays exact (all gaps are set explicitly). */
-        super("ins 0, gapy 0", "[grow,fill]", "[][][][][][][][][][][]");
+        super("ins 0, gapy 0", "[grow,fill]", "[][][][][][][][][][][][]");
         this.solverOrder = urlOrder;
         /* Main solver order table. Slightly narrower on the right; never shows any scrollbar. */
         final JScrollPane sp = urlOrder.createScrollPane();
         SwingUtils.setOpaque(this, false);
         add(sp, "wrap");
+        /*
+         * Opens the timing dialog (how a captcha runs through the solvers). Always shown, left aligned below the table, but only usable
+         * while there is an enabled solver which is ready.
+         */
+        timingButton = new JButton(new AppAction() {
+            {
+                setIconKey(IconKey.ICON_SETTINGS);
+                setName(_GUI.T.SolverOrderContainer_configureTimings());
+                setTooltipText(_GUI.T.SolverOrderContainer_configureTimings_tooltip());
+            }
+
+            @Override
+            public void actionPerformed(final ActionEvent e) {
+                UIOManager.I().show(null, new SolverTimingDialog(selectedSolver));
+            }
+        });
+        updateTimingButton();
+        /* Enabled/ready state of the solvers changes: the table model is updated then. */
+        urlOrder.getModel().addTableModelListener(new TableModelListener() {
+            @Override
+            public void tableChanged(final TableModelEvent e) {
+                updateTimingButton();
+            }
+        });
+        add(timingButton, "gaptop 6, alignx left, growx 0, wrap");
         /* Header label shown above the detail table; separated from the solver table above by a gap. */
         detailLabel = new JLabel();
         detailLabel.setVisible(false);
@@ -440,6 +470,18 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
         }
     }
 
+    /** The timing button is only usable if there is at least one solver which is enabled and ready. */
+    private void updateTimingButton() {
+        boolean usable = false;
+        for (final SolverService service : ChallengeResponseController.getInstance().getOrderedServices()) {
+            if (service.getConfigV3().isEnabled() && service.isReady()) {
+                usable = true;
+                break;
+            }
+        }
+        timingButton.setEnabled(usable);
+    }
+
     private void refreshLayout() {
         revalidate();
         repaint();
@@ -519,7 +561,8 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
      */
     @Override
     public String getConstraints() {
-        int height = tableFullHeight(solverOrder);
+        /* The timing button below the table has a gaptop of 6. */
+        int height = tableFullHeight(solverOrder) + 6 + timingButton.getPreferredSize().height;
         if (detailScrollPane.isVisible() && detailTable != null) {
             /* gaptop 15 above the header label. */
             height += 15 + detailLabel.getPreferredSize().height;

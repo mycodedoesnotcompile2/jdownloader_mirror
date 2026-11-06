@@ -472,7 +472,21 @@ public class IconIO {
     public static ModifyLock getLockForResource(final URL url) {
         synchronized (LOCKS) {
             Object key = url;
-            if ("file".equals(url.getProtocol())) {
+            jar: if ("jar".equals(url.getProtocol())) {
+                try {
+                    final String urlString = url.toExternalForm();
+                    final int separatorIndex = urlString.toLowerCase().indexOf(".jar!/");
+                    if (separatorIndex == -1) {
+                        break jar;
+                    }
+                    int jarEndIndex = separatorIndex + 4; // ".jar"
+                    final String jarPath = urlString.substring(4/* jar: */, jarEndIndex);
+                    return getLockForResource(new URL(jarPath));
+                } catch (IOException ignore) {
+                    ignore.printStackTrace();
+                }
+            }
+            file: if ("file".equals(url.getProtocol())) {
                 try {
                     Path path = Paths.get(url.toURI()).normalize();
                     key = path;
@@ -963,6 +977,7 @@ public class IconIO {
             final int g1 = search.getGreen();
             final int b1 = search.getBlue();
             final ImageFilter filter = new RGBImageFilter() {
+
                 @Override
                 public final int filterRGB(final int x, final int y, final int rgb) {
                     final int a = (rgb >> 24) & 0xff;
@@ -980,6 +995,7 @@ public class IconIO {
                     return rgb;
                 }
             };
+
             final ImageProducer ip = new FilteredImageSource(image.getSource(), filter);
             final Image img = Toolkit.getDefaultToolkit().createImage(ip);
             return img;

@@ -66,7 +66,7 @@ public class CFG_GUI {
      **/
     public static final BooleanKeyHandler                              DOWNLOAD_TAB_OVERVIEW_VISIBLE                                        = SH.getKeyHandler("DownloadTabOverviewVisible", BooleanKeyHandler.class);
     public static final BooleanKeyHandler                              PREMIUM_DISABLED_WARNING_FLASH_ENABLED                               = SH.getKeyHandler("PremiumDisabledWarningFlashEnabled", BooleanKeyHandler.class);
-    public static final IntegerKeyHandler                              SPEED_METER_TIME_FRAME                                               = SH.getKeyHandler("SpeedMeterTimeFrame", IntegerKeyHandler.class);
+    public static final IntegerKeyHandler                              SPEED_METER_TIME_FRAME                                             = SH.getKeyHandler("SpeedMeterTimeFrame", IntegerKeyHandler.class);
     public static final BooleanKeyHandler                              TASK_BAR_FLASH_ENABLED                                               = SH.getKeyHandler("TaskBarFlashEnabled", BooleanKeyHandler.class);
     public static final BooleanKeyHandler                              PASSWORD_PROTECTION_ENABLED                                          = SH.getKeyHandler("PasswordProtectionEnabled", BooleanKeyHandler.class);
     public static final IntegerKeyHandler                              DIALOG_DEFAULT_TIMEOUT_IN_MS                                         = SH.getKeyHandler("DialogDefaultTimeoutInMS", IntegerKeyHandler.class);

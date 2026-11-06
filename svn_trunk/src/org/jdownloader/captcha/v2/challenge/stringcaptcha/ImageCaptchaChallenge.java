@@ -60,7 +60,7 @@ public abstract class ImageCaptchaChallenge<T> extends Challenge<T> {
         try {
             super.cleanup();
         } finally {
-            final File imageFile = getImageFile();
+            final File imageFile = getSetImageFile();
             if (imageFile != null && !imageFile.delete() && imageFile.exists()) {
                 imageFile.deleteOnExit();
             }
@@ -165,10 +165,18 @@ public abstract class ImageCaptchaChallenge<T> extends Challenge<T> {
     private final Plugin plugin;
 
     public synchronized File getImageFile() {
-        final Plugin plugin = this.getPlugin();
-        if (imageFile == null && plugin != null) {
-            imageFile = plugin.getLocalCaptchaFile();
+        File imageFile = getSetImageFile();
+        if (imageFile != null) {
+            return imageFile;
         }
+        final Plugin plugin = this.getPlugin();
+        if (plugin == null) {
+            return null;
+        }
+        return this.imageFile = plugin.getLocalCaptchaFile();
+    }
+
+    public synchronized File getSetImageFile() {
         return imageFile;
     }
 

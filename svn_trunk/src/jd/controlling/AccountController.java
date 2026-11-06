@@ -34,6 +34,28 @@ import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.TimeUnit;
 
+import jd.controlling.accountchecker.AccountChecker;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.controlling.downloadcontroller.AccountCache.CachedAccount;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.WarnLevel;
+import jd.http.Browser;
+import jd.http.BrowserSettingsThread;
+import jd.nutils.encoding.Encoding;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountError;
+import jd.plugins.Account.AccountPropertyChangeHandler;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountProperty;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
+import jd.plugins.Plugin;
+import jd.plugins.Plugin.PluginEnvironment;
+import jd.plugins.PluginForHost;
+
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.shutdown.ShutdownController;
 import org.appwork.shutdown.ShutdownEvent;
@@ -69,28 +91,6 @@ import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.settings.AccountData;
 import org.jdownloader.settings.AccountSettings;
 
-import jd.controlling.accountchecker.AccountChecker;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.controlling.downloadcontroller.AccountCache.CachedAccount;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.WarnLevel;
-import jd.http.Browser;
-import jd.http.BrowserSettingsThread;
-import jd.nutils.encoding.Encoding;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountError;
-import jd.plugins.Account.AccountPropertyChangeHandler;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountProperty;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.MultiHostHost;
-import jd.plugins.MultiHostHost.MultihosterHostStatus;
-import jd.plugins.Plugin;
-import jd.plugins.Plugin.PluginEnvironment;
-import jd.plugins.PluginForHost;
-
 public class AccountController implements AccountControllerListener, AccountPropertyChangeHandler {
     private static final long                                                    serialVersionUID = -7560087582989096645L;
     private final HashMap<String, List<Account>>                                 ACCOUNTS;
@@ -98,11 +98,11 @@ public class AccountController implements AccountControllerListener, AccountProp
     private final HashMap<String, Map<Account, Object>>                          MULTIHOSTER_ACCOUNTS;
     private static AccountController                                             INSTANCE         = new AccountController();
     private final Eventsender<AccountControllerListener, AccountControllerEvent> broadcaster      = new Eventsender<AccountControllerListener, AccountControllerEvent>() {
-                                                                                                      @Override
-                                                                                                      protected void fireEvent(final AccountControllerListener listener, final AccountControllerEvent event) {
-                                                                                                          listener.onAccountControllerEvent(event);
-                                                                                                      }
-                                                                                                  };
+        @Override
+        protected void fireEvent(final AccountControllerListener listener, final AccountControllerEvent event) {
+            listener.onAccountControllerEvent(event);
+        }
+    };
 
     public Eventsender<AccountControllerListener, AccountControllerEvent> getEventSender() {
         return broadcaster;
@@ -173,8 +173,16 @@ public class AccountController implements AccountControllerListener, AccountProp
         org.jdownloader.settings.staticreferences.CFG_GENERAL.USE_AVAILABLE_ACCOUNTS.getEventSender().addListener(new GenericConfigEventListener<Boolean>() {
             @Override
             public void onConfigValueModified(KeyHandler<Boolean> keyHandler, Boolean newValue) {
-                if (JDGui.bugme(WarnLevel.SEVERE)) {
-                    if (!newValue) {
+                if (!JDGui.bugme(WarnLevel.SEVERE)) {
+                    return;
+                }
+                if (!Boolean.FALSE.equals(newValue)) {
+                    return;
+                }
+                /* we need a new thread to throw correct change events and NOT block events */
+                final Thread thread = new Thread("USE_AVAILABLE_ACCOUNTS") {
+                    @Override
+                    public void run() {
                         final ConfirmDialog d = new ConfirmDialog(0 | Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN | UIOManager.LOGIC_DONT_SHOW_AGAIN_IGNORES_CANCEL, _GUI.T.lit_are_you_sure(), _GUI.T.are_you_sure_disabled_premium(), new AbstractIcon(IconKey.ICON_QUESTION, 32), _GUI.T.lit_continue(), null);
                         try {
                             UIOManager.I().show(ConfirmDialogInterface.class, d).throwCloseExceptions();
@@ -182,16 +190,43 @@ public class AccountController implements AccountControllerListener, AccountProp
                         } catch (DialogClosedException e) {
                         } catch (DialogCanceledException e) {
                         }
-                        // we need a new thread to throw correct change events
-                        new Thread("") {
-                            public void run() {
-                                org.jdownloader.settings.staticreferences.CFG_GENERAL.USE_AVAILABLE_ACCOUNTS.setValue(true);
-                            };
-                        }.start();
-                    }
-                } else {
+                        org.jdownloader.settings.staticreferences.CFG_GENERAL.USE_AVAILABLE_ACCOUNTS.setValue(true);
+                    };
+                };
+                thread.setDaemon(true);
+                thread.start();
+            }
+
+            @Override
+            public void onConfigValidatorError(KeyHandler<Boolean> keyHandler, Boolean invalidValue, ValidationException validateException) {
+            }
+        });
+        /* Same safety question as above, but for the external captcha solver accounts. */
+        org.jdownloader.settings.staticreferences.CFG_GENERAL.USE_AVAILABLE_CAPTCHA_SOLVER_ACCOUNTS.getEventSender().addListener(new GenericConfigEventListener<Boolean>() {
+            @Override
+            public void onConfigValueModified(KeyHandler<Boolean> keyHandler, Boolean newValue) {
+                if (!JDGui.bugme(WarnLevel.SEVERE)) {
                     return;
                 }
+                if (!Boolean.FALSE.equals(newValue)) {
+                    return;
+                }
+                /* we need a new thread to throw correct change events and NOT block events */
+                final Thread thread = new Thread("USE_AVAILABLE_CAPTCHA_SOLVER_ACCOUNTS") {
+                    @Override
+                    public void run() {
+                        final ConfirmDialog d = new ConfirmDialog(0 | Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN | UIOManager.LOGIC_DONT_SHOW_AGAIN_IGNORES_CANCEL, _GUI.T.lit_are_you_sure(), _GUI.T.are_you_sure_disabled_captcha_solver_accounts(), new AbstractIcon(IconKey.ICON_QUESTION, 32), _GUI.T.lit_continue(), null);
+                        try {
+                            UIOManager.I().show(ConfirmDialogInterface.class, d).throwCloseExceptions();
+                            return;
+                        } catch (DialogClosedException e) {
+                        } catch (DialogCanceledException e) {
+                        }
+                        org.jdownloader.settings.staticreferences.CFG_GENERAL.USE_AVAILABLE_CAPTCHA_SOLVER_ACCOUNTS.setValue(true);
+                    };
+                };
+                thread.setDaemon(true);
+                thread.start();
             }
 
             @Override
@@ -441,15 +476,16 @@ public class AccountController implements AccountControllerListener, AccountProp
      * accounts do not leak.
      */
     private final Set<Account> lowCreditsSuppressedAccounts = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<Account, Boolean>()));
+
     /** Stops the low credits bubble for the given account until JDownloader is restarted. */
     public void suppressLowCreditsBubble(final Account account) {
         lowCreditsSuppressedAccounts.add(account);
     }
 
     /**
-     * Captcha solver specific part of the account check: default status text, zero balance error and low balance warning. If the balance
-     * is below the user's warning threshold, a notification is shown after every account check, unless the user suppressed it for this
-     * account (see {@link #suppressLowCreditsBubble(Account)}).
+     * Captcha solver specific part of the account check: default status text, zero balance error and low balance warning. If the balance is
+     * below the user's warning threshold, a notification is shown after every account check, unless the user suppressed it for this account
+     * (see {@link #suppressLowCreditsBubble(Account)}).
      *
      * @param pluginSetStatus
      *            True if the plugin set a status text itself (it is kept then, otherwise a default "Balance: ..." status is set)

@@ -27,6 +27,7 @@ import java.awt.event.MouseListener;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -99,11 +100,7 @@ public class MainToolBar extends JToolBar implements MouseListener, DownloadWatc
     private JRootPane                    rootpane;
     private boolean                      initDone         = false;
     private LogSource                    logger;
-    private Map<Action, List<KeyStroke>> shortCutActions  = new HashMap<Action, List<KeyStroke>>();
-
-    public boolean isInitDone() {
-        return initDone;
-    }
+    private Map<Action, List<KeyStroke>> shortCutActions  = new LinkedHashMap<Action, List<KeyStroke>>();
 
     public static synchronized MainToolBar getInstance() {
         if (INSTANCE == null) {
@@ -166,9 +163,10 @@ public class MainToolBar extends JToolBar implements MouseListener, DownloadWatc
                 new EDTRunner() {
                     @Override
                     protected void runInEDT() {
-                        if (!isInitDone()) {
-                            updateToolbar();
+                        if (initDone) {
+                            return;
                         }
+                        updateToolbar();
                     }
                 };
             }
@@ -206,10 +204,10 @@ public class MainToolBar extends JToolBar implements MouseListener, DownloadWatc
         if (!SecondLevelLaunch.GUI_COMPLETE.isReached()) {
             return;
         }
-        initDone = true;
         new EDTRunner() {
             @Override
             protected void runInEDT() {
+                initDone = true;
                 setVisible(false);
                 removeAll();
                 initToolbar();

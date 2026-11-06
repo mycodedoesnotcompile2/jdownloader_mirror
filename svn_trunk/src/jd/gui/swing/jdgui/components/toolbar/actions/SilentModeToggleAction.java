@@ -7,6 +7,7 @@ import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.utils.swing.EDTRunner;
+import org.jdownloader.actions.AppAction;
 import org.jdownloader.controlling.contextmenu.Customizer;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.toolbar.action.AbstractToolBarAction;
@@ -83,8 +84,10 @@ public class SilentModeToggleAction extends AbstractToolBarAction implements Gen
         /* Static like the name of all actions (shown e.g. in the menu manager), only the tooltip tells the current silent mode. */
         setName(_GUI.T.SilentModeToggleAction_name());
         final KeyHandler keyHandler = SilentModeController.getInstance().getSettingKeyHandler();
-        keyHandler.getEventSender().addListener(this, true);
-        update(SilentModeController.getInstance().getSetting());
+        if (!AppAction.isValidationMode()) {
+            keyHandler.getEventSender().addListener(this, true);
+            update(SilentModeController.getInstance().getSetting());
+        }
     }
 
     /** Short description of the given silent mode for the name and the tooltip. */
@@ -120,6 +123,11 @@ public class SilentModeToggleAction extends AbstractToolBarAction implements Gen
             @Override
             protected void runInEDT() {
                 SilentModeToggleAction.super.setSelected(selected);
+                /*
+                 * The selected state does not change between the enabled and the auto modes and Swing buttons only refresh the tooltip on a
+                 * "ShortDescription" property change event, so it has to be fired explicitly.
+                 */
+                fireToolTipUpdate();
             }
         };
     }

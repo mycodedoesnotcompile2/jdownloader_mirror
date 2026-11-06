@@ -2,6 +2,8 @@ package org.jdownloader.captcha.v2;
 
 import org.jdownloader.images.AbstractIcon;
 import jd.gui.swing.jdgui.views.settings.panels.anticaptcha.CaptchaTestPanel;
+import jd.gui.swing.jdgui.views.settings.panels.anticaptcha.SolverTimingDialog;
+import org.appwork.uio.UIOManager;
 import jd.gui.swing.jdgui.views.settings.panels.anticaptcha.CaptchaConfigPanel;
 import jd.gui.swing.jdgui.views.settings.components.ToggleEnabledSelectionAction;
 import javax.swing.JPopupMenu;
@@ -141,6 +143,16 @@ public class CaptchaSolverCaptchaTypesSettingsPanelBuilder {
                         getModel().fireTableDataChanged();
                     }
                 });
+                /* Opens the solver timing dialog with the clicked captcha type preselected. */
+                final CAPTCHA_TYPE timingType = contextObject != null ? contextObject : selection.get(0);
+                final JMenuItem showInTimingTable = new JMenuItem(_GUI.T.CaptchaTypesTable_context_showInTimingTable(), new AbstractIcon(IconKey.ICON_WAIT, 18));
+                showInTimingTable.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(final ActionEvent e) {
+                        UIOManager.I().show(null, new SolverTimingDialog(accessor.getSolverService(), timingType));
+                    }
+                });
+                popup.add(showInTimingTable);
                 if (CaptchaConfigPanel.isDebugTabShown()) {
                     /* Only if the "Test & Debug" tab exists, only for solvers which can be tested and if a selected type has a test. */
                     final List<CAPTCHA_TYPE> testable = new ArrayList<CAPTCHA_TYPE>();

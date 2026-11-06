@@ -3298,9 +3298,6 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Refresh is not possible for this type of captcha." })
     String AbstractCaptchaDialog_refreshDisabledCaptchaType_tooltip();
 
-    @Default(lngs = { "en" }, values = { "Refresh (Attempt %s1/%s2)" })
-    String AbstractCaptchaDialog_refreshAttempt_tooltip(String attempt, String maxAttempts);
-
     @Default(lngs = { "en" }, values = { "Show captcha image in greyscale" })
     String AbstractImageCaptchaDialog_greyscaleToggle_tooltip();
 
@@ -5711,8 +5708,11 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Path" })
     String SelectBrowserDialog_column_path();
 
-    @Default(lngs = { "en" }, values = { "Browse..." })
-    String SelectBrowserDialog_browse();
+    @Default(lngs = { "en" }, values = { "Browser not in List? Click to browse for custom browser" })
+    String SelectBrowserDialog_browseCustom();
+
+    @Default(lngs = { "en" }, values = { "Close & Discard changes" })
+    String SelectBrowserDialog_cancel();
 
     @Default(lngs = { "en" }, values = { "Open help article" })
     String SelectBrowserDialog_info_tooltip();
@@ -5726,8 +5726,8 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Number of supported Captcha Types" })
     String SolverOrderTableModel_column_supportedCaptchaTypes();
 
-    @Default(lngs = { "en" }, values = { "Use external solver account(s) to solve captchas?" })
-    String CaptchaConfigPanel_useExternalSolverAccounts();
+    @Default(lngs = { "en" }, values = { "The table below sets the order in which the enabled and ready solvers are used, drag & drop the rows to set your own order." })
+    String CaptchaConfigPanel_solverOrderInfo();
 
     @Default(lngs = { "en" }, values = { "Avoid external solvers for login captchas?" })
     String CaptchaConfigPanel_avoidAutoSolverForLoginCaptchas();
@@ -6200,6 +6200,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Clear local captcha usage history" })
     String CaptchaTypesTable_context_clearHistory();
 
+    @Default(lngs = { "en" }, values = { "Show in solver timing table" })
+    String CaptchaTypesTable_context_showInTimingTable();
+
     @Default(lngs = { "en" }, values = { "Ever used by me?" })
     String CaptchaTypesTable_column_everUsed();
 
@@ -6326,10 +6329,10 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Changes apply only to the captcha type: %s1" })
     String SolverTimingDialog_appliesToCaptchaType(String captchaType);
 
-    @Default(lngs = { "en" }, values = { "Warning: There is no enabled solver which is ready." })
+    @Default(lngs = { "en" }, values = { "There is no enabled solver which is ready." })
     String SolverTimingDialog_noSolver();
 
-    @Default(lngs = { "en" }, values = { "Warning: There is no enabled solver which is ready and supports the captcha type %s1" })
+    @Default(lngs = { "en" }, values = { "There is no enabled solver which is ready and supports the captcha type %s1" })
     String SolverTimingDialog_noSolverForCaptchaType(String captchaType);
 
     @Default(lngs = { "en" }, values = { "If not solved by %s1, start solver %s2 in parallel after the configured time" })
@@ -6341,7 +6344,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Seconds" })
     String TimingTableModel_column_seconds();
 
-    @Default(lngs = { "en" }, values = { "%s1 seconds" })
+    @Default(lngs = { "en" }, values = { "%s1s" })
     String TimingTableModel_seconds(String seconds);
 
     @Default(lngs = { "en" }, values = { "Challenge timeout: %s1. After this time a captcha is given up, even if not all solvers have been started. Solvers and challenges can affect that timeout." })
@@ -6368,7 +6371,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Starts all solvers in parallel, can waste paid solver balance" })
     String SolverTimingDialog_preselected_immediatelyInfo();
 
-    @Default(lngs = { "en" }, values = { "Default for this solver" })
+    @Default(lngs = { "en" }, values = { "Default" })
     String SolverTimingDialog_preselected_default();
 
     @Default(lngs = { "en" }, values = { "Custom" })
@@ -6397,6 +6400,18 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Removes the values of this captcha type of all shown solvers, so the value of the solver applies again." })
     String TimingTable_reset_tooltip_captchaType();
+
+    @Default(lngs = { "en" }, values = { "Reset captcha type timings" })
+    String TimingTable_reset_captchaType();
+
+    @Default(lngs = { "en" }, values = { "Reset solver timings" })
+    String TimingTable_reset_solver();
+
+    @Default(lngs = { "en" }, values = { "Reset all timings" })
+    String TimingTable_reset_all();
+
+    @Default(lngs = { "en" }, values = { "Resets all timings of all shown solvers: the time of the solver and the times of its captcha types." })
+    String TimingTable_reset_tooltip_all();
 
     @Default(lngs = { "en" }, values = { "Reset to the default of the solver" })
     String TimingTable_context_reset_solver();
@@ -7009,6 +7024,9 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Are you sure? You are trying to disable all download accounts.\r\nIf you continue, JDownloader will NOT use your download accounts unless you re-enable this feature." })
     String are_you_sure_disabled_premium();
+
+    @Default(lngs = { "en" }, values = { "Are you sure? You are trying to disable all external captcha solver accounts.\r\nIf you continue, JDownloader will NOT use your captcha solver accounts unless you re-enable this feature.\r\nLocal solvers and MyJDownloader remote solving are not affected." })
+    String are_you_sure_disabled_captcha_solver_accounts();
 
     @Default(lngs = { "en" }, values = { "Download account usage enabled. If you add a download account, JDownloader will use it." })
     String Premium_enabled_button_tooltip_selected();

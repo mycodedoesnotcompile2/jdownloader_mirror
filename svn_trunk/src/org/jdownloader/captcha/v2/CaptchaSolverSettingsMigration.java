@@ -55,7 +55,11 @@ import jd.plugins.Account;
  * switched on. <br>
  * - The old "enabled" state of the solvers (only the account of an external solver is disabled if the solver was disabled), the old max
  * number of simultaneous captchas and the 9kw settings selfsolve, prio and max timeout. <br>
- * - Settings that have no equivalent in the new config (e.g. the other 9kw settings, the Anti-Captcha API base).
+ * - Settings that have no equivalent in the new config (e.g. the other 9kw settings, the Anti-Captcha API base). <br>
+ * - The old wait times of the solvers ("wait for other solvers", a map per solver) and the order of the solvers: There is no migration of
+ * these values, because the old settings were very confusing. Each solver has a single new setting now (see
+ * {@link CaptchaSolverConfigV3#getStartNextSolverAfterSeconds()}) and the order of the solvers is set in the solver table (see
+ * {@link ChallengeResponseController#getOrderedServices()}). The old values are dropped.
  */
 public class CaptchaSolverSettingsMigration {
     final AccountController ac                                  = AccountController.getInstance();

@@ -198,9 +198,7 @@ public class MenuItemData implements Storable {
             ret = (MenuItemData) Class.forName(menuItemData.getClassName()).newInstance();
         }
         ret.setVisible(menuItemData.isVisible());
-        if (getActionData() != null) {
-            ret.setActionData(getActionData());
-        }
+        ret.setActionData(menuItemData.getActionData());
         ret.setIconKey(menuItemData.getIconKey());
         ret.setName(menuItemData.getName());
         ret.setItems(menuItemData.getItems());
@@ -392,7 +390,7 @@ public class MenuItemData implements Storable {
     }
 
     public void _setValidated(boolean b) {
-        validated = true;
+        validated = b;
     }
 
     public boolean _isValidated() {

@@ -36,6 +36,7 @@ import org.appwork.swing.components.tooltips.ExtTooltip;
 import org.appwork.swing.components.tooltips.PanelToolTip;
 import org.appwork.swing.components.tooltips.TooltipPanel;
 import org.appwork.utils.DebugMode;
+import org.appwork.utils.Time;
 import org.appwork.utils.swing.EDTRunner;
 import org.appwork.utils.swing.SwingUtils;
 import org.jdownloader.DomainInfo;
@@ -121,7 +122,7 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
         if (total <= 0) {
             return -1;
         }
-        final long elapsed = Math.max(0, System.currentTimeMillis() - job.getCreated());
+        final long elapsed = Math.max(0, Time.systemIndependentCurrentJVMTimeMillis() - job.getCreated());
         return (int) Math.min(100, elapsed * 100 / total);
     }
 
@@ -215,33 +216,18 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
     }
 
     /**
-     * Returns how long the given solver still waits for the other solvers before it starts, mirroring the wait logic in
-     * {@link JobRunnable}: it waits for every other unfinished solver in turn, but all waits count from the same start, so the longest one
-     * decides. Solvers that are already done are not waited for any more. The start of the waiting is approximated by the creation of the
-     * job. Returns a value &lt;= 0 if there is no (known) remaining wait.
+     * Returns how long the given solver still waits before it starts, see {@link JobRunnable}: A solver is started when the solver before
+     * it has been working for its "start the next solver after" time without a solution (or is done). Returns a value &lt;= 0 if there is
+     * no remaining wait.
      */
     private <T> long getRemainingWaitMillis(final SolverJob<T> job, final ChallengeSolver<T> solver) {
-        if (job.isForcedStart(solver)) {
-            return 0;
-        }
-        long wait = 0;
-        for (final ChallengeSolver<T> other : job.getSolverList()) {
-            if (other == solver || job.isDone(other)) {
-                continue;
-            }
-            final int waitForOther = JobRunnable.getWaitFor(solver.getService(), other.getService(), job);
-            /* JobRunnable ignores waits of one second or less */
-            if (waitForOther > 1000) {
-                wait = Math.max(wait, waitForOther);
-            }
-        }
-        return wait - (System.currentTimeMillis() - job.getCreated());
+        return job.getRemainingWaitMillis(solver);
     }
 
     /** A solver together with its position in the sorted solver list. */
     private static final class SolverSortEntry<T> {
         private final ChallengeSolver<T> solver;
-        private final long              key;
+        private final long               key;
 
         private SolverSortEntry(final ChallengeSolver<T> solver, final long key) {
             this.solver = solver;
@@ -323,8 +309,8 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
             @Override
             public void run() {
                 /*
-                 * Only sort again if the state of a solver changed (waiting -> solving -> done). The countdowns of the waiting solvers change
-                 * all the time and would make the rows jump around.
+                 * Only sort again if the state of a solver changed (waiting -> solving -> done). The countdowns of the waiting solvers
+                 * change all the time and would make the rows jump around.
                  */
                 final List<Integer> states = new ArrayList<Integer>();
                 for (final ChallengeSolver<T> solver : job.getSolverList()) {
@@ -418,7 +404,7 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
         addLiveRow(rows, newLiveRows, null, false, new TextProvider() {
             @Override
             public String getText() {
-                final long elapsed = System.currentTimeMillis() - job.getCreated();
+                final long elapsed = Time.systemIndependentCurrentJVMTimeMillis() - job.getCreated();
                 final int percent = getPercent();
                 if (percent < 0) {
                     return _GUI.T.CaptchaIndicator_time_unlimited(formatTime(elapsed));
@@ -491,11 +477,11 @@ public class CaptchaIndicator extends IconedProcessIndicator implements Challeng
         final Challenge<?> challenge = job.getChallenge();
         if (challenge.isCreatedInsideAccountChecker()) {
             return CaptchaContext.ACCOUNT_CHECK;
-        }
-        if (challenge.getPlugin() instanceof PluginForHost) {
+        } else if (challenge.getPlugin() instanceof PluginForHost) {
             return CaptchaContext.DOWNLOAD;
+        } else {
+            return CaptchaContext.CRAWLER;
         }
-        return CaptchaContext.CRAWLER;
     }
 
     private void addSkipAction(final JPopupMenu popup, final String name, final Icon icon, final SkipRequest skipRequest) {

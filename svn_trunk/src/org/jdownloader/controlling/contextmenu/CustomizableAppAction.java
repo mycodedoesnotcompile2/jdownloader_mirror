@@ -195,16 +195,16 @@ public abstract class CustomizableAppAction extends AppAction {
         if (menuItemData != null) {
             if (menuItemData.isShortcutDisabled()) {
                 /*
-                 * The hotkey is disabled via the checkbox. Clear the accelerator even if the action set a default in its
-                 * constructor, but keep the stored (custom) shortcut value untouched so enabling it again restores it.
+                 * The hotkey is disabled via the checkbox. Clear the accelerator even if the action set a default in its constructor, but
+                 * keep the stored (custom) shortcut value untouched so enabling it again restores it.
                  */
                 return super.setAccelerator(null);
             }
             final String customShortcut = menuItemData.getShortcut();
             if (MenuItemData.isEmptyValue(customShortcut)) {
                 /*
-                 * Legacy "removed" state: the shortcut value itself is the EMPTY sentinel. Clear the accelerator even if the
-                 * action set a default in its constructor, instead of reverting to that default.
+                 * Legacy "removed" state: the shortcut value itself is the EMPTY sentinel. Clear the accelerator even if the action set a
+                 * default in its constructor, instead of reverting to that default.
                  */
                 return super.setAccelerator(null);
             }

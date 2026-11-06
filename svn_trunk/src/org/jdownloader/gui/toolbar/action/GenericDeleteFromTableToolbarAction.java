@@ -550,6 +550,8 @@ public class GenericDeleteFromTableToolbarAction extends AbstractToolBarAction i
             @Override
             protected void runInEDT() {
                 setName(createName());
+                /* The tooltip is derived from the name, but Swing buttons only refresh it on a "ShortDescription" property change event. */
+                setTooltipText(createTooltip());
             }
         };
     }
