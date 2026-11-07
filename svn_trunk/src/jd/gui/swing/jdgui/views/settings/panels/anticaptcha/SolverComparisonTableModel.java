@@ -246,6 +246,11 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
                 if (diff != 0) {
                     return diff;
                 }
+                /* Same support: keep the order of the solver table (allSolvers is in that order). */
+                final int orderDiff = allSolvers.indexOf(a) - allSolvers.indexOf(b);
+                if (orderDiff != 0) {
+                    return orderDiff;
+                }
                 return a.getName().compareToIgnoreCase(b.getName());
             }
         });

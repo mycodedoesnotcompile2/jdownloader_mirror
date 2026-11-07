@@ -14,10 +14,26 @@ import org.appwork.utils.event.queue.QueueAction;
 
 import jd.controlling.TaskQueue;
 
+/**
+ * Base class for histories of names (package names, download paths, search terms,...). Keeps the entries sorted newest first without
+ * duplicates, limits them to {@link #getMaxLength()} and saves changes asynchronously. Subclasses define what a valid entry is, how
+ * entries are created and where they are stored.
+ *
+ * @param <T>
+ *            type of the history entries
+ */
 public abstract class HistoryManager<T extends HistoryEntry> {
-    protected final ArrayList<T> packageHistory;
+    /** The entries, newest first. Access has to be synchronized on this manager. */
+    protected final ArrayList<T> history;
 
-    public HistoryManager(final List<T> packageNameHistory) {
+    /**
+     * Creates the history from the stored entries and registers a save on shutdown. Invalid entries and duplicates of the stored entries
+     * are removed, the list is cut to {@link #getMaxLength()}.
+     *
+     * @param initialEntries
+     *            the stored entries, may be null
+     */
+    public HistoryManager(final List<T> initialEntries) {
         try {
             ShutdownController.getInstance().addShutdownEvent(new ShutdownEvent() {
                 @Override
@@ -28,9 +44,9 @@ public abstract class HistoryManager<T extends HistoryEntry> {
         } catch (Throwable e) {
             /* prevent ClassNotFound exception on shutdown */
         }
-        packageHistory = new ArrayList<T>();
-        if (packageNameHistory != null) {
-            packageHistory.addAll(packageNameHistory);
+        history = new ArrayList<T>();
+        if (initialEntries != null) {
+            history.addAll(initialEntries);
         }
         cleanup();
     }
@@ -40,16 +56,16 @@ public abstract class HistoryManager<T extends HistoryEntry> {
      * removed before sorting because sorting would throw a NullPointerException on null entries.
      */
     private void cleanup() {
-        for (final Iterator<T> it = packageHistory.iterator(); it.hasNext();) {
+        for (final Iterator<T> it = history.iterator(); it.hasNext();) {
             final T next = it.next();
             if (next == null || StringUtils.isEmpty(next.getName()) || !isValid(next.getName())) {
                 it.remove();
             }
         }
-        Collections.sort(packageHistory);
+        Collections.sort(history);
         final int max = Math.max(0, getMaxLength());
         final ArrayList<T> kept = new ArrayList<T>();
-        for (final T next : packageHistory) {
+        for (final T next : history) {
             if (kept.size() >= max) {
                 break;
             }
@@ -65,8 +81,8 @@ public abstract class HistoryManager<T extends HistoryEntry> {
                 kept.add(next);
             }
         }
-        packageHistory.clear();
-        packageHistory.addAll(kept);
+        history.clear();
+        history.addAll(kept);
     }
 
     /**
@@ -74,9 +90,9 @@ public abstract class HistoryManager<T extends HistoryEntry> {
      * are kept. Does not trigger a save.
      */
     protected synchronized void setEntries(final List<T> entries) {
-        packageHistory.clear();
+        history.clear();
         if (entries != null) {
-            packageHistory.addAll(entries);
+            history.addAll(entries);
         }
         cleanup();
     }
@@ -89,59 +105,84 @@ public abstract class HistoryManager<T extends HistoryEntry> {
         return name1.equalsIgnoreCase(name2);
     }
 
+    /** Returns a copy of the history, newest entry first. */
     public synchronized List<T> list() {
-        return new ArrayList<T>(packageHistory);
+        return new ArrayList<T>(history);
     }
 
+    /** Removes all entries and saves the empty history. */
     public synchronized void clear() {
-        packageHistory.clear();
+        history.clear();
         requestSave();
     }
 
-    protected synchronized boolean contains(String packageName) {
-        return get(packageName) != null;
+    /** Removes the entry with the given name. Returns true if an entry has been removed. */
+    public synchronized boolean remove(String name) {
+        final T existing = get(name);
+        if (existing == null) {
+            return false;
+        }
+        history.remove(existing);
+        requestSave();
+        return true;
     }
 
-    protected synchronized T get(String packageName) {
-        if (StringUtils.isEmpty(packageName)) {
+    /** Returns true if the history contains an entry with the given name, see {@link #isSameName(String, String)}. */
+    public synchronized boolean contains(String name) {
+        return get(name) != null;
+    }
+
+    /** Returns the entry with the given name, see {@link #isSameName(String, String)}, or null if there is none. */
+    protected synchronized T get(String name) {
+        if (StringUtils.isEmpty(name)) {
             return null;
         }
-        for (final T existing : packageHistory) {
-            if (isSameName(existing.getName(), packageName)) {
+        for (final T existing : history) {
+            if (isSameName(existing.getName(), name)) {
                 return existing;
             }
         }
         return null;
     }
 
+    /* Counter of the save requests, used to merge multiple pending requests in requestSave */
     private final AtomicLong saveRequest = new AtomicLong(-1);
 
+    /** Returns true if the given name may be part of the history. Entries with an invalid name are not added and removed on load. */
     protected boolean isValid(String input) {
         return true;
     }
 
-    public synchronized void add(String packageName) {
-        if (StringUtils.isEmpty(packageName) || !isValid(packageName)) {
+    /**
+     * Adds the name as newest entry and saves the history. An entry with the same name is not duplicated but moved to the top and gets
+     * its last used time updated. Invalid names are ignored, as well as all names if the history is disabled (max length 0). The oldest
+     * entries are dropped if the history gets longer than {@link #getMaxLength()}.
+     */
+    public synchronized void add(String name) {
+        if (StringUtils.isEmpty(name) || !isValid(name)) {
+            return;
+        } else if (getMaxLength() <= 0) {
+            /* History is disabled -> Nothing to add, avoid useless saves of the empty list */
             return;
         }
-        final T existing = get(packageName);
+        final T existing = get(name);
         if (existing != null) {
             /*
              * Entry with the same name has been found -> Update name (spelling may differ) and last used timestamp and re-sort list so it
              * will be the first entry next time.
              */
-            existing.setName(packageName);
+            existing.setName(name);
             existing.setTime(System.currentTimeMillis());
-            Collections.sort(packageHistory);
+            Collections.sort(history);
         } else {
-            /* This package name is not in our list -> Add it */
-            final T newOne = createNew(packageName);
+            /* This name is not in our list -> Add it */
+            final T newOne = createNew(name);
             newOne.setTime(System.currentTimeMillis());
-            packageHistory.add(0, newOne);
+            history.add(0, newOne);
         }
         final int max = Math.max(0, getMaxLength());
-        while (packageHistory.size() > max) {
-            packageHistory.remove(packageHistory.size() - 1);
+        while (history.size() > max) {
+            history.remove(history.size() - 1);
         }
         requestSave();
     }
@@ -162,7 +203,9 @@ public abstract class HistoryManager<T extends HistoryEntry> {
         });
     }
 
+    /** Creates a new entry with the given name. */
     abstract protected T createNew(String name);
 
+    /** Stores the given entries (e.g. in the config). Called asynchronously via {@link #requestSave()} and on shutdown. */
     abstract protected void save(List<T> list);
 }

@@ -807,13 +807,14 @@ public class ChallengeResponseController {
         final List<SolverService> manualCandidates = new ArrayList<SolverService>();
         boolean readyAndEnabledExternalSolverExists = false;
         if (captcha_type != null) {
-            for (final SolverService service : listServices()) {
+            /* The solvers are listed in the order the user set in the solver table. */
+            for (final SolverService service : getOrderedServices()) {
                 final Set<CAPTCHA_TYPE> supportedTypes = service.getSupportedCaptchaTypes();
                 if (supportedTypes == null || !supportedTypes.contains(captcha_type)) {
                     continue;
                 }
                 final boolean external = service.getType() == SolverType.EXTERNAL;
-                if (external && service.isReady() && service.getConfigV3().isEnabled()) {
+                if (external && service.isUsable()) {
                     readyAndEnabledExternalSolverExists = true;
                 }
                 if (silentMode && isManualSolverType(service.getType())) {

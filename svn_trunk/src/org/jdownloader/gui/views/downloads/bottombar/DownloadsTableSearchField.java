@@ -1,7 +1,5 @@
 package org.jdownloader.gui.views.downloads.bottombar;
 
-import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
 import java.io.File;
 import java.util.List;
 import java.util.WeakHashMap;
@@ -34,19 +32,6 @@ public final class DownloadsTableSearchField extends SearchField<LinktablesSearc
         super(table2Filter, defCategory);
         setCategories(new LinktablesSearchCategory[] { LinktablesSearchCategory.FILENAME, LinktablesSearchCategory.FILEPATH, LinktablesSearchCategory.HOSTER, LinktablesSearchCategory.PACKAGE, LinktablesSearchCategory.COMMENT, LinktablesSearchCategory.COMMENT_PACKAGE, LinktablesSearchCategory.STATUS });
         setSelectedCategory(JsonConfig.create(GraphicalUserInterfaceSettings.class).getSelectedDownloadSearchCategory());
-        addKeyListener(new KeyListener() {
-            public void keyTyped(KeyEvent e) {
-            }
-
-            public void keyReleased(KeyEvent e) {
-                if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
-                    setText("");
-                }
-            }
-
-            public void keyPressed(KeyEvent e) {
-            }
-        });
     }
 
     @Override

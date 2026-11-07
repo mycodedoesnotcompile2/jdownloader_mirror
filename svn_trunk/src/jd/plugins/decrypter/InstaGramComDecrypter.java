@@ -75,7 +75,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.InstaGramCom;
 
-@DecrypterPlugin(revision = "$Revision: 53833 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53921 $", interfaceVersion = 4, names = {}, urls = {})
 public class InstaGramComDecrypter extends PluginForDecrypt {
     public InstaGramComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -408,8 +408,11 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         }
         findUserIdViaTopSearch: if (userID == null && allowUseSearchToFindUserID) {
             /**
+             * Last resort: Only used if the profile page did not contain the userID (see above). <br>
              * 2025-02-24: For some profiles, this API did not return the expected results or at least not on "pagination page 1". <br>
-             * For this reason, other methods should be preferred over this one from now on.
+             * For this reason, other methods should be preferred over this one from now on. <br>
+             * 2026-10-30: When not logged in, this endpoint was observed to respond with {"require_login":true,"status":"fail"} or response
+             * 401, in which case this method is skipped (see below). It has not been verified whether it works when logged in.
              */
             /* 2022-05-11: New method: Faster and json only */
             logger.info("Trying to find user-id via website search function");

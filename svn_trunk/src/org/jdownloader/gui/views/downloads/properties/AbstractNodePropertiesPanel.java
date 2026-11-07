@@ -50,6 +50,7 @@ import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtTextArea;
 import org.appwork.swing.components.ExtTextField;
 import org.appwork.swing.components.pathchooser.PathChooser;
+import org.jdownloader.gui.views.components.DownloadPathChooser;
 import org.appwork.swing.components.searchcombo.SearchComboBox;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.swing.EDTRunner;
@@ -157,7 +158,7 @@ public abstract class AbstractNodePropertiesPanel<E extends AbstractNodeProperti
                 return "updateDelayer";
             }
         };
-        destination = new PathChooser("ADDLinks", true) {
+        destination = new DownloadPathChooser("ADDLinks", true) {
             public File doFileChooser() {
                 try {
                     return DownloadFolderChooserDialog.open(getFile(), true, getDialogTitle());
@@ -200,6 +201,12 @@ public abstract class AbstractNodePropertiesPanel<E extends AbstractNodeProperti
             @Override
             protected Icon getIconForValue(PackageHistoryEntry value) {
                 return null;
+            }
+
+            @Override
+            protected Icon getPopupIconForValue(PackageHistoryEntry value) {
+                /* Clock icon marks the entries as history */
+                return NewTheme.I().getIcon(IconKey.ICON_WAIT, 14);
             }
 
             @Override
@@ -743,6 +750,7 @@ public abstract class AbstractNodePropertiesPanel<E extends AbstractNodeProperti
                 final String path = destination.getPath();
                 if (!StringUtils.equals(saveTo, path)) {
                     abstractNodes.saveSaveTo(PackagizerController.replaceDynamicTags(path, abstractNodes.loadPackageName(), abstractNodes.getCurrentNode()));
+                    /* save() also runs on focus loss (see Listener.focusLost) -> Path gets added to the history on focus loss, too */
                     DownloadPathHistoryManager.getInstance().add(path);
                 }
             }

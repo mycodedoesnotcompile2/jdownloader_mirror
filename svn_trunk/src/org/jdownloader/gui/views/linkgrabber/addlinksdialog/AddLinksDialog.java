@@ -67,6 +67,7 @@ import org.appwork.swing.components.ExtMergedIcon;
 import org.appwork.swing.components.ExtTextArea;
 import org.appwork.swing.components.ExtTextField;
 import org.appwork.swing.components.pathchooser.PathChooser;
+import org.jdownloader.gui.views.components.DownloadPathChooser;
 import org.appwork.swing.components.searchcombo.SearchComboBox;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.StringUtils;
@@ -93,6 +94,7 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.DownloadFolderChooserDialog;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.BadgeIcon;
+import org.jdownloader.images.NewTheme;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
@@ -388,7 +390,7 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
 
     @Override
     public JComponent layoutDialogContent() {
-        destination = new PathChooser("ADDLinks", true) {
+        destination = new DownloadPathChooser("ADDLinks", true) {
             {
                 txt.setDragEnabled(true);
             }
@@ -438,6 +440,12 @@ public class AddLinksDialog extends AbstractDialog<LinkCollectingJob> {
             @Override
             protected Icon getIconForValue(PackageHistoryEntry value) {
                 return null;
+            }
+
+            @Override
+            protected Icon getPopupIconForValue(PackageHistoryEntry value) {
+                /* Clock icon marks the entries as history */
+                return NewTheme.I().getIcon(IconKey.ICON_WAIT, 14);
             }
 
             @Override

@@ -189,6 +189,12 @@ public abstract class AbstractSolverService implements SolverService {
         return getStatusActionName() == null && getBlockingStatusIssue() == null;
     }
 
+    /** Enabled by the user and ready, see {@link SolverService#isUsable()}. */
+    @Override
+    public boolean isUsable() {
+        return getConfigV3().isEnabled() && isReady();
+    }
+
     protected void initServicePanel(final KeyHandler... handlers) {
         if (org.appwork.utils.Application.isHeadless()) {
             return;

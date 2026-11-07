@@ -784,7 +784,7 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
                 selected = solver.getConfigV3().isEnabled();
                 break;
             case USABLE:
-                selected = solver.getConfigV3().isEnabled() && solver.isReady();
+                selected = solver.isUsable();
                 break;
             case ALL:
             default:
@@ -892,7 +892,8 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
      */
     public void refresh() {
         allServices.clear();
-        allServices.addAll(ChallengeResponseController.getInstance().listServices());
+        /* Rows and solver selection follow the order of the solver table. */
+        allServices.addAll(ChallengeResponseController.getInstance().getOrderedServices());
         syncSolverTypesCombo();
         reloadSolvers(false);
         rebuildPresetCombo();

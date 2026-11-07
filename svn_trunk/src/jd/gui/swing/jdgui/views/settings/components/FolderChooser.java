@@ -12,7 +12,6 @@ import javax.swing.event.PopupMenuEvent;
 import javax.swing.event.PopupMenuListener;
 
 import org.appwork.swing.components.ExtTextField;
-import org.appwork.swing.components.pathchooser.PathChooser;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.dialog.DialogCanceledException;
@@ -22,13 +21,14 @@ import org.jdownloader.controlling.packagizer.PackagizerController;
 import org.jdownloader.gui.packagehistorycontroller.DownloadPathHistoryManager;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.DownloadFolderChooserDialog;
+import org.jdownloader.gui.views.components.DownloadPathChooser;
 import org.jdownloader.translate._JDT;
 
 import jd.controlling.downloadcontroller.BadFilePathException;
 import jd.controlling.downloadcontroller.FilePathChecker;
 import jd.gui.swing.jdgui.views.settings.panels.packagizer.VariableAction;
 
-public class FolderChooser extends PathChooser implements SettingsComponent {
+public class FolderChooser extends DownloadPathChooser implements SettingsComponent {
     /**
      *
      */

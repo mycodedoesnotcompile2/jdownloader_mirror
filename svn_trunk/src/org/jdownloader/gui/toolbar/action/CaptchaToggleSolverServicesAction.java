@@ -67,7 +67,7 @@ public class CaptchaToggleSolverServicesAction extends AbstractToolBarAction imp
         /* Build the hint text as an HTML list (one id per line) so the action edit dialog does not become extremely wide. */
         final StringBuilder sb = new StringBuilder();
         sb.append("<html>").append(_GUI.T.CaptchaToggleSolverServicesAction_solverIDs_hint());
-        final List<SolverService> all = ChallengeResponseController.getInstance().listServices();
+        final List<SolverService> all = ChallengeResponseController.getInstance().getOrderedServices();
         for (final SolverService service : all) {
             sb.append("<br>&nbsp;&nbsp;- ").append(service.getID());
         }

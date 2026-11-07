@@ -5,6 +5,7 @@ import java.awt.event.MouseEvent;
 import java.util.List;
 
 import javax.swing.JPopupMenu;
+import javax.swing.KeyStroke;
 
 import jd.gui.swing.jdgui.BasicJDTable;
 
@@ -27,6 +28,15 @@ public class AdvancedTable extends BasicJDTable<AdvancedConfigEntry> {
 
     public AdvancedTable() {
         super(new AdvancedConfigTableModel("AdvancedTable"));
+    }
+
+    /*
+     * Ctrl+F focuses the search field above the table (see AdvancedSettings) instead of opening the search dialog of the table. The
+     * dialog is still available via the context menu.
+     */
+    @Override
+    protected boolean isSearchTrigger(KeyStroke ks) {
+        return false;
     }
 
     @Override

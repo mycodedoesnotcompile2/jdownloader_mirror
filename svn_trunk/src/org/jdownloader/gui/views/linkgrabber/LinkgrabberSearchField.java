@@ -1,7 +1,5 @@
 package org.jdownloader.gui.views.linkgrabber;
 
-import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
 import java.io.File;
 import java.util.List;
 import java.util.WeakHashMap;
@@ -38,19 +36,6 @@ public final class LinkgrabberSearchField extends SearchField<LinktablesSearchCa
 
     private LinkgrabberSearchField(PackageControllerTable<CrawledPackage, CrawledLink> packageControllerTable, LinktablesSearchCategory categories) {
         super(packageControllerTable, categories);
-        addKeyListener(new KeyListener() {
-            public void keyTyped(KeyEvent e) {
-            }
-
-            public void keyReleased(KeyEvent e) {
-                if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
-                    setText("");
-                }
-            }
-
-            public void keyPressed(KeyEvent e) {
-            }
-        });
         setCategories(new LinktablesSearchCategory[] { LinktablesSearchCategory.FILENAME, LinktablesSearchCategory.FILEPATH, LinktablesSearchCategory.HOSTER, LinktablesSearchCategory.PACKAGE, LinktablesSearchCategory.COMMENT, LinktablesSearchCategory.COMMENT_PACKAGE });
         setSelectedCategory(JsonConfig.create(GraphicalUserInterfaceSettings.class).getSelectedLinkgrabberSearchCategory());
     }

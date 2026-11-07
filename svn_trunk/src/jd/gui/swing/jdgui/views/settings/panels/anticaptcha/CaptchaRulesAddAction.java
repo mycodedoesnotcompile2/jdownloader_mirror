@@ -42,7 +42,7 @@ public class CaptchaRulesAddAction extends AbstractAddAction {
          * (e.g. an external solver only shows up once it has a valid account). A rule for a currently unusable solver would have no effect
          * anyway.
          */
-        final List<SolverService> allServices = new ArrayList<SolverService>(ChallengeResponseController.getInstance().listServices());
+        final List<SolverService> allServices = new ArrayList<SolverService>(ChallengeResponseController.getInstance().getOrderedServices());
         final List<SolverService> services = new ArrayList<SolverService>();
         for (final SolverService service : allServices) {
             if (service.isReady()) {

@@ -673,7 +673,8 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         solverCheckBoxServices.clear();
         solversPopup.add(solverSelectAllBox);
         solversPopup.addSeparator();
-        for (final SolverService service : ChallengeResponseController.getInstance().listServices()) {
+        /* The order of the solver table (the order in which the solvers are used). */
+        for (final SolverService service : ChallengeResponseController.getInstance().getOrderedServices()) {
             if (!isSelectable(service)) {
                 continue;
             }
@@ -1246,7 +1247,7 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
 
     /** A solver can only be tested if it is ready and activated in the "Solver overview" tab. */
     public static boolean isSelectable(final SolverService service) {
-        return service.isReady() && service.getConfigV3().isEnabled();
+        return service.isUsable();
     }
 
     /**

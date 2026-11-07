@@ -33,14 +33,22 @@
  * ==================================================================================================================================================== */
 package org.appwork.swing.components.searchcombo;
 
+import java.awt.BasicStroke;
+import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.Rectangle;
+import java.awt.RenderingHints;
 import java.awt.event.ActionListener;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
+import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -49,6 +57,7 @@ import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.accessibility.Accessible;
+import javax.swing.BorderFactory;
 import javax.swing.ComboBoxEditor;
 import javax.swing.ComboBoxModel;
 import javax.swing.DefaultComboBoxModel;
@@ -58,6 +67,7 @@ import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JList;
+import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import javax.swing.KeyStroke;
@@ -483,6 +493,11 @@ public abstract class SearchComboBox<T> extends JComboBox {
     private ColorState        currentColorSet;
     private List<T>           data;
     private boolean           byPassTxtUpdate        = false;
+    private static final String REMOVE_ENTRY_HANDLER_KEY = "SearchComboBox.removeEntryHandler";
+    /* Lazily created renderer parts to show a remove icon at the right side of removable entries */
+    private JPanel            removeEntryRendererPanel;
+    private JLabel            removeEntryLabel;
+    private Icon              defaultRemoveEntryIcon;
 
     /**
      * @param plugins
@@ -533,24 +548,291 @@ public abstract class SearchComboBox<T> extends JComboBox {
             public void popupMenuWillBecomeVisible(final PopupMenuEvent e) {
                 /* limit max row to 8 */
                 SearchComboBox.this.setMaximumRowCount(SearchComboBox.this.getActualMaximumRowCount());
+                SearchComboBox.this.installRemoveEntryHandler();
             }
         });
         this.setRenderer(new ListCellRenderer() {
             @SuppressWarnings("unchecked")
             public Component getListCellRendererComponent(final JList list, final Object value, final int index, final boolean isSelected, final boolean cellHasFocus) {
+                Component ret;
                 try {
-                    final JLabel ret = (JLabel) org.getListCellRendererComponent(list, SearchComboBox.this.getTextForValue((T) value), index, isSelected, cellHasFocus);
-                    ret.setIcon(SearchComboBox.this.getIconForValue((T) value));
+                    final JLabel label = (JLabel) org.getListCellRendererComponent(list, SearchComboBox.this.getTextForValue((T) value), index, isSelected, cellHasFocus);
+                    label.setIcon(SearchComboBox.this.getPopupIconForValue((T) value));
                     // ret.setOpaque(false);
-                    return ret;
+                    ret = label;
                 } catch (final Throwable e) {
                     // org might not be a JLabel (depending on the LAF)
                     // fallback here
-                    return org.getListCellRendererComponent(list, SearchComboBox.this.getTextForValue((T) value), index, isSelected, cellHasFocus);
+                    ret = org.getListCellRendererComponent(list, SearchComboBox.this.getTextForValue((T) value), index, isSelected, cellHasFocus);
+                }
+                return SearchComboBox.this.wrapRemovableEntry(ret, (T) value, index, isSelected);
+            }
+        });
+        final JTextField tf = this.getTextField();
+        if (tf != null) {
+            tf.addKeyListener(new KeyAdapter() {
+                @SuppressWarnings("unchecked")
+                @Override
+                public void keyPressed(final KeyEvent e) {
+                    /* DEL removes the highlighted entry while the popup is open */
+                    if (e.getKeyCode() != KeyEvent.VK_DELETE || e.getModifiersEx() != 0 || !SearchComboBox.this.isPopupVisible()) {
+                        return;
+                    }
+                    final JList list = SearchComboBox.this.getPopupList();
+                    if (list == null) {
+                        return;
+                    }
+                    final int index = list.getSelectedIndex();
+                    if (index >= 0 && index < SearchComboBox.this.getModel().getSize() && SearchComboBox.this.isEntryRemovable((T) SearchComboBox.this.getModel().getElementAt(index))) {
+                        e.consume();
+                        SearchComboBox.this.removeEntryAt(index, true);
+                    }
+                }
+            });
+        }
+        this.setColorState(this.normalColorSet);
+    }
+
+    /**
+     * Override to allow removing entries from the popup: Removable entries show a remove icon at their right side while highlighted, a
+     * click on it or the DEL key removes the entry. Use {@link #onEntryRemoved(Object)} to e.g. remove it from a persistent history.
+     *
+     * @param value
+     * @return true if the given entry may be removed by the user
+     */
+    protected boolean isEntryRemovable(final T value) {
+        return false;
+    }
+
+    /**
+     * Gets called after an entry has been removed from the list of this combobox by the user.
+     *
+     * @param value
+     */
+    protected void onEntryRemoved(final T value) {
+    }
+
+    /**
+     * @return icon shown at the right side of the highlighted entry if it is removable, see {@link #isEntryRemovable(Object)}
+     */
+    protected Icon getRemoveEntryIcon() {
+        if (this.defaultRemoveEntryIcon == null) {
+            this.defaultRemoveEntryIcon = new RemoveEntryIcon();
+        }
+        return this.defaultRemoveEntryIcon;
+    }
+
+    /**
+     * Default remove icon: Small painted cross, so there is no dependency on any icon theme.
+     */
+    private static class RemoveEntryIcon implements Icon {
+        private static final int SIZE = 10;
+
+        @Override
+        public void paintIcon(final Component c, final Graphics g, final int x, final int y) {
+            final Graphics2D g2 = (Graphics2D) g.create();
+            try {
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(c != null ? c.getForeground() : Color.GRAY);
+                g2.setStroke(new BasicStroke(1.5f));
+                g2.drawLine(x + 2, y + 2, x + SIZE - 2, y + SIZE - 2);
+                g2.drawLine(x + SIZE - 2, y + 2, x + 2, y + SIZE - 2);
+            } finally {
+                g2.dispose();
+            }
+        }
+
+        @Override
+        public int getIconWidth() {
+            return SIZE;
+        }
+
+        @Override
+        public int getIconHeight() {
+            return SIZE;
+        }
+    }
+
+    /**
+     * Adds the remove icon to the rendered component of removable entries. The icon is only visible for the highlighted entry, but its
+     * space is always reserved so the text does not jump on hover.
+     */
+    private Component wrapRemovableEntry(final Component component, final T value, final int index, final boolean isSelected) {
+        /* index -1 = rendering of the current value inside the combobox itself */
+        if (index < 0 || !this.isEntryRemovable(value)) {
+            return component;
+        }
+        if (this.removeEntryRendererPanel == null) {
+            this.removeEntryLabel = new JLabel();
+            this.removeEntryLabel.setBorder(BorderFactory.createEmptyBorder(0, 4, 0, 4));
+            this.removeEntryRendererPanel = new JPanel(new BorderLayout());
+        }
+        final Icon icon = this.getRemoveEntryIcon();
+        this.removeEntryLabel.setPreferredSize(null);
+        this.removeEntryLabel.setIcon(icon);
+        this.removeEntryLabel.setPreferredSize(this.removeEntryLabel.getPreferredSize());
+        this.removeEntryLabel.setIcon(isSelected ? icon : null);
+        this.removeEntryRendererPanel.removeAll();
+        this.removeEntryRendererPanel.add(component, BorderLayout.CENTER);
+        this.removeEntryRendererPanel.add(this.removeEntryLabel, BorderLayout.EAST);
+        this.removeEntryRendererPanel.setOpaque(true);
+        this.removeEntryRendererPanel.setBackground(component.getBackground());
+        return this.removeEntryRendererPanel;
+    }
+
+    private int getRemoveEntryAreaWidth() {
+        return this.removeEntryLabel == null ? 0 : this.removeEntryLabel.getPreferredSize().width;
+    }
+
+    /**
+     * @return the list of the popup or null if the LAF does not use a {@link ComboPopup}
+     */
+    protected JList getPopupList() {
+        final Accessible a = this.getUI().getAccessibleChild(this, 0);
+        if (a instanceof ComboPopup) {
+            return ((ComboPopup) a).getList();
+        }
+        return null;
+    }
+
+    /**
+     * @return index of the removable entry if the mouse event is located on its remove icon area, else -1
+     */
+    @SuppressWarnings("unchecked")
+    private int getRemovableIndexAt(final JList list, final MouseEvent e) {
+        final int width = this.getRemoveEntryAreaWidth();
+        if (width <= 0) {
+            return -1;
+        }
+        final int index = list.locationToIndex(e.getPoint());
+        if (index < 0 || index >= this.getModel().getSize()) {
+            return -1;
+        }
+        final Rectangle bounds = list.getCellBounds(index, index);
+        if (bounds == null || !bounds.contains(e.getPoint()) || e.getX() < bounds.x + bounds.width - width) {
+            return -1;
+        }
+        if (!this.isEntryRemovable((T) this.getModel().getElementAt(index))) {
+            return -1;
+        }
+        return index;
+    }
+
+    /**
+     * Wraps the mouse listeners of the popup list: Clicks on the remove icon of an entry remove it and are not forwarded, so the entry does
+     * not get selected and the popup stays open. All other events are forwarded unchanged.
+     */
+    private void installRemoveEntryHandler() {
+        final JList list = this.getPopupList();
+        if (list == null || list.getClientProperty(REMOVE_ENTRY_HANDLER_KEY) != null) {
+            return;
+        }
+        list.putClientProperty(REMOVE_ENTRY_HANDLER_KEY, Boolean.TRUE);
+        final MouseListener[] originals = list.getMouseListeners();
+        for (final MouseListener listener : originals) {
+            list.removeMouseListener(listener);
+        }
+        list.addMouseListener(new MouseListener() {
+            private boolean isRemoveClick(final MouseEvent e) {
+                return SwingUtilities.isLeftMouseButton(e) && SearchComboBox.this.getRemovableIndexAt(list, e) >= 0;
+            }
+
+            @Override
+            public void mousePressed(final MouseEvent e) {
+                if (this.isRemoveClick(e)) {
+                    e.consume();
+                    return;
+                }
+                for (final MouseListener listener : originals) {
+                    listener.mousePressed(e);
+                }
+            }
+
+            @Override
+            public void mouseReleased(final MouseEvent e) {
+                final int index = SwingUtilities.isLeftMouseButton(e) ? SearchComboBox.this.getRemovableIndexAt(list, e) : -1;
+                if (index >= 0) {
+                    e.consume();
+                    SearchComboBox.this.removeEntryAt(index, false);
+                    return;
+                }
+                for (final MouseListener listener : originals) {
+                    listener.mouseReleased(e);
+                }
+            }
+
+            @Override
+            public void mouseClicked(final MouseEvent e) {
+                if (this.isRemoveClick(e)) {
+                    e.consume();
+                    return;
+                }
+                for (final MouseListener listener : originals) {
+                    listener.mouseClicked(e);
+                }
+            }
+
+            @Override
+            public void mouseEntered(final MouseEvent e) {
+                for (final MouseListener listener : originals) {
+                    listener.mouseEntered(e);
+                }
+            }
+
+            @Override
+            public void mouseExited(final MouseEvent e) {
+                for (final MouseListener listener : originals) {
+                    listener.mouseExited(e);
                 }
             }
         });
-        this.setColorState(this.normalColorSet);
+    }
+
+    /**
+     * Removes the entry at the given index, keeps the text of the editor and moves the highlight to the neighbor (the next newer entry,
+     * else the next older one), so multiple entries can be removed in a row.
+     *
+     * @param fromKeyboard
+     *            true = also select the neighbor in the combobox, same as navigating with the arrow keys
+     */
+    @SuppressWarnings("unchecked")
+    private void removeEntryAt(final int index, final boolean fromKeyboard) {
+        final ComboBoxModel model = this.getModel();
+        final int size = model.getSize();
+        if (index < 0 || index >= size) {
+            return;
+        }
+        final T value = (T) model.getElementAt(index);
+        final List<T> newList = new ArrayList<T>(size - 1);
+        for (int i = 0; i < size; i++) {
+            if (i != index) {
+                newList.add((T) model.getElementAt(i));
+            }
+        }
+        final boolean popupVisible = this.isPopupVisible();
+        /* autoSelectFirstModelElement=false keeps the text of the editor */
+        this.setList(newList, false);
+        this.onEntryRemoved(value);
+        if (!popupVisible || newList.size() == 0) {
+            this.hidePopup();
+            return;
+        }
+        /*
+         * Neighbor is chosen by age: Lists of this combobox are ordered newest first -> the entry above is the next newer one, else take the
+         * next older one below.
+         */
+        final int neighbor = index > 0 ? index - 1 : 0;
+        if (fromKeyboard) {
+            this.setSelectedIndex(neighbor);
+        }
+        /* Re-open the popup so its size fits the new number of entries */
+        this.hidePopup();
+        this.showPopup();
+        final JList list = this.getPopupList();
+        if (list != null) {
+            list.setSelectedIndex(neighbor);
+            list.ensureIndexIsVisible(neighbor);
+        }
     }
 
     /**
@@ -627,6 +909,14 @@ public abstract class SearchComboBox<T> extends JComboBox {
      * @return
      */
     abstract protected Icon getIconForValue(T value);
+
+    /**
+     * @param value
+     * @return icon shown in front of the entry in the popup list only (not in the editor). Defaults to {@link #getIconForValue(Object)}
+     */
+    protected Icon getPopupIconForValue(final T value) {
+        return this.getIconForValue(value);
+    }
 
     @Override
     public T getSelectedItem() {

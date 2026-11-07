@@ -252,7 +252,7 @@ public class TimingTableModel extends ExtTableModel<TimingRow> {
 
     /** True if the solver can be used in the simulation: enabled, ready and, with a captcha type, supporting this captcha type. */
     private boolean isShown(final SolverService service, final CAPTCHA_TYPE type) {
-        if (!service.getConfigV3().isEnabled() || !service.isReady()) {
+        if (!service.isUsable()) {
             return false;
         } else if (type == null) {
             return true;

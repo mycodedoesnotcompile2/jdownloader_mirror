@@ -101,7 +101,7 @@ public class CaptchaServiceAction extends AbstractScheduleAction<CaptchaServiceA
     private String getSolverIDsHint() {
         final StringBuilder sb = new StringBuilder();
         sb.append("Comma separated solver ids (empty or \"*\" = all). Available: ");
-        final List<SolverService> all = ChallengeResponseController.getInstance().listServices();
+        final List<SolverService> all = ChallengeResponseController.getInstance().getOrderedServices();
         boolean first = true;
         for (final SolverService service : all) {
             if (!first) {

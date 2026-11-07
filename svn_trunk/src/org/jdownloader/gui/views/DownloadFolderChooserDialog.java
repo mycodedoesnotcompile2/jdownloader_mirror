@@ -4,6 +4,7 @@ import java.awt.event.ActionEvent;
 import java.io.File;
 import java.util.List;
 
+import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -25,8 +26,10 @@ import org.appwork.utils.swing.dialog.FileChooserSelectionMode;
 import org.appwork.utils.swing.dialog.dimensor.RememberLastDialogDimension;
 import org.jdownloader.actions.AppAction;
 import org.jdownloader.controlling.packagizer.PackagizerController;
+import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.packagehistorycontroller.DownloadPathHistoryManager;
 import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.DownloadFolderChooserDialogSubfolder;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
@@ -251,5 +254,21 @@ public class DownloadFolderChooserDialog extends ExtFileChooserDialog {
 
     public boolean isPackageSubFolderSelectionVisible() {
         return packageSubFolderSelectionVisible;
+    }
+
+    @Override
+    protected boolean isQuickSelectionEntryRemovable(final String path) {
+        /* Quick selection may also contain e.g. the current folder which is not part of the history */
+        return DownloadPathHistoryManager.getInstance().contains(path);
+    }
+
+    @Override
+    protected void onQuickSelectionEntryRemoved(final String path) {
+        DownloadPathHistoryManager.getInstance().remove(path);
+    }
+
+    @Override
+    protected Icon getQuickSelectionRemoveIcon(final Icon defaultIcon) {
+        return NewTheme.I().getIcon(IconKey.ICON_CLOSE, 10);
     }
 }

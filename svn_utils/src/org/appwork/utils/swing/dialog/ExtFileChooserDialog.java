@@ -897,6 +897,21 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
                         }
 
                         @Override
+                        protected boolean isEntryRemovable(final String value) {
+                            return ExtFileChooserDialog.this.isQuickSelectionEntryRemovable(value);
+                        }
+
+                        @Override
+                        protected void onEntryRemoved(final String value) {
+                            ExtFileChooserDialog.this.onQuickSelectionEntryRemoved(value);
+                        }
+
+                        @Override
+                        protected Icon getRemoveEntryIcon() {
+                            return ExtFileChooserDialog.this.getQuickSelectionRemoveIcon(super.getRemoveEntryIcon());
+                        }
+
+                        @Override
                         public void onChanged() {
                             if (selecting) {
                                 SwingUtilities.invokeLater(new Runnable() {
@@ -1241,6 +1256,30 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
 
     public void setQuickSelectionList(final java.util.List<String> quickSelectionList) {
         this.quickSelectionList = quickSelectionList;
+    }
+
+    /**
+     * Override to allow removing entries from the quick selection popup (remove icon on the highlighted entry, DEL key).
+     *
+     * @see SearchComboBox#isEntryRemovable(Object)
+     */
+    protected boolean isQuickSelectionEntryRemovable(final String path) {
+        return false;
+    }
+
+    /**
+     * Gets called after the user removed an entry from the quick selection popup, e.g. to remove it from a persistent history.
+     */
+    protected void onQuickSelectionEntryRemoved(final String path) {
+    }
+
+    /**
+     * @param defaultIcon
+     *            default remove icon of the {@link SearchComboBox}
+     * @return icon shown at the right side of the highlighted removable quick selection entry
+     */
+    protected Icon getQuickSelectionRemoveIcon(final Icon defaultIcon) {
+        return defaultIcon;
     }
 
     @Override

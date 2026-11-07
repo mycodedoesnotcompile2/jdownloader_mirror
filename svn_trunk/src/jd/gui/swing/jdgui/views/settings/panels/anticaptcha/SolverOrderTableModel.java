@@ -15,6 +15,7 @@ import java.util.Currency;
 import java.util.List;
 
 import javax.swing.Icon;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.SwingConstants;
@@ -60,10 +61,14 @@ import org.jdownloader.settings.staticreferences.CFG_SILENTMODE;
 
 import jd.controlling.AccountControllerEvent;
 import jd.controlling.AccountControllerListener;
+import jd.gui.swing.jdgui.TriStateSorterTableModel;
 import jd.plugins.AccountInfo;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
-public class SolverOrderTableModel extends ExtTableModel<SolverService> {
+public class SolverOrderTableModel extends ExtTableModel<SolverService> implements TriStateSorterTableModel {
+    /* Third state of the tri-state sorting: back to the real order of the solvers. */
+    private static final String SORT_ORIGINAL = "ORIGINAL";
+
     /* Assigned in initColumns() (called by the super constructor), so it must not have an initializer. */
     private ExtColumn<SolverService> activeJobsColumn;
 
@@ -255,12 +260,15 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
     /**
      * Drag and drop: Moves the dragged solvers to the given drop row (an index into the displayed rows) and stores the new order. The order
      * is the order in which the solvers are started for a captcha, see {@link ChallengeResponseController#getOrderedServices()}. <br>
-     * The displayed rows are always in the order of the solvers, because sorting by a column stores its result as the solver order, see
-     * {@link #sort(List, ExtColumn)}.
+     * Only possible while the rows are displayed in the real order of the solvers, see {@link #sort(List, ExtColumn)}.
      */
     @Override
     public boolean move(final List<SolverService> transferData, final int dropRow) {
         if (transferData == null || transferData.isEmpty()) {
+            return false;
+        }
+        if (getSortColumn() != null) {
+            /* The rows are only sorted visually: Their positions are not the positions in the real order. */
             return false;
         }
         final List<SolverService> displayed = new ArrayList<SolverService>(getTableData());
@@ -272,11 +280,6 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
         newOrder.addAll(transferData);
         newOrder.addAll(after);
         ChallengeResponseController.getInstance().setServiceOrder(newOrder);
-        /*
-         * Remove the active sorting: Otherwise the rows are sorted by the sort column again when the table is updated, and the moved rows
-         * would jump back to their sorted position.
-         */
-        setSortColumn(null);
         update();
         return true;
     }
@@ -291,25 +294,75 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> {
     }
 
     /**
-     * Sorting by a column (e.g. click on a column header) is a one-time rearrangement of the solvers: The resulting row order is stored as
-     * the new solver order and the sort column is reset afterwards. This way the displayed order is always the order of the solvers (timing
-     * table and order in which the solvers are used for captchas), and dragging rows afterwards works on exactly what is displayed. <br>
-     * TODO: This handling is not optimal yet: Sorting the table overwrites the order the user has saved before (by drag and drop), so
-     * that order is lost.
+     * Sorting by a column (click on a column header) is a visual sort only: It does not change the order of the solvers. The table shows
+     * the highlighted sort column then, and a click on the header until the highlighting disappears (third state, {@link #SORT_ORIGINAL})
+     * shows the real order again. A permanent sort (Ctrl + click) is done by {@link #sortPermanently(ExtColumn)}.
      */
     @Override
     public List<SolverService> sort(final List<SolverService> data, final ExtColumn<SolverService> column) {
-        final List<SolverService> ret = super.sort(data, column);
-        if (column != null && ret != null) {
-            ChallengeResponseController.getInstance().setServiceOrder(ret);
-            /* Not a permanent sorting: Later updates must not re-sort the rows by this column. */
-            setSortColumn(null);
+        if (column == null || SORT_ORIGINAL.equals(column.getSortOrderIdentifier())) {
+            super.sort(data, null);
+            /* Back to the real order: The rows may be in the order of a previous visual sort. */
+            final List<SolverService> ordered = ChallengeResponseController.getInstance().getOrderedServices();
+            Collections.sort(data, new Comparator<SolverService>() {
+                @Override
+                public int compare(final SolverService a, final SolverService b) {
+                    return ordered.indexOf(a) - ordered.indexOf(b);
+                }
+            });
+            return data;
         }
-        return ret;
+        return super.sort(data, column);
     }
 
     /**
-     * Do not restore the sort state of a previous session: The table has to start in the order of the solvers (see
+     * Permanent sort (Ctrl + click on a column header): The resulting row order is stored as the new order of the solvers. This overwrites
+     * the order the user has set before.
+     */
+    public void sortPermanently(final ExtColumn<SolverService> column) {
+        final String current = column.getSortOrderIdentifier();
+        final String primary = getPrimarySortIdentifier();
+        /* Toggles between ascending and descending. */
+        column.setSortOrderIdentifier(primary.equals(current) ? getSecondarySortIdentifier() : primary);
+        final List<SolverService> sorted = new ArrayList<SolverService>(ChallengeResponseController.getInstance().getOrderedServices());
+        Collections.sort(sorted, column.getRowSorter());
+        ChallengeResponseController.getInstance().setServiceOrder(sorted);
+        /* The rows are in the real order now: No visual sort is active any more. */
+        column.setSortOrderIdentifier(SORT_ORIGINAL);
+        setSortColumn(null);
+        update();
+    }
+
+    private static String getPrimarySortIdentifier() {
+        return CFG_GUI.CFG.isPrimaryTableSorterDesc() ? ExtColumn.SORT_DESC : ExtColumn.SORT_ASC;
+    }
+
+    private static String getSecondarySortIdentifier() {
+        return CFG_GUI.CFG.isPrimaryTableSorterDesc() ? ExtColumn.SORT_ASC : ExtColumn.SORT_DESC;
+    }
+
+    /** Tri-state: primary sort order, secondary sort order, then back to the real order. */
+    @Override
+    public String getNextSortIdentifier(final String sortOrderIdentifier) {
+        if (sortOrderIdentifier == null || SORT_ORIGINAL.equals(sortOrderIdentifier)) {
+            return getPrimarySortIdentifier();
+        } else if (getPrimarySortIdentifier().equals(sortOrderIdentifier)) {
+            return getSecondarySortIdentifier();
+        } else {
+            return SORT_ORIGINAL;
+        }
+    }
+
+    @Override
+    public Icon getSortIcon(final String sortOrderIdentifier) {
+        if (SORT_ORIGINAL.equals(sortOrderIdentifier)) {
+            return null;
+        }
+        return super.getSortIcon(sortOrderIdentifier);
+    }
+
+    /**
+     * Do not restore the sort state of a previous session (a visual sort only): The table has to start in the order of the solvers (see
      * {@link ChallengeResponseController#getOrderedServices()}), which is also the order of the timing table and the order in which the
      * solvers are used for captchas. A restored sort column would display the rows in a different order.
      */

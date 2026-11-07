@@ -34,6 +34,7 @@ import org.appwork.utils.os.CrossSystem.OperatingSystem;
 import org.appwork.utils.os.hardware.HardwareType;
 import org.appwork.utils.os.hardware.HardwareTypeInterface;
 import org.jdownloader.controlling.domainrules.DomainRule;
+import org.jdownloader.gui.packagehistorycontroller.SearchHistoryEntry;
 import org.jdownloader.gui.translate._GUI;
 
 import com.sun.jna.platform.win32.KnownFolders;
@@ -759,10 +760,45 @@ public interface GeneralSettings extends ConfigInterface {
     @AboutConfig
     @RequiresRestart("A JDownloader Restart is Required")
     @DefaultIntValue(25)
+    @SpinnerValidator(min = 0, max = 250)
     @DescriptionForConfigEntry("How many entries are allowed to be in the download destination quick selection. Set this to 0 to disable download destination history.")
     int getDownloadDestinationHistoryLength();
 
     void setDownloadDestinationHistoryLength(int i);
+
+    @DefaultJsonObject("[]")
+    @DefaultOnNull
+    @AboutConfig
+    @DescriptionForConfigEntry("History of search terms used in the search fields of the download and linkgrabber tab.")
+    List<SearchHistoryEntry> getSearchHistory();
+
+    void setSearchHistory(List<SearchHistoryEntry> value);
+
+    @AboutConfig
+    @RequiresRestart("A JDownloader Restart is Required")
+    @DefaultIntValue(25)
+    @SpinnerValidator(min = 0, max = 250)
+    @DescriptionForConfigEntry("How many entries are allowed to be in the search history of the download and linkgrabber tab. Set this to 0 to disable search history.")
+    int getSearchHistoryLength();
+
+    void setSearchHistoryLength(int i);
+
+    @DefaultJsonObject("[]")
+    @DefaultOnNull
+    @AboutConfig
+    @DescriptionForConfigEntry("History of search terms used in the search field of the advanced settings.")
+    List<SearchHistoryEntry> getAdvancedSettingsSearchHistory();
+
+    void setAdvancedSettingsSearchHistory(List<SearchHistoryEntry> value);
+
+    @AboutConfig
+    @RequiresRestart("A JDownloader Restart is Required")
+    @DefaultIntValue(25)
+    @SpinnerValidator(min = 0, max = 250)
+    @DescriptionForConfigEntry("How many entries are allowed to be in the search history of the advanced settings. Set this to 0 to disable search history.")
+    int getAdvancedSettingsSearchHistoryLength();
+
+    void setAdvancedSettingsSearchHistoryLength(int i);
 
     @AboutConfig
     @DefaultBooleanValue(true)
@@ -788,7 +824,8 @@ public interface GeneralSettings extends ConfigInterface {
 
     @AboutConfig
     @DefaultIntValue(10)
-    @DescriptionForConfigEntry("How many history entries will be kept in the download links")
+    @SpinnerValidator(min = 0, max = 100)
+    @DescriptionForConfigEntry("How many history entries will be kept in the download links. Set this to 0 to disable download link history.")
     int getMaxDownloadLinkHistoryEntries();
 
     void setMaxDownloadLinkHistoryEntries(int size);

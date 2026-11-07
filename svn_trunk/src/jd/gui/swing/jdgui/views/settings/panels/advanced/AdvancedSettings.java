@@ -2,38 +2,40 @@ package jd.gui.swing.jdgui.views.settings.panels.advanced;
 
 import java.awt.AlphaComposite;
 import java.awt.Composite;
-import java.awt.Cursor;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.Image;
+import java.awt.Toolkit;
+import java.awt.event.ActionEvent;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.awt.event.MouseMotionListener;
 
+import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.Icon;
 import javax.swing.JComponent;
 import javax.swing.JScrollPane;
-import javax.swing.JTextField;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
+import javax.swing.KeyStroke;
+import javax.swing.SwingUtilities;
 
 import jd.gui.swing.jdgui.JDGui;
 
 import org.appwork.scheduler.DelayedRunnable;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.swing.EDTRunner;
-import org.appwork.utils.swing.HelpNotifier;
-import org.appwork.utils.swing.HelpNotifierCallbackListener;
 import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.packagehistorycontroller.AbstractSearchHistoryManager;
+import org.jdownloader.gui.packagehistorycontroller.AdvancedSettingsSearchHistoryManager;
 import org.jdownloader.gui.settings.AbstractConfigPanel;
 import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.gui.views.components.HistorySearchField;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.advanced.AdvancedConfigEventListener;
 import org.jdownloader.settings.advanced.AdvancedConfigManager;
 import org.jdownloader.translate._JDT;
 
-public class AdvancedSettings extends AbstractConfigPanel implements DocumentListener, AdvancedConfigEventListener {
+public class AdvancedSettings extends AbstractConfigPanel implements AdvancedConfigEventListener {
 
     /*
      * (non-Javadoc)
@@ -60,7 +62,7 @@ public class AdvancedSettings extends AbstractConfigPanel implements DocumentLis
     }
 
     private static final long     serialVersionUID = 1L;
-    private final JTextField      filterText;
+    private final HistorySearchField filterText;
     private final String          filterHelp;
     private final AdvancedTable   table;
     private final DelayedRunnable delayedRefresh;
@@ -79,85 +81,41 @@ public class AdvancedSettings extends AbstractConfigPanel implements DocumentLis
         this.addHeader(getTitle(), NewTheme.I().getIcon(IconKey.ICON_ADVANCEDCONFIG, 32));
         this.addDescription(_JDT.T.gui_settings_advanced_description());
         filterHelp = _GUI.T.AdvancedSettings_AdvancedSettings_filter_();
-        filterText = new JTextField() {
+        filterText = new HistorySearchField() {
 
             private static final long serialVersionUID = 1L;
-            private boolean           drawReset        = false;
-
             {
-                this.getDocument().addDocumentListener(new DocumentListener() {
-
-                    private boolean hasText() {
-                        final String text = getText();
-                        return text != null && text.length() > 0 && !text.equals(filterHelp);
-                    }
-
-                    @Override
-                    public void removeUpdate(DocumentEvent e) {
-                        drawReset = hasText();
-                    }
-
-                    @Override
-                    public void insertUpdate(DocumentEvent e) {
-                        drawReset = hasText();
-                    }
-
-                    @Override
-                    public void changedUpdate(DocumentEvent e) {
-                        drawReset = hasText();
-                    }
-                });
-                this.addMouseMotionListener(new MouseMotionListener() {
-
-                    @Override
-                    public void mouseMoved(MouseEvent e) {
-                        if (!hasFocus()) {
-                            return;
-                        }
-                        if (drawReset && closeXPos > 0 && e.getX() > closeXPos) {
-                            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-                            setCaretColor(getBackground());
-                        } else {
-                            setCursor(Cursor.getPredefinedCursor(Cursor.TEXT_CURSOR));
-                            setCaretColor(null);
-                        }
-                    }
-
-                    @Override
-                    public void mouseDragged(MouseEvent e) {
-                    }
-                });
-
-                this.addMouseListener(new MouseListener() {
-
-                    @Override
-                    public void mouseReleased(MouseEvent e) {
-                    }
-
-                    @Override
-                    public void mousePressed(MouseEvent e) {
-                    }
-
-                    @Override
-                    public void mouseExited(MouseEvent e) {
-                    }
-
-                    @Override
-                    public void mouseEntered(MouseEvent e) {
-                    }
-
+                this.addMouseListener(new MouseAdapter() {
                     @Override
                     public void mouseClicked(MouseEvent e) {
-                        if (drawReset && closeXPos > 0 && e.getX() > closeXPos) {
-                            setText("");
+                        if (StringUtils.isEmpty(getText()) && SwingUtilities.isLeftMouseButton(e)) {
+                            /* Click into the empty field shows the whole history */
+                            updateHistoryPopup(true);
                         }
                     }
                 });
             }
 
-            final Image               close            = NewTheme.I().getImage(IconKey.ICON_CLOSE, -1);
-            final AbstractIcon        search           = new AbstractIcon(IconKey.ICON_SEARCH, 16);
-            private int               closeXPos        = -1;
+            @Override
+            protected AbstractSearchHistoryManager getSearchHistoryManager() {
+                return AdvancedSettingsSearchHistoryManager.getInstance();
+            }
+
+            /* The search field is located at the top of the settings panel -> popup opens downwards */
+            @Override
+            protected boolean isHistoryPopupUpwards() {
+                return false;
+            }
+
+            @Override
+            protected void onSearchTextChanged() {
+                /* delayedRefresh does not exist yet while the help text is set in the constructor */
+                if (AdvancedSettings.this.delayedRefresh != null) {
+                    AdvancedSettings.this.delayedRefresh.resetAndStart();
+                }
+            }
+
+            final AbstractIcon search = new AbstractIcon(IconKey.ICON_SEARCH, 16);
 
             @Override
             protected void paintComponent(Graphics g) {
@@ -167,29 +125,31 @@ public class AdvancedSettings extends AbstractConfigPanel implements DocumentLis
                 g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.6f));
                 search.paintIcon(this, g2, 3, 3);
                 g2.setComposite(comp);
-                if (drawReset) {
-                    closeXPos = getWidth() - close.getWidth(null) - (getHeight() - close.getHeight(null)) / 2;
-                    g2.drawImage(close, closeXPos, (getHeight() - close.getHeight(null)) / 2, close.getWidth(null), close.getHeight(null), null);
-                }
             }
-
         };
 
-        HelpNotifier.register(filterText, new HelpNotifierCallbackListener() {
+        filterText.setHelpText(filterHelp);
+        /*
+         * Ctrl+F focuses the search field, same as in the download list and the linkgrabber. WHEN_IN_FOCUSED_WINDOW makes it work no
+         * matter which component of this panel has the focus.
+         */
+        final String focusSearchKey = "focusSearch";
+        getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_F, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()), focusSearchKey);
+        getActionMap().put(focusSearchKey, new AbstractAction() {
+            private static final long serialVersionUID = 1L;
 
-            public void onHelpNotifyShown(JComponent c) {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                filterText.requestFocusInWindow();
+                filterText.selectAll();
             }
-
-            public void onHelpNotifyHidden(JComponent c) {
-            }
-        }, filterHelp);
+        });
 
         // filterText.setOpaque(false);
         // filterText.putClientProperty("Synthetica.opaque", Boolean.FALSE);
         // filterText.setBorder(null);
         filterText.setBorder(BorderFactory.createCompoundBorder(filterText.getBorder(), BorderFactory.createEmptyBorder(0, 20, 0, 0)));
         add(filterText, "gapleft " + getLeftGap() + ",spanx,growx,pushx");
-        filterText.getDocument().addDocumentListener(this);
         add(new JScrollPane(table = new AdvancedTable()));
         delayedRefresh = new DelayedRunnable(200, 1000) {
 
@@ -204,7 +164,7 @@ public class AdvancedSettings extends AbstractConfigPanel implements DocumentLis
 
                     @Override
                     protected void runInEDT() {
-                        final String text = filterText.getText();
+                        final String text = filterText.getFilterText();
                         if (text != null && !text.equals(filterHelp)) {
                             table.filter(text);
                         } else {
@@ -229,18 +189,6 @@ public class AdvancedSettings extends AbstractConfigPanel implements DocumentLis
 
     @Override
     public void updateContents() {
-        delayedRefresh.resetAndStart();
-    }
-
-    public void insertUpdate(DocumentEvent e) {
-        delayedRefresh.resetAndStart();
-    }
-
-    public void removeUpdate(DocumentEvent e) {
-        delayedRefresh.resetAndStart();
-    }
-
-    public void changedUpdate(DocumentEvent e) {
         delayedRefresh.resetAndStart();
     }
 

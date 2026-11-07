@@ -11,6 +11,7 @@ import javax.swing.DropMode;
 import javax.swing.Icon;
 import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
+import javax.swing.Timer;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
@@ -20,11 +21,15 @@ import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtTransferHandler;
 import org.appwork.utils.Application;
 import org.appwork.utils.images.TransparentIcon;
+import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.swing.dialog.Dialog;
 import org.jdownloader.api.captcha.CaptchaAPIManualRemoteSolverService;
 import org.jdownloader.captcha.v2.SolverService;
 import org.jdownloader.captcha.v2.solver.service.BrowserSolverService;
 import org.jdownloader.captcha.v2.solver.service.DialogSolverService;
 import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.helpdialogs.HelpDialog;
+import org.jdownloader.gui.helpdialogs.MessageConfig;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
@@ -54,7 +59,13 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
         setFocusable(true);
         /* The order of the rows is the order in which the solvers are started for a captcha: Rows can be moved by drag and drop. */
         setDragEnabled(true);
-        setTransferHandler(new ExtTransferHandler<SolverService>());
+        setTransferHandler(new ExtTransferHandler<SolverService>() {
+            /* Only in the real order: While the rows are sorted visually, their positions are not the positions of the solver order. */
+            @Override
+            public boolean canImport(final TransferSupport support) {
+                return isOriginalOrder() && super.canImport(support);
+            }
+        });
         if (Application.getJavaVersion() >= Application.JAVA16) {
             setDropMode(DropMode.INSERT_ROWS);
         }
@@ -71,6 +82,40 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
                 fireSelectionChanged();
             }
         });
+    }
+
+    /**
+     * Click on a column header: Sorts the rows visually only (the solver order is not changed), see
+     * {@link SolverOrderTableModel#sort(List, ExtColumn)}. Ctrl + click (Cmd on Mac) sorts permanently, see
+     * {@link SolverOrderTableModel#sortPermanently(ExtColumn)}.
+     */
+    @Override
+    protected void doSortOnColumn(final ExtColumn<SolverService> column, final MouseEvent e) {
+        final boolean permanent = CrossSystem.isMac() ? e.isMetaDown() : e.isControlDown();
+        if (permanent) {
+            ((SolverOrderTableModel) getModel()).sortPermanently(column);
+            return;
+        }
+        column.doSort();
+    }
+
+    /** Tells the user the first time that a click on a column header only sorts visually. */
+    @Override
+    protected boolean onHeaderSortClick(final MouseEvent e1, final ExtColumn<SolverService> oldSortColumn, final String oldSortId, final ExtColumn<SolverService> newColumn) {
+        /* The sort runs in its own thread: Check the result a moment later. */
+        new Timer(100, new ActionListener() {
+            @Override
+            public void actionPerformed(final ActionEvent e) {
+                final Timer t = (Timer) e.getSource();
+                t.stop();
+                final ExtColumn<SolverService> sortColumn = getModel().getSortColumn();
+                if (oldSortColumn == sortColumn || sortColumn == null) {
+                    return;
+                }
+                HelpDialog.showIfAllowed(new MessageConfig(e1.getLocationOnScreen(), "solvertable_sortwarner", Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, _GUI.T.SolverOrderTable_sortwarner_title(sortColumn.getName()), _GUI.T.SolverOrderTable_sortwarner_text(), new AbstractIcon(IconKey.ICON_SORT, 32)));
+            }
+        }).start();
+        return false;
     }
 
     /** Informs the selection listener about the currently selected solver (null = nothing selected). */

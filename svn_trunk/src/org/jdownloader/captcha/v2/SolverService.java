@@ -76,6 +76,12 @@ public interface SolverService {
     public abstract boolean isReady();
 
     /**
+     * Returns true if this solver can be used for captchas right now: It is enabled by the user ({@link CaptchaSolverConfigV3#isEnabled()})
+     * and ready ({@link #isReady()}). Use this instead of checking both states at every place.
+     */
+    public abstract boolean isUsable();
+
+    /**
      * Returns the captcha solver config (V3) of this solver. For plugin solvers this is the plugin's own config; for local solvers it is
      * their dedicated {@link CaptchaSolverConfigV3} subclass. Every solver has a config, so this never returns null.
      */

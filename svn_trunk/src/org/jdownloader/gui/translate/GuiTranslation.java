@@ -5729,6 +5729,12 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "The table below sets the order in which the enabled and ready solvers are used, drag & drop the rows to set your own order." })
     String CaptchaConfigPanel_solverOrderInfo();
 
+    @Default(lngs = { "en" }, values = { "Sorted by '%s1'-Column" })
+    String SolverOrderTable_sortwarner_title(String column);
+
+    @Default(lngs = { "en" }, values = { "You've just applied a visual sort.\r\nNOTE: This does not change the order of the solvers!\r\nTo revert this, click on the highlighted column header until the highlighting disappears.\r\nTo perform a permanent sort which will change the order of the solvers, press and hold CTRL and click inside any column header.\r\nBe careful with sorting: The order of the solvers in this table is the order they will be used for captcha solving!" })
+    String SolverOrderTable_sortwarner_text();
+
     @Default(lngs = { "en" }, values = { "Avoid external solvers for login captchas?" })
     String CaptchaConfigPanel_avoidAutoSolverForLoginCaptchas();
 

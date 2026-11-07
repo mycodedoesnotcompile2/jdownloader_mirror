@@ -39,6 +39,7 @@ import org.appwork.swing.components.ExtCheckBox;
 import org.appwork.swing.components.ExtSpinner;
 import org.appwork.swing.components.ExtTextField;
 import org.appwork.swing.components.pathchooser.PathChooser;
+import org.jdownloader.gui.views.components.DownloadPathChooser;
 import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.uio.CloseReason;
 import org.appwork.uio.UIOManager;
@@ -447,7 +448,7 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
         cobExtract = createEnabledBox();
         cobDownloadlistMode = createDownloadlistModeBox();
         cobEnable = createEnabledBox();
-        fpDest = new PathChooser("PackagizerDest", true) {
+        fpDest = new DownloadPathChooser("PackagizerDest", true) {
             /**
              *
              */
@@ -641,7 +642,7 @@ public class PackagizerFilterRuleDialog extends ConditionDialog<PackagizerRule> 
         /* THEN DO */
         ret.add(createHeader(_GUI.T.PackagizerFilterRuleDialog_layoutDialogContent_do2()), "gaptop 10, spanx,growx,pushx");
         lblMove = createLbl(_GUI.T.PackagizerFilterRuleDialog_layoutDialogContent_move());
-        fpMove = new PathChooser("PackagizerMove", true) {
+        fpMove = new DownloadPathChooser("PackagizerMove", true) {
             /**
              *
              */

@@ -30,7 +30,23 @@ public class CFG_GENERAL {
      * How many entries will be in the download Destination quick selection
      **/
     public static final IntegerKeyHandler               DOWNLOAD_DESTINATION_HISTORY_LENGTH                              = SH.getKeyHandler("DownloadDestinationHistoryLength", IntegerKeyHandler.class);
-    public static final EnumKeyHandler                  IF_FILE_EXISTS_ACTION                                            = SH.getKeyHandler("IfFileExistsAction", EnumKeyHandler.class);
+    /**
+     * History of search terms used in the search fields of the download and linkgrabber tab.
+     **/
+    public static final ObjectKeyHandler                SEARCH_HISTORY                                                   = SH.getKeyHandler("SearchHistory", ObjectKeyHandler.class);
+    /**
+     * How many entries are allowed to be in the search history of the download and linkgrabber tab
+     **/
+    public static final IntegerKeyHandler               SEARCH_HISTORY_LENGTH                                            = SH.getKeyHandler("SearchHistoryLength", IntegerKeyHandler.class);
+    /**
+     * History of search terms used in the search field of the advanced settings.
+     **/
+    public static final ObjectKeyHandler                ADVANCED_SETTINGS_SEARCH_HISTORY                                 = SH.getKeyHandler("AdvancedSettingsSearchHistory", ObjectKeyHandler.class);
+    /**
+     * How many entries are allowed to be in the search history of the advanced settings
+     **/
+    public static final IntegerKeyHandler               ADVANCED_SETTINGS_SEARCH_HISTORY_LENGTH                          = SH.getKeyHandler("AdvancedSettingsSearchHistoryLength", IntegerKeyHandler.class);
+    public static final EnumKeyHandler                  IF_FILE_EXISTS_ACTION                                           = SH.getKeyHandler("IfFileExistsAction", EnumKeyHandler.class);
     public static final BooleanKeyHandler               AUTO_OPEN_CONTAINER_AFTER_DOWNLOAD                               = SH.getKeyHandler("AutoOpenContainerAfterDownload", BooleanKeyHandler.class);
     /**
      * Force Jdownloader to always keep a certain amount of MB Diskspace free

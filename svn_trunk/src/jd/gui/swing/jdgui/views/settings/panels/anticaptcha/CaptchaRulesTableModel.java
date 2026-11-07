@@ -386,7 +386,7 @@ public class CaptchaRulesTableModel extends ExtTableModel<CaptchaChallengeFilter
                     editing = value;
                     editorBox.removeAllItems();
                     /* "All solvers" (empty/broken solver id) is no longer offered: a rule must always name one concrete, existing solver. */
-                    for (final SolverService service : ChallengeResponseController.getInstance().listServices()) {
+                    for (final SolverService service : ChallengeResponseController.getInstance().getOrderedServices()) {
                         editorBox.addItem(service);
                     }
                     editorBox.setSelectedItem(getSolverService(value));

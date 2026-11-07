@@ -44,10 +44,10 @@ public class DownloadPathHistoryManager extends HistoryManager<DownloadPath> imp
     }
 
     @Override
-    public void add(String packageName) {
-        if (isValid(packageName)) {
-            CFG_LINKGRABBER.CFG.setLatestDownloadDestinationFolder(packageName);
-            superadd(packageName);
+    public void add(String path) {
+        if (isValid(path)) {
+            CFG_LINKGRABBER.CFG.setLatestDownloadDestinationFolder(path);
+            super.add(path);
         }
     }
 
@@ -56,19 +56,15 @@ public class DownloadPathHistoryManager extends HistoryManager<DownloadPath> imp
         return !StringUtils.isEmpty(input) && new File(input).isAbsolute();
     }
 
-    public synchronized boolean setLastIfExists(String packageName) {
-        final DownloadPath existing = get(packageName);
+    public synchronized boolean setLastIfExists(String path) {
+        final DownloadPath existing = get(path);
         if (existing != null) {
             existing.setTime(System.currentTimeMillis());
-            Collections.sort(packageHistory);
+            Collections.sort(history);
             requestSave();
             return true;
         }
         return false;
-    }
-
-    private void superadd(String packageName) {
-        super.add(packageName);
     }
 
     @Override
