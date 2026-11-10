@@ -60,7 +60,7 @@ import org.jdownloader.plugins.components.config.EpornerComConfig.PreferredVideo
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 53746 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53929 $", interfaceVersion = 3, names = {}, urls = {})
 public class EPornerCom extends PluginForHost {
     public EPornerCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -139,6 +139,16 @@ public class EPornerCom extends PluginForHost {
         }
     }
 
+    @Override
+    public String getMirrorID(DownloadLink link) {
+        final String fid = getFID(link);
+        if (fid != null) {
+            return fid;
+        } else {
+            return super.getMirrorID(link);
+        }
+    }
+
     private String getFID(final DownloadLink link) {
         final String url = link.getPluginPatternMatcher();
         Regex regex = new Regex(url, PATTERN_VIDEO);
@@ -153,7 +163,8 @@ public class EPornerCom extends PluginForHost {
         if (regex.patternFind()) {
             return regex.getMatch(0);
         }
-        return new Regex(url, PATTERN_PHOTO).getMatch(0);
+        regex = new Regex(url, PATTERN_PHOTO);
+        return regex.getMatch(0);
     }
 
     @Override

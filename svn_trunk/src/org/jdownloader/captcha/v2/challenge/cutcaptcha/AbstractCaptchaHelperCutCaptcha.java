@@ -77,6 +77,12 @@ public abstract class AbstractCaptchaHelperCutCaptcha<T extends Plugin> {
             if (autoSiteKey != null) {
                 this.siteKey = autoSiteKey;
                 return this.siteKey;
+            }
+            /* New version: <div class="cutcaptcha" data-sitekey="cc_..."> */
+            final String autoNewSiteKey = new Regex(source, "class=\"cutcaptcha\"[^>]*data-sitekey=\"(cc_[A-Za-z0-9]+)\"").getMatch(0);
+            if (autoNewSiteKey != null) {
+                this.siteKey = autoNewSiteKey;
+                return this.siteKey;
             } else {
                 logger.info("AutoSiteKey: No siteKey found!");
                 return null;
@@ -91,6 +97,9 @@ public abstract class AbstractCaptchaHelperCutCaptcha<T extends Plugin> {
     public String getAPIKey(final String source) {
         if (apiKey != null) {
             return apiKey;
+        } else if (CutCaptchaChallenge.looksLikeNewSiteKey(getSiteKey(source))) {
+            /* New version: No apiKey needed. */
+            return null;
         } else {
             /* Auto find sitekey */
             final String autoApiKey = new Regex(source, "cutcaptcha\\.net/captcha/([A-Za-z0-9]+)\\.js").getMatch(0);
@@ -179,7 +188,8 @@ public abstract class AbstractCaptchaHelperCutCaptcha<T extends Plugin> {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         } else if (siteKey == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        } else if (apiKey == null) {
+        } else if (apiKey == null && !CutCaptchaChallenge.looksLikeNewSiteKey(siteKey)) {
+            /* Old version needs the apiKey, new version only needs the siteKey */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         } else {
             return new CutCaptchaChallenge(plugin, siteKey, apiKey) {

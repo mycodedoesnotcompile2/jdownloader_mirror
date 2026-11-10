@@ -46,7 +46,6 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
 import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
@@ -63,7 +62,7 @@ import org.mozilla.javascript.ScriptableObject;
  *
  */
 @SuppressWarnings({ "deprecation", "unused" })
-@HostPlugin(revision = "$Revision: 53914 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53943 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class antiDDoSForHost extends PluginForHost {
     public antiDDoSForHost(PluginWrapper wrapper) {
         super(wrapper);
@@ -461,15 +460,6 @@ public abstract class antiDDoSForHost extends PluginForHost {
         }
     }
 
-    @Override
-    public boolean isAccountLoginCaptchaChallenge(Challenge<?> c) {
-        if (antiDDosCaptcha.get() == 0) {
-            return super.isAccountLoginCaptchaChallenge(c);
-        } else {
-            return false;
-        }
-    }
-
     /**
      * Performs Cloudflare, Incapsula, Sucuri requirements.<br />
      * Auto fill out the required fields and updates antiDDoSCookies session.<br />
@@ -656,7 +646,7 @@ public abstract class antiDDoSForHost extends PluginForHost {
                             // add meta cookies to current previous request cookies
                             for (int i = 0; i < cookieHeaders.size(); i++) {
                                 final String header = cookieHeaders.get(i);
-                                ckies.add(Cookies.parseCookies(header, ibr._getURL(), date));
+                                ckies.add(Cookies.parseCookies(header, ibr._getURL(), date, true));
                             }
                             // set ckies as current cookies
                             ibr.getHttpConnection().getRequest().setCookies(ckies);

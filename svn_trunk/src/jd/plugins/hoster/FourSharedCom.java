@@ -17,6 +17,7 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
@@ -27,6 +28,7 @@ import jd.config.ConfigEntry;
 import jd.config.Property;
 import jd.http.Browser;
 import jd.http.Cookies;
+import jd.http.Request;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -34,6 +36,7 @@ import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -43,9 +46,12 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.utils.locale.JDL;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 
-@HostPlugin(revision = "$Revision: 52482 $", interfaceVersion = 2, names = { "4shared.com" }, urls = { "https?://(www\\.)?(?:4shared(?:-china)?\\.com|4s\\.io)/(account/)?(download|get|file|document|embed|photo|video|audio|mp3|office|rar|zip|archive|music|mobile)/[A-Za-z0-9\\-_]+(?:/.*)?|https?://api\\.4shared(-china)?\\.com/download/[A-Za-z0-9\\-_]+" })
+@HostPlugin(revision = "$Revision: 53925 $", interfaceVersion = 2, names = { "4shared.com" }, urls = { "https?://(www\\.)?(?:4shared(?:-china)?\\.com|4s\\.io)/(account/)?(download|get|file|document|embed|photo|video|audio|mp3|office|rar|zip|archive|music|mobile)/[A-Za-z0-9\\-_]+(?:/.*)?|https?://api\\.4shared(-china)?\\.com/download/[A-Za-z0-9\\-_]+" })
 public class FourSharedCom extends PluginForHost {
     // DEV NOTES:
     // old versions of JDownloader can have troubles with Java7+ with HTTPS posts.
@@ -539,7 +545,7 @@ public class FourSharedCom extends PluginForHost {
                     } else {
                         /* Check cookie validity */
                         br.getPage("https://www.4shared.com/");
-                        if (br.containsHTML("jsSignOutLink")) {
+                        if (br.containsHTML("/web/logout")) {
                             logger.info("Cookie login successful");
                             account.saveCookies(br.getCookies(br.getHost()), "");
                             return;
@@ -551,22 +557,35 @@ public class FourSharedCom extends PluginForHost {
                 }
                 logger.info("Performing full login");
                 br.getPage("https://www.4shared.com/");
-                br.getHeaders().put("Content-Type", "application/x-www-form-urlencoded");
-                final boolean ajax_login = false;
-                if (ajax_login) {
-                    final Browser br2 = br.cloneBrowser();
-                    br2.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-                    br2.postPage("/web/login/validate", "login=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()));
-                    if (!br2.containsHTML("\"success\":true")) {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+                Request request = br.createPostRequest("/web/login", "login=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()) + "&returnTo=https%253A%252F%252Fwww.4shared.com%252Faccount%252Fhome.jsp&remember=on&_remember=on");
+                request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.4shared.com");
+                request.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+                br.getPage(request);
+                Map<String, Object> response = StringUtils.startsWithCaseInsensitive(br.getRequest().getHttpConnection().getContentType(), "application/json") ? restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP) : null;
+                if (response != null && Boolean.TRUE.equals(response.get("codeRequired"))) {
+                    final String ticket = response.get("ticket").toString();
+                    DownloadLink downloadLink = this.getDownloadLink();
+                    if (downloadLink == null) {
+                        downloadLink = new DownloadLink(this, "Account", this.getHost(), "https://" + account.getHoster(), true);
                     }
-                } else {
-                    br.postPage("/web/login", "login=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()) + "&returnTo=https%253A%252F%252Fwww.4shared.com%252Faccount%252Fhome.jsp&remember=on&_remember=on");
+                    String twoFACode = getUserInput("Enter 2FA code that was sent to your email " + response.get("email"), downloadLink);
+                    if (twoFACode != null) {
+                        twoFACode = twoFACode.trim();
+                    }
+                    if (twoFACode == null || !twoFACode.matches("\\d{6}")) {
+                        throw new AccountInvalidException("Missing 2fa code!");
+                    }
+                    request = br.createPostRequest("/web/login/code", "ticket=" + ticket + "&returnTo=https%253A%252F%252Fwww.4shared.com%252Faccount%252Fhome.jsp&addHeaderForSpecial=true&code=" + twoFACode);
+                    request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.4shared.com");
+                    request.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+                    br.getPage(request);
+                    response = StringUtils.startsWithCaseInsensitive(br.getRequest().getHttpConnection().getContentType(), "application/json") ? restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP) : null;
+                    if (response != null && Boolean.TRUE.equals(response.get("codeRequired"))) {
+                        throw new AccountInvalidException("Wrong 2fa code!");
+                    }
                 }
-                br.postPage("/web/login", "login=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()) + "&remember=on&_remember=on&returnTo=https%253A%252F%252Fwww.4shared.com%252Faccount%252Fhome.jsp");
-                br.getHeaders().put("Content-Type", null);
                 if (br.getCookie(this.getHost(), "ulin", Cookies.NOTDELETEDPATTERN) == null || !br.getCookie(this.getHost(), "ulin", Cookies.NOTDELETEDPATTERN).equals("true")) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+                    throw new AccountInvalidException();
                 }
                 account.saveCookies(br.getCookies(br.getHost()), "");
             } catch (final PluginException e) {
@@ -586,7 +605,6 @@ public class FourSharedCom extends PluginForHost {
             Browser br2 = br.cloneBrowser();
             br2.getHeaders().put("X-Requested-With", "XMLHttpRequest");
             br2.postPage("/web/user/language", "code=en");
-            br2.getHeaders().put("X-Requested-With", null);
         }
         br.getPage("/web/account/settings/overview");
         if (br.getRedirectLocation() != null && br.getRedirectLocation().endsWith("/verifyemail")) {
@@ -600,12 +618,12 @@ public class FourSharedCom extends PluginForHost {
                 expire = "Until Cancellation";
             }
         }
-        String accType = br.getRegex(">Account type:</div>[\t\n\r ]+<div[^>]+>(.*?)</div").getMatch(0);
+        String accType = br.getRegex(">Account type:</div>[\t\n\r ]+<div[^>]+>\\s*(.*?)\\s*(</div|\\()").getMatch(0);
         if (accType == null) {
             accType = br.getRegex("accountType : \"AccType = (\\w+)\"").getMatch(0);
         }
         final String usedSpace = br.getRegex(">Used space:</div>[\t\n\r ]+<div[^>]+>([0-9\\.]+(KB|MB|GB|TB)) of").getMatch(0);
-        final String[] traffic = br.getRegex(">Premium traffic:</div>[\t\n\r ]+<div[^>]+>([0-9\\.]+(KB|MB|GB|TB)) of ([0-9\\.]+(KB|MB|GB|TB))").getRow(0);
+        final String[] traffic = br.getRegex(">\\s*(?:Daily|Premium) traffic:</div>[\t\n\r ]+<div[^>]+>([0-9\\.]+(KB|MB|GB|TB)) of ([0-9\\.]+(KB|MB|GB|TB))").getRow(0);
         if (expire == null || accType == null) {
             logger.info("expire = " + expire + ", accType = " + accType);
             throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
@@ -614,8 +632,8 @@ public class FourSharedCom extends PluginForHost {
             ai.setUsedSpace(SizeFormatter.getSize(usedSpace));
         }
         if (traffic != null && traffic.length == 4) {
-            ai.setTrafficLeft(SizeFormatter.getSize(traffic[2]) - SizeFormatter.getSize(traffic[0]));
-            ai.setTrafficMax(SizeFormatter.getSize(traffic[2]));
+            ai.setTrafficLeft(SizeFormatter.getSize(traffic[2], true, false) - SizeFormatter.getSize(traffic[0], true, false));
+            ai.setTrafficMax(SizeFormatter.getSize(traffic[2], true, false));
         }
         if (!expire.equalsIgnoreCase("Until Cancellation")) {
             ai.setValidUntil(System.currentTimeMillis() + (Long.parseLong(expire) * 24 * 60 * 60 * 1000l));

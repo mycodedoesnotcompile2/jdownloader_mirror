@@ -113,19 +113,6 @@ public class CookieStorable implements Storable {
         this.protocol = protocol;
     }
 
-    private int version = -1;
-
-    public int getVersion() {
-        if (this.cookie != null) {
-            return this.cookie.getVersion();
-        }
-        return version;
-    }
-
-    public void setVersion(int version) {
-        this.version = version;
-    }
-
     public String getSameSite() {
         if (this.cookie != null) {
             return this.cookie.getSetSameSite();
@@ -185,7 +172,6 @@ public class CookieStorable implements Storable {
         ret.setPath(getPath());
         ret.setHostOnly(getHostOnly());
         ret.setSameSite(getSameSite());
-        ret.setVersion(getVersion());
         ret.setProtocol(getProtocol());
         return ret;
     }

@@ -28,6 +28,7 @@ import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.Challenge.CaptchaRequestType;
 import org.jdownloader.captcha.v2.challenge.altcha.AltchaChallenge;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CloudflareTurnstileChallenge;
+import org.jdownloader.captcha.v2.challenge.cutcaptcha.CutCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
@@ -121,6 +122,8 @@ public class CaptchaTestChallengeFactory {
          * them.
          */
         addDefaults(CAPTCHA_TYPE.CLOUDFLARE_TURNSTILE, KEY_SITE_KEY, "0x4AAAAAACGwIXkmZ2lsGdCV", KEY_SITE_URL, "https://rapidgator.net/");
+        /* CutCaptcha V2 siteKey of FileCrypt (V2 needs no apiKey). The URL is a non-existing container. */
+        addDefaults(CAPTCHA_TYPE.CUTCAPTCHA_V2, KEY_SITE_KEY, "cc_zKZGmOrcOLMA6vMA4gJeFqrh", KEY_SITE_URL, "https://filecrypt.co/Container/FFFFFFFFFF.html");
         /* No challenge URL by default: prepareTestChallenge generates a test challenge then. */
         addDefaults(CAPTCHA_TYPE.ALTCHA, KEY_SITE_URL, "https://altcha.org/", KEY_CHALLENGE_URL, null);
     }
@@ -421,6 +424,18 @@ public class CaptchaTestChallengeFactory {
 
                 @Override
                 public String getHTML(final HttpRequest request, final String id) {
+                    return null;
+                }
+            };
+        case CUTCAPTCHA_V2:
+            return new CutCaptchaChallenge(plugin, siteKey, null) {
+                @Override
+                public String getSiteUrl() {
+                    return siteUrl;
+                }
+
+                @Override
+                public BrowserViewport getBrowserViewport(final BrowserWindow screenResource, final Rectangle elementBounds) {
                     return null;
                 }
             };

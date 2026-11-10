@@ -1,10 +1,9 @@
 package jd.plugins.hoster;
 
 import java.util.EnumSet;
-import java.util.Set;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.appwork.utils.Time;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.HCaptchaChallenge;
@@ -18,7 +17,7 @@ import jd.plugins.Account;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 53706 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53937 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
 public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSolverTwoCaptchaAPIV2 {
     /**
      * hCaptcha support is cached per account via account properties (not an instance field): abstractPluginForCaptchaSolver creates a fresh
@@ -82,6 +81,8 @@ public class PluginForCaptchaSolverTwoCaptcha extends abstractPluginForCaptchaSo
         types.add(CAPTCHA_TYPE.POW_CAPTCHA);
         /* 2026-10-22: https://2captcha.com/api-docs/altcha */
         types.add(CAPTCHA_TYPE.ALTCHA);
+        types.add(CAPTCHA_TYPE.CUTCAPTCHA_V1);
+        types.add(CAPTCHA_TYPE.CUTCAPTCHA_V2);
         /*
          * 2026-09-24: 2captcha's API does offer MtCaptchaTaskProxyless/GeeTestTaskProxyless, but solve() (in
          * abstractPluginForCaptchaSolverTwoCaptchaAPIV2) has no request handling for them yet, so they are NOT declared here. Declaring

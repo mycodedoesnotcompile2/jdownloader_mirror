@@ -10,7 +10,7 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginHost;
 import org.jdownloader.plugins.config.Type;
 
-@PluginHost(host = "pornxp.net", type = Type.HOSTER)
+@PluginHost(host = "pxp.news", type = Type.HOSTER)
 public interface PornxpNetConfig extends PluginConfigInterface {
     public static final PornxpNetConfig.TRANSLATION  TRANSLATION  = new TRANSLATION();
     public static final PornxpNetConfig.VideoQuality DEFAULT_MODE = VideoQuality.BEST;

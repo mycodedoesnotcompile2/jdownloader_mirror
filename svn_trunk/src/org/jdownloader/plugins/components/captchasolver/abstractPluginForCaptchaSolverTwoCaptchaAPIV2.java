@@ -52,9 +52,8 @@ import jd.plugins.PluginException;
 @HostPlugin(revision = "$Revision: 50799 $", interfaceVersion = 3, names = { "2captcha.com" }, urls = { "" })
 public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abstractPluginForCaptchaSolver {
     /**
-     * Task types with proxy. Documented for: reCAPTCHA v2 (https://2captcha.com/api-docs/recaptcha-v2), reCAPTCHA v2 Enterprise,
-     * Cloudflare Turnstile, Altcha and CutCaptcha. reCAPTCHA v3 has no task type with proxy. hCaptcha is not documented (404) -> not
-     * included.
+     * Task types with proxy. Documented for: reCAPTCHA v2 (https://2captcha.com/api-docs/recaptcha-v2), reCAPTCHA v2 Enterprise, Cloudflare
+     * Turnstile, Altcha and CutCaptcha. reCAPTCHA v3 has no task type with proxy. hCaptcha is not documented (404) -> not included.
      */
     private static final Map<String, String> PROXY_TASK_TYPES = new HashMap<String, String>();
     static {
@@ -91,7 +90,8 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
     }
 
     /**
-     * Used by 2captcha and the solvers based on its API: sends the proxy of the challenge in the format of the 2captcha API (task types see PROXY_TASK_TYPES). Does nothing if the challenge has no proxy or the task type has no proxy variant.
+     * Used by 2captcha and the solvers based on its API: sends the proxy of the challenge in the format of the 2captcha API (task types see
+     * PROXY_TASK_TYPES). Does nothing if the challenge has no proxy or the task type has no proxy variant.
      */
     protected void applyProxy(final Map<String, Object> task, final Challenge<?> challenge) {
         if (!challenge.hasProxy()) {
@@ -184,8 +184,15 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
             /* CutCaptcha: https://2captcha.com/api-docs/cutcaptcha */
             final CutCaptchaChallenge challenge = (CutCaptchaChallenge) captchachallenge;
             task.put("type", "CutCaptchaTaskProxyless");
-            task.put("miseryKey", challenge.getSiteKey());
-            task.put("apiKey", challenge.getApiKey());
+            if (challenge.isV2()) {
+                /* New version: Only websiteURL and siteKey ("cc_...") are needed. */
+                /* 2026-11-10: Important: 'sitekey' lowercase!!! */
+                task.put("sitekey", challenge.getSiteKey());
+            } else {
+                /* Old version */
+                task.put("miseryKey", challenge.getSiteKey());
+                task.put("apiKey", challenge.getApiKey());
+            }
             task.put("websiteURL", challenge.getSiteUrl(this));
         } else if (captchachallenge instanceof CloudflareTurnstileChallenge) {
             /* Cloudflare turnstile: https://2captcha.com/api-docs/cloudflare-turnstile */
@@ -409,8 +416,8 @@ public abstract class abstractPluginForCaptchaSolverTwoCaptchaAPIV2 extends abst
     @Override
     public Set<SolverFeature> getSolverFeatures() {
         /*
-         * https://2captcha.com/api-docs/report-correct and https://2captcha.com/api-docs/report-incorrect <br>
-         * Proxy: see PROXY_TASK_TYPES and solvePowCaptcha.
+         * https://2captcha.com/api-docs/report-correct and https://2captcha.com/api-docs/report-incorrect <br> Proxy: see PROXY_TASK_TYPES
+         * and solvePowCaptcha.
          */
         return EnumSet.of(SolverFeature.REPORT_INVALID_CAPTCHAS, SolverFeature.REPORT_VALID_CAPTCHAS, SolverFeature.PROXY);
     }

@@ -102,7 +102,7 @@ import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 53703 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53943 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     /* Account properties */
     private final String        PROPERTY_ACCOUNT_USE_CDN_CREDITS                                  = "use_cdn_credits";
@@ -881,7 +881,13 @@ public class OneFichierCom extends PluginForHost {
      * demand".
      */
     private boolean isErrorNoFreeSlots(final Browser br) {
-        if (br.containsHTML(">\\s*Free download is temporarily limited due to high demand")) {
+        if (br.containsHTML(">\\s*Free downloads are limited")) {
+            // <b>Free downloads are limited.</b>
+            // <br>Storing and delivering your files has a real cost: servers, bandwidth, power. <b>Premium</b> subscribers are the ones
+            // funding the service.
+            // <br>Free access can only exist at reduced capacity, and will never be unlimited.
+            return true;
+        } else if (br.containsHTML(">\\s*Free download is temporarily limited due to high demand")) {
             return true;
         } else if (br.containsHTML(">\\s*all free guest slots are currently in use")) {
             // <b>High demand:</b> all free guest slots are currently in use.

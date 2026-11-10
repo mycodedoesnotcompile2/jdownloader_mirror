@@ -40,6 +40,7 @@ import java.io.InputStreamReader;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -87,6 +88,69 @@ public class PublicSuffixList {
         this(Application.getRessourceURL("org/appwork/utils/net/effective_tld_names.dat"));
     }
 
+    public class InternetDomainName {
+        private final String domain;
+
+        private InternetDomainName(final String domain) {
+            this.domain = domain;
+        }
+
+        public String getDomain() {
+            return domain;
+        }
+
+        public String publicSuffix() {
+            final List<String> ret = find(getDomain());
+            if (ret == null) {
+                return null;
+            }
+            return ret.get(0);
+        }
+
+        public boolean isPublicSuffix() {
+            final List<String> ret = find(getDomain());
+            if (ret == null) {
+                return false;
+            }
+            for (String entry : ret) {
+                if (entry.equalsIgnoreCase(getDomain())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public String topPrivateDomain() {
+            final List<String> ret = find(getDomain());
+            if (ret == null) {
+                return null;
+            }
+            final String top = new Regex(getDomain(), "([^\\.]+\\." + Pattern.quote(ret.get(0)) + ")$").getMatch(0);
+            return top;
+        }
+
+        public String registrySuffix() {
+            final List<String> ret = find(getDomain());
+            if (ret == null) {
+                return null;
+            }
+            return ret.get(ret.size() - 1);
+        }
+
+        public String subDomain() {
+            final String topPrivateDomain = topPrivateDomain();
+            if (topPrivateDomain == null) {
+                return null;
+            }
+            final String subDomain = new Regex(getDomain(), "(.+)\\." + Pattern.quote(topPrivateDomain) + "$").getMatch(0);
+            return subDomain;
+        }
+    }
+
+    public InternetDomainName parse(final String domain) {
+        return new InternetDomainName(domain);
+    }
+
     public String getSubDomain(final String fullDomain) {
         final String domain = getDomain(fullDomain);
         if (domain != null) {
@@ -107,7 +171,7 @@ public class PublicSuffixList {
         return null;
     }
 
-    public String getTopLevelDomain(String fullDomain) {
+    private List<String> find(final String fullDomain) {
         if (fullDomain != null) {
             final int tldIndex = fullDomain.lastIndexOf('.');
             if (tldIndex > 0 && tldIndex + 1 < fullDomain.length()) {
@@ -116,7 +180,7 @@ public class PublicSuffixList {
                 final List<ByteArrayWrapper> list = this.map.get(tldbA);
                 if (list != null) {
                     if (list.size() == 0) {
-                        return tld;
+                        return Arrays.asList(new String[] { tld });
                     }
                     final List<String> hits = new ArrayList<String>();
                     hits.add(tld);
@@ -129,7 +193,7 @@ public class PublicSuffixList {
                                 hits.add(domain);
                             }
                         } else if (item.startsWith("!") && fullDomain.contains(item.substring(1))) {
-                            return item.substring(item.indexOf('.') + 1);
+                            return Arrays.asList(item.substring(item.indexOf('.') + 1));
                         } else if (fullDomain.contains(item)) {
                             hits.add(item);
                         }
@@ -144,9 +208,17 @@ public class PublicSuffixList {
                             return this.compare(o1.length(), o2.length());
                         }
                     });
-                    return hits.get(0);
+                    return hits;
                 }
             }
+        }
+        return null;
+    }
+
+    public String getTopLevelDomain(String fullDomain) {
+        final List<String> ret = find(fullDomain);
+        if (ret != null) {
+            return ret.get(0);
         }
         return null;
     }

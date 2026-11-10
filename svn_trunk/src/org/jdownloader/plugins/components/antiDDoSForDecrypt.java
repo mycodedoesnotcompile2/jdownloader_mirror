@@ -60,7 +60,7 @@ import org.mozilla.javascript.ScriptableObject;
  *
  */
 @SuppressWarnings({ "deprecation", "unused" })
-@DecrypterPlugin(revision = "$Revision: 53806 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53943 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class antiDDoSForDecrypt extends PluginForDecrypt {
     public antiDDoSForDecrypt(PluginWrapper wrapper) {
         super(wrapper);
@@ -605,7 +605,7 @@ public abstract class antiDDoSForDecrypt extends PluginForDecrypt {
                         // add meta cookies to current previous request cookies
                         for (int i = 0; i < cookieHeaders.size(); i++) {
                             final String header = cookieHeaders.get(i);
-                            ckies.add(Cookies.parseCookies(header, ibr._getURL(), date));
+                            ckies.add(Cookies.parseCookies(header, ibr._getURL(), date, true));
                         }
                         // set ckies as current cookies
                         ibr.getHttpConnection().getRequest().setCookies(ckies);

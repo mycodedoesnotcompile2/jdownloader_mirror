@@ -736,7 +736,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
     private String                              acceptLanguage        = "de, en-gb;q=0.9, en;q=0.8";
     /*
      * -1 means use default Timeouts
-     * 
+     *
      * 0 means infinite (DO NOT USE if not needed)
      */
     private int                                 connectTimeout        = -1;
@@ -1076,6 +1076,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
      *
      *
      *
+     *
      */
     @Deprecated
     public PostRequest createPostRequest(String url, final List<KeyValueStringEntry> post, final String encoding) throws IOException {
@@ -1384,14 +1385,13 @@ public class Browser implements HTTPConnectionFactoryInterface {
         try {
             if (url == null) {
                 return getCookies((URL) null);
-            }
-            return getCookies(new URL(url));
-        } catch (MalformedURLException e) {
-            try {
+            } else if (url.matches("(?i)^https?://.+")) {
+                return getCookies(new URL(url));
+            } else {
                 return getCookies(new URL("https://" + url));
-            } catch (MalformedURLException e2) {
-                throw new WTFException(e);
             }
+        } catch (MalformedURLException e) {
+            throw new WTFException(e);
         }
     }
 
@@ -2589,12 +2589,9 @@ public class Browser implements HTTPConnectionFactoryInterface {
      * @author pspzockerscene
      * @param iCookies
      */
+    @Deprecated
     public void setCookies(final Cookies iCookies) {
-        this.setCookies(null, iCookies, false);
-        final String userAgent = iCookies.getUserAgent();
-        if (!StringUtils.isEmpty(userAgent)) {
-            this.getHeaders().put("User-Agent", userAgent);
-        }
+        setCookies(null, iCookies);
     }
 
     /**
@@ -2607,25 +2604,31 @@ public class Browser implements HTTPConnectionFactoryInterface {
      * @param iCookies
      * @param replace
      */
-    public void setCookies(final String url, final Cookies iCookies, final boolean replace) {
+    public void setCookies(final String url, final Cookies setCookies, final boolean replace) {
         if (url == null) {
             /* Set all cookies on their (hopefully given) host. */
-            if (replace) {
-                this.clearCookies(null);
-            }
-            final List<Cookie> cookieArray = iCookies.getCookies();
-            for (final Cookie cookie : cookieArray) {
-                this.setCookie(cookie);
+            final Set<String> clearedCookies = new HashSet<String>();
+            for (final Cookie setCookie : setCookies.getCookies()) {
+                if (replace && clearedCookies.add(setCookie.getHost())) {
+                    clearCookies(setCookie.getHost());
+                }
+                this.setCookie(setCookie);
             }
         } else {
             /* Get cookies for pre-defined host and set them */
             final Cookies cookies = this.getCookies(url);
             if (replace) {
                 cookies.clear();
-                cookies.add(iCookies);
-            } else {
-                cookies.add(iCookies);
             }
+            final String host = getHost(url);
+            final Cookies newSetCookies = new Cookies();
+            for (final Cookie setCookie : setCookies.getCookies()) {
+                final Cookie copy = Cookie.copyOf(setCookie);
+                if (copy.updateHost(host)) {
+                    newSetCookies.add(copy);
+                }
+            }
+            cookies.add(newSetCookies);
         }
     }
 
@@ -3382,9 +3385,9 @@ public class Browser implements HTTPConnectionFactoryInterface {
                      * </p>
                      *
                      * <p>
-                     * È possibile presentare <a
-                     * href="https://www.agcom.it/competenze/antipirateria-e-piracy-shield/piattaforma-piracy-shield#link_utili">reclamo</a>
-                     * per i provvedimenti cautelari e i blocchi tramite Piracy Shield ai sensi del Regolamento Agcom sul diritto d'autore
+                     * È possibile presentare <a href=
+                     * "https://www.agcom.it/competenze/antipirateria-e-piracy-shield/piattaforma-piracy-shield#link_utili">reclamo</a> per
+                     * i provvedimenti cautelari e i blocchi tramite Piracy Shield ai sensi del Regolamento Agcom sul diritto d'autore
                      * online
                      * </p>
                      *
@@ -3861,8 +3864,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
                     return null;
                 }
                 if (true) { /*
-                             * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
-                             */
+                 * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
+                 */
                     /* See new ESET NOD32 html code 2023: https://board.jdownloader.org/showthread.php?t=91433 */
                     return null;
                 }

@@ -10,6 +10,7 @@ import java.util.Map;
 
 import javax.swing.TransferHandler;
 
+import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.os.CrossSystem;
 import org.jdownloader.controlling.contextmenu.ActionContext;
@@ -29,6 +30,7 @@ import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.
 import org.jdownloader.gui.views.components.packagetable.dragdrop.PackageControllerTableTransferHandler;
 import org.jdownloader.gui.views.downloads.action.replacer.DownloadReplacerTag;
 import org.jdownloader.gui.views.downloads.table.DownloadsTable;
+import org.jdownloader.plugins.config.Order;
 import org.jdownloader.gui.views.linkgrabber.LinkGrabberTable;
 import org.jdownloader.translate._JDT;
 
@@ -95,6 +97,7 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
 
     private String patternPackages;
 
+    @Order(20)
     @Customizer(link = "#getTranslationForPatternPackages")
     public String getPatternPackages() {
         return patternPackages;
@@ -123,6 +126,7 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
 
     private String patternLinks;
 
+    @Order(10)
     @Customizer(link = "#getTranslationForPatternLinks")
     public String getPatternLinks() {
         return patternLinks;
@@ -133,8 +137,55 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
         updateTooltip();
     }
 
+    /**
+     * Defines when the pattern for packages is also used for packages of which links are selected. Only used with smart selection.
+     */
+    public static enum IncludePackageInfo implements LabelInterface {
+        /* Same as LINKS_SELECTED */
+        AUTO {
+            @Override
+            public String getLabel() {
+                return "Auto";
+            }
+        },
+        /* The package line is added for every package of which something is selected */
+        LINKS_SELECTED {
+            @Override
+            public String getLabel() {
+                return "Links are selected";
+            }
+        },
+        /* The package line is added if the package itself and at least one of its links are selected */
+        LINKS_AND_PACKAGES_SELECTED {
+            @Override
+            public String getLabel() {
+                return "Links and packages are selected";
+            }
+        },
+        /* The package line is only added for packages that are selected themselves */
+        PACKAGES_SELECTED {
+            @Override
+            public String getLabel() {
+                return "Only packages are selected";
+            }
+        };
+    }
+
+    private IncludePackageInfo includePackageInfo = IncludePackageInfo.AUTO;
+
+    @Order(40)
+    @Customizer(name = "Include package copy information if")
+    public IncludePackageInfo getIncludePackageInfo() {
+        return includePackageInfo;
+    }
+
+    public void setIncludePackageInfo(final IncludePackageInfo includePackageInfo) {
+        this.includePackageInfo = includePackageInfo != null ? includePackageInfo : IncludePackageInfo.AUTO;
+    }
+
     private boolean smartSelection;
 
+    @Order(30)
     @Customizer(link = "#getTranslationForSmartSelection")
     public boolean isSmartSelection() {
         return smartSelection;
@@ -154,6 +205,7 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
         patternPackages = "";
         patternLinks = "{type};{name};{url}";
         smartSelection = true;
+        includePackageInfo = IncludePackageInfo.AUTO;
     }
 
     @Override
@@ -206,8 +258,9 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
             }
             final List<Replacer> linkTags = createLinkReplacers(contentPermission, archivePasswords);
             for (final PackageView<ParentType, ChildrenType> pv : selectionInfo.getPackageViews()) {
-                final ParentType pkg = pv.getPackage();
-                add(sb, pkg, linkTags);
+                if (isIncludePackageInfo(pv)) {
+                    add(sb, pv.getPackage(), linkTags);
+                }
                 final List<ChildrenType> childs = pv.getChildren();
                 for (final ChildrenType c : childs) {
                     add(sb, c, linkTags);
@@ -223,6 +276,23 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
             }
         }
         return sb.toString();
+    }
+
+    /**
+     * @return true if the pattern for packages is used for the package of the given view, depending on {@link #getIncludePackageInfo()}
+     */
+    private boolean isIncludePackageInfo(final PackageView<?, ?> pv) {
+        switch (getIncludePackageInfo()) {
+        case LINKS_AND_PACKAGES_SELECTED:
+            /* The package itself and at least one of its links have been selected */
+            return pv.isPackageSelected() && pv.getSelectedChildren().size() > 0;
+        case PACKAGES_SELECTED:
+            return pv.isPackageSelected();
+        case AUTO:
+        case LINKS_SELECTED:
+        default:
+            return true;
+        }
     }
 
     @Override

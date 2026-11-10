@@ -37,6 +37,7 @@ import org.appwork.testframework.AWTest;
 import org.appwork.testframework.TestDependency;
 import org.appwork.utils.Application;
 import org.appwork.utils.net.PublicSuffixList;
+import org.appwork.utils.net.PublicSuffixList.InternetDomainName;
 
 /**
  * @author daniel
@@ -53,23 +54,65 @@ public class PublicSuffixListTest extends AWTest {
     public void runTest() throws Exception {
         final PublicSuffixList suffixList = PublicSuffixList.getInstance();
         assertNotNull(Application.getRessourceURL("org/appwork/utils/net/effective_tld_names.dat"));
-        assertEquals("example.net", suffixList.getDomain("example.net"));
-        assertEquals("example.net", suffixList.getDomain("www.example.net"));
-        assertEquals("www", suffixList.getSubDomain("www.example.net"));
-        assertEquals("example.co.uk", suffixList.getDomain("example.co.uk"));
-        assertEquals("example.co.uk", suffixList.getDomain("www.example.co.uk"));
-        assertEquals("www", suffixList.getSubDomain("www.example.co.uk"));
-        assertEquals("食狮.com.cn", suffixList.getDomain("食狮.com.cn"));
-        assertEquals("xn--85x722f.com.cn", suffixList.getDomain("xn--85x722f.com.cn"));
-        assertEquals("my", suffixList.getSubDomain("my.jdownloader.org"));
-        assertEquals(null, suffixList.getSubDomain("jdownloader.org"));
-        final String mydns = "127-0-0-1.mydns.jdownloader.org";
-        assertEquals("jdownloader.org", suffixList.getDomain(mydns));
-        assertEquals("127-0-0-1.mydns", suffixList.getSubDomain(mydns));
-        assertEquals("org", suffixList.getTopLevelDomain(mydns));
-        final String dyn = "ip-127-0-0-1.dyn.luxdsl.pt.lu";
-        assertEquals("pt.lu", suffixList.getDomain(dyn));
-        assertEquals("ip-127-0-0-1.dyn.luxdsl", suffixList.getSubDomain(dyn));
-        assertEquals("lu", suffixList.getTopLevelDomain(dyn));
+        if (true) {
+            assertEquals("example.net", suffixList.getDomain("example.net"));
+            assertEquals("example.net", suffixList.getDomain("www.example.net"));
+            assertEquals("www", suffixList.getSubDomain("www.example.net"));
+            assertEquals("example.co.uk", suffixList.getDomain("example.co.uk"));
+            assertEquals("example.co.uk", suffixList.getDomain("www.example.co.uk"));
+            assertEquals("www", suffixList.getSubDomain("www.example.co.uk"));
+            assertEquals("食狮.com.cn", suffixList.getDomain("食狮.com.cn"));
+            assertEquals("xn--85x722f.com.cn", suffixList.getDomain("xn--85x722f.com.cn"));
+            assertEquals("my", suffixList.getSubDomain("my.jdownloader.org"));
+            assertEquals(null, suffixList.getSubDomain("jdownloader.org"));
+            final String mydns = "127-0-0-1.mydns.jdownloader.org";
+            assertEquals("jdownloader.org", suffixList.getDomain(mydns));
+            assertEquals("127-0-0-1.mydns", suffixList.getSubDomain(mydns));
+            assertEquals("org", suffixList.getTopLevelDomain(mydns));
+            final String dyn = "ip-127-0-0-1.dyn.luxdsl.pt.lu";
+            assertEquals("pt.lu", suffixList.getDomain(dyn));
+            assertEquals("ip-127-0-0-1.dyn.luxdsl", suffixList.getSubDomain(dyn));
+            assertEquals("lu", suffixList.getTopLevelDomain(dyn));
+        }
+        {
+            InternetDomainName entry = suffixList.parse("google.com");
+            assertEquals("com", entry.publicSuffix());
+            assertEquals("com", entry.registrySuffix());
+            assertEquals("google.com", entry.topPrivateDomain());
+            assertEquals(false, entry.isPublicSuffix());
+            assertEquals(null, entry.subDomain());
+        }
+        {
+            InternetDomainName entry = suffixList.parse("co.uk");
+            assertEquals("co.uk", entry.publicSuffix());
+            assertEquals("uk", entry.registrySuffix());
+            assertEquals(null, entry.topPrivateDomain());
+            assertEquals(true, entry.isPublicSuffix());
+            assertEquals(null, entry.subDomain());
+        }
+        {
+            InternetDomainName entry = suffixList.parse("www.google.co.uk");
+            assertEquals("co.uk", entry.publicSuffix());
+            assertEquals("uk", entry.registrySuffix());
+            assertEquals("google.co.uk", entry.topPrivateDomain());
+            assertEquals(false, entry.isPublicSuffix());
+            assertEquals("www", entry.subDomain());
+        }
+        {
+            InternetDomainName entry = suffixList.parse("foo.blogspot.com");
+            assertEquals("blogspot.com", entry.publicSuffix());
+            assertEquals("com", entry.registrySuffix());
+            assertEquals("foo.blogspot.com", entry.topPrivateDomain());
+            assertEquals(false, entry.isPublicSuffix());
+            assertEquals(null, entry.subDomain());
+        }
+        {
+            InternetDomainName entry = suffixList.parse("google.invalid");
+            assertEquals(null, entry.publicSuffix());
+            assertEquals(null, entry.registrySuffix());
+            assertEquals(null, entry.topPrivateDomain());
+            assertEquals(false, entry.isPublicSuffix());
+            assertEquals(null, entry.subDomain());
+        }
     }
 }

@@ -60,10 +60,24 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 53839 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53941 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileCryptCc extends PluginForDecrypt {
+    /**
+     * TEMPORARY, only for local testing: If true, the captcha page and the page after solving the captcha are loaded from a local web
+     * server instead of filecrypt. After the captcha has been "submitted", the crawl process is aborted with a DecrypterRetryException.
+     * Must be false when committing!
+     */
+    private static final boolean LOCAL_TEST                   = false;
+    private static final String  LOCAL_TEST_CAPTCHA_URL       = "http://localhost/jdtest/filecrypt/cutcaptcha.html";
+    private static final String  LOCAL_TEST_AFTER_CAPTCHA_URL = "http://localhost/jdtest/filecrypt/after_cutcaptcha.html";
+
     public FileCryptCc(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    /** Returns true only if LOCAL_TEST is enabled and JDownloader is running inside the IDE. */
+    private static boolean isLocalTest() {
+        return LOCAL_TEST && DebugMode.TRUE_IN_IDE_ELSE_FALSE;
     }
 
     @Override
@@ -81,7 +95,8 @@ public class FileCryptCc extends PluginForDecrypt {
         br.setCookie(getHost(), "lang_v2", "en_US");
         br.addAllowedResponseCodes(500);// submit captcha responds with 500 code
         br.getHeaders().put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36");
-        final HTTPProxy proxy = HTTPProxy.parseHTTPProxy(getConfiguredProxyUrl());
+        /* LOCAL_TEST: Do not use the proxy because localhost cannot be reached through it. */
+        final HTTPProxy proxy = isLocalTest() ? null : HTTPProxy.parseHTTPProxy(getConfiguredProxyUrl());
         if (proxy != null) {
             /* Use the user defined proxy for all requests. This is important for powCAPTCHA remote solving. */
             br.setProxy(proxy);
@@ -366,6 +381,10 @@ public class FileCryptCc extends PluginForDecrypt {
                 }
                 String[] links = br.getRegex("<button[^<>]+\\sdata-[0-9a-z]{5,}=\"([^\"]+)").getColumn(0);
                 if (links == null || links.length == 0) {
+                    /* 2026-11-10: Links are now <a href="/Link/ID.html" class="button download"> */
+                    links = br.getRegex("<a href=\"/Link/([A-Za-z0-9]+)\\.html\"[^>]*class=\"button download\"").getColumn(0);
+                }
+                if (links == null || links.length == 0) {
                     logger.info("Failed to find redirectLinks");
                     break redirectLinksHandling;
                 }
@@ -412,7 +431,7 @@ public class FileCryptCc extends PluginForDecrypt {
                         link.setName(filename);
                     }
                     if (filesizes != null && filesizes.length == links.length) {
-                        String filesize = filenames[index];
+                        String filesize = filesizes[index];
                         filesize = Encoding.htmlDecode(filesize).trim();
                         link.setDownloadSize(SizeFormatter.getSize(filesize));
                     }
@@ -641,7 +660,8 @@ public class FileCryptCc extends PluginForDecrypt {
         return null;
     }
 
-    private void handlePasswordAndCaptcha(final CryptedLink param, final String folderID, final String url) throws Exception {
+    private void handlePasswordAndCaptcha(final CryptedLink param, final String folderID, final String realUrl) throws Exception {
+        final String url = isLocalTest() ? LOCAL_TEST_CAPTCHA_URL : realUrl;
         final String host;
         if (br.getRequest() != null) {
             host = br.getHost();
@@ -701,9 +721,24 @@ public class FileCryptCc extends PluginForDecrypt {
             } else if (captchaForm != null && captchaForm.containsHTML("=\"g-recaptcha\"")) {
                 final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
                 captchaForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-            } else if (StringUtils.containsIgnoreCase(captchaURL, "cutcaptcha")) {
+            } else if (StringUtils.containsIgnoreCase(captchaURL, "cutcaptcha") || captchaForm.containsHTML("class=\"cutcaptcha\"")) {
+                /*
+                 * 2026-11: New CutCaptcha version: <div class="cutcaptcha" data-sitekey="cc_..."> instead of a /captcha/...cutcaptcha URL.
+                 */
                 logger.info("Attempting to solve CutCaptcha");
-                final String cutcaptchaToken = new CaptchaHelperCrawlerPluginCutCaptcha(this, br, null).getToken();
+                final CaptchaHelperCrawlerPluginCutCaptcha cutcaptchaHelper;
+                if (isLocalTest()) {
+                    /* Local test: Page is served by localhost but the solver should get the real filecrypt URL. */
+                    cutcaptchaHelper = new CaptchaHelperCrawlerPluginCutCaptcha(this, br, null) {
+                        @Override
+                        protected String getSiteUrl() {
+                            return realUrl;
+                        }
+                    };
+                } else {
+                    cutcaptchaHelper = new CaptchaHelperCrawlerPluginCutCaptcha(this, br, null);
+                }
+                final String cutcaptchaToken = cutcaptchaHelper.getToken();
                 captchaForm.put("cap_token", Encoding.urlEncode(cutcaptchaToken));
             } else if (AbstractPowCaptcha.containsPowCaptchaClass(captchaForm)) {
                 logger.info("Attempting to solve powCAPTCHA");
@@ -723,6 +758,13 @@ public class FileCryptCc extends PluginForDecrypt {
             } else {
                 final String code = getCaptchaCode(captchaURL, param);
                 captchaForm.put("recaptcha_response_field", Encoding.urlEncode(code));
+            }
+            if (isLocalTest()) {
+                /* Local test: Simulate the form submit by loading the "after captcha" page, then stop. */
+                logger.info("LOCAL_TEST: Form that would be submitted: " + captchaForm);
+                this.getPage(LOCAL_TEST_AFTER_CAPTCHA_URL);
+                logger.info("LOCAL_TEST: containsCaptcha after solving: " + this.containsCaptcha(this.cleanHTML));
+                throw new DecrypterRetryException(RetryReason.PLUGIN_DEFECT, "LOCAL_TEST finished", "Captcha handling finished, local test aborted on purpose. See log for details.");
             }
             submitForm(captchaForm);
             if (this.containsCaptcha(this.cleanHTML)) {

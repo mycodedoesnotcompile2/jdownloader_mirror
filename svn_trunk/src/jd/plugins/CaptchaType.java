@@ -321,15 +321,15 @@ public class CaptchaType {
                 return true;
             }
         },
-        CUTCAPTCHA {
+        CUTCAPTCHA_V1 {
             @Override
             public boolean canHandle(Challenge<?> c) {
-                return c instanceof CutCaptchaChallenge;
+                return c instanceof CutCaptchaChallenge && !((CutCaptchaChallenge) c).isV2();
             }
 
             @Override
             public String getDisplayName() {
-                return "Cutcaptcha";
+                return "Cutcaptcha V1";
             }
 
             @Override
@@ -339,12 +339,55 @@ public class CaptchaType {
 
             @Override
             public String getDescription() {
-                return "Interactive puzzle-based captcha service. Mostly used for provider 'Filecrypt'.";
+                return "Interactive puzzle-based captcha service (old version, needs siteKey/miseryKey and apiKey).";
             }
 
             @Override
             public String getDomain() {
                 return "cutcaptcha.com";
+            }
+
+            @Override
+            public Icon getIcon() {
+                /* Use the favicon of filecrypt, the main user of this captcha. */
+                return DomainInfo.getInstance("filecrypt.cc").getFavIcon();
+            }
+        },
+        CUTCAPTCHA_V2 {
+            @Override
+            public boolean canHandle(Challenge<?> c) {
+                return c instanceof CutCaptchaChallenge && ((CutCaptchaChallenge) c).isV2();
+            }
+
+            @Override
+            public String getDisplayName() {
+                return "Cutcaptcha V2";
+            }
+
+            @Override
+            public String getDemoUrl() {
+                return "https://www.cutcaptcha.com/";
+            }
+
+            @Override
+            public String getDescription() {
+                return "Interactive puzzle-based captcha service (new version, only needs siteKey 'cc_...'). Mostly used for provider 'Filecrypt'.";
+            }
+
+            @Override
+            public String getDomain() {
+                return "cutcaptcha.net";
+            }
+
+            @Override
+            public boolean hasTestChallenges() {
+                return true;
+            }
+
+            @Override
+            public Icon getIcon() {
+                /* Use the favicon of filecrypt, the main user of this captcha. */
+                return DomainInfo.getInstance("filecrypt.cc").getFavIcon();
             }
         },
         POW_CAPTCHA {
