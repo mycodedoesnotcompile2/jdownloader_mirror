@@ -163,15 +163,8 @@ public class CESSolverJob<T> {
             if (job.isDone(other)) {
                 continue;
             }
-            switch (other.getSolverType()) {
-            case JD_LOCAL_DIALOG:
-            case JD_LOCAL_BROWSER:
-            case JD_REMOTE_MYJD:
+            if (other.getSolverType().requiresHuman()) {
                 return true;
-            case JD_LOCAL:
-            case EXTERNAL:
-            default:
-                break;
             }
         }
         return false;

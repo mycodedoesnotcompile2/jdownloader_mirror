@@ -138,7 +138,7 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
         }
         /* Always ask the super class first, then check the solver specific things. */
         final ChallengeVetoReason superVeto = super.getUnsupportedReason(c);
-        if (superVeto != null) {
+        if (superVeto != ChallengeVetoReason.NONE) {
             return superVeto;
         }
         /* Check if plugin provides a veto reason (technical limitations of the solver service). */
@@ -149,14 +149,13 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
     public ChallengeVetoReason getChallengeVetoReason(final Challenge<?> c) {
         /* Always ask the super class first, then check the solver specific things. */
         final ChallengeVetoReason superVeto = super.getChallengeVetoReason(c);
-        if (superVeto != null) {
+        if (superVeto != ChallengeVetoReason.NONE) {
             return superVeto;
         }
-        if (!account.isEnabled()) {
-            return ChallengeVetoReason.ACCOUNT_DISABLED;
-        }
-        if (!account.isValid()) {
-            return ChallengeVetoReason.ACCOUNT_IN_ERROR_STATE;
+        /* Same definition of a usable account as the status of the solver service. */
+        final ChallengeVetoReason accountVeto = PluginForCaptchaSolverSolverService.getAccountVetoReason(account);
+        if (accountVeto != ChallengeVetoReason.NONE) {
+            return accountVeto;
         }
         if (!plugin.enoughBalanceFor(c, account)) {
             return ChallengeVetoReason.ACCOUNT_NOT_ENOUGH_BALANCE;
@@ -169,7 +168,7 @@ public class PluginChallengeSolver<T> extends ChallengeSolver<T> {
             return ChallengeVetoReason.CUSTOM_LIMIT_REACHED;
         }
         /* No veto = Given challenge can be solved by this solver. */
-        return null;
+        return ChallengeVetoReason.NONE;
     }
 
     /* The feedback type is already checked by ChallengeSolver#setValid. */

@@ -5,6 +5,7 @@ import java.lang.reflect.Type;
 
 import jd.controlling.accountchecker.AccountCheckerThread;
 import jd.controlling.captcha.SkipRequest;
+import jd.controlling.linkchecker.LinkCheckerThread;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.LinkCrawler;
 import jd.plugins.DownloadLink;
@@ -32,6 +33,7 @@ public abstract class Challenge<T> {
     private volatile long         lastActivity       = created;
     private int                   timeout            = -1;
     private final boolean         createdInsideAccountChecker;
+    private final boolean         createdInsideLinkChecker;
     private int                   round              = -1;
     private CaptchaRequestType    captchaRequestType = null;
     private final boolean         guessAccountLogin;
@@ -191,6 +193,7 @@ public abstract class Challenge<T> {
         typeID = method;
         explain = explain2;
         createdInsideAccountChecker = Thread.currentThread() instanceof AccountCheckerThread;
+        createdInsideLinkChecker = Thread.currentThread() instanceof LinkCheckerThread;
         Type superClass = this.getClass().getGenericSuperclass();
         while (superClass instanceof Class) {
             superClass = ((Class<?>) superClass).getGenericSuperclass();
@@ -233,6 +236,14 @@ public abstract class Challenge<T> {
 
     public boolean isCreatedInsideAccountChecker() {
         return createdInsideAccountChecker;
+    }
+
+    /**
+     * True if the challenge was created by the thread of the linkcheck. Plugins should not ask for captchas there, see
+     * {@link jd.plugins.Plugin.ChallengeRefreshVeto#REFRESH_LINKCHECK_NOT_ALLOWED}.
+     */
+    public boolean isCreatedInsideLinkChecker() {
+        return createdInsideLinkChecker;
     }
 
     public int getTimeout() {

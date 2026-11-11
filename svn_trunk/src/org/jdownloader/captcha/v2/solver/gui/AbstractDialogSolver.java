@@ -24,13 +24,13 @@ public abstract class AbstractDialogSolver<T> extends ChallengeSolver<T> {
     @Override
     public ChallengeVetoReason getChallengeVetoReason(final Challenge<?> c) {
         final ChallengeVetoReason superVeto = super.getChallengeVetoReason(c);
-        if (superVeto != null) {
+        if (superVeto != ChallengeVetoReason.NONE) {
             return superVeto;
         }
         if (AbstractSolverService.isManualSolvingBlockedBySilentMode()) {
             return ChallengeVetoReason.SILENT_MODE;
         }
-        return null;
+        return ChallengeVetoReason.NONE;
     }
 
     /**

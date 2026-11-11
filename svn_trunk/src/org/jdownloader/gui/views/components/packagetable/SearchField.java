@@ -149,13 +149,13 @@ public class SearchField<SearchCat extends SearchCatInterface, PackageType exten
         return SearchHistoryManager.getInstance();
     }
 
-    /* The search fields of the download and linkgrabber tab are always at the very bottom of the JD window -> popup opens upwards */
     @Override
     protected boolean isClearButtonEnabled() {
         /* Draws its own clear button */
         return false;
     }
 
+    /* The search fields of the download and linkgrabber tab are always at the very bottom of the JD window -> popup opens upwards */
     @Override
     protected boolean isHistoryPopupUpwards() {
         return true;

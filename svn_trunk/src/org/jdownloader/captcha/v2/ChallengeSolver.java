@@ -103,6 +103,16 @@ public abstract class ChallengeSolver<T> {
             public Icon getIcon(final int size) {
                 return NewTheme.I().getIcon(IconKey.ICON_OCR, size);
             }
+
+            @Override
+            public boolean requiresUserOnThisComputer() {
+                return false;
+            }
+
+            @Override
+            public boolean requiresHuman() {
+                return false;
+            }
         },
         /** Local dialog solver: a human solves the captcha in a JDownloader dialog. */
         JD_LOCAL_DIALOG(SolverType.DEFAULT_START_NEXT_AFTER_SECONDS_JD_LOCAL_DIALOG) {
@@ -115,6 +125,16 @@ public abstract class ChallengeSolver<T> {
             public Icon getIcon(final int size) {
                 return NewTheme.I().getIcon(IconKey.ICON_EDIT, size);
             }
+
+            @Override
+            public boolean requiresUserOnThisComputer() {
+                return true;
+            }
+
+            @Override
+            public boolean requiresHuman() {
+                return true;
+            }
         },
         JD_LOCAL_BROWSER(SolverType.DEFAULT_START_NEXT_AFTER_SECONDS_JD_LOCAL_BROWSER) {
             @Override
@@ -125,6 +145,16 @@ public abstract class ChallengeSolver<T> {
             @Override
             public Icon getIcon(final int size) {
                 return NewTheme.I().getIcon(IconKey.ICON_BROWSE, size);
+            }
+
+            @Override
+            public boolean requiresUserOnThisComputer() {
+                return true;
+            }
+
+            @Override
+            public boolean requiresHuman() {
+                return true;
             }
         },
         JD_REMOTE_MYJD(SolverType.DEFAULT_START_NEXT_AFTER_SECONDS_JD_REMOTE_MYJD) {
@@ -137,6 +167,16 @@ public abstract class ChallengeSolver<T> {
             public Icon getIcon(final int size) {
                 return new AbstractIcon(IconKey.ICON_LOGO_MYJDOWNLOADER, size);
             }
+
+            @Override
+            public boolean requiresUserOnThisComputer() {
+                return false;
+            }
+
+            @Override
+            public boolean requiresHuman() {
+                return true;
+            }
         },
         EXTERNAL(SolverType.DEFAULT_START_NEXT_AFTER_SECONDS_EXTERNAL) {
             @Override
@@ -147,6 +187,16 @@ public abstract class ChallengeSolver<T> {
             @Override
             public Icon getIcon(final int size) {
                 return NewTheme.I().getIcon(IconKey.ICON_PREMIUM, size);
+            }
+
+            @Override
+            public boolean requiresUserOnThisComputer() {
+                return false;
+            }
+
+            @Override
+            public boolean requiresHuman() {
+                return false;
             }
         };
 
@@ -188,6 +238,18 @@ public abstract class ChallengeSolver<T> {
 
         /** Icon of this solver type, e.g. for the solver type selection of the solver comparison table. */
         public abstract Icon getIcon(int size);
+
+        /**
+         * True for the solver types which need the user in front of this computer (dialog, browser): The silent mode keeps these away.
+         * This is the one place which defines that, every type overrides it, so do not switch over the solver types for it.
+         */
+        public abstract boolean requiresUserOnThisComputer();
+
+        /**
+         * True for the solver types where a human has to solve the captcha: The ones of {@link #requiresUserOnThisComputer()} and the remote
+         * solver (MyJDownloader), where the user answers on another device.
+         */
+        public abstract boolean requiresHuman();
     }
 
     public enum ChallengeVetoReason {
@@ -219,7 +281,9 @@ public abstract class ChallengeSolver<T> {
          * but try auto solver"): Solvers which need the user (dialog, browser) are not used. Depends on the state of the silent mode, so it
          * is a temporary reason and not an "unsupported" one, see {@link ChallengeSolver#getUnsupportedReason(Challenge)}.
          */
-        SILENT_MODE
+        SILENT_MODE,
+        /** No veto: The challenge can be handled by the solver. */
+        NONE
     }
 
     protected ChallengeSolver() {
@@ -491,13 +555,13 @@ public abstract class ChallengeSolver<T> {
     }
 
     /**
-     * Returns null if challenge can be handled by ChallengeSolver. <br>
-     * Returns nun null value if challenge cannot be solved by this ChallengeSolver. <br>
+     * Returns {@link ChallengeVetoReason#NONE} if challenge can be handled by ChallengeSolver. <br>
+     * Returns any other value if challenge cannot be solved by this ChallengeSolver. <br>
      * Checks the user's settings first (solver enabled, captcha type disabled), then {@link #getUnsupportedReason(Challenge)}, then the
      * captcha rules. <br>
      * Subclasses that add checks independent of the user's settings must override {@link #getUnsupportedReason(Challenge)} instead.
      * Subclasses that add checks depending on state or settings (e.g. account state) have to call super first, then check the solver
-     * specific things and return null (= can be handled) if none of them vetoes.
+     * specific things and return {@link ChallengeVetoReason#NONE} (= can be handled) if none of them vetoes.
      */
     public ChallengeVetoReason getChallengeVetoReason(final Challenge<?> c) {
         if (!this.isEnabled()) {
@@ -513,7 +577,7 @@ public abstract class ChallengeSolver<T> {
             }
         }
         final ChallengeVetoReason unsupportedReason = getUnsupportedReason(c);
-        if (unsupportedReason != null) {
+        if (unsupportedReason != ChallengeVetoReason.NONE) {
             return unsupportedReason;
         }
         /* Check for filter list entry. */
@@ -524,18 +588,18 @@ public abstract class ChallengeSolver<T> {
         case FILTERED_WHITELIST:
         case NOT_FILTERED:
         default:
-            return null;
+            return ChallengeVetoReason.NONE;
         }
     }
 
     /**
-     * Returns null if this solver is technically able to solve the given challenge, no matter whether the user enabled it or not.
-     * Returns a non-null value if it can never solve it, e.g. because it does not support the captcha type. <br>
+     * Returns {@link ChallengeVetoReason#NONE} if this solver is technically able to solve the given challenge, no matter whether the user
+     * enabled it or not. Returns any other value if it can never solve it, e.g. because it does not support the captcha type. <br>
      * Only reasons which do not depend on the user's settings (solver enabled, captcha type disabled, captcha rules, ...) may be returned
      * here. This allows to find out that "the only thing in the way is the user's own configuration", see
      * {@link #getChallengeVetoReason(Challenge)} which includes this check. <br>
-     * Subclasses that add their own checks have to call super first, then check the solver specific things and return null if none of them
-     * vetoes. Subclasses must not override {@link #getChallengeVetoReason(Challenge)} for such checks.
+     * Subclasses that add their own checks have to call super first, then check the solver specific things and return
+     * {@link ChallengeVetoReason#NONE} if none of them vetoes. Subclasses must not override {@link #getChallengeVetoReason(Challenge)} for such checks.
      */
     public ChallengeVetoReason getUnsupportedReason(final Challenge<?> c) {
         final Set<CAPTCHA_TYPE> supported_types = this.getSupportedCaptchaTypes();
@@ -567,7 +631,7 @@ public abstract class ChallengeSolver<T> {
                 return ChallengeVetoReason.SAME_IP_REQUIRED_NO_PROXY;
             }
         }
-        return null;
+        return ChallengeVetoReason.NONE;
     }
 
     /**

@@ -15,6 +15,7 @@ import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
 import org.jdownloader.captcha.v2.solver.service.AbstractSolverService;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.settings.staticreferences.CFG_API;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.settings.advanced.AdvancedConfigManager;
 import org.jdownloader.settings.staticreferences.CFG_MYJD;
@@ -52,7 +53,7 @@ public class CaptchaAPIManualRemoteSolverService extends AbstractSolverService {
     }
 
     /**
-     * The states the Status column can be in for this solver: connected (ready), no MyJDownloader account configured yet (routine
+     * The states the Status column can be in for this solver: connected (ready, see {@link #isRemoteSolvingAvailable()}), no MyJDownloader account configured yet (routine
      * "Configure" case), account configured but currently not connected, or account configured but in an error state (see
      * {@link MyJDownloaderError}). The last two need the user's attention and are shown with a warning icon.
      */
@@ -63,8 +64,16 @@ public class CaptchaAPIManualRemoteSolverService extends AbstractSolverService {
         ERROR
     }
 
+    /**
+     * True if captchas can be sent to a remote client: MyJDownloader is active or the deprecated API (local HTTP API) is enabled. This is
+     * the one place which defines that, the status of this service and the solver ({@link CaptchaAPISolver}) both use it.
+     */
+    public static boolean isRemoteSolvingAvailable() {
+        return MyJDownloaderController.getInstance().isActive() || CFG_API.DEPRECATED_API_ENABLED.isEnabled();
+    }
+
     private Status getResolvedStatus() {
-        if (MyJDownloaderController.getInstance().isActive()) {
+        if (isRemoteSolvingAvailable()) {
             return Status.CONNECTED;
         }
         if (StringUtils.isEmpty(CFG_MYJD.CFG.getEmail()) || StringUtils.isEmpty(CFG_MYJD.CFG.getPassword())) {
@@ -79,21 +88,6 @@ public class CaptchaAPIManualRemoteSolverService extends AbstractSolverService {
             return Status.NOT_CONNECTED;
         default:
             return Status.ERROR;
-        }
-    }
-
-    @Override
-    public String getStatusText() {
-        switch (getResolvedStatus()) {
-        case CONNECTED:
-            final String blocking = getBlockingStatusIssue();
-            return blocking != null ? blocking : _GUI.T.CaptchaSolverService_status_ready();
-        case NOT_CONFIGURED:
-        case NOT_CONNECTED:
-        case ERROR:
-        default:
-            /* Not ready -> an action button (see getStatusActionName()) is shown instead. */
-            return null;
         }
     }
 

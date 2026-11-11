@@ -36,7 +36,7 @@ import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.plugins.components.antiDDoSForHost;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 41283 $", interfaceVersion = 3, names = { "hqq.tv" }, urls = { "https?://(?:www\\.)?hqq\\.(?:tv|watch)/.+|https?://waaw\\.tv/watch_video\\.php\\?v=[A-Za-z0-9]+" })
+@HostPlugin(revision = "$Revision: 53954 $", interfaceVersion = 3, names = { "hqq.tv" }, urls = { "https?://(?:www\\.)?hqq\\.(?:tv|watch)/.+|https?://waaw\\.tv/watch_video\\.php\\?v=[A-Za-z0-9]+" })
 public class HqqTv extends antiDDoSForHost {
     public HqqTv(PluginWrapper wrapper) {
         super(wrapper);
@@ -85,6 +85,10 @@ public class HqqTv extends antiDDoSForHost {
         final String ip = PluginJSonUtils.getJsonValue(ajax, "ip");
         final String needCaptcha = PluginJSonUtils.getJsonValue(ajax, "need_captcha");
         final String sitekey = new Regex(decode, "grecaptcha.execute\\('([^']+)'").getMatch(0);
+        if (!PluginEnvironment.DOWNLOAD.equals(getPluginEnvironment())) {
+            /* Do not ask for a captcha during the linkcheck. The file information is only available after solving it. */
+            return AvailableStatus.UNCHECKABLE;
+        }
         final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, this.br, sitekey) {
             @Override
             public TYPE getType() {

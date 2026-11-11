@@ -29,7 +29,7 @@ public class AccountOAuthSolver extends ChallengeSolver<Boolean> {
             return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
         }
         /* No veto = Given challenge can be solved by this solver. */
-        return null;
+        return ChallengeVetoReason.NONE;
     }
 
     @Override

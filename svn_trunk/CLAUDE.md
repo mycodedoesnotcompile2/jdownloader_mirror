@@ -8,6 +8,8 @@ When asked for a commit message, provide the message as **plain text with no svn
 
 Always wrap the commit message in a fenced ```text code block so it can be copied with one click. The block must contain only the commit message itself (subject line, blank line, body), nothing else.
 
+Do **not** insert manual line breaks (hard wrapping) inside the message. The subject is one single line and every body paragraph is one single line, however long. Line breaks are only allowed between paragraphs (blank line) and between list items, each of which also stays on one line.
+
 **No manual line breaks inside the message.** Do not hard-wrap lines at a fixed width. Every paragraph and every list item is written as one single line; line breaks are only used to separate the subject, blank lines, headings and list items.
 
 **Describe the changes in the style of [Keep a Changelog 1.0.0](https://keepachangelog.com/en/1.0.0/).** After the subject line, group the body under the headings `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed` and `Security` (only the ones that apply, in that order). Each entry is a `-` list item written for a reader of the changelog: say what changed from the user's or caller's point of view, not how the code was edited. Also mention the names of the changed classes in the entries (e.g. `SelectBrowserDialog`, `ChallengeResponseController`), so the reader can tell where the change was made. Use `Fixed` for bug fixes and `Changed` for behaviour or performance changes of existing functionality.
@@ -37,20 +39,9 @@ Fixed
 
 ## Java Compatibility
 
-**All Java code in this project must be Java 1.6 compatible.**
+**All Java code in this project must be Java 1.8 compatible.**
 
-The following Java 1.7+ features are forbidden:
-
-| Feature | Example (forbidden) |
-|---|---|
-| Diamond operator | `new ArrayList<>()` → use `new ArrayList<String>()` |
-| Try-with-resources | `try (InputStream is = ...)` → use `finally { is.close(); }` |
-| Multi-catch | `catch (A \| B e)` → use separate catch blocks |
-| Switch on Strings | `switch (str) { case "foo": }` → use `if/else` chains |
-| Lambdas | `list.forEach(x -> ...)` → use explicit loops |
-| Streams | `list.stream().filter(...)` → use loops |
-| Binary literals | `0b1010` → use `10` or hex |
-| Underscores in literals | `1_000_000` → use `1000000` |
+Java 1.8 language features (diamond operator, try-with-resources, multi-catch, switch on Strings, lambdas, streams, binary literals, underscores in literals) are allowed. Do not use features or APIs introduced after Java 1.8 (e.g. `var`, `List.of(...)`, `String.isBlank()`, records, text blocks).
 
 ## Enum Evaluation
 
@@ -85,7 +76,6 @@ default:
 }
 ```
 
-Note: `switch` over an `enum` is Java 1.6 compatible — only `switch` over `String` is forbidden (see Java Compatibility above).
 
 ## API Field Access (Null / Type Checks)
 
@@ -178,6 +168,28 @@ The **newest entry is always the one closest to the search field**, the oldest e
 - Every row has a remove icon at its right end. It is only shown for the highlighted row, but its space is always reserved so the text does not jump. A click on the icon removes the entry, a click anywhere else on the row applies it.
 - Entries are removed via `SearchHistoryManager.remove(...)` (shared, persistent history), then the popup is refreshed.
 - After a removal the selection moves to a neighbor so several entries can be removed in a row. The neighbor is chosen by age, not by screen position: the next **newer** entry (towards the search field) if there is one, else the next **older** one, else the selection is cleared. In a downward popup the newer neighbor is therefore the one above, in an upward popup the one below.
+
+## Veto Reasons Instead of boolean
+
+A method that checks something and returns `true`/`false` can return a **veto reason enum** instead, so that the caller gets the exact reason in the negative case. Examples: `Plugin.ChallengeRefreshVeto`, `ChallengeSolver.ChallengeVetoReason`.
+
+**When to use it:** only if there are several *different* reasons for the negative result **and** the caller needs to know or process them (e.g. show the reason to the user, react differently per reason, log it). If there is one reason, or the caller only needs yes/no, keep `boolean`. Do not use a veto enum by default.
+
+**"No veto" is `NONE`, never `null`:**
+
+- Every veto enum has a `NONE` constant as its **last** constant. It means "no veto, the check passed".
+- Methods returning a veto enum never return `null`. Callers compare against `NONE`.
+
+**Naming and structure:**
+
+- Nest the enum in the class that owns the check (like `Plugin.ChallengeRefreshVeto`), named `<Subject>Veto` or `<Subject>VetoReason`.
+- Implement `LabelInterface` only if the reason is shown to the user. `NONE` returns `null` as label.
+- Document each constant (Javadoc) with when it is returned.
+
+**Do not change existing code on your own — ask first:**
+
+- Never convert an existing `boolean` method or an existing class to a veto enum without asking.
+- Also ask before creating a **new** veto enum, even for a new method, so the reasons and the need for them can be agreed on first.
 
 ## Throw After a Method That Only Ever Throws
 

@@ -138,8 +138,16 @@ public abstract class AbstractSolverService implements SolverService {
         return _GUI.T.CaptchaSolverService_status_silentMode();
     }
 
+    /**
+     * The status text, the same order for all solvers: null while an action button is shown instead (see {@link #getStatusActionName()}),
+     * then a blocking problem, then an info and otherwise the text of the ready state, see {@link #getReadyStatusText()}. Subclasses
+     * override the parts, not this method.
+     */
     @Override
     public String getStatusText() {
+        if (getStatusActionName() != null) {
+            return null;
+        }
         final String blocking = getBlockingStatusIssue();
         if (blocking != null) {
             return blocking;
@@ -148,7 +156,12 @@ public abstract class AbstractSolverService implements SolverService {
         if (info != null) {
             return info;
         }
-        return "Ready";
+        return getReadyStatusText();
+    }
+
+    /** The status text of a solver which is ready and has no problem. Overridable (e.g. to show the balance). */
+    protected String getReadyStatusText() {
+        return _GUI.T.CaptchaSolverService_status_ready();
     }
 
     @Override

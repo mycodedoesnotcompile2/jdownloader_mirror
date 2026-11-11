@@ -1577,6 +1577,16 @@ public abstract class Plugin implements ActionListener {
                 return _GUI.T.AbstractCaptchaDialog_refreshDisabledLogin_tooltip();
             }
         },
+        /**
+         * The captcha was requested during the linkcheck. Plugins should not do that, so nobody waits for a refresh there: A refresh would
+         * not create a new challenge.
+         */
+        REFRESH_LINKCHECK_NOT_ALLOWED {
+            @Override
+            public String getLabel() {
+                return _GUI.T.AbstractCaptchaDialog_refreshDisabledLinkcheck_tooltip();
+            }
+        },
         /** This type of captcha cannot be refreshed, e.g. because it is not an image captcha. */
         REFRESH_CAPTCHA_TYPE_NOT_ALLOWED {
             @Override
@@ -1614,6 +1624,10 @@ public abstract class Plugin implements ActionListener {
              * 3. Not sure how retry + adding an account for the first time (modal add account dialog) would play together.
              */
             return ChallengeRefreshVeto.REFRESH_LOGIN_CAPTCHA_NOT_ALLOWED;
+        }
+        if (challenge.isCreatedInsideLinkChecker()) {
+            /* Captchas should be avoided during the linkcheck (see PluginForHost#handleCaptchaChallenge): There is no retry for a refresh. */
+            return ChallengeRefreshVeto.REFRESH_LINKCHECK_NOT_ALLOWED;
         }
         /* 2025-11-05: Only alow refresh for image captchas. */
         if (!(challenge instanceof ImageCaptchaChallenge)) {

@@ -23,7 +23,6 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -38,6 +37,7 @@ import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Regex;
 import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
 
@@ -50,7 +50,7 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 53899 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53953 $", interfaceVersion = 2, names = {}, urls = {})
 public class JustPasteIt extends AbstractPastebinCrawler {
     public JustPasteIt(PluginWrapper wrapper) {
         super(wrapper);
@@ -175,13 +175,22 @@ public class JustPasteIt extends AbstractPastebinCrawler {
     private static final int CAPTCHA_TILE_GAP         = 6;
     private static final int CAPTCHA_MIN_CLICKS       = 2;
     private static final int CAPTCHA_MAX_CLICKS       = 6;
-    private static final int CAPTCHA_MAX_ATTEMPTS     = 3;
-    /*
-     * Max. number of captcha refreshes (user clicks refresh button) before the crawl process is stopped with a retry. Same limit as in the
-     * browser: There the active challenge can also be refreshed 5 times, after that it cannot be refreshed anymore without reloading the
-     * whole page.
-     */
-    private static final int CAPTCHA_MAX_REFRESHES    = 5;
+    /**
+     * False as soon as the server said (response of "next test" request) that no further captcha test can be loaded. */
+    private boolean          canLoadNextCaptchaTest   = true;
+
+    @Override
+    public ChallengeRefreshVeto getChallengeRefreshVeto(final Challenge<?> challenge) {
+        final ChallengeRefreshVeto veto = super.getChallengeRefreshVeto(challenge);
+        if (veto != ChallengeRefreshVeto.NONE) {
+            return veto;
+        }
+        if (!canLoadNextCaptchaTest) {
+            /* Server side limit reached: Disables the refresh button of the captcha dialog and shows the matching tooltip. */
+            return ChallengeRefreshVeto.REFRESH_LIMIT_REACHED;
+        }
+        return ChallengeRefreshVeto.NONE;
+    }
 
     /** Sends a JSON POST request and returns the parsed JSON response. */
     private Map<String, Object> postJson(final Browser br, final String url, final Map<String, Object> body) throws Exception {
@@ -207,7 +216,11 @@ public class JustPasteIt extends AbstractPastebinCrawler {
         logger.info("Creating captcha test: " + createTestUrl);
         Map<String, Object> test = postJson(br, createTestUrl, new HashMap<String, Object>());
         int refreshCount = 0;
-        for (int attempt = 1; attempt <= CAPTCHA_MAX_ATTEMPTS; attempt++) {
+        int attempt = 0;
+        canLoadNextCaptchaTest = true;
+        /* No fixed limit: Ends when solved, when the server refuses further tests (canSolveTest/canLoadNextTest) or when the user aborts. */
+        while (true) {
+            attempt++;
             if (this.isAbort()) {
                 throw new InterruptedException();
             }
@@ -217,7 +230,7 @@ public class JustPasteIt extends AbstractPastebinCrawler {
             final Map<String, Object> imageChallenge = (Map<String, Object>) testCase.get("imageChallenge");
             final String correctWord = imageChallenge.get("correctWord").toString();
             final String imageUrl = imageChallenge.get("imageUrl").toString();
-            logger.info("Captcha attempt " + attempt + "/" + CAPTCHA_MAX_ATTEMPTS + " | testID: " + testID + " | word: " + correctWord);
+            logger.info("Captcha attempt " + attempt + " | testID: " + testID + " | word: " + correctWord);
             final String cryptoAnswer = generateCryptoAnswer(cryptoChallenge.get("source").toString(), cryptoChallenge.get("salt").toString(), ((Number) cryptoChallenge.get("iterations")).intValue());
             logger.info("Solved crypto challenge: " + cryptoAnswer);
             final File captchaFile = getClickCaptchaImage(br, imageUrl);
@@ -232,11 +245,7 @@ public class JustPasteIt extends AbstractPastebinCrawler {
                  * old challenge is done and must not be reused. A refresh is no failed attempt so it does not count as one.
                  */
                 refreshCount++;
-                logger.info("User requested new captcha (refresh " + refreshCount + "/" + CAPTCHA_MAX_REFRESHES + ")");
-                if (refreshCount > CAPTCHA_MAX_REFRESHES) {
-                    logger.warning("Too many captcha refreshes");
-                    throw e;
-                }
+                logger.info("User requested new captcha (refresh " + refreshCount + ")");
                 test = loadNextCaptchaTest(br, nextTestUrl, testID);
                 attempt--;
                 continue;
@@ -262,13 +271,11 @@ public class JustPasteIt extends AbstractPastebinCrawler {
             /* Number of different images must still reach the minimum, otherwise the server would reject the answer anyway. */
             if (clicksPerImage.size() < CAPTCHA_MIN_CLICKS) {
                 /*
-                 * Invalid answer: Do not send it. The challenge object must not be reused (it counts as answered), so the next round gets
-                 * a completely new captcha test from the server.
+                 * Invalid answer: Do not send it. The challenge object must not be reused (it counts as answered), so the next round gets a
+                 * completely new captcha test from the server.
                  */
                 logger.warning("Invalid answer: Only " + clicksPerImage.size() + " different image(s) selected (" + clicks.getX().length + " clicks), minimum is " + CAPTCHA_MIN_CLICKS + " -> Not sending answer, requesting new captcha");
-                if (attempt < CAPTCHA_MAX_ATTEMPTS) {
-                    test = loadNextCaptchaTest(br, nextTestUrl, testID);
-                }
+                test = loadNextCaptchaTest(br, nextTestUrl, testID);
                 continue;
             }
             final Set<Integer> selected = clicksPerImage.keySet();
@@ -289,15 +296,14 @@ public class JustPasteIt extends AbstractPastebinCrawler {
             if (!Boolean.TRUE.equals(result.get("canSolveTest"))) {
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA);
             }
-            if (!Boolean.TRUE.equals(result.get("canLoadNextTest"))) {
+            canLoadNextCaptchaTest = Boolean.TRUE.equals(result.get("canLoadNextTest"));
+            if (!canLoadNextCaptchaTest) {
+                /* Server side per-session captcha reload limit */
                 logger.info("Cannot load next captcha test");
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA);
             }
-            if (attempt < CAPTCHA_MAX_ATTEMPTS) {
-                test = loadNextCaptchaTest(br, nextTestUrl, testID);
-            }
+            test = loadNextCaptchaTest(br, nextTestUrl, testID);
         }
-        throw new PluginException(LinkStatus.ERROR_CAPTCHA);
     }
 
     /** Requests a new captcha test from the server. Needed after every invalid or wrong answer: A used test cannot be answered again. */
@@ -308,6 +314,11 @@ public class JustPasteIt extends AbstractPastebinCrawler {
         if (nextTest == null) {
             logger.warning("Failed to load next captcha test: " + next);
             throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+        }
+        if (!Boolean.TRUE.equals(next.get("canLoadNextTest"))) {
+            /* The new test can still be solved but it cannot be refreshed anymore: See getChallengeRefreshVeto. */
+            logger.info("Server does not allow to load further captcha tests");
+            canLoadNextCaptchaTest = false;
         }
         return nextTest;
     }

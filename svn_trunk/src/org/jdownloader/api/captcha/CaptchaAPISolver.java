@@ -13,9 +13,7 @@ import org.appwork.remoteapi.RemoteAPIRequest;
 import org.appwork.remoteapi.RemoteAPIResponse;
 import org.appwork.remoteapi.exceptions.InternalApiException;
 import org.appwork.storage.JSonStorage;
-import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.StringUtils;
-import org.jdownloader.api.RemoteAPIConfig;
 import org.jdownloader.api.myjdownloader.MyJDownloaderController;
 import org.jdownloader.api.myjdownloader.MyJDownloaderHttpConnection;
 import org.jdownloader.api.myjdownloader.MyJDownloaderRequestInterface;
@@ -50,7 +48,7 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
     public ChallengeVetoReason getUnsupportedReason(final Challenge<?> c) {
         /* Always ask the super class first, then check the solver specific things. */
         final ChallengeVetoReason superVeto = super.getUnsupportedReason(c);
-        if (superVeto != null) {
+        if (superVeto != ChallengeVetoReason.NONE) {
             return superVeto;
         }
         if (BrowserSolver.isSpecialReCaptchaEnterpriseChallenge(c)) {
@@ -58,7 +56,7 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
             return ChallengeVetoReason.UNSUPPORTED_FOR_INTERNAL_SPECIAL_REASONS;
         }
         /* No veto = Given challenge can be solved by this solver. */
-        return null;
+        return ChallengeVetoReason.NONE;
     }
 
     @Override
@@ -74,11 +72,9 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
                 CAPTCHA_TYPE.HCAPTCHA);
     }
 
-    private final RemoteAPIConfig remoteAPIConfig = JsonConfig.create(RemoteAPIConfig.class);
-
     @Override
     public boolean isEnabled() {
-        return super.isEnabled() && (isMyJDownloaderActive() || remoteAPIConfig.isDeprecatedApiEnabled());
+        return super.isEnabled() && CaptchaAPIManualRemoteSolverService.isRemoteSolvingAvailable();
     }
 
     @Override
@@ -119,7 +115,7 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
         for (final SolverJob<?> entry : ChallengeResponseController.getInstance().listJobs()) {
             if (!entry.isDone()) {
                 final Challenge<?> challenge = entry.getChallenge();
-                if (getChallengeVetoReason(challenge) == null) {
+                if (getChallengeVetoReason(challenge) == ChallengeVetoReason.NONE) {
                     final CaptchaJob captchaJob = getCaptchaJob(request, challenge.getId().getID());
                     if (captchaJob != null) {
                         ret.add(captchaJob);
@@ -175,24 +171,34 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
         return ChallengeResponseController.getInstance().getJobByChallengeId(id);
     }
 
+    /**
+     * Special behavior of the remote solver: Its job is solved by a client on another device (MyJDownloader or the deprecated API), not
+     * by JDownloader itself, so it only runs while such a client can reach JDownloader, see
+     * {@link CaptchaAPIManualRemoteSolverService#isRemoteSolvingAvailable()}. If the connection is gone (e.g. MyJDownloader disconnected
+     * while the job was running), nobody can answer anymore: The job counts as done for this solver, so the other solvers are not
+     * blocked by waiting for it.
+     */
     public boolean isJobDone(final SolverJob<?> job) {
-        if (!isMyJDownloaderActive()) {
+        if (!CaptchaAPIManualRemoteSolverService.isRemoteSolvingAvailable()) {
             return true;
         }
         return super.isJobDone(job);
     }
 
+    /**
+     * Special behavior of the remote solver: It is not started if no client can reach JDownloader (neither MyJDownloader nor the
+     * deprecated API is available, see {@link CaptchaAPIManualRemoteSolverService#isRemoteSolvingAvailable()}), because nobody could
+     * answer the captcha then. The solver is marked as done for the job right away instead of being queued, so the job does not wait for
+     * it and the other solvers solve the captcha. The check is repeated here (and in {@link #isJobDone(SolverJob)}) because the
+     * availability can change between creating the list of solvers and starting the job.
+     */
     @Override
     public void enqueue(SolverJob<Object> job) {
-        if (!isMyJDownloaderActive()) {
+        if (!CaptchaAPIManualRemoteSolverService.isRemoteSolvingAvailable()) {
             job.setSolverDone(this);
             return;
         }
         super.enqueue(job);
-    }
-
-    private boolean isMyJDownloaderActive() {
-        return MyJDownloaderController.getInstance().isActive();
     }
 
     public boolean solve(long id, String result) throws InvalidCaptchaIDException, InvalidChallengeTypeException {
@@ -219,6 +225,13 @@ public class CaptchaAPISolver extends ChallengeSolver<Object> implements Captcha
         return skip(id, SkipRequest.SINGLE);
     }
 
+    /**
+     * Note: This accepts every {@link SkipRequest}, including {@link SkipRequest#REFRESH}, and does not check
+     * {@link jd.plugins.Plugin#getChallengeRefreshVeto(org.jdownloader.captcha.v2.Challenge)}. This is harmless: If a refresh is not
+     * allowed for the challenge, the plugin checks the veto again when it handles the SkipException (see
+     * PluginForHost#handleSkipException and PluginForDecrypt#handleSkipException) and treats the request as a normal skip instead of
+     * retrying.
+     */
     public boolean skip(long id, SkipRequest type) throws InvalidCaptchaIDException {
         final SolverJob<?> job = getJobByChallengeId(id);
         if (job == null) {

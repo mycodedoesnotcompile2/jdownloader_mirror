@@ -358,6 +358,7 @@ public abstract class AbstractImageCaptchaDialog<T> extends AbstractCaptchaDialo
             ret.add(inputComponent);
         }
         addExternalSolverPanel(ret);
+        addLoginCaptchaPanel(ret);
         return ret;
     }
 

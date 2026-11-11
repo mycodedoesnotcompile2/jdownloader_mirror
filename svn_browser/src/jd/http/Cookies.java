@@ -142,7 +142,7 @@ public class Cookies {
 
     /**
      * TODO: add proper support of PublicSuffixList
-     * 
+     *
      * @param url
      * @param cookie
      * @return
@@ -161,14 +161,14 @@ public class Cookies {
         if (normalizedDomain.startsWith(".")) {
             normalizedDomain = normalizedDomain.substring(1);
         }
+        final String normalizedHost = IDN.toASCII(host.trim()).toLowerCase(Locale.ROOT);
+        if (normalizedHost.equals(normalizedDomain)) {
+            return true;
+        }
         if (normalizedDomain.isEmpty() || !normalizedDomain.contains(".")) {
             /* invalid pure tld like com/de... */
             DebugMode.debugger();
             return false;
-        }
-        final String normalizedHost = IDN.toASCII(host.trim()).toLowerCase(Locale.ROOT);
-        if (normalizedHost.equals(normalizedDomain)) {
-            return true;
         }
         final boolean ret = normalizedHost.endsWith("." + normalizedDomain);
         if (!ret) {
@@ -472,14 +472,39 @@ public class Cookies {
             DebugMode.debugger();
             return;
         }
+        final List<Cookie> candiates = new ArrayList<Cookie>();
+        final List<Cookie> replaceNonServerCookies = new ArrayList<Cookie>();
+        boolean containsSameCookieByIdentity = false;
+        final boolean newServerCookie = Cookie.SOURCE.SERVER.isSameSource(newCookie);
         for (final Cookie cookie : this.getCookies()) {
-            if (cookie.equals(newCookie)) {
-                if (cookie.isCustomCookie() != newCookie.isCustomCookie()) {
-                    continue;
-                }
-                cookie.update(newCookie);
-                return;
+            if (!StringUtils.equalsIgnoreCase(cookie.getHost(), newCookie.getHost())) {
+                /* collection might contain cookies from different hosts */
+                continue;
             }
+            if (newServerCookie && !Cookie.SOURCE.SERVER.isSameSource(newCookie) && StringUtils.equals(cookie.getKey(), newCookie.getKey())) {
+                /* new server cookie is replacing all non server cookies with same key */
+                replaceNonServerCookies.add(cookie);
+                continue;
+            }
+            if (cookie == newCookie) {
+                /* newCookie already part of this collection, don't call Cookie.update on any candidates */
+                containsSameCookieByIdentity = true;
+            } else if (cookie.equals(newCookie)) {
+                candiates.add(cookie);
+            }
+        }
+        for (final Cookie replace : replaceNonServerCookies) {
+            removeCookieByIdentity(replace);
+        }
+        if (containsSameCookieByIdentity) {
+            return;
+        }
+        boolean ret = false;
+        for (final Cookie candidate : candiates) {
+            ret |= candidate.update(newCookie);
+        }
+        if (ret) {
+            return;
         }
         cookies.add(newCookie);
     }
@@ -660,7 +685,7 @@ public class Cookies {
         return this.getCookies().isEmpty();
     }
 
-    public boolean remove(final Cookie cookie) {
+    public boolean removeCookieByIdentity(final Cookie cookie) {
         return cookie != null && getCookies().removeIf(new Predicate<Cookie>() {
             @Override
             public boolean test(Cookie t) {

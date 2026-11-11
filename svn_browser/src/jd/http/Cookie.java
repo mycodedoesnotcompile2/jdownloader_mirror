@@ -19,6 +19,7 @@ import java.net.IDN;
 import java.net.URL;
 import java.util.Date;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 import org.appwork.utils.DebugMode;
@@ -111,6 +112,11 @@ public class Cookie {
         public LegacyCookie newCookieInstance() {
             return new LegacyCookie();
         }
+
+        @Override
+        public boolean isCustomCookie() {
+            return getDomain() == null;
+        }
     }
 
     public static enum SOURCE {
@@ -139,6 +145,10 @@ public class Cookie {
             }
         };
         public abstract Cookie newCookieInstance();
+
+        public boolean isSameSource(Cookie cookie) {
+            return cookie.getSource() == this;
+        }
     }
 
     public final static String UNSECURE_HTTP = "http";
@@ -171,8 +181,9 @@ public class Cookie {
         return SECURE_HTTPS.equalsIgnoreCase(protocol);
     }
 
-    public void setProtocol(String protocol) {
-        this.protocol = protocol;
+    public boolean setProtocol(String protocol) {
+        final String oldProtocol = this.protocol;
+        return StringUtils.equalsIgnoreCase(oldProtocol, this.protocol = protocol);
     }
 
     public static <T extends Cookie> T copyOf(T cookie) {
@@ -205,7 +216,8 @@ public class Cookie {
         return "Lax";// default
     }
 
-    public void setSameSite(String sameSite) {
+    public boolean setSameSite(String sameSite) {
+        final String oldSameSite = this.sameSite;
         if ("Lax".equalsIgnoreCase(sameSite)) {
             this.sameSite = "Lax";
         } else if ("Strict".equalsIgnoreCase(sameSite)) {
@@ -215,22 +227,31 @@ public class Cookie {
         } else {
             this.sameSite = null;
         }
+        return !StringUtils.equals(oldSameSite, this.sameSite);
     }
 
     public Boolean isHostOnly() {
         return hostOnly;
     }
 
-    public void setHostOnly(Boolean hostOnly) {
+    public boolean setHostOnly(Boolean hostOnly) {
+        if (Objects.equals(this.hostOnly, hostOnly)) {
+            return false;
+        }
         this.hostOnly = hostOnly;
+        return true;
     }
 
     public Boolean isSecure() {
         return this.secure;
     }
 
-    public void setSecure(Boolean secure) {
+    public boolean setSecure(Boolean secure) {
+        if (Objects.equals(this.secure, secure)) {
+            return false;
+        }
         this.secure = secure;
+        return true;
     }
 
     private String domain       = null;
@@ -424,8 +445,9 @@ public class Cookie {
         }
     }
 
-    public void setCreationTime(final long time) {
-        this.creationTime = time;
+    public boolean setCreationTime(final long time) {
+        final long oldCreationTime = this.creationTime;
+        return oldCreationTime != (this.creationTime = time);
     }
 
     public boolean setDomain(String domain) {
@@ -434,7 +456,13 @@ public class Cookie {
             /** RFC 6265, remove leading dot **/
             domain = domain.replaceFirst("^\\.+", "");
             /** normalize domain */
-            domain = IDN.toASCII(domain).toLowerCase(Locale.ROOT);
+            try {
+                domain = IDN.toASCII(domain).toLowerCase(Locale.ROOT);
+            } catch (IllegalArgumentException e) {
+                e.printStackTrace();
+                DebugMode.debugger();
+                return false;
+            }
         }
         if (StringUtils.isEmpty(domain)) {
             this.domain = null;
@@ -444,8 +472,9 @@ public class Cookie {
         return true;
     }
 
-    public void setExpireDate(final long time) {
-        this.expireTime = time;
+    public boolean setExpireDate(final long time) {
+        final long oldExpireTime = this.expireTime;
+        return oldExpireTime != (this.expireTime = time);
     }
 
     public void setExpires(final String expires) {
@@ -463,12 +492,14 @@ public class Cookie {
         return;
     }
 
-    public void setHost(final String host) {
-        this.host = Browser.getHost(host, false);
+    public boolean setHost(final String host) {
+        final String oldHost = this.host;
+        return !StringUtils.equalsIgnoreCase(oldHost, this.host = Browser.getHost(host, false));
     }
 
-    public void setHostTime(final long time) {
-        this.hostTime = time;
+    public boolean setHostTime(final long time) {
+        final long oldHostTime = this.hostTime;
+        return oldHostTime != (this.hostTime = time);
     }
 
     public boolean updateHost(String newHost) {
@@ -484,13 +515,16 @@ public class Cookie {
         newHost = newHost.toLowerCase(Locale.ROOT);
         String domain = getDomain();
         if (domain == null) {
-            setHost(newHost);
-            return true;
+            return setHost(newHost);
+        } else if (StringUtils.equalsIgnoreCase(oldHost, domain)) {
+            boolean ret = setDomain(newHost);
+            ret |= setHost(newHost);
+            return ret;
         } else if (StringUtils.endsWithCaseInsensitive(domain, "." + oldHost)) {
             domain = domain.replaceFirst("(?i)\\." + Pattern.quote(oldHost) + "$", "." + newHost);
-            setDomain(domain);
-            setHost(newHost);
-            return true;
+            boolean ret = setDomain(domain);
+            ret |= setHost(newHost);
+            return ret;
         }
         return false;
     }
@@ -510,17 +544,20 @@ public class Cookie {
         return;
     }
 
-    public void setKey(final String key) {
-        this.key = key;
+    public boolean setKey(final String key) {
+        final String oldKey = this.key;
+        return !StringUtils.equals(oldKey, this.key = key);
     }
 
-    public void setPath(String path) {
+    public boolean setPath(String path) {
+        final String oldPath = this.path;
         path = cleanAttributeValue(path);
         if (StringUtils.isEmpty(path)) {
             this.path = null;
         } else {
             this.path = path;
         }
+        return !StringUtils.equals(oldPath, this.path);
     }
 
     protected String cleanAttributeValue(String val) {
@@ -539,8 +576,9 @@ public class Cookie {
         return val;
     }
 
-    public void setValue(final String value) {
-        this.value = value;
+    public boolean setValue(final String value) {
+        final String oldValue = this.value;
+        return !StringUtils.equals(oldValue, this.value = value);
     }
 
     @Override
@@ -548,31 +586,36 @@ public class Cookie {
         return this.getKey() + "=" + this.getValue() + " @Host:" + this.getHost() + "|Domain:" + getDomain() + "|HostOnly:" + isHostOnly() + "|Path:" + getPath() + "|SameSite:" + getSameSite() + "|Secure:" + isSecure() + "|Source:" + getSource();
     }
 
-    protected synchronized void update(final Cookie source) {
+    protected synchronized boolean update(final Cookie source) {
         if (Boolean.TRUE.equals(isSecure()) && UNSECURE_HTTP.equals(source.getProtocol())) {
             /** unsecure http cookie never can change a secure(d) cookie **/
             DebugMode.debugger();
-            return;
+            return false;
         }
-        this.setCreationTime(source.getCreationTime());
-        this.setExpireDate(source.getExpireDate());
-        this.setValue(source.getValue());
-        this.setHostTime(source.getHostTime());
+        boolean ret = this.setCreationTime(source.getCreationTime());
+        ret |= this.setExpireDate(source.getExpireDate());
+        ret |= this.setValue(source.getValue());
+        ret |= this.setHostTime(source.getHostTime());
         final Boolean hostOnly = source.isHostOnly();
-        if (hostOnly != null) {
-            setHostOnly(hostOnly);
+        if (hostOnly != null || source.isCustomCookie()) {
+            ret |= setHostOnly(hostOnly);
         }
         final Boolean secure = source.isSecure();
-        if (secure != null) {
-            setSecure(secure);
+        if (secure != null || source.isCustomCookie()) {
+            ret |= setSecure(secure);
         }
         final String domain = source.getDomain();
-        if (domain != null) {
-            setDomain(domain);
+        if (domain != null || source.isCustomCookie()) {
+            ret |= setDomain(domain);
         }
         final String sameSite = source.getSetSameSite();
-        if (sameSite != null) {
-            setSameSite(sameSite);
+        if (sameSite != null || source.isCustomCookie()) {
+            ret |= setSameSite(sameSite);
         }
+        if (source.isCustomCookie()) {
+            ret |= setProtocol(source.getProtocol());
+            ret |= setPath(source.getPath());
+        }
+        return ret;
     }
 }

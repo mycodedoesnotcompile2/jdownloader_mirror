@@ -630,6 +630,14 @@ public abstract class PluginForHost extends Plugin {
         PluginProgress progress = null;
         Account checkedAccount = null;
         try {
+            switch (getPluginEnvironment()) {
+            case LINK_CHECK:
+                /* Plugins must not ask for captchas during the linkcheck. Log it so that the plugin can be fixed. */
+                logger.log(new Exception("Plugin " + getHost() + " requested a captcha (" + c.getClass().getSimpleName() + ") during the linkcheck! Captchas must be avoided in the linkcheck, e.g. by returning AvailableStatus.UNCHECKABLE if PluginEnvironment != DOWNLOAD."));
+                break;
+            default:
+                break;
+            }
             c.setTimeout(getChallengeTimeout(c));
             invalidateLastChallengeResponse();
             if (isAccountLoginCaptchaChallenge(c)) {
@@ -684,6 +692,14 @@ public abstract class PluginForHost extends Plugin {
                     }
                 }
             }
+            /*
+             * Neither a download (SingleDownloadController) nor a crawler plugin (PluginForDecrypt in the LinkCrawlerThread) is waiting for
+             * this challenge. This can only happen if a plugin asks for a captcha in a place where it should not, e.g. inside
+             * requestFileInformation during the linkcheck (LinkCheckerThread). Plugins must avoid captchas during the linkcheck, such a
+             * case is logged at the start of this method. <br>
+             * Consequence for the refresh button of the captcha dialog: The button is not disabled here (the veto does not know the thread),
+             * but there is no retry which could create a new challenge. A SkipRequest.REFRESH ends up as a normal CaptchaException.
+             */
             throw new CaptchaException(e);
         } finally {
             c.cleanup();

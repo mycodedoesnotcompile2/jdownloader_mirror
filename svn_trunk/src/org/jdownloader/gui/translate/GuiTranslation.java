@@ -3295,6 +3295,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Login captchas cannot be refreshed (with this button)." })
     String AbstractCaptchaDialog_refreshDisabledLogin_tooltip();
 
+    @Default(lngs = { "en" }, values = { "Refresh is not possible: This captcha was requested during the linkcheck." })
+    String AbstractCaptchaDialog_refreshDisabledLinkcheck_tooltip();
+
     @Default(lngs = { "en" }, values = { "Refresh is not possible for this type of captcha." })
     String AbstractCaptchaDialog_refreshDisabledCaptchaType_tooltip();
 
@@ -5735,11 +5738,14 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "You've just applied a visual sort.\r\nNOTE: This does not change the order of the solvers!\r\nTo revert this, click on the highlighted column header until the highlighting disappears.\r\nTo perform a permanent sort which will change the order of the solvers, press and hold CTRL and click inside any column header.\r\nBe careful with sorting: The order of the solvers in this table is the order they will be used for captcha solving!" })
     String SolverOrderTable_sortwarner_text();
 
-    @Default(lngs = { "en" }, values = { "Avoid external solvers for login captchas?" })
-    String CaptchaConfigPanel_avoidAutoSolverForLoginCaptchas();
+    @Default(lngs = { "en" }, values = { "Ask me first for login captchas?" })
+    String AbstractCaptchaDialog_avoidExternalSolversForLoginCaptchas();
 
-    @Default(lngs = { "en" }, values = { "Affects login captchas only: If a login captcha is required and at least one manual captcha solver is available, only manual captcha solvers will be allowed to solve this login captcha. Background: External captcha solvers can take a long time to solve captchas but when the user is adding an account or an account gets checked and a captcha is required, it should typically be solved faster and the manual solvers are typically faster. If you disable this setting, login captchas are handled exactly the same way as any other captchas." })
-    String CaptchaConfigPanel_avoidAutoSolverForLoginCaptchas_tooltip();
+    @Default(lngs = { "en" }, values = { "Login captchas only: You are asked first, external solvers follow as usual." })
+    String AbstractCaptchaDialog_avoidExternalSolversForLoginCaptchas_description();
+
+    @Default(lngs = { "en" }, values = { "Affects login captchas only: If enabled, the manual captcha solvers (browser, dialog, MyJDownloader) are asked first for a login captcha, before the external captcha solvers. The external solvers are still used afterwards as usual (see the setting \"Start the next solver after\" of the solvers). Background: When the user is adding an account or an account gets checked and a captcha is required, it should be solved fast and the user is typically faster than external solvers. If you disable this setting, login captchas are handled exactly the same way as any other captchas, in the order of the solver table." })
+String AbstractCaptchaDialog_avoidExternalSolversForLoginCaptchas_tooltip();
 
     @Default(lngs = { "en" }, values = { "Solver comparison table" })
     String CaptchaSolverComparison_tab_title();

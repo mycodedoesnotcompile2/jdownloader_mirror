@@ -316,10 +316,10 @@ public abstract class abstractPluginForCaptchaSolver extends PluginForHost {
      *
      * @param c
      *            The challenge to check
-     * @return null if this solver can handle the challenge, ChallengeVetoReason otherwise
+     * @return {@link ChallengeVetoReason#NONE} if this solver can handle the challenge, any other ChallengeVetoReason otherwise
      */
     public ChallengeVetoReason getVetoReason(final Challenge<?> c, final Account account) {
-        return null;
+        return ChallengeVetoReason.NONE;
     }
 
     @Override

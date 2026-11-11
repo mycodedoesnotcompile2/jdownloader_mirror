@@ -53,6 +53,7 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.translate._JDT;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
+import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSolverService;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
@@ -534,7 +535,7 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
         }
         switch (getAccountManagerType(acc)) {
         case CAPTCHA_SOLVER:
-            return CFG_GENERAL.CFG.isUseAvailableCaptchaSolverAccounts() ? StatusAction.NONE : StatusAction.ENABLE_SOLVER_ACCOUNTS;
+            return PluginForCaptchaSolverSolverService.isUsageOfSolverAccountsEnabled() ? StatusAction.NONE : StatusAction.ENABLE_SOLVER_ACCOUNTS;
         case MULTIHOST:
         case DOWNLOAD:
         default:

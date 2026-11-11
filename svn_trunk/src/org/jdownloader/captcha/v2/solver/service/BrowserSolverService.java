@@ -68,8 +68,9 @@ public class BrowserSolverService extends AbstractSolverService {
     }
 
     /**
-     * Not ready if the system cannot open URLs (no OS default browser and no usable browser command line, see BrowserSolver#enqueue) or if
-     * the configured browser executable does not exist.
+     * Not ready if the system cannot open URLs (no OS default browser and no usable browser command line, see
+     * {@link #getBlockingStatusIssue()}) or if the configured browser executable does not exist (see {@link #getStatusActionName()}), the
+     * rest is the default of the base class.
      */
     @Override
     public boolean isReady() {
@@ -77,7 +78,16 @@ public class BrowserSolverService extends AbstractSolverService {
             /* Guard Clause for headless installations though headless shouldn't even try to use this service anyways. */
             return false;
         }
-        return isOpenBrowserSupported() && getMissingBrowserPath() == null && getBlockingStatusIssue() == null;
+        return super.isReady();
+    }
+
+    /** The system cannot open URLs (no OS default browser and no usable browser command line, see BrowserSolver#enqueue). */
+    @Override
+    protected String getBlockingStatusIssue() {
+        if (!isOpenBrowserSupported()) {
+            return _GUI.T.BrowserSolverService_status_notReady_openUrlsUnsupported();
+        }
+        return super.getBlockingStatusIssue();
     }
 
     /** The user has to solve the captchas in the browser on this computer, which the silent mode prevents. */
@@ -142,29 +152,8 @@ public class BrowserSolverService extends AbstractSolverService {
         return getMissingBrowserPath() != null;
     }
 
-    /** The "Not ready" status text is shown as a warning, see {@link #getStatusText()}. */
     @Override
-    public boolean isStatusTextWarning() {
-        return !isReady() || getInfoStatusIssue() != null;
-    }
-
-    @Override
-    public String getStatusText() {
-        if (isCustomBrowserMissing()) {
-            /* Not ready -> an action button (see getStatusActionName()) is shown instead. */
-            return null;
-        }
-        if (!isOpenBrowserSupported()) {
-            return _GUI.T.BrowserSolverService_status_notReady_openUrlsUnsupported();
-        }
-        final String blocking = getBlockingStatusIssue();
-        if (blocking != null) {
-            return blocking;
-        }
-        final String info = getInfoStatusIssue();
-        if (info != null) {
-            return info;
-        }
+    protected String getReadyStatusText() {
         final String[] commandline = getConfig().getBrowserCommandline();
         if (commandline != null && commandline.length > 0) {
             final String browserName = ExternalBrowserManager.getInstance().getLazyBrowserName(commandline);

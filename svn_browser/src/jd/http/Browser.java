@@ -1298,7 +1298,11 @@ public class Browser implements HTTPConnectionFactoryInterface {
         }
         final Cookies requestCookies = request.getCookies();
         for (final Cookie cookie : cookies.getCookies()) {
-            if (cookie.isExpired() || !cookie.matches(url)) {
+            if (cookie.isExpired()) {
+                continue;
+            } else if (!cookie.isValid()) {
+                continue;
+            } else if (!cookie.matches(url)) {
                 continue;
             }
             requestCookies.add(cookie);
@@ -2626,6 +2630,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 final Cookie copy = Cookie.copyOf(setCookie);
                 if (copy.updateHost(host)) {
                     newSetCookies.add(copy);
+                } else {
+                    DebugMode.debugger();
                 }
             }
             cookies.add(newSetCookies);

@@ -89,7 +89,6 @@ import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSolverService;
 import org.jdownloader.plugins.components.captchasolver.abstractPluginForCaptchaSolver;
 
-import jd.controlling.AccountController;
 import jd.gui.swing.jdgui.BasicJDTable;
 import jd.controlling.captcha.SkipException;
 import jd.plugins.Account;
@@ -1176,8 +1175,8 @@ public class CaptchaTestPanel extends WidthTrackingPanel {
         }
         if (service instanceof PluginForCaptchaSolverSolverService) {
             /* External solvers are created per account (the controller uses one account per solver service). */
-            final List<Account> accounts = AccountController.getInstance().getValidAccounts(service.getID());
-            if (accounts != null && !accounts.isEmpty()) {
+            final List<Account> accounts = ((PluginForCaptchaSolverSolverService) service).getUsableAccounts();
+            if (!accounts.isEmpty()) {
                 final Account account = accounts.get(0);
                 try {
                     limit = Math.min(limit, getSolverLimit(((abstractPluginForCaptchaSolver) account.getPlugin()).getPluginChallengeSolver(null, account)));

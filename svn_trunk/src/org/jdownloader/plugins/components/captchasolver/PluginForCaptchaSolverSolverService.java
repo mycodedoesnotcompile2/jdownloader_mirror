@@ -24,7 +24,9 @@ import org.jdownloader.DomainInfo;
 import org.jdownloader.captcha.v2.CaptchaSolverConfigV3;
 import org.jdownloader.captcha.v2.CaptchaSolverLimitRule;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
+import org.jdownloader.captcha.v2.ChallengeSolver.ChallengeVetoReason;
 import org.jdownloader.captcha.v2.ChallengeSolver.SolverFeature;
+import org.jdownloader.captcha.v2.PluginChallengeSolver;
 import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
 import org.jdownloader.captcha.v2.solver.service.AbstractSolverService;
 import org.jdownloader.gui.translate._GUI;
@@ -83,10 +85,46 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
         return _GUI.T.CaptchaSolverService_description();
     }
 
+    /**
+     * Why an account of an external solver cannot be used, or {@link ChallengeVetoReason#NONE} if it can. This is the one place which defines
+     * whether an account is usable: The status of the solver (see {@link #getUsableAccounts()}) and the solver of the account (see
+     * {@link PluginChallengeSolver#getChallengeVetoReason(org.jdownloader.captcha.v2.Challenge)}) both use it, so they cannot disagree.
+     */
+    public static ChallengeVetoReason getAccountVetoReason(final Account account) {
+        if (!account.isEnabled()) {
+            return ChallengeVetoReason.ACCOUNT_DISABLED;
+        } else if (!account.isValid() || account.isTempDisabled()) {
+            return ChallengeVetoReason.ACCOUNT_IN_ERROR_STATE;
+        }
+        return ChallengeVetoReason.NONE;
+    }
+
+    /** The accounts of this solver which can be used right now, see {@link #getAccountVetoReason(Account)}. Never null. */
+    public List<Account> getUsableAccounts() {
+        final List<Account> ret = new ArrayList<Account>();
+        final List<Account> allAccounts = AccountController.getInstance().list(plugin.getHost());
+        if (allAccounts != null) {
+            for (final Account account : allAccounts) {
+                if (getAccountVetoReason(account) == ChallengeVetoReason.NONE) {
+                    ret.add(account);
+                }
+            }
+        }
+        return ret;
+    }
+
+    /**
+     * False if the user has globally disabled the usage of external solver accounts (setting "Use available captcha solver accounts"): No
+     * external solver is used then. This is the one place which reads the setting.
+     */
+    public static boolean isUsageOfSolverAccountsEnabled() {
+        return CFG_GENERAL.CFG.isUseAvailableCaptchaSolverAccounts();
+    }
+
     @Override
     public Double getBalance() {
-        final List<Account> validAccounts = AccountController.getInstance().getValidAccounts(plugin.getHost());
-        if (validAccounts == null || validAccounts.isEmpty()) {
+        final List<Account> validAccounts = getUsableAccounts();
+        if (validAccounts.isEmpty()) {
             return null;
         }
         double balance = 0;
@@ -104,8 +142,8 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
 
     @Override
     public Currency getBalanceCurrency() {
-        final List<Account> validAccounts = AccountController.getInstance().getValidAccounts(plugin.getHost());
-        if (validAccounts == null || validAccounts.isEmpty()) {
+        final List<Account> validAccounts = getUsableAccounts();
+        if (validAccounts.isEmpty()) {
             return null;
         }
         /* In practice all accounts of one solver share the same currency, so the first one that has one is used for the total. */
@@ -154,7 +192,7 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
      * are not used anyway, and solvers that already show an action button (no/unusable account) need no second warning on top of it.
      */
     private boolean isAccountsGloballyDisabledWarning() {
-        return !CFG_GENERAL.CFG.isUseAvailableCaptchaSolverAccounts() && getConfigV3().isEnabled() && getResolvedStatus() == Status.READY;
+        return !isUsageOfSolverAccountsEnabled() && getConfigV3().isEnabled() && getResolvedStatus() == Status.READY;
     }
 
     @Override
@@ -183,8 +221,7 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
         if (allAccounts == null || allAccounts.isEmpty()) {
             return Status.NO_ACCOUNT;
         }
-        final List<Account> validAccounts = AccountController.getInstance().getValidAccounts(plugin.getHost());
-        if (validAccounts == null || validAccounts.isEmpty()) {
+        if (getUsableAccounts().isEmpty()) {
             /* Accounts exist, but every single one is currently unusable: disabled by the user, in an error state (invalid) or both. */
             boolean anyDisabled = false;
             boolean anyEnabled = false;
@@ -205,20 +242,13 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
         return Status.READY;
     }
 
+    /** Ready: shows the balance of the usable accounts. */
     @Override
-    public String getStatusText() {
-        if (getResolvedStatus() != Status.READY) {
-            /* Not ready -> an action button (see getStatusActionName()) is shown instead. */
-            return null;
-        }
-        final String blocking = getBlockingStatusIssue();
-        if (blocking != null) {
-            return blocking;
-        }
-        final List<Account> validAccounts = AccountController.getInstance().getValidAccounts(plugin.getHost());
+    protected String getReadyStatusText() {
+        final List<Account> validAccounts = getUsableAccounts();
         final Double balance = getBalance();
         if (balance == null) {
-            return _GUI.T.CaptchaSolverService_status_ready();
+            return super.getReadyStatusText();
         }
         final Currency currency = getBalanceCurrency();
         /* Same balance formatting regardless of account count, consistent with the Balance column and single-account solvers. */
@@ -240,14 +270,14 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
      * nothing about the single accounts, so no warning is shown then.
      */
     private boolean isLowBalance() {
-        final List<Account> validAccounts = AccountController.getInstance().getValidAccounts(plugin.getHost());
-        return validAccounts != null && validAccounts.size() == 1 && validAccounts.get(0).isLowBalance();
+        final List<Account> validAccounts = getUsableAccounts();
+        return validAccounts.size() == 1 && validAccounts.get(0).isLowBalance();
     }
 
     /** Warning for a low balance (see {@link #isLowBalance()}) and for the problems of the base class and a used up custom limit. */
     @Override
     public boolean isStatusTextWarning() {
-        return getBlockingStatusIssue() != null || isLowBalance();
+        return super.isStatusTextWarning() || isLowBalance();
     }
 
     @Override

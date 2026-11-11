@@ -291,6 +291,7 @@ public class BrowserCaptchaDialog extends AbstractCaptchaDialog<String> {
     public JComponent layoutDialogContent() {
         final JComponent ret = super.layoutDialogContent();
         addExternalSolverPanel(ret);
+        addLoginCaptchaPanel(ret);
         if (BrowserSolverService.getInstance().getConfig().isAutoOpenBrowserEnabled()) {
             final Thread openBrowseThread = new Thread("BrowserCaptcha:AutoOpen:" + challenge) {
                 {

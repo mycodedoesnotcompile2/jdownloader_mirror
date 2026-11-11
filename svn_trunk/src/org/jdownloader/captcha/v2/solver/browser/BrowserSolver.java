@@ -48,7 +48,7 @@ public class BrowserSolver extends ChallengeSolver<String> {
     public ChallengeVetoReason getUnsupportedReason(Challenge<?> c) {
         /* Always ask the super class first, then check the solver specific things. */
         final ChallengeVetoReason superVeto = super.getUnsupportedReason(c);
-        if (superVeto != null) {
+        if (superVeto != ChallengeVetoReason.NONE) {
             return superVeto;
         }
         if (isSpecialReCaptchaEnterpriseChallenge(c)) {
@@ -61,20 +61,20 @@ public class BrowserSolver extends ChallengeSolver<String> {
             return ChallengeVetoReason.UNSUPPORTED_BROWSER_NOT_FOUND;
         }
         /* No veto = Given challenge can be solved by this solver. */
-        return null;
+        return ChallengeVetoReason.NONE;
     }
 
     /** Silent mode with "Skip the Captcha" or "Do not show a dialog, but try auto solver": The user cannot be asked, so no browser. */
     @Override
     public ChallengeVetoReason getChallengeVetoReason(final Challenge<?> c) {
         final ChallengeVetoReason superVeto = super.getChallengeVetoReason(c);
-        if (superVeto != null) {
+        if (superVeto != ChallengeVetoReason.NONE) {
             return superVeto;
         }
         if (AbstractSolverService.isManualSolvingBlockedBySilentMode()) {
             return ChallengeVetoReason.SILENT_MODE;
         }
-        return null;
+        return ChallengeVetoReason.NONE;
     }
 
     @Override

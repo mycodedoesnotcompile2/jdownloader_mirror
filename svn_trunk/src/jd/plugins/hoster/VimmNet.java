@@ -39,7 +39,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.VimmNetCrawler;
 
-@HostPlugin(revision = "$Revision: 53254 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53954 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { VimmNetCrawler.class })
 public class VimmNet extends PluginForHost {
     public VimmNet(PluginWrapper wrapper) {
@@ -132,6 +132,11 @@ public class VimmNet extends PluginForHost {
         /* Captcha form may come along with http response 404 so first handle captcha, then check for offline */
         final Form captchaform = br.getFormbyProperty("id", "turnstile-form");
         if (captchaform != null) {
+            if (!PluginEnvironment.DOWNLOAD.equals(getPluginEnvironment())) {
+                /* Do not ask for a captcha during the linkcheck. */
+                logger.info("Cannot do linkcheck due to captcha");
+                return AvailableStatus.UNCHECKABLE;
+            }
             final String cfTurnstileResponse = new CaptchaHelperHostPluginCloudflareTurnstile(this, br).getToken();
             captchaform.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
             br.submitForm(captchaform);

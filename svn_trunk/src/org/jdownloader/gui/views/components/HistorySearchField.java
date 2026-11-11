@@ -191,6 +191,30 @@ public abstract class HistorySearchField extends ExtTextField {
         return isClearButtonVisible() && clearXPos > 0 && e.getX() >= clearXPos;
     }
 
+    /** Space at the right end of the field reserved for the clear button, so the text never runs under it. */
+    private int getClearButtonSpace() {
+        /* clearImage is null while the super constructor already asks for the insets */
+        if (clearImage == null || !isClearButtonEnabled()) {
+            return 0;
+        }
+        return clearImage.getWidth(null) + 6;
+    }
+
+    /* Insets are copied before modification: Some borders (e.g. of the LAF) return a cached instance which must not grow on every call */
+    @Override
+    public Insets getInsets() {
+        final Insets insets = (Insets) super.getInsets().clone();
+        insets.right += getClearButtonSpace();
+        return insets;
+    }
+
+    @Override
+    public Insets getInsets(final Insets insets) {
+        final Insets ret = (Insets) super.getInsets(insets).clone();
+        ret.right += getClearButtonSpace();
+        return ret;
+    }
+
     @Override
     protected void paintComponent(final Graphics g) {
         super.paintComponent(g);
@@ -213,6 +237,13 @@ public abstract class HistorySearchField extends ExtTextField {
             inlineCompletionPrefix = null;
         }
         onSearchTextChanged();
+        if (isClearButtonVisible() != (clearXPos > 0)) {
+            /*
+             * Clear button has to appear/disappear: Typing only repaints the area of the text, not the right end of the field where the
+             * button is drawn
+             */
+            repaint();
+        }
         if (isHistoryPopupVisible() && SwingUtilities.isEventDispatchThread()) {
             updateHistoryPopup(false);
         }

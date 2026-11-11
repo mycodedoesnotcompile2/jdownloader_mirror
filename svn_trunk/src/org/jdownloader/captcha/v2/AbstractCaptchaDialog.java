@@ -51,6 +51,8 @@ import javax.swing.event.ChangeListener;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.gui.swing.dialog.DialogType;
 import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.views.settings.components.Checkbox;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.DownloadLink;
 import jd.plugins.Plugin;
 import jd.plugins.PluginForDecrypt;
@@ -908,6 +910,31 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
         selectPanel.add(button);
         externalPanel.add(selectPanel, "alignx left");
         container.add(externalPanel, "growy 0");
+    }
+
+    /**
+     * Adds the setting "Avoid external solvers for login captchas" with a short description (the long one is the tooltip) to the given
+     * dialog content. It is only shown for login captchas (see {@link Plugin#isAccountLoginCaptchaChallenge(Challenge)}) and only if the
+     * user has at least one usable external solver which could solve this captcha type, because otherwise the setting has no effect. Has
+     * to be called by the subclass after the rest of the content has been added.
+     */
+    protected void addLoginCaptchaPanel(final JComponent container) {
+        final Plugin plugin = this.plugin;
+        if (plugin == null || !plugin.isAccountLoginCaptchaChallenge(challenge)) {
+            return;
+        }
+        if (!ChallengeResponseController.getInstance().isUsableExternalSolverAvailable(CAPTCHA_TYPE.getCaptchaTypeForChallenge(challenge))) {
+            return;
+        }
+        final MigPanel loginPanel = new MigPanel("ins 5 0 0 0,wrap 1", "[grow,fill]", "[]");
+        SwingUtils.setOpaque(loginPanel, false);
+        final Checkbox avoidExternalSolvers = new Checkbox(CFG_CAPTCHA.AVOID_AUTO_SOLVER_FOR_LOGIN_CAPTCHAS);
+        avoidExternalSolvers.setText(_GUI.T.AbstractCaptchaDialog_avoidExternalSolversForLoginCaptchas());
+        avoidExternalSolvers.setToolTipText("<html><body style='width:400px'>" + _GUI.T.AbstractCaptchaDialog_avoidExternalSolversForLoginCaptchas_tooltip() + "</body></html>");
+        loginPanel.add(avoidExternalSolvers);
+        /* Fixed html width: a plain label would make the whole dialog as wide as the text. */
+        loginPanel.add(new JLabel("<html><body style='width:320px'>" + _GUI.T.AbstractCaptchaDialog_avoidExternalSolversForLoginCaptchas_description() + "</body></html>"), "wmin 0");
+        container.add(loginPanel, "growy 0");
     }
 
     protected HeaderScrollPane createHeaderScrollPane(MigPanel field) {

@@ -86,7 +86,6 @@ import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChi
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPluginFilter;
-import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 import org.jdownloader.updatev2.UpdateController;
 
 public class ChallengeResponseController {
@@ -679,7 +678,7 @@ public class ChallengeResponseController {
             /* Not an interactive captcha (e.g. image captcha) -> No BrowserSolver required */
             return false;
         }
-        return BrowserSolver.getInstance().getUnsupportedReason(c) != null;
+        return BrowserSolver.getInstance().getUnsupportedReason(c) != ChallengeVetoReason.NONE;
     }
 
     protected final static Map<String, Long> TIMESTAMP_NO_BROWSER_SOLVER_AVAILABLE_DIALOG_LAST_DISPLAYED = new HashMap<String, Long>();
@@ -779,16 +778,6 @@ public class ChallengeResponseController {
         return texts != null ? texts : NO_SOLVER_DIALOG_TEXTS.get("en");
     }
 
-    /** True for the solver types which need the user in front of the computer (dialog, browser). */
-    private static boolean isManualSolverType(final SolverType type) {
-        switch (type) {
-        case JD_LOCAL_DIALOG:
-        case JD_LOCAL_BROWSER:
-            return true;
-        default:
-            return false;
-        }
-    }
 
     /**
      * Called if no solver at all is available for the given challenge. Informs the user why (if it is something the user can change), lists
@@ -817,7 +806,7 @@ public class ChallengeResponseController {
                 if (external && service.isUsable()) {
                     readyAndEnabledExternalSolverExists = true;
                 }
-                if (silentMode && isManualSolverType(service.getType())) {
+                if (silentMode && service.getType().requiresUserOnThisComputer()) {
                     /* The solvers which need the user are no option during the silent mode. */
                     manualCandidates.add(service);
                     continue;
@@ -878,7 +867,7 @@ public class ChallengeResponseController {
         /* The reasons why the captcha cannot be solved right now, shown as a list. */
         final List<String> reasons = new ArrayList<String>();
         reasons.add(toReasonText(introText.replace("{type}", captchaType)));
-        if (!CFG_GENERAL.CFG.isUseAvailableCaptchaSolverAccounts()) {
+        if (!PluginForCaptchaSolverSolverService.isUsageOfSolverAccountsEnabled()) {
             reasons.add(toReasonText(texts[TEXT_ACCOUNTS_DISABLED]));
         }
         int disabledCount = 0;
@@ -1198,7 +1187,7 @@ public class ChallengeResponseController {
         for (final ChallengeSolver<?> solver : solverList) {
             try {
                 final ChallengeVetoReason veto = solver.getChallengeVetoReason(c);
-                if (veto != null) {
+                if (veto != ChallengeVetoReason.NONE) {
                     vetoReasons.add(veto);
                     if (reasonsByServiceID != null) {
                         reasonsByServiceID.put(solver.getService().getID(), veto);
@@ -1211,7 +1200,7 @@ public class ChallengeResponseController {
             }
         }
         add_solver_accounts: {
-            if (!CFG_GENERAL.CFG.isUseAvailableCaptchaSolverAccounts()) {
+            if (!PluginForCaptchaSolverSolverService.isUsageOfSolverAccountsEnabled()) {
                 /* User has globally disabled usage of solver accounts -> Don't even fetch accounts */
                 logger.info("User has globally disabled usage of solver accounts");
                 vetoReasons.add(ChallengeVetoReason.EXTERNAL_SOLVER_ACCOUNTS_DISABLED);
@@ -1257,7 +1246,7 @@ public class ChallengeResponseController {
                         continue;
                     }
                     final ChallengeVetoReason veto = solver.getChallengeVetoReason(c);
-                    if (veto != null) {
+                    if (veto != ChallengeVetoReason.NONE) {
                         vetoReasons.add(veto);
                         if (reasonsByServiceID != null) {
                             reasonsByServiceID.put(service.getID(), veto);
@@ -1324,8 +1313,32 @@ public class ChallengeResponseController {
     }
 
     /**
-     * Special handling for login captchas: Removes the external (auto) solvers from the list if wished and if at least one other solver is
-     * left.
+     * Order of the solvers for login captchas if the manual solvers are asked first (see
+     * {@link #applyLoginCaptchaPolicy(Challenge, List)}): Local automatic solvers first (they answer within moments), then the browser
+     * solver, the dialog solver and the remote solver (MyJDownloader), then the external solvers.
+     */
+    private static int getLoginCaptchaOrderRank(final SolverType type) {
+        switch (type) {
+        case JD_LOCAL:
+            return 0;
+        case JD_LOCAL_BROWSER:
+            return 1;
+        case JD_LOCAL_DIALOG:
+            return 2;
+        case JD_REMOTE_MYJD:
+            return 3;
+        case EXTERNAL:
+        default:
+            return 4;
+        }
+    }
+
+    /**
+     * Special handling for login captchas, if wished: The manual solvers are asked first and the external solvers come after them. No
+     * solver is removed: The external solvers are still used (and the user can still choose one in the captcha dialog), only the order
+     * changes: The order of the solver table is replaced by the fixed order of {@link #getLoginCaptchaOrderRank(SolverType)} for the
+     * solver types, the solvers of the same type keep the order of the solver table (the sort is stable). Without manual solvers the order
+     * stays as it is.
      */
     private <T> void applyLoginCaptchaPolicy(final Challenge<T> c, final List<ChallengeSolver<T>> ret) {
         if (!c.getPlugin().isAccountLoginCaptchaChallenge(c)) {
@@ -1342,42 +1355,17 @@ public class ChallengeResponseController {
              */
             return;
         }
-        int avoidedAutoSolversForLoginCaptcha = 0;
-        avoidAutoSolver: {
-            /*
-             * Special handling for login captchas: Solve them locally if possible and wished in order to solve them faster since account
-             * logins in JDownloader are supposed to happen fast.
-             */
-            final List<ChallengeSolver<T>> manualSolvers = new ArrayList<ChallengeSolver<T>>();
-            int numberOfAvoidedSolvers = 0;
-            for (final ChallengeSolver<T> solver : ret) {
-                /*
-                 * Explicitly collect the solver types which are wanted for login captchas. Everything else (external solvers and any solver
-                 * type added in the future) is avoided.
-                 */
-                switch (solver.getSolverType()) {
-                case JD_LOCAL:
-                case JD_LOCAL_DIALOG:
-                case JD_LOCAL_BROWSER:
-                case JD_REMOTE_MYJD:
-                    manualSolvers.add(solver);
-                    break;
-                case EXTERNAL:
-                default:
-                    numberOfAvoidedSolvers++;
-                    break;
-                }
+        /*
+         * Special handling for login captchas: Ask the user first, because account logins in JDownloader are supposed to happen fast and
+         * the manual solvers are typically faster than external ones.
+         */
+        Collections.sort(ret, new Comparator<ChallengeSolver<T>>() {
+            @Override
+            public int compare(final ChallengeSolver<T> a, final ChallengeSolver<T> b) {
+                return getLoginCaptchaOrderRank(a.getSolverType()) - getLoginCaptchaOrderRank(b.getSolverType());
             }
-            if (manualSolvers.size() == 0) {
-                logger.info("Tried to avoid auto solvers for login challenge -> Impossible because there are no manual solvers available!");
-                break avoidAutoSolver;
-            }
-            /* Clear all external solvers and only allow local solvers. */
-            avoidedAutoSolversForLoginCaptcha = numberOfAvoidedSolvers;
-            ret.clear();
-            ret.addAll(manualSolvers);
-        }
-        logger.info("avoidedAutoSolversForLoginCaptcha=" + avoidedAutoSolversForLoginCaptcha + " for challenge " + c.getId());
+        });
+        logger.info("Login challenge " + c.getId() + ": Manual solvers first: " + ret);
     }
 
     /**
@@ -1416,14 +1404,10 @@ public class ChallengeResponseController {
         final List<ChallengeSolver<T>> others = new ArrayList<ChallengeSolver<T>>(ret.size());
         final List<ChallengeSolver<T>> manual = new ArrayList<ChallengeSolver<T>>();
         for (final ChallengeSolver<T> solver : ret) {
-            switch (solver.getSolverType()) {
-            case JD_LOCAL_DIALOG:
-            case JD_LOCAL_BROWSER:
+            if (solver.getSolverType().requiresUserOnThisComputer()) {
                 manual.add(solver);
-                break;
-            default:
+            } else {
                 others.add(solver);
-                break;
             }
         }
         if (manual.size() > 0 && others.size() > 0) {
@@ -1442,6 +1426,27 @@ public class ChallengeResponseController {
 
     public List<SolverService> listServices() {
         return new ArrayList<SolverService>(serviceList);
+    }
+
+    /**
+     * True if the user has at least one external solver which is usable (enabled and ready, see {@link SolverService#isUsable()}) and
+     * could solve the given captcha type: The solver supports it and the user has not disabled it for this solver.
+     */
+    public boolean isUsableExternalSolverAvailable(final CAPTCHA_TYPE type) {
+        if (type == null) {
+            return false;
+        }
+        for (final SolverService service : serviceList) {
+            if (service.getType() != SolverType.EXTERNAL || !service.isUsable()) {
+                continue;
+            }
+            final Set<CAPTCHA_TYPE> supported = service.getSupportedCaptchaTypes();
+            final Set<CAPTCHA_TYPE> disabled = service.getConfigV3().getDisabledCaptchaTypes();
+            if (supported != null && supported.contains(type) && (disabled == null || !disabled.contains(type))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public SolverService getServiceByID(String key) {

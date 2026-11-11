@@ -36,7 +36,7 @@ import jd.plugins.PluginForHost;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 
-@HostPlugin(revision = "$Revision: 52665 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53947 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImagepondNet extends PluginForHost {
     public ImagepondNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -72,7 +72,7 @@ public class ImagepondNet extends PluginForHost {
 
     private static final Pattern PATTERN_IMAGE_OR_VIDEO    = Pattern.compile("/i/([\\w\\-\\.]+)");
     private static final Pattern PATTERN_IMAGE             = Pattern.compile("/image/([\\w\\-\\.]+)");
-    private static final Pattern PATTERN_VIDEO             = Pattern.compile("/videos/([\\w\\-\\.]+)");
+    private static final Pattern PATTERN_VIDEO             = Pattern.compile("/videos?/([\\w\\-\\.]+)");
     private static final String  PROPERTY_INTERNAL_FILE_ID = "internal_file_id";
 
     public static String[] getAnnotationUrls() {
@@ -142,6 +142,10 @@ public class ImagepondNet extends PluginForHost {
     private String getContentURL(final DownloadLink link) {
         final String original_url = link.getPluginPatternMatcher();
         final Regex regex_video = new Regex(original_url, PATTERN_VIDEO);
+        if (StringUtils.containsIgnoreCase(original_url, "/video/")) {
+            /* legacy /video/ */
+            return original_url;
+        }
         if (regex_video.patternFind()) {
             /* Special case: Overview page differs from format of added url. */
             return "https://www." + getHost() + "/i/" + regex_video.getMatch(0);
@@ -161,7 +165,7 @@ public class ImagepondNet extends PluginForHost {
             final String fid_from_browser_url = this.getFID(br.getURL());
             final String fid_from_added_url = this.getFID(link);
             if (fid_from_browser_url != null && !StringUtils.equals(fid_from_added_url, fid_from_browser_url)) {
-                /* E.g. when user adds legacy "/image/..." links and they redirect to new "/i/..." url-format." */
+                /* E.g. when user adds legacy "/image/ or /video/..." links and they redirect to new "/i/..." url-format." */
                 logger.info("Setting new file_id as property | id from added url: " + fid_from_added_url + " | real/new id: " + fid_from_browser_url);
                 link.setProperty(PROPERTY_INTERNAL_FILE_ID, fid_from_browser_url);
             }

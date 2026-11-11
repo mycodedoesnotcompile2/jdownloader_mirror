@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
  * The API is similar to the one of anti-captcha.com/2captcha.com (createTask/getTaskResult) but has its own task types and feedback
  * methods.
  */
-@HostPlugin(revision = "$Revision: 53783 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53952 $", interfaceVersion = 3, names = { "capmonster.cloud" }, urls = { "" })
 public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCaptchaSolver {
     /**
      * Task types which accept the proxy parameters (proxyType, proxyAddress, proxyPort, proxyLogin, proxyPassword). reCAPTCHA v2 (docs:
@@ -114,7 +114,7 @@ public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCapt
     @Override
     public ChallengeVetoReason getVetoReason(final Challenge<?> c, final Account account) {
         final ChallengeVetoReason reason = super.getVetoReason(c, account);
-        if (reason != null) {
+        if (reason != ChallengeVetoReason.NONE) {
             return reason;
         } else if (c instanceof AltchaChallenge && ((AltchaChallenge) c).getChallengeV1() == null) {
             /*
@@ -122,7 +122,7 @@ public class PluginForCaptchaSolverCapmonsterCloud extends abstractPluginForCapt
              */
             return ChallengeVetoReason.UNSUITABLE_FOR_SOLVER;
         } else {
-            return null;
+            return ChallengeVetoReason.NONE;
         }
     }
 

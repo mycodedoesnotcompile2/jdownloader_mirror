@@ -100,7 +100,7 @@ public class JACSolver extends ChallengeSolver<String> {
     public ChallengeVetoReason getUnsupportedReason(final Challenge<?> c) {
         /* Always ask the super class first, then check the solver specific things. */
         final ChallengeVetoReason superVeto = super.getUnsupportedReason(c);
-        if (superVeto != null) {
+        if (superVeto != ChallengeVetoReason.NONE) {
             return superVeto;
         }
         if (!(c instanceof BasicCaptchaChallenge)) {
@@ -112,12 +112,12 @@ public class JACSolver extends ChallengeSolver<String> {
             return ChallengeVetoReason.UNSUPPORTED_BY_SOLVER;
         }
         /* No veto = Given challenge can be solved by this solver. */
-        return null;
+        return ChallengeVetoReason.NONE;
     }
 
     @Override
     public void enqueue(SolverJob<String> job) {
-        if (getChallengeVetoReason(job.getChallenge()) == null) {
+        if (getChallengeVetoReason(job.getChallenge()) == ChallengeVetoReason.NONE) {
             super.enqueue(job);
         }
     }
