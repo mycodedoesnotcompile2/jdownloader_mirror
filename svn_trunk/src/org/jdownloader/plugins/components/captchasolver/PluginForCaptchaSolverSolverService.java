@@ -113,6 +113,20 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
         return ret;
     }
 
+    /** The accounts of this solver which the user has disabled (accounts in an error state are not included). Never null. */
+    public List<Account> getDisabledAccounts() {
+        final List<Account> ret = new ArrayList<Account>();
+        final List<Account> allAccounts = AccountController.getInstance().list(plugin.getHost());
+        if (allAccounts != null) {
+            for (final Account account : allAccounts) {
+                if (!account.isEnabled()) {
+                    ret.add(account);
+                }
+            }
+        }
+        return ret;
+    }
+
     /**
      * False if the user has globally disabled the usage of external solver accounts (setting "Use available captcha solver accounts"): No
      * external solver is used then. This is the one place which reads the setting.

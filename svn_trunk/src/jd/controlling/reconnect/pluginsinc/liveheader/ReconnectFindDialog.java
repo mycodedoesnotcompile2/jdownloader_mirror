@@ -139,6 +139,7 @@ public abstract class ReconnectFindDialog extends AbstractDialog<Object> impleme
 
             public void run() {
                 try {
+                    checkCancelled();
                     IPController.getInstance().invalidate();
                     IPController.getInstance().validate();
                     if (IPController.getInstance().getIpState().isOffline()) {
@@ -148,6 +149,7 @@ public abstract class ReconnectFindDialog extends AbstractDialog<Object> impleme
                         setSubStatusState(_GUI.T.ReconnectDialog_onIPOnline_(), new AbstractIcon(IconKey.ICON_NETWORK_IDLE, 16));
                         setNewIP(IPController.getInstance().getIpState().getExternalIp().toString());
                     }
+                    checkCancelled();
                     ReconnectFindDialog.this.run();
                 } catch (InterruptedException e) {
                     e.printStackTrace();
@@ -209,8 +211,32 @@ public abstract class ReconnectFindDialog extends AbstractDialog<Object> impleme
         };
     }
 
+    /**
+     * Set as soon as the dialog has been closed. Unlike the interrupt flag of the worker thread, this flag cannot get lost when some code in
+     * the wizard swallows an InterruptedException.
+     */
+    private volatile boolean disposed = false;
+
+    /**
+     * @return true if the dialog has been closed and the worker thread must stop and must not show any further dialogs
+     */
+    public boolean isCancelled() {
+        return disposed;
+    }
+
+    /**
+     * Throws an InterruptedException if the dialog has been closed. Also restores the interrupt flag of the current thread.
+     */
+    public void checkCancelled() throws InterruptedException {
+        if (disposed) {
+            Thread.currentThread().interrupt();
+            throw new InterruptedException("Dialog closed");
+        }
+    }
+
     @Override
     public void dispose() {
+        disposed = true;
         super.dispose();
         IPController.getInstance().getEventSender().removeListener(this);
         updateTimer.stop();

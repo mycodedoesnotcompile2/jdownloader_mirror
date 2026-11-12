@@ -231,7 +231,6 @@ public abstract class SearchComboBox<T> extends JComboBox {
             final ComboBoxModel model = SearchComboBox.this.getModel();
             this.searchComboBox.searchAutoComplete(model, txt, found, all);
             SearchComboBox.this.sortFound(txt, found);
-            System.out.println("Found: " + found);
             new EDTRunner() {
                 @Override
                 protected void runInEDT() {
@@ -275,7 +274,6 @@ public abstract class SearchComboBox<T> extends JComboBox {
                                                 @Override
                                                 public Void edtRun() {
                                                     final Rectangle cellBounds = jlist.getCellBounds(selectedIndex, selectedIndex + found.size() - 1);
-                                                    System.out.println("Scroll to " + cellBounds);
                                                     if (cellBounds != null) {
                                                         jlist.scrollRectToVisible(cellBounds);
                                                     }

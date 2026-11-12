@@ -87,6 +87,10 @@ public class ReconnectPluginController {
                     throw e;
                 } catch (Exception e) {
                 }
+                /* A swallowed exception must not let the wizard continue with the next plugin after the dialog has been closed */
+                if (Thread.currentThread().isInterrupted()) {
+                    throw new InterruptedException();
+                }
             }
         }
         if (JsonConfig.create(ReconnectConfig.class).getOptimizationRounds() > 1 && scripts.size() > 0) {

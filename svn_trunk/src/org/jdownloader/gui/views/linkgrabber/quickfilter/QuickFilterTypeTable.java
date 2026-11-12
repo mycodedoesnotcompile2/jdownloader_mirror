@@ -104,6 +104,8 @@ public class QuickFilterTypeTable extends FilterTable {
         } else {
             enabledFilters.remove(filter);
         }
+        /* Only called when the user switches the filter (checkbox, space key) */
+        updateUnfilteredState(true);
         getLinkgrabberTable().getModel().recreateModel(false);
     }
 

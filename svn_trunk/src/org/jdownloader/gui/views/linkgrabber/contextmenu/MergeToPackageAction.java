@@ -1,5 +1,8 @@
 package org.jdownloader.gui.views.linkgrabber.contextmenu;
 
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTableModel;
+import org.jdownloader.gui.views.linkgrabber.LinkGrabberTableModel;
+
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.CrawledPackage;
 
@@ -19,5 +22,10 @@ public class MergeToPackageAction extends org.jdownloader.gui.views.linkgrabber.
         newPackage.setName(name);
         newPackage.setDownloadFolder(downloadFolder);
         return newPackage;
+    }
+
+    @Override
+    protected PackageControllerTableModel<CrawledPackage, CrawledLink> getTableModel() {
+        return LinkGrabberTableModel.getInstance();
     }
 }

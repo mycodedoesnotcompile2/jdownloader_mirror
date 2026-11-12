@@ -106,6 +106,12 @@ public abstract class PackageControllerTable<ParentType extends AbstractPackageN
     private final AtomicLong                                      selectionVersion    = new AtomicLong(0);
     private final DelayedRunnable                                 selectionDelayedUpdate;
     private final boolean                                         wrapAroundEnabled;
+    /* Selection and scroll position from before filtering (search, quick filters), shared by all filter sources of this table */
+    private final UnfilteredTableState                            unfilteredState     = new UnfilteredTableState(this);
+
+    public UnfilteredTableState getUnfilteredState() {
+        return unfilteredState;
+    }
 
     public ExtColumn<AbstractNode> getMouseOverColumn() {
         final Point mp = ToolTipController.getMouseLocation();

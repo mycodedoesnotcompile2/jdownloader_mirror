@@ -1,6 +1,7 @@
 package jd.controlling.captcha;
 
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.appwork.storage.config.ConfigInterface;
@@ -135,6 +136,13 @@ public interface CaptchaSettings extends ConfigInterface {
     CopyOnWriteArrayList<CaptchaHistoryEntry> getCaptchaHistoryEntries();
 
     void setCaptchaHistoryEntries(CopyOnWriteArrayList<CaptchaHistoryEntry> entry);
+
+    @AboutConfig
+    @DescriptionForConfigEntry("Domains the user selected in the last run of the captcha wizard. They are preselected the next time the wizard is opened.")
+    @DefaultJsonObject("[]")
+    Set<String> getCaptchaWizardEntries();
+
+    void setCaptchaWizardEntries(Set<String> entries);
 
     @AboutConfig
     @DescriptionForConfigEntry("Privacy level for interactive captchas ('Browser captchas'). For such captchas, the URL of the website where the captcha needs to be solved might be opened in your browser or sent to your external captcha solvers. This URL may contain information about the file you are about to download e.g. 'https://example.com/file/123456/test.rar'. Set this to strict then only the base URL will be used instead e.g. 'https://example.com/'. WARNING: This can cause problems with captcha solving such as invalid captcha responses or make the captchas harder to solve in your browser.")

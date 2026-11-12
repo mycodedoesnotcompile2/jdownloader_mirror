@@ -14,6 +14,8 @@ Do **not** insert manual line breaks (hard wrapping) inside the message. The sub
 
 **Describe the changes in the style of [Keep a Changelog 1.0.0](https://keepachangelog.com/en/1.0.0/).** After the subject line, group the body under the headings `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed` and `Security` (only the ones that apply, in that order). Each entry is a `-` list item written for a reader of the changelog: say what changed from the user's or caller's point of view, not how the code was edited. Also mention the names of the changed classes in the entries (e.g. `SelectBrowserDialog`, `ChallengeResponseController`), so the reader can tell where the change was made. Use `Fixed` for bug fixes and `Changed` for behaviour or performance changes of existing functionality.
 
+**No Markdown inside the commit message.** The message is plain text: no `###` or `**` headings, no bold/italic, no backticks around class names. Headings are the bare words (`Added`, `Changed`, ...) on their own line, list items start with a plain `- `.
+
 ```text
 Short subject line
 
@@ -251,6 +253,24 @@ Applies to every table created in the JDownloader project.
 
 - All access to the table and its model happens in the EDT (wrap in `EDTRunner`). Background threads only collect data.
 - Frequently changing values (progress, countdown, speed) are refreshed by a periodic repaint of the affected columns, not by rebuilding the model.
+
+## Package Tables: Selection and Scroll Position on Filter Changes
+
+Applies to the package tables (`PackageControllerTable`: download list, linkgrabber) whenever a user facing filter is switched: views of the download list, the search, and every new filter of this kind. Reference implementation: `TableStateSnapshot` used by `UnfilteredTableState` (search, linkgrabber quick filters) and `QuickFilterMenuItem.FilterCombo` (download list views).
+
+A filter change rebuilds the model. Without extra handling the table keeps its pixel scroll position, which is an arbitrary place in the new rows, and `guessSelectedRows` may select a row that has nothing to do with the previous selection. Therefore:
+
+- **Remember:** Before the filter changes, take a `TableStateSnapshot` (selection, lead/anchor, first visible node plus pixel offset). Each filter state keeps its own snapshot (every view, the state from before a search). Nodes are only weakly referenced, nothing is persisted across restarts.
+- **After the rebuild** (`PackageControllerTableModel.runAfterRebuild` / `TableStateSnapshot.runAfterRebuild`, registered *after* the filter change and before `recreateModel`; it only runs after a rebuild that started after the registration, so a rebuild already running with the old filters does not trigger it. Do not listen to `structureChangedFired` for this):
+  1. View switch: if at least one of the nodes selected before the change is present in the new table, `carryOverSelection` keeps them selected, restores lead/anchor and scrolls the lead node (else the topmost selected node) into view, only if it is not visible yet.
+  2. Otherwise the remembered snapshot of the new filter state is restored (`restore`). If nothing was selected in the snapshot and the table was scrolled to its very top or bottom, that edge is restored instead of the first visible node (new links are usually appended at the end; the user wants to see them, not the row that was last before they were added).
+  3. If there is neither, the table stays as it is after the rebuild.
+- **Search and linkgrabber quick filters (`UnfilteredTableState`):** These do not have one snapshot per filter state but a single one per table, shared by all filter sources (search field, all quick filters including custom views; each source reports itself via `table.getUnfilteredState().setFilterActive(source, active, userAction)` before `recreateModel`). The snapshot is taken when the first source gets active (nothing filtered -> filtered) and used when the last one gets inactive. Then the selection of the filtered view is carried over only if the user selected something there that was not selected before (`TableStateSnapshot.hasSelectionNotIn`, a selection made by clicking a quick filter row with QuickViewSelection counts as such); otherwise the snapshot is restored, which also brings back selected nodes the filter had hidden. Only user actions (typing, checkbox, space key, hiding the sidebar or a section) take or restore a snapshot; automatic changes (stored filter states after a restart, new links of a disabled hoster, all links of a disabled filter removed) only update the active state, and if filtering ends automatically the snapshot is dropped.
+- **Actions that replace the selected nodes** (e.g. merge to package) should select the resulting node themselves via `runAfterRebuild` and scroll it into view. Otherwise `guessSelectedRows` selects a neighbour row, which would count as a user selection when a filter ends. Reference: `AbstractMergeToPackageAction.selectMergedPackage`.
+- **Collapsed packages:** A node hidden inside a collapsed package (but passing the filter) counts as present; its package is selected / scrolled to instead. Never change the expanded state of a package for this.
+- **Row lookup:** `PackageControllerTableModel.getRowforObject` returns -1 for children of a collapsed package. For many nodes at once use a single index of the table data (see `TableStateSnapshot.RowLookup`) instead of calling `getRowforObject` per node.
+- Known, intentionally not handled yet: the restore (up to about 1 s after the switch) may overwrite a selection the user made in the meantime; switching the view while a search is active.
+
 ## Search Suggestions (Autocomplete / History)
 
 Applies to every new text field that offers suggestions based on previous input. Reference implementation: `SearchField` together with `SearchHistoryManager`.
@@ -284,13 +304,15 @@ Applies to every new text field that offers suggestions based on previous input.
 
 Every **search field** (a field that only filters or looks something up, and is allowed to be empty) shows a clear button (X icon, `IconKey.ICON_CLOSE`) at its right end. It is only visible while the field contains text, clicking it empties the field (the mouse cursor turns into a hand over it).
 
-- `HistorySearchField` draws it by default. A field with its own clear button (e.g. `SearchField`) overrides `isClearButtonEnabled()` and returns `false`.
+- `HistorySearchField` draws it for all its subclasses (including `SearchField` of the download list and linkgrabber), so there is only one implementation. Do not draw an own clear button in a subclass. It reserves the space via `getInsets()`, so do not add an extra right border for it. Its click is consumed (`MouseEvent.consume()`): other click handlers of the field (e.g. "click into the empty field opens the history") must check `e.isConsumed()`. `isClearButtonEnabled()` returning `false` is only for fields that must not have one.
 - Do **not** add it to fields that must always hold a value, e.g. the download directory selection, package name or file name fields. An X there would let the user create an invalid state.
 
 ## Time and Durations
 
 - Write durations with the existing constants, not with manual multiplication: `TimeUnit.MINUTES.toMillis(5)` instead of `5 * 60 * 1000l`.
 - For calculations with time (e.g. elapsed time, timeouts, wait periods) use `Time.systemIndependentCurrentJVMTimeMillis()` (`org.appwork.utils.Time`) instead of `System.currentTimeMillis()`. It is independent of changes of the system clock.
+- This also applies to timestamps that are only compared with each other (e.g. "requested" vs. "processed" markers to decide whether something is newer, like `structureChangeRequested` / `repaintRequested` in `PackageControllerTableModel`).
+- Use it right away in every line you write or touch, even if the surrounding existing code still uses `System.currentTimeMillis()`. Do not copy `System.currentTimeMillis()` from existing code. If you touch a timestamp that is compared with other timestamps, switch all of them in that comparison group to the same clock, never mix both clocks.
 - `System.currentTimeMillis()` is only for real wall-clock timestamps (e.g. a date that is stored or displayed).
 
 ## File Names and Package Names in the GUI

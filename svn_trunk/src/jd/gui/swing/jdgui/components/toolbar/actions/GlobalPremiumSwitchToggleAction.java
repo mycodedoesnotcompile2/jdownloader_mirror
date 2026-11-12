@@ -6,20 +6,20 @@ import javax.swing.AbstractButton;
 import javax.swing.Icon;
 import javax.swing.JToggleButton;
 
-import jd.gui.swing.jdgui.Flashable;
-import jd.gui.swing.jdgui.JDGui;
-
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.swing.components.ExtJToggleButton;
 import org.appwork.utils.swing.EDTRunner;
+import org.jdownloader.actions.AppAction;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.toolbar.action.AbstractToolbarToggleAction;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-public class GlobalPremiumSwitchToggleAction extends AbstractToolbarToggleAction implements Flashable {
+import jd.gui.swing.jdgui.Flashable;
+import jd.gui.swing.jdgui.JDGui;
 
+public class GlobalPremiumSwitchToggleAction extends AbstractToolbarToggleAction implements Flashable {
     private JToggleButton bt;
     private final Icon    iconNormal;
     private final Icon    iconHighlight;
@@ -31,6 +31,9 @@ public class GlobalPremiumSwitchToggleAction extends AbstractToolbarToggleAction
         iconNormal = NewTheme.I().getCheckBoxImage(getIconKey(), false, 24);
         iconHighlight = NewTheme.I().getCheckBoxImage(getIconKey(), false, 24, new Color(0xFF9393));
         iconSelected = NewTheme.I().getCheckBoxImage(this.getIconKey(), true, 24);
+        if (AppAction.isValidationMode()) {
+            return;
+        }
         CFG_GUI.PREMIUM_DISABLED_WARNING_FLASH_ENABLED.getEventSender().addListener(this, true);
         if (!getKeyHandler().isEnabled() && CFG_GUI.PREMIUM_DISABLED_WARNING_FLASH_ENABLED.isEnabled()) {
             JDGui.getInstance().getFlashController().register(GlobalPremiumSwitchToggleAction.this);
@@ -62,7 +65,6 @@ public class GlobalPremiumSwitchToggleAction extends AbstractToolbarToggleAction
     public void onConfigValueModified(final KeyHandler<Boolean> keyHandler, Boolean newValue) {
         super.onConfigValueModified(keyHandler, newValue);
         new EDTRunner() {
-
             @Override
             protected void runInEDT() {
                 final boolean useAvailableAccounts = getKeyHandler().isEnabled();
@@ -97,30 +99,15 @@ public class GlobalPremiumSwitchToggleAction extends AbstractToolbarToggleAction
     @Override
     public void onFlashRegister(long c) {
         onFlash(c);
-
     }
 
     @Override
     public void onFlashUnRegister(long c) {
-        if (bt != null) {
-            bt.setIcon(iconNormal);
-            bt.setRolloverIcon(iconNormal);
+        if (bt == null) {
+            return;
         }
-    }
-
-    @Override
-    protected Icon getLargeIconForToolbar() {
-        return super.getLargeIconForToolbar();
-    }
-
-    @Override
-    public Object getValue(String key) {
-        return super.getValue(key);
-    }
-
-    @Override
-    protected Icon getSmallIconForToolbar() {
-        return super.getSmallIconForToolbar();
+        bt.setIcon(iconNormal);
+        bt.setRolloverIcon(iconNormal);
     }
 
     @Override

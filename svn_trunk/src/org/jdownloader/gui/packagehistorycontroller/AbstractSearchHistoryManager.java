@@ -2,6 +2,7 @@ package org.jdownloader.gui.packagehistorycontroller;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.ConfigEvent;
@@ -68,12 +69,13 @@ public abstract class AbstractSearchHistoryManager extends HistoryManager<Search
     public List<String> listMatching(final String text) {
         final List<SearchHistoryEntry> list = list();
         final ArrayList<String> ret = new ArrayList<String>();
-        final String search = text == null ? "" : text.toLowerCase();
+        /* Locale.ROOT: With the default locale e.g. a turkish system would lowercase "I" to a dotless i, so "I" would not find "i" */
+        final String search = text == null ? "" : text.toLowerCase(Locale.ROOT);
         for (final SearchHistoryEntry entry : list) {
             final String name = entry.getName();
             if (search.length() == 0) {
                 ret.add(name);
-            } else if (!isSameName(name, text) && name.toLowerCase().contains(search)) {
+            } else if (!isSameName(name, text) && name.toLowerCase(Locale.ROOT).contains(search)) {
                 ret.add(name);
             }
         }

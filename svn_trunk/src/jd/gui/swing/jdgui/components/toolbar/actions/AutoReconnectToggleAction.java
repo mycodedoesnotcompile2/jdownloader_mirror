@@ -4,6 +4,7 @@ import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.utils.swing.EDTRunner;
+import org.jdownloader.actions.AppAction;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.toolbar.action.AbstractToolbarToggleAction;
 import org.jdownloader.gui.translate._GUI;
@@ -25,7 +26,10 @@ public class AutoReconnectToggleAction extends AbstractToolbarToggleAction {
             public void onConfigValidatorError(KeyHandler<String> keyHandler, String invalidValue, ValidationException validateException) {
             }
         };
-        org.jdownloader.settings.staticreferences.CFG_RECONNECT.ACTIVE_PLUGIN_ID.getEventSender().addListener(listener);
+        if (AppAction.isValidationMode()) {
+            return;
+        }
+        org.jdownloader.settings.staticreferences.CFG_RECONNECT.ACTIVE_PLUGIN_ID.getEventSender().addListener(listener, true);
         updateAction(org.jdownloader.settings.staticreferences.CFG_RECONNECT.ACTIVE_PLUGIN_ID.getValue());
     }
 

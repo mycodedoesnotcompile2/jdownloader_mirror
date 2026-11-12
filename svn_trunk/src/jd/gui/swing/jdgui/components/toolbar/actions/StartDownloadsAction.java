@@ -9,30 +9,6 @@ import javax.swing.AbstractButton;
 import javax.swing.Action;
 import javax.swing.Icon;
 
-import jd.controlling.downloadcontroller.DownloadController;
-import jd.controlling.downloadcontroller.DownloadLinkCandidate;
-import jd.controlling.downloadcontroller.DownloadLinkCandidateResult;
-import jd.controlling.downloadcontroller.DownloadSession;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.DownloadWatchDogJob;
-import jd.controlling.downloadcontroller.DownloadWatchDogProperty;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.downloadcontroller.event.DownloadWatchdogListener;
-import jd.controlling.linkcollector.DefaultLinkCollectorListener;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings;
-import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings.SwitchToDownloadlistBehavior;
-import jd.controlling.linkcollector.LinkCollector.MoveLinksMode;
-import jd.controlling.linkcollector.LinkCollectorEvent;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.JDGui.Panels;
-import jd.gui.swing.jdgui.MainTabbedPane;
-import jd.gui.swing.jdgui.interfaces.View;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
@@ -57,6 +33,30 @@ import org.jdownloader.settings.GraphicalUserInterfaceSettings.StartButtonAction
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.translate._JDT;
 
+import jd.controlling.downloadcontroller.DownloadController;
+import jd.controlling.downloadcontroller.DownloadLinkCandidate;
+import jd.controlling.downloadcontroller.DownloadLinkCandidateResult;
+import jd.controlling.downloadcontroller.DownloadSession;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.downloadcontroller.DownloadWatchDogJob;
+import jd.controlling.downloadcontroller.DownloadWatchDogProperty;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.downloadcontroller.event.DownloadWatchdogListener;
+import jd.controlling.linkcollector.DefaultLinkCollectorListener;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings;
+import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings.SwitchToDownloadlistBehavior;
+import jd.controlling.linkcollector.LinkCollector.MoveLinksMode;
+import jd.controlling.linkcollector.LinkCollectorEvent;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.JDGui.Panels;
+import jd.gui.swing.jdgui.MainTabbedPane;
+import jd.gui.swing.jdgui.interfaces.View;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+
 public class StartDownloadsAction extends AbstractToolBarAction implements DownloadWatchdogListener, GUIListener, GenericConfigEventListener<Enum>, ActionContext {
     private final DelayedRunnable delayedUpdateEnableState;
 
@@ -73,7 +73,6 @@ public class StartDownloadsAction extends AbstractToolBarAction implements Downl
                 @Override
                 public void delayedrun() {
                     final long finalJobID = jobID.incrementAndGet();
-                    System.out.println("update " + finalJobID + " " + StartDownloadsAction.this);
                     DownloadWatchDog.getInstance().enqueueJob(new DownloadWatchDogJob() {
                         @Override
                         public boolean isHighPriority() {
@@ -89,7 +88,6 @@ public class StartDownloadsAction extends AbstractToolBarAction implements Downl
                             if (finalJobID != jobID.get()) {
                                 return;
                             }
-                            System.out.println("update 1:" + finalJobID + "\t" + jobID.get() + " " + StartDownloadsAction.this);
                             final boolean downloadListHasContent = DownloadController.getInstance().size() > 0;
                             final boolean linkgrabberHasContent = LinkCollector.getInstance().size() > 0;
                             final boolean isRunning = DownloadWatchDog.getInstance().isRunning();
@@ -102,7 +100,6 @@ public class StartDownloadsAction extends AbstractToolBarAction implements Downl
                                     if (finalJobID != jobID.get()) {
                                         return;
                                     }
-                                    System.out.println("update 2 :" + finalJobID + "\t" + jobID.get() + " " + StartDownloadsAction.this);
                                     boolean enable = (!isRunning);
                                     Icon newSmall = normalSmall;
                                     if (session != null && isRunning) {
@@ -160,60 +157,87 @@ public class StartDownloadsAction extends AbstractToolBarAction implements Downl
      * Held in a field because the listeners are registered weakly and would otherwise be garbage collected.
      */
     private final DefaultDownloadControllerListener downloadListListener = new DefaultDownloadControllerListener() {
+                                                                             @Override
+                                                                             public void onDownloadControllerAddedPackage(FilePackage pkg) {
+                                                                                 updateEnableState(true, false);
+                                                                             }
 
-        @Override
-        public void onDownloadControllerAddedPackage(FilePackage pkg) {
-            updateEnableState(true, false);
-        }
+                                                                             @Override
+                                                                             public void onDownloadControllerStructureRefresh() {
+                                                                                                                                                       /*
+                                                                                                                                                        * The
+                                                                                                                                                        * initial
+                                                                                                                                                        * load
+                                                                                                                                                        * of
+                                                                                                                                                        * the
+                                                                                                                                                        * saved
+                                                                                                                                                        * downloadlist
+                                                                                                                                                        * only
+                                                                                                                                                        * fires
+                                                                                                                                                        * a
+                                                                                                                                                        * structure
+                                                                                                                                                        * refresh,
+                                                                                                                                                        * no
+                                                                                                                                                        * "package added"
+                                                                                                                                                        * events
+                                                                                                                                                        */
+                                                                                 updateEnableState(null, null);
+                                                                             }
 
-        @Override
-        public void onDownloadControllerStructureRefresh() {
-            /*
-             * The initial load of the saved downloadlist only fires a
-             * structure refresh, no "package added" events
-             */
-             updateEnableState(null, null);
-        }
+                                                                             @Override
+                                                                             public void onDownloadControllerRemovedPackage(FilePackage pkg) {
+                                                                                 updateEnableState(false, null);
+                                                                             }
 
-        @Override
-        public void onDownloadControllerRemovedPackage(FilePackage pkg) {
-            updateEnableState(false, null);
-        }
-
-        @Override
-        public void onDownloadControllerRemovedLinklist(List<DownloadLink> list) {
-            updateEnableState(false, null);
-        }
-
-    };
+                                                                             @Override
+                                                                             public void onDownloadControllerRemovedLinklist(List<DownloadLink> list) {
+                                                                                 updateEnableState(false, null);
+                                                                             }
+                                                                         };
     /**
      * Re-evaluates the enabled state when content is added to or removed from the linkgrabber, because in the linkgrabber context the
      * button is only disabled if both the linkgrabber and the downloadlist are empty. All other events are irrelevant here.<br>
      * Held in a field because the listeners are registered weakly and would otherwise be garbage collected.
      */
     private final DefaultLinkCollectorListener      linkgrabberListener  = new DefaultLinkCollectorListener() {
+                                                                             @Override
+                                                                             public void onLinkCollectorStructureRefresh(LinkCollectorEvent event) {
+                                                                                                                                                       /*
+                                                                                                                                                        * Covers
+                                                                                                                                                        * structure
+                                                                                                                                                        * changes
+                                                                                                                                                        * that
+                                                                                                                                                        * are
+                                                                                                                                                        * not
+                                                                                                                                                        * reported
+                                                                                                                                                        * as
+                                                                                                                                                        * content
+                                                                                                                                                        * added
+                                                                                                                                                        * /
+                                                                                                                                                        * removed,
+                                                                                                                                                        * e
+                                                                                                                                                        * .
+                                                                                                                                                        * g.
+                                                                                                                                                        * when
+                                                                                                                                                        * the
+                                                                                                                                                        * linkgrabber
+                                                                                                                                                        * list
+                                                                                                                                                        * gets
+                                                                                                                                                        * loaded
+                                                                                                                                                        */
+                                                                                 updateEnableState(null, null);
+                                                                             }
 
-        @Override
-        public void onLinkCollectorStructureRefresh(LinkCollectorEvent event) {
-            /*
-             * Covers structure changes that are not reported as
-             * content added/removed, e.g. when the linkgrabber list
-             * gets loaded
-             */
-            updateEnableState(null, null);
-        }
+                                                                             @Override
+                                                                             public void onLinkCollectorContentRemoved(LinkCollectorEvent event) {
+                                                                                 updateEnableState(null, false);
+                                                                             }
 
-        @Override
-        public void onLinkCollectorContentRemoved(LinkCollectorEvent event) {
-            updateEnableState(null, false);
-        }
-
-        @Override
-        public void onLinkCollectorContentAdded(LinkCollectorEvent event) {
-            updateEnableState(null, true);
-        }
-
-    };
+                                                                             @Override
+                                                                             public void onLinkCollectorContentAdded(LinkCollectorEvent event) {
+                                                                                 updateEnableState(null, true);
+                                                                             }
+                                                                         };
 
     @Override
     public void initContextDefaults() {
@@ -229,7 +253,6 @@ public class StartDownloadsAction extends AbstractToolBarAction implements Downl
             switch (CFG_GUI.CFG.getStartButtonActionInLinkgrabberContext()) {
             case ADD_ALL_LINKS_AND_START_DOWNLOADS:
                 LinkGrabberTable.getInstance().getSelectionInfo(new SelectionInfoCallback<CrawledPackage, CrawledLink>() {
-
                     @Override
                     public void onSelectionInfo(SelectionInfo<CrawledPackage, CrawledLink> selectionInfo) {
                         final ConfirmLinksSettings cls = new ConfirmLinksSettings(MoveLinksMode.MANUAL);
@@ -245,7 +268,6 @@ public class StartDownloadsAction extends AbstractToolBarAction implements Downl
                         return false;
                     }
                 }, SelectionType.ALL);
-
                 break;
             case START_DOWNLOADS_ONLY:
                 DownloadWatchDog.getInstance().startDownloads();
@@ -356,9 +378,9 @@ public class StartDownloadsAction extends AbstractToolBarAction implements Downl
     }
 
     private final Icon normalSmall = new AbstractIcon(IconKey.ICON_MEDIA_PLAYBACK_START, 18);
-    private final Icon forcedSmall = new AbstractIcon(IconKey.ICON_PLAY_BREAKUP_FORCED_ONLY, 18); ;
+    private final Icon forcedSmall = new AbstractIcon(IconKey.ICON_PLAY_BREAKUP_FORCED_ONLY, 18);;
     private final Icon normalLarge = new AbstractIcon(IconKey.ICON_MEDIA_PLAYBACK_START, 24);
-    private final Icon forcedLarge = new AbstractIcon(IconKey.ICON_PLAY_BREAKUP_FORCED_ONLY, 24); ;
+    private final Icon forcedLarge = new AbstractIcon(IconKey.ICON_PLAY_BREAKUP_FORCED_ONLY, 24);;
     private Icon       smallIcon   = normalSmall;
     private Icon       largeIcon   = normalLarge;
 

@@ -41,6 +41,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
+import jd.http.Cookie.ManualCookie;
 import jd.http.requests.FormData;
 import jd.http.requests.GetRequest;
 import jd.http.requests.HeadRequest;
@@ -145,6 +146,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
         STRICT_ORIGIN,
         STRICT_ORIGIN_WHEN_CROSS_ORIGIN,
         UNSAFE_URL;
+
         public static boolean isSameProtocol(final Request current, final Request next) {
             return StringUtils.equalsIgnoreCase(current.getURL().getProtocol(), next.getURL().getProtocol());
         }
@@ -1069,7 +1071,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
     /**
      * Creates a new postrequest based an an requestVariable ArrayList
      *
-     * @deprecated use {@link #createPostRequest(String, UrlQuery, String)
+     * @deprecated use {@link #createPostRequest(String, UrlQuery, String)
      *
      *
      *
@@ -1077,6 +1079,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
      *
      *
      *
+     * 
      */
     @Deprecated
     public PostRequest createPostRequest(String url, final List<KeyValueStringEntry> post, final String encoding) throws IOException {
@@ -1389,7 +1392,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
         try {
             if (url == null) {
                 return getCookies((URL) null);
-            } else if (url.matches("(?i)^https?://.+")) {
+            } else if (url.matches("(?i)^(https?|ftps?|wss?)://.+")) {
                 return getCookies(new URL(url));
             } else {
                 return getCookies(new URL("https://" + url));
@@ -1937,8 +1940,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
     }
 
     /**
-     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site </br> auto completes Sec-Fetch-Site, some websites(eg
-     * facebook) check it
+     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site </br>
+     * auto completes Sec-Fetch-Site, some websites(eg facebook) check it
      */
     protected void autoCompleteHeaders(final Request request) {
         if (request == null) {
@@ -2556,21 +2559,15 @@ public class Browser implements HTTPConnectionFactoryInterface {
             }
             setCookie(new URL(url), key, value);
         } catch (MalformedURLException e) {
-            final Cookies cookies = this.getCookies(url);
-            final Cookie newCookie = Cookie.SOURCE.MANUAL.newCookieInstance();
-            newCookie.setHost(Browser.getHost(url));
-            newCookie.setKey(key);
-            newCookie.setValue(value);
+            final Cookies cookies = this.getCookies(url);            
+            final ManualCookie newCookie = new ManualCookie(Browser.getHost(url),key,value);
             cookies.add(newCookie);
         }
     }
 
     public void setCookie(final URL url, final String key, final String value) {
         final Cookies cookies = this.getCookies(url);
-        final Cookie newCookie = Cookie.SOURCE.MANUAL.newCookieInstance();
-        newCookie.setHost(Browser.getHost(url));
-        newCookie.setKey(key);
-        newCookie.setValue(value);
+        final ManualCookie newCookie = new ManualCookie(Browser.getHost(url),key,value);
         cookies.add(newCookie);
     }
 
@@ -2627,10 +2624,19 @@ public class Browser implements HTTPConnectionFactoryInterface {
             final String host = getHost(url);
             final Cookies newSetCookies = new Cookies();
             for (final Cookie setCookie : setCookies.getCookies()) {
+                if (host.equalsIgnoreCase(setCookie.getHost())) {
+                    /* no copy required, correct/same host */
+                    newSetCookies.add(setCookie);
+                    continue;
+                }
                 final Cookie copy = Cookie.copyOf(setCookie);
                 if (copy.updateHost(host)) {
                     newSetCookies.add(copy);
                 } else {
+                    final LogInterface logger = getLogger();
+                    if (logger != null && isDebug()) {
+                        logger.info("Cookie.update(" + host + ") failed for " + copy);
+                    }
                     DebugMode.debugger();
                 }
             }
@@ -2750,7 +2756,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
     }
 
     /**
-     * Sets Browser upper page load limit Byte value. </br> Use Integer.MAX_VALUE for "unlimited" (do not use "-1"!).
+     * Sets Browser upper page load limit Byte value. </br>
+     * Use Integer.MAX_VALUE for "unlimited" (do not use "-1"!).
      *
      * @since JD2
      * @param i
@@ -2901,7 +2908,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
     }
 
     /**
-     * Checks for block by firewalls and similar. </br> To be called after a sent request.
+     * Checks for block by firewalls and similar. </br>
+     * To be called after a sent request.
      */
     public void checkForBlockedByAfterLoadConnection(Request request) throws IOException {
         if (!this.getThrowExceptionOnBlockedBy(request)) {
@@ -2933,7 +2941,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
         /* 520: Web server is returning an unknown error | 526: Invalid SSL certificate */
         /**
          * TODO: 2023-12-21: Maybe remove reliance on http status-code as it looks like literally any status code can be returned when a
-         * Cloudflare block happens. </br> I've just added code 502 to the list of "Cloudflare response-codes".
+         * Cloudflare block happens. </br>
+         * I've just added code 502 to the list of "Cloudflare response-codes".
          */
         /*
          * It is really important to also check for Cloudflare html else stuff will fail/break e.g. icerbox.com wrong login -> Cloudflare
@@ -3383,7 +3392,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
                         return this;
                     }
                     /**
-                     * <title>Sito Illegale - AGCOM</title> <h1>ATTENZIONE SITO ILLEGALE</h1>
+                     * <title>Sito Illegale - AGCOM</title>
+                     * <h1>ATTENZIONE SITO ILLEGALE</h1>
                      *
                      * <p class="warning-text">
                      * L'accesso al presente sito è stato disabilitato in esecuzione di un provvedimento Agcom per violazione del diritto
@@ -3402,9 +3412,9 @@ public class Browser implements HTTPConnectionFactoryInterface {
                      * </p>
                      *
                      * <p>
-                     * Per maggiori informazioni visita la <a
-                     * href="https://www.agcom.it/competenze/piattaforme-online/antipirateria-e-piracy-shield">pagina dedicata</a> sul sito
-                     * Agcom.it
+                     * Per maggiori informazioni visita la
+                     * <a href="https://www.agcom.it/competenze/piattaforme-online/antipirateria-e-piracy-shield">pagina dedicata</a> sul
+                     * sito Agcom.it
                      * </p>
                      */
                     if (request.containsHTML("<h1>\\s*ATTENZIONE SITO ILLEGALE\\s*</h1>") && request.containsHTML("per violazione del diritto") && request.containsHTML("www\\.agcom\\.it")) {
@@ -3870,8 +3880,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
                     return null;
                 }
                 if (true) { /*
-                 * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
-                 */
+                             * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
+                             */
                     /* See new ESET NOD32 html code 2023: https://board.jdownloader.org/showthread.php?t=91433 */
                     return null;
                 }
@@ -4095,8 +4105,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
     }
 
     /**
-     * Returns true if any antiddos provider/other sort of blocking is blocking at this moment. </br> See also:
-     * https://svn.jdownloader.org/issues/89834
+     * Returns true if any antiddos provider/other sort of blocking is blocking at this moment. </br>
+     * See also: https://svn.jdownloader.org/issues/89834
      */
     public boolean isBlocked() {
         final Request request = this.getRequest();

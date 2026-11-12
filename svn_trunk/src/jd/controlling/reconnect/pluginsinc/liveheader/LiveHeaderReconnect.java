@@ -270,6 +270,9 @@ public class LiveHeaderReconnect extends RouterPlugin implements ConfigEventList
         } catch (Throwable e) {
             LogController.CL().log(e);
         }
+        if (Thread.currentThread().isInterrupted()) {
+            throw new InterruptedException();
+        }
         return null;
     }
 

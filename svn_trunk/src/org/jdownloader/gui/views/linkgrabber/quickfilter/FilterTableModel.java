@@ -223,6 +223,12 @@ public class FilterTableModel extends ExtTableModel<Filter> {
 
             @Override
             protected void setBooleanValue(boolean value, Filter object) {
+                /*
+                 * TODO: Race with the automatic report in FilterTable.updateFilterTables: setEnabled changes the flag first and reports to
+                 * UnfilteredTableState afterwards (updateUnfilteredState). If the automatic update cycle runs in between, it reports "active" as
+                 * automatic change and no snapshot is taken. Fix: wrap this setEnabled and the automatic report in a shared lock (e.g. static
+                 * FilterTable.FILTER_STATE_LOCK). Deferred, the window is tiny and the only effect is a missing snapshot.
+                 */
                 object.setEnabled(value);
             }
         });

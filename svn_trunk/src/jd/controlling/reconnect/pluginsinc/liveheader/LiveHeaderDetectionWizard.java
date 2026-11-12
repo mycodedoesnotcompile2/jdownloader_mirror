@@ -319,6 +319,10 @@ public class LiveHeaderDetectionWizard {
         for (int i = 0; i < tests.size(); i++) {
             RouterData test = tests.get(i);
             processCallBack.setStatusString(getPlugin(), T.T.jd_controlling_reconnect_plugins_liveheader_LiveHeaderDetectionWizard_runTests((i + 1), tests.size(), test.getManufactor() + " - " + test.getRouterName()));
+            /* Stop immediately if the wizard dialog has been closed, so no further dialogs are shown. The callback restores the interrupt flag. */
+            if (Thread.currentThread().isInterrupted()) {
+                throw new InterruptedException();
+            }
             String sc = tests.get(i).getScript().toLowerCase(Locale.ENGLISH);
             if ((username.trim().length() < 2 && (sc.contains("%%%username%%%") || sc.contains("%%%user%%%"))) || (password.trim().length() < 2 && (sc.contains("%%%pass%%%") || sc.contains("%%%password%%%")))) {
                 // script requires data which is not available
@@ -413,6 +417,9 @@ public class LiveHeaderDetectionWizard {
             collectInfo();
             specialCollectInfo();
             while (true) {
+                if (Thread.currentThread().isInterrupted()) {
+                    throw new InterruptedException();
+                }
                 userConfirm();
                 if (!IP.isValidRouterIP(gatewayAdressIP)) {
                     if (!UIOManager.I().showConfirmDialog(0, _GUI.T.literally_warning(), T.T.LiveHeaderDetectionWizard_runOnlineScan_warning_badip(gatewayAdressHost), new AbstractIcon(IconKey.ICON_WARNING, 32), _GUI.T.literally_yes(), _GUI.T.literally_edit())) {

@@ -1,6 +1,8 @@
 package org.jdownloader.gui.views.downloads.action;
 
 import org.jdownloader.controlling.packagizer.PackagizerController;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTableModel;
+import org.jdownloader.gui.views.downloads.table.DownloadsTableModel;
 
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
@@ -18,5 +20,10 @@ public class MergeToPackageAction extends org.jdownloader.gui.views.linkgrabber.
         newPackage.setName(name);
         newPackage.setDownloadDirectory(PackagizerController.replaceDynamicTags(downloadFolder, name, newPackage));
         return newPackage;
+    }
+
+    @Override
+    protected PackageControllerTableModel<FilePackage, DownloadLink> getTableModel() {
+        return DownloadsTableModel.getInstance();
     }
 }

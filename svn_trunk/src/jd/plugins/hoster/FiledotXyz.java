@@ -22,12 +22,14 @@ import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.parser.html.Form;
+import jd.parser.html.InputField;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52803 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53966 $", interfaceVersion = 3, names = {}, urls = {})
 public class FiledotXyz extends XFileSharingProBasic {
     public FiledotXyz(final PluginWrapper wrapper) {
         super(wrapper);
@@ -133,5 +135,19 @@ public class FiledotXyz extends XFileSharingProBasic {
     protected boolean supports_availablecheck_filesize_html() {
         // 2025-01-16
         return false;
+    }
+
+    @Override
+    protected Form findFormDownload2Free(final Browser br) {
+        final Form ret = super.findFormDownload2Free(br);
+        if (ret == null) {
+            return null;
+        }
+        /* 2026-11-12 */
+        final InputField adblock_ok = ret.getInputField("adblock_ok");
+        if (adblock_ok != null && (adblock_ok.getValue() == null || adblock_ok.getValue().equals("0"))) {
+            adblock_ok.setValue("1");
+        }
+        return ret;
     }
 }

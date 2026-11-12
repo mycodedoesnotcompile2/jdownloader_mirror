@@ -45,11 +45,6 @@ public abstract class AppAction extends BasicAction {
         super();
     }
 
-    protected void fireIconUpdate() {
-        firePropertyChange(Action.SMALL_ICON, null, new Object());
-        firePropertyChange(Action.LARGE_ICON_KEY, null, new Object());
-    }
-
     protected void fireNameUpdate() {
         firePropertyChange(Action.NAME, null, new Object());
     }

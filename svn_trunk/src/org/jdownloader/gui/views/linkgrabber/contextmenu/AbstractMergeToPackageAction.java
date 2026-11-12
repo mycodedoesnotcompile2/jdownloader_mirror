@@ -1,5 +1,6 @@
 package org.jdownloader.gui.views.linkgrabber.contextmenu;
 
+import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
 import java.io.File;
 import java.util.ArrayList;
@@ -21,12 +22,14 @@ import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.SelectionInfo.PackageView;
 import org.jdownloader.gui.views.components.LocationInList;
 import org.jdownloader.gui.views.components.packagetable.LinkTreeUtils;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTableModel;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.translate._JDT;
 
 import jd.controlling.linkcollector.LinknameCleaner;
+import jd.controlling.packagecontroller.AbstractNode;
 import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
 import jd.controlling.packagecontroller.AbstractPackageNode;
 import jd.controlling.packagecontroller.PackageController;
@@ -380,10 +383,51 @@ public abstract class AbstractMergeToPackageAction<PackageType extends AbstractP
                 settings.setPackagePosition(index);
                 settings.setMergeSameNamedPackages(final_mergeSameNamedPackages);
                 controller.moveIntoPackage(sel.getChildren(), selectedPackages, newPackage, settings);
+                selectMergedPackage(sel.getChildren());
                 return null;
             }
         });
     }
 
     protected abstract PackageType createNewPackage(final String name, final String downloadFolder);
+
+    /** @return model of the table this action works on (download list or linkgrabber) */
+    protected abstract PackageControllerTableModel<PackageType, ChildrenType> getTableModel();
+
+    /**
+     * Selects the package which holds the merged links and scrolls it into view, so the user sees the result. While a filter or search is
+     * active, this selection is also taken over when it ends (see UnfilteredTableState). Without it, the table would guess a neighbour row
+     * of the removed packages as new selection.
+     *
+     * The package is taken from the moved links: with "merge with same named packages" they end up in an existing package instead of the
+     * new one.
+     */
+    private void selectMergedPackage(final List<ChildrenType> movedChildren) {
+        final PackageControllerTableModel<PackageType, ChildrenType> model = getTableModel();
+        if (model == null || movedChildren == null || movedChildren.size() == 0) {
+            return;
+        }
+        final PackageType target = movedChildren.get(0).getParentNode();
+        if (target == null) {
+            return;
+        }
+        /* After the rebuild which contains the merged package */
+        model.runAfterRebuild(new Runnable() {
+            @Override
+            public void run() {
+                final List<AbstractNode> selection = new ArrayList<AbstractNode>();
+                selection.add(target);
+                /* If the package does not pass the current filter, this only clears the selection */
+                model.setSelectedObjects(selection);
+                final int row = model.getRowforObject(target);
+                if (row >= 0 && model.getTable() != null) {
+                    final Rectangle rowRect = model.getTable().getCellRect(row, 0, true);
+                    final Rectangle visible = model.getTable().getVisibleRect();
+                    rowRect.x = visible.x;
+                    rowRect.width = visible.width;
+                    model.getTable().scrollRectToVisible(rowRect);
+                }
+            }
+        });
+    }
 }

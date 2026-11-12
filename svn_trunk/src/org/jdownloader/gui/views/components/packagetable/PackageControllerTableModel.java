@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledExecutorService;
@@ -13,14 +14,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.swing.Icon;
-
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.packagecontroller.AbstractNodeVisitor;
-import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
-import jd.controlling.packagecontroller.AbstractPackageNode;
-import jd.controlling.packagecontroller.ChildrenView;
-import jd.controlling.packagecontroller.PackageController;
-import jd.controlling.packagecontroller.PackageControllerComparator;
+import javax.swing.SwingUtilities;
 
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.storage.Storage;
@@ -31,6 +25,7 @@ import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtDefaultRowSorter;
 import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.utils.Application;
+import org.appwork.utils.Time;
 import org.appwork.utils.swing.EDTRunner;
 import org.jdownloader.controlling.UniqueAlltimeID;
 import org.jdownloader.gui.views.SelectionInfo;
@@ -39,6 +34,14 @@ import org.jdownloader.gui.views.components.packagetable.PackageControllerTableM
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
+
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.packagecontroller.AbstractNodeVisitor;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
+import jd.controlling.packagecontroller.AbstractPackageNode;
+import jd.controlling.packagecontroller.ChildrenView;
+import jd.controlling.packagecontroller.PackageController;
+import jd.controlling.packagecontroller.PackageControllerComparator;
 
 public abstract class PackageControllerTableModel<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> extends ExtTableModel<AbstractNode> {
     /**
@@ -214,19 +217,39 @@ public abstract class PackageControllerTableModel<PackageType extends AbstractPa
         this.tristateSorterEnabled = tristateSorterEnabled;
     }
 
-    private static final String                                                 SORT_ORIGINAL                   = "ORIGINAL";
-    private final DelayedRunnable                                               asyncRefresh;
-    protected final PackageController<PackageType, ChildrenType>                pc;
-    private final DelayedRunnable                                               asyncRecreate;
-    private CopyOnWriteArrayList<TableDataModification>                         tableModifiers                  = new CopyOnWriteArrayList<TableDataModification>();
-    private ScheduledExecutorService                                            queue                           = DelayedRunnable.getNewScheduledExecutorService();
-    private final DelayedRunnable                                               asyncRecreateFast;
-    private final Storage                                                       storage;
-    private final AtomicLong                                                    repaintFiredCounter             = new AtomicLong(0);
-    private final AtomicLong                                                    structureChangedCounter         = new AtomicLong(0);
-    private final AtomicLong                                                    repaintRequested                = new AtomicLong(0);
-    private final AtomicLong                                                    structureChangeRequested        = new AtomicLong(0);
-    private final AtomicLong                                                    structureChangeProcessed        = new AtomicLong(0);
+    private static final String                                  SORT_ORIGINAL                 = "ORIGINAL";
+    private final DelayedRunnable                                asyncRefresh;
+    protected final PackageController<PackageType, ChildrenType> pc;
+    private final DelayedRunnable                                asyncRecreate;
+    private CopyOnWriteArrayList<TableDataModification>          tableModifiers                = new CopyOnWriteArrayList<TableDataModification>();
+    private ScheduledExecutorService                             queue                         = DelayedRunnable.getNewScheduledExecutorService();
+    private final DelayedRunnable                                asyncRecreateFast;
+    private final Storage                                        storage;
+    private final AtomicLong                                     repaintFiredCounter           = new AtomicLong(0);
+    private final AtomicLong                                     structureChangedCounter       = new AtomicLong(0);
+    private final AtomicLong                                     repaintRequested              = new AtomicLong(0);
+    private final AtomicLong                                     structureChangeRequested      = new AtomicLong(0);
+    /*
+     * Counts the rebuild requests (recreateModel, runAfterRebuild). A rebuild covers all requests made before it started, because it reads
+     * the data, filters etc. only after that. Counters instead of timestamps: two events within the same millisecond are distinguishable.
+     */
+    private long                                                 structureChangeRequestCount   = 0;
+    /* Highest request count covered by a rebuild that has already started */
+    private long                                                 structureChangeProcessedCount = 0;
+    /* Tasks of runAfterRebuild, waiting for a rebuild which covers their request. Guarded by structureChangeLock. */
+    private final List<AfterRebuildTask>                         afterRebuildTasks             = new ArrayList<AfterRebuildTask>();
+    private final Object                                         structureChangeLock           = new Object();
+
+    private static class AfterRebuildTask {
+        private final long     request;
+        private final Runnable task;
+
+        private AfterRebuildTask(final long request, final Runnable task) {
+            this.request = request;
+            this.task = task;
+        }
+    }
+
     private volatile boolean                                                    hideSinglePackage               = false;
     private volatile PackageControllerTableModelData<PackageType, ChildrenType> packageControllertableModelData = new PackageControllerTableModelData<PackageType, ChildrenType>();
     private boolean                                                             scrollPositionRestoreDone;
@@ -331,12 +354,59 @@ public abstract class PackageControllerTableModel<PackageType extends AbstractPa
     }
 
     public void fireStructureChange(boolean force) {
-        if (structureChangeRequested.get() > structureChangeProcessed.getAndSet(System.currentTimeMillis()) || force) {
+        final long covered;
+        final boolean requested;
+        synchronized (structureChangeLock) {
+            /* All requests up to now are covered by this rebuild: it reads data and filters only after this point */
+            covered = structureChangeRequestCount;
+            requested = covered > structureChangeProcessedCount;
+            if (requested) {
+                structureChangeProcessedCount = covered;
+            }
+        }
+        if (requested || force) {
             try {
                 _fireTableStructureChanged(getTableData(), true);
             } finally {
                 getTable().firePropertyChange("structureChangedFired", structureChangedCounter.get(), structureChangedCounter.incrementAndGet());
+                runAfterRebuildTasks(covered);
             }
+        }
+    }
+
+    /**
+     * Runs the given task in the EDT as soon as the table shows data rebuilt after this call, i.e. with the filters, data etc. as they are
+     * now. Unlike listening to "structureChangedFired", a rebuild which was already running at the time of this call (still with the old
+     * state) does not trigger the task.
+     *
+     * Requests a rebuild itself if none follows. The caller usually changes filters etc. first, then calls this, then recreateModel with
+     * the delay it wants; both requests are covered by the same rebuild.
+     */
+    public void runAfterRebuild(final Runnable task) {
+        synchronized (structureChangeLock) {
+            /* Counter and task are updated together, so a rebuild which covers this request always finds the task */
+            afterRebuildTasks.add(new AfterRebuildTask(++structureChangeRequestCount, task));
+        }
+        structureChangeRequested.set(Time.systemIndependentCurrentJVMTimeMillis());
+        asyncRecreate.run();
+    }
+
+    /** Called after a rebuild covering all requests up to the given count has scheduled the replacement of the table data in the EDT. */
+    private void runAfterRebuildTasks(final long covered) {
+        final List<Runnable> tasks = new ArrayList<Runnable>();
+        synchronized (structureChangeLock) {
+            final Iterator<AfterRebuildTask> it = afterRebuildTasks.iterator();
+            while (it.hasNext()) {
+                final AfterRebuildTask next = it.next();
+                if (next.request <= covered) {
+                    it.remove();
+                    tasks.add(next.task);
+                }
+            }
+        }
+        /* Queued behind the replacement of the table data, which _fireTableStructureChanged has already scheduled in the EDT */
+        for (final Runnable task : tasks) {
+            SwingUtilities.invokeLater(task);
         }
     }
 
@@ -359,7 +429,10 @@ public abstract class PackageControllerTableModel<PackageType extends AbstractPa
     }
 
     public void recreateModel(boolean delay) {
-        structureChangeRequested.set(System.currentTimeMillis());
+        synchronized (structureChangeLock) {
+            structureChangeRequestCount++;
+        }
+        structureChangeRequested.set(Time.systemIndependentCurrentJVMTimeMillis());
         if (delay) {
             asyncRecreate.run();
         } else {
@@ -372,7 +445,7 @@ public abstract class PackageControllerTableModel<PackageType extends AbstractPa
     }
 
     public void refreshModel(boolean delay) {
-        repaintRequested.set(System.currentTimeMillis());
+        repaintRequested.set(Time.systemIndependentCurrentJVMTimeMillis());
         if (delay) {
             asyncRefresh.run();
         } else {
@@ -497,15 +570,15 @@ public abstract class PackageControllerTableModel<PackageType extends AbstractPa
     }
 
     private final Comparator<PackageControllerTableModelFilter<PackageType, ChildrenType>> tableFilterComparator = new Comparator<PackageControllerTableModelFilter<PackageType, ChildrenType>>() {
-                                                                                                                     public int compare(int x, int y) {
-                                                                                                                         return (x < y) ? -1 : ((x == y) ? 0 : 1);
-                                                                                                                     }
+        public int compare(int x, int y) {
+            return (x < y) ? -1 : ((x == y) ? 0 : 1);
+        }
 
-                                                                                                                     @Override
-                                                                                                                     public int compare(PackageControllerTableModelFilter<PackageType, ChildrenType> o1, PackageControllerTableModelFilter<PackageType, ChildrenType> o2) {
-                                                                                                                         return compare(o1.getComplexity(), o2.getComplexity());
-                                                                                                                     }
-                                                                                                                 };
+        @Override
+        public int compare(PackageControllerTableModelFilter<PackageType, ChildrenType> o1, PackageControllerTableModelFilter<PackageType, ChildrenType> o2) {
+            return compare(o1.getComplexity(), o2.getComplexity());
+        }
+    };
 
     public boolean isFilteredView() {
         return getTableData().isFiltered();

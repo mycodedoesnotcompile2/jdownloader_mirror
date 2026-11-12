@@ -10,20 +10,21 @@ import javax.swing.JComponent;
 import javax.swing.JToggleButton;
 import javax.swing.TransferHandler;
 
-import jd.controlling.ClipboardMonitoring;
-import jd.controlling.linkcollector.LinkOrigin;
-import jd.gui.swing.jdgui.Flashable;
-import jd.gui.swing.jdgui.JDGui;
-
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.swing.components.ExtJToggleButton;
 import org.appwork.utils.swing.EDTRunner;
+import org.jdownloader.actions.AppAction;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.toolbar.action.AbstractToolbarToggleAction;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
+
+import jd.controlling.ClipboardMonitoring;
+import jd.controlling.linkcollector.LinkOrigin;
+import jd.gui.swing.jdgui.Flashable;
+import jd.gui.swing.jdgui.JDGui;
 
 public class ClipBoardToggleAction extends AbstractToolbarToggleAction implements Flashable {
     private final Icon    iconNormal;
@@ -37,6 +38,9 @@ public class ClipBoardToggleAction extends AbstractToolbarToggleAction implement
         iconNormal = NewTheme.I().getCheckBoxImage(getIconKey(), false, 24);
         iconHighlight = NewTheme.I().getCheckBoxImage(getIconKey(), false, 24, new Color(0xFF9393));
         iconSelected = NewTheme.I().getCheckBoxImage(this.getIconKey(), true, 24);
+        if (AppAction.isValidationMode()) {
+            return;
+        }
         CFG_GUI.CLIPBOARD_DISABLED_WARNING_FLASH_ENABLED.getEventSender().addListener(this, true);
         if (!getKeyHandler().isEnabled() && CFG_GUI.CLIPBOARD_DISABLED_WARNING_FLASH_ENABLED.isEnabled()) {
             JDGui.getInstance().getFlashController().register(ClipBoardToggleAction.this);

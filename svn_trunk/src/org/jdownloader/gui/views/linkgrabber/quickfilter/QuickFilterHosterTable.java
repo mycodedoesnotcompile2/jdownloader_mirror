@@ -83,6 +83,8 @@ public class QuickFilterHosterTable extends FilterTable {
                 enabledFilters.remove(ID);
             }
         }
+        /* Only called when the user switches the filter (checkbox, space key) */
+        updateUnfilteredState(true);
         getLinkgrabberTable().getModel().recreateModel(false);
     }
 

@@ -1,27 +1,34 @@
 package org.jdownloader.gui.views.components.packagetable;
 
+import java.awt.Point;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.swing.DefaultListSelectionModel;
+import javax.swing.JViewport;
 import javax.swing.ListSelectionModel;
-
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
-import jd.controlling.packagecontroller.AbstractPackageNode;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.utils.event.queue.Queue;
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTableModelData.PackageControllerTableModelDataPackage;
 
-public class PackageControllerTableModelSelectionOnlySelectionInfo<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> extends SelectionInfo<PackageType, ChildrenType> {
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
+import jd.controlling.packagecontroller.AbstractPackageNode;
+
+public class PackageControllerTableModelSelectionOnlySelectionInfo<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> extends SelectionInfo<PackageType, ChildrenType> implements PackageControllerTableSelectionModelInfo<PackageType, ChildrenType> {
     private final PackageControllerTableModel<PackageType, ChildrenType>     tableModel;
     private final PackageControllerTableModelData<PackageType, ChildrenType> tableModelData;
     private ListSelectionModel                                               selectionModel = null;
     private volatile AbstractNode                                            rawContext     = null;
+    private final AbstractNode                                               lead;
+    private final AbstractNode                                               anchor;
+    private final EDGE                                                       edge;
+    private final AbstractNode                                               firstVisible;
+    private final int                                                        offset;
 
     protected void setRawContext(AbstractNode rawContext) {
         this.rawContext = rawContext;
@@ -38,6 +45,35 @@ public class PackageControllerTableModelSelectionOnlySelectionInfo<PackageType e
         this.rawContext = contextObject;
         this.tableModel = tableModel;
         this.tableModelData = tableModel.getTableData();
+        final PackageControllerTable<PackageType, ChildrenType> table = tableModel.getTable();
+        this.lead = PackageControllerTableModelSelectionInfo.getObjectByRow(tableModel, table.getSelectionModel().getLeadSelectionIndex());
+        this.anchor = PackageControllerTableModelSelectionInfo.getObjectByRow(tableModel, table.getSelectionModel().getAnchorSelectionIndex());
+        {
+            EDGE edge = EDGE.NONE;
+            AbstractNode firstVisible = null;
+            int offset = 0;
+            if (table.getParent() instanceof JViewport) {
+                final JViewport viewport = (JViewport) table.getParent();
+                final Point position = viewport.getViewPosition();
+                final int maxY = table.getPreferredSize().height - viewport.getExtentSize().height;
+                if (maxY > 0) {
+                    if (position.y <= 0) {
+                        edge = EDGE.TOP;
+                    } else if (position.y >= maxY) {
+                        edge = EDGE.BOTTOM;
+                    }
+                }
+                /* Row at the top edge of the viewport, may be only partly visible */
+                final int row = table.rowAtPoint(new Point(0, position.y));
+                if (row >= 0) {
+                    firstVisible = PackageControllerTableModelSelectionInfo.getObjectByRow(tableModel, row);
+                    offset = position.y - table.getCellRect(row, 0, true).y;
+                }
+            }
+            this.firstVisible = firstVisible;
+            this.edge = edge;
+            this.offset = offset;
+        }
         aggregate();
     }
 
@@ -59,6 +95,11 @@ public class PackageControllerTableModelSelectionOnlySelectionInfo<PackageType e
             this.pluginViewsInitiated.set(true);
             this.pluginViews.putAll(selectionInfo.pluginViews);
         }
+        this.lead = selectionInfo.getSelectionModelLead();
+        this.anchor = selectionInfo.getSelectionModelAnchor();
+        this.firstVisible = selectionInfo.getSelectionModelFirstVisible();
+        this.edge = selectionInfo.getSelectionModeltEdge();
+        this.offset = selectionInfo.getSelectionModelOffset();
     }
 
     @Override
@@ -413,5 +454,35 @@ public class PackageControllerTableModelSelectionOnlySelectionInfo<PackageType e
                 return;
             }
         }
+    }
+
+    @Override
+    public AbstractNode getSelectionModelLead() {
+        return lead;
+    }
+
+    @Override
+    public AbstractNode getSelectionModelAnchor() {
+        return anchor;
+    }
+
+    @Override
+    public AbstractNode getSelectionModelFirstVisible() {
+        return firstVisible;
+    }
+
+    @Override
+    public EDGE getSelectionModeltEdge() {
+        return edge;
+    }
+
+    @Override
+    public int getSelectionModelOffset() {
+        return offset;
+    }
+
+    @Override
+    public SelectionInfo<PackageType, ChildrenType> getSelectionInfo() {
+        return this;
     }
 }

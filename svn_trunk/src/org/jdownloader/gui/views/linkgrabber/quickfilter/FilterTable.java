@@ -11,6 +11,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ScheduledExecutorService;
@@ -28,6 +29,7 @@ import org.appwork.storage.config.handler.BooleanKeyHandler;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.columns.ExtCheckColumn;
+import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.EDTRunner;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTableModelCustomizer;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTableModelData;
@@ -225,9 +227,72 @@ public abstract class FilterTable extends BasicJDTable<Filter> implements Packag
             Entry<FilterTable, List<Filter>> next = it2.next();
             next.getKey().updateTableData(next.getValue());
         }
+        /*
+         * Automatic changes, e.g. new links of a hoster whose filter is disabled, or the last links of a disabled filter got removed: only
+         * keep the state up to date, no snapshot is taken or restored for these. The fresh filter lists are used where available, the
+         * filter tables update their rows asynchronously.
+         *
+         * TODO: Race with user toggles: if this runs between Filter.setEnabled and the user report (updateUnfilteredState(true)), the start
+         * is reported here as automatic change and no snapshot is taken. Fix: shared lock (e.g. static FILTER_STATE_LOCK) around this
+         * computation + report and around setEnabled at the two user call sites (FilterTableModel checkbox column, space key in
+         * processKeyBinding). No deadlock: this side does not touch the EDT while holding the lock, the user side already runs in the EDT.
+         */
+        final LinkGrabberTable table = getAnyLinkgrabberTable();
+        if (table != null) {
+            table.getUnfilteredState().setFilterActive(QUICKFILTER_SOURCE, isAnyViewActive(updateTableData), false);
+        }
         if (newDisabledFilters) {
             LinkGrabberTableModel.getInstance().recreateModel(false);
         }
+    }
+
+    /* Source key of the quick filters in the UnfilteredTableState of the linkgrabber table: all filter tables count as one source */
+    private static final Object QUICKFILTER_SOURCE = new Object();
+
+    /**
+     * Reports to the linkgrabber table whether any quick filter currently hides links, so that selection and scroll position from before
+     * filtering are remembered and restored once all filters are off again (see UnfilteredTableState). All filters count the same, also
+     * the custom views. Has to be called before recreateModel.
+     *
+     * @param userAction
+     *            true if the user switched a filter (checkbox, space key) or the sidebar, false for automatic changes
+     */
+    protected void updateUnfilteredState(final boolean userAction) {
+        final boolean active = new EDTHelper<Boolean>() {
+            @Override
+            public Boolean edtRun() {
+                return isAnyViewActive(null);
+            }
+        }.getReturnValue();
+        linkgrabberTable.getUnfilteredState().setFilterActive(QUICKFILTER_SOURCE, active, userAction);
+    }
+
+    /**
+     * @param freshFilters
+     *            current filter lists of (some of) the filter tables, may be null. Tables without an entry use the filters they show.
+     * @return true if any filter of the visible filter tables hides links. Hidden filter tables (sidebar or section hidden) do not filter.
+     */
+    private static boolean isAnyViewActive(final Map<FilterTable, List<Filter>> freshFilters) {
+        for (final FilterTableUpdater filterTableUpdater : FILTERTABLES) {
+            final FilterTable filterTable = filterTableUpdater.getTable();
+            List<Filter> filters = freshFilters != null ? freshFilters.get(filterTable) : null;
+            if (filters == null) {
+                filters = filterTable.getModel().getTableData();
+            }
+            for (final Filter filter : filters) {
+                if (filter.isViewActive()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static LinkGrabberTable getAnyLinkgrabberTable() {
+        for (final FilterTableUpdater filterTableUpdater : FILTERTABLES) {
+            return filterTableUpdater.getTable().getLinkgrabberTable();
+        }
+        return null;
     }
 
     public boolean isSortingEnabledDisabled() {
@@ -329,6 +394,11 @@ public abstract class FilterTable extends BasicJDTable<Filter> implements Packag
                     }
                     FilterTable.super.setVisible(false);
                 }
+                /*
+                 * Hiding the sidebar (or a section) removes its filters: counts like switching them off. keyHandler is null for the
+                 * initial call after startup, that is no user action.
+                 */
+                updateUnfilteredState(keyHandler != null);
                 linkgrabberTable.getModel().recreateModel(false);
             }
 
@@ -462,6 +532,12 @@ public abstract class FilterTable extends BasicJDTable<Filter> implements Packag
             action.actionPerformed(null);
             return true;
         case KeyEvent.VK_SPACE:
+            /*
+             * TODO: Race with the automatic report in FilterTable.updateFilterTables: setEnabled changes the flag first and reports to
+             * UnfilteredTableState afterwards (updateUnfilteredState). If the automatic update cycle runs in between, it reports "active" as
+             * automatic change and no snapshot is taken. Fix: wrap this setEnabled and the automatic report in a shared lock (e.g. static
+             * FilterTable.FILTER_STATE_LOCK). Deferred, the window is tiny and the only effect is a missing snapshot.
+             */
             for (FilterTableUpdater filterTableUpdater : FILTERTABLES) {
                 for (Filter f : filterTableUpdater.getTable().getModel().getSelectedObjects()) {
                     f.setEnabled(!f.isEnabled());

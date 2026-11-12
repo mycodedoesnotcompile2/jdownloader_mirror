@@ -82,30 +82,48 @@ public class AutoSetupAction extends BasicAction {
 
                 @Override
                 public void run() throws InterruptedException {
+                    checkCancelled();
                     setBarText(_GUI.T.LiveaheaderDetection_wait_for_online());
                     IPController.getInstance().waitUntilWeAreOnline();
+                    checkCancelled();
                     setBarText(_GUI.T.LiveaheaderDetection_find_router());
                     RouterUtils.getAddress(false);
+                    checkCancelled();
                     setBarText(_GUI.T.LiveaheaderDetection_network_setup_check());
 
                     if (WizardUtils.modemCheck()) {
                         return;
                     }
+                    /* modemCheck swallows exceptions, so check again before showing the next dialog */
+                    checkCancelled();
                     if (WizardUtils.vpnCheck()) {
                         return;
                     }
+                    checkCancelled();
                     final java.util.List<ReconnectResult> scripts = ReconnectPluginController.getInstance().autoFind(new ProcessCallBackAdapter() {
 
-                        public void setStatusString(Object caller, String string) {
+                        /*
+                         * Called regularly by the wizard threads. If the dialog has been closed, make sure the worker thread is
+                         * interrupted again, even if some code swallowed the interrupt before.
+                         */
+                        private void restoreInterrupt() {
+                            if (isCancelled()) {
+                                Thread.currentThread().interrupt();
+                            }
+                        }
 
+                        public void setStatusString(Object caller, String string) {
+                            restoreInterrupt();
                             setBarText(string);
                         }
 
                         public void setProgress(Object caller, int percent) {
+                            restoreInterrupt();
                             setBarProgress(percent);
                         }
 
                         public void setStatus(Object caller, Object statusObject) {
+                            restoreInterrupt();
                             if (caller instanceof RouterPlugin) {
                                 setSubStatusHeader(_GUI.T.ReconnectDialog_layoutDialogContent_header(((RouterPlugin) caller).getName()));
                             }
@@ -123,6 +141,7 @@ public class AutoSetupAction extends BasicAction {
                         }
                     });
 
+                    checkCancelled();
                     if (scripts != null && scripts.size() > 0) {
 
                         System.out.println("Scripts " + scripts);

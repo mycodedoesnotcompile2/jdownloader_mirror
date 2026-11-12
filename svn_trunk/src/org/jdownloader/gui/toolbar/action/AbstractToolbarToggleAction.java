@@ -24,13 +24,18 @@ public abstract class AbstractToolbarToggleAction extends AbstractToolBarAction 
         }
     }
 
+    @Override
+    public boolean isToggle() {
+        /* important! AppAction.isValidationMode prevents initial setSelected -> setting toogle=true */
+        return true;
+    }
+
     public void setSelected(final boolean selected) {
         new EDTRunner() {
             @Override
             protected void runInEDT() {
                 AbstractToolbarToggleAction.super.setSelected(selected);
                 fireNameUpdate();
-                fireIconUpdate();
                 fireToolTipUpdate();
             }
         };

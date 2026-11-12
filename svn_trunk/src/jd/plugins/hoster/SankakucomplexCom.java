@@ -23,6 +23,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.appwork.net.protocol.http.HTTPConstants;
@@ -62,7 +63,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.SankakucomplexComCrawler;
 
-@HostPlugin(revision = "$Revision: 52983 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 53979 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
 public class SankakucomplexCom extends PluginForHost {
     public SankakucomplexCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -177,12 +178,14 @@ public class SankakucomplexCom extends PluginForHost {
     public boolean allowUseAPI(final Account account, API_METHOD apiMethod) {
         final SankakucomplexComConfig cfg = PluginJsonConfig.get(SankakucomplexComConfig.class);
         final AccessMode mode = cfg.getLinkcheckAccessMode();
-        if (mode == AccessMode.API) {
+        switch (mode) {
+        case API:
             return true;
-        } else if (mode == AccessMode.AUTO && apiMethod.isAutoModePreferAPI(account)) {
-            return true;
-        } else {
+        case WEBSITE:
             return false;
+        case AUTO:
+        default:
+            return apiMethod.isAutoModePreferAPI(account);
         }
     }
 
@@ -330,7 +333,7 @@ public class SankakucomplexCom extends PluginForHost {
         }
         final String datePublished = br.getRegex("Posted\\s*:?\\s*</span>\\s*<a[^>]*title=\"(\\d{4}-\\d{2}-\\d{2})").getMatch(0);
         if (datePublished != null) {
-            link.setProperty(datePublished, PROPERTY_DATE_PUBLISHED);
+            link.setProperty(PROPERTY_DATE_PUBLISHED, datePublished);
         } else {
             logger.warning("Failed to find publish date");
         }
@@ -366,13 +369,23 @@ public class SankakucomplexCom extends PluginForHost {
         setWeakFilename(link);
         final String fileID = this.getFID(link);
         final Browser brc = this.createNewBrowserInstance();
-        brc.setAllowedResponseCodes(400);
+        /* 429 is not only used for rate limiting but also for items which can only be accessed when logged in. */
+        brc.setAllowedResponseCodes(400, 429);
         // Hint: https://sankakuapi.com/posts/ID/fu?lang=en -> return fileURLs even without being logged in?!
         final Request request = addAPIToken(brc.createGetRequest(SankakucomplexComCrawler.API_BASE + "/v2/posts?lang=en&page=1&limit=1&tags=id_range:" + fileID), account);
         brc.getPage(request);
         if (brc.getHttpConnection().getResponseCode() == 400) {
             /* {"success":false,"code":"invalid id","error":"invalid id","errorId":"error_<someHash>"} */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (brc.getHttpConnection().getResponseCode() == 429) {
+            if (account == null) {
+                /* Item requires the user to be logged in. */
+                link.setProperty(PROPERTY_IS_ACCOUNT_REQUIRED, true);
+                return AvailableStatus.TRUE;
+            } else {
+                /* We are logged in -> Most likely real rate limiting. */
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "API rate limit (HTTP 429)", TimeUnit.MINUTES.toMillis(1));
+            }
         }
         final Object obj = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.OBJECT);
         if (obj instanceof Map) {
@@ -485,7 +498,7 @@ public class SankakucomplexCom extends PluginForHost {
         try {
             final String filenameFromURL = Plugin.getFileNameFromURL(new URL(url));
             link.setProperty(PROPERTY_DIRECTURL_FILENAME, filenameFromURL);
-        } catch (MalformedURLException e) {
+        } catch (final MalformedURLException e) {
             e.printStackTrace();
         }
         link.setProperty(PROPERTY_DIRECTURL, url);

@@ -456,7 +456,7 @@ public abstract class Request {
         if (cookies == null) {
             return null;
         }
-        return cookies.getCookieString(getURL());
+        return cookies.getCookieString(this, getURL());
     }
 
     public String getCustomCharset() {

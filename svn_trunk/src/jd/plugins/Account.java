@@ -27,13 +27,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import jd.config.Property;
-import jd.controlling.AccountController;
-import jd.http.Browser;
-import jd.http.Cookie;
-import jd.http.Cookies;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.SimpleMapper;
 import org.appwork.storage.TypeRef;
@@ -52,6 +45,13 @@ import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.translate._JDT;
+
+import jd.config.Property;
+import jd.controlling.AccountController;
+import jd.http.Browser;
+import jd.http.Cookie;
+import jd.http.Cookies;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 public class Account extends Property {
     private static final String VALID_UNTIL              = "VALID_UNTIL";
@@ -159,9 +159,14 @@ public class Account extends Property {
         }
         final List<CookieStorable> cookieStorables = new ArrayList<CookieStorable>();
         for (final Cookie cookie : cookies.getCookies()) {
-            if (cookie.getKey() != null && !cookie.isExpired() && cookie.isValid()) {
-                cookieStorables.add(new CookieStorable(cookie));
+            if (cookie.isExpired()) {
+                continue;
+            } else if (!cookie.isValid()) {
+                continue;
+            } else if (!cookie.isPersistent()) {
+                continue;
             }
+            cookieStorables.add(new CookieStorable(cookie));
         }
         return cookieStorables;
     }
@@ -178,9 +183,16 @@ public class Account extends Property {
         final List<CookieStorable> cookieStorables = new ArrayList<CookieStorable>();
         final String antiddosCookies = org.jdownloader.plugins.components.antiDDoSForHost.antiDDoSCookiePattern;
         for (final Cookie cookie : cookies.getCookies()) {
-            if (cookie.getKey() != null && !cookie.getKey().matches(antiddosCookies) && !cookie.isExpired() && cookie.isValid()) {
-                cookieStorables.add(new CookieStorable(cookie));
+            if (cookie.isExpired()) {
+                continue;
+            } else if (!cookie.isValid()) {
+                continue;
+            } else if (!cookie.isPersistent()) {
+                continue;
+            } else if (cookie.getKey().matches(antiddosCookies)) {
+                continue;
             }
+            cookieStorables.add(new CookieStorable(cookie));
         }
         return cookieStorables;
     }
@@ -363,9 +375,9 @@ public class Account extends Property {
     }
 
     /**
-     * Set this to true to indicate that changing the IP address will also reset this accounts' limits. </br> Most of all services will
-     * store the limits on account (+ IP) but some will only rely on the IP thus allowing users to reset account limits by changing their
-     * IP.
+     * Set this to true to indicate that changing the IP address will also reset this accounts' limits. </br>
+     * Most of all services will store the limits on account (+ IP) but some will only rely on the IP thus allowing users to reset account
+     * limits by changing their IP.
      */
     public void setAllowReconnectToResetLimits(final boolean b) {
         /* 2022-07-19: TODO: Dummy function, see: https://svn.jdownloader.org/issues/87351 */

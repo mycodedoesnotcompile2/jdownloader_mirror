@@ -6,13 +6,14 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.InputEvent;
 import java.awt.event.MouseEvent;
-import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map.Entry;
+import java.util.WeakHashMap;
 
 import javax.swing.Action;
 import javax.swing.Icon;
@@ -22,7 +23,10 @@ import javax.swing.JMenuItem;
 import javax.swing.Timer;
 
 import org.appwork.exceptions.WTFException;
+import org.appwork.serializer.Deser;
+import org.appwork.serializer.SC;
 import org.appwork.storage.Storable;
+import org.appwork.utils.Hash;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.event.queue.QueueAction;
 import org.jdownloader.actions.AppAction;
@@ -299,7 +303,7 @@ public class MenuItemData implements Storable {
         return ret;
     }
 
-    protected WeakReference<Constructor<?>> weakConstructor = new WeakReference<Constructor<?>>(null);
+    protected final WeakHashMap<CustomizableAppAction, String> actionInstances = new WeakHashMap<CustomizableAppAction, String>();
 
     public CustomizableAppAction createAction() throws ClassNotFoundException, NoSuchMethodException, SecurityException, InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ExtensionNotLoadedException {
         if (!validated) {
@@ -310,18 +314,27 @@ public class MenuItemData implements Storable {
             //
             throw new WTFException("No ACTION");
         }
-        Constructor<?> c = weakConstructor.get();
-        if (c == null) {
-            final Class<?> clazz = actionData._getClazz();
-            c = clazz.getConstructor();
-            weakConstructor = new WeakReference<Constructor<?>>(c);
+        final boolean allowActionInstanceReuse = !AppAction.isValidationMode();
+        synchronized (actionInstances) {
+            final String cacheID = Hash.getSHA256(Deser.toString(this, SC.HASH_CONTENT));
+            if (allowActionInstanceReuse) {
+                for (Entry<CustomizableAppAction, String> entry : actionInstances.entrySet()) {
+                    if (cacheID.equals(entry.getValue())) {
+                        return entry.getKey();
+                    }
+                }
+            }
+            final Constructor<?> constructor = actionData._getClazz().getConstructor();
+            final CustomizableAppAction ret = (CustomizableAppAction) constructor.newInstance();
+            ret.setMenuItemData(this);
+            ret.applyMenuItemData();
+            ret.initContextDefaults();
+            ret.loadContextSetups();
+            if (allowActionInstanceReuse) {
+                actionInstances.put(ret, cacheID);
+            }
+            return ret;
         }
-        final CustomizableAppAction ret = (CustomizableAppAction) c.newInstance();
-        ret.setMenuItemData(this);
-        ret.applyMenuItemData();
-        ret.initContextDefaults();
-        ret.loadContextSetups();
-        return (ret);
     }
 
     public JComponent addTo(JComponent root, MenuBuilder menuBuilder) throws InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ClassNotFoundException, NoSuchMethodException, SecurityException, ExtensionNotLoadedException {

@@ -1,8 +1,8 @@
 package jd.plugins;
 
-import jd.http.Cookie;
-
 import org.appwork.storage.Storable;
+
+import jd.http.Cookie;
 
 public class CookieStorable implements Storable {
     public String getPath() {
@@ -94,8 +94,21 @@ public class CookieStorable implements Storable {
         this.expireTime = expireTime;
     }
 
-    private String path     = null;
-    private String host     = null;
+    private String path       = null;
+    private String host       = null;
+    private String originHost = null;
+
+    public String getOriginHost() {
+        if (cookie != null) {
+            return cookie.getOriginHost();
+        }
+        return originHost;
+    }
+
+    public void setOriginHost(String originHost) {
+        this.originHost = originHost;
+    }
+
     private String value    = null;
     private String key      = null;
     private String domain   = null;
@@ -160,8 +173,23 @@ public class CookieStorable implements Storable {
             }
         } catch (IllegalArgumentException e) {
         }
+        if (Cookie.SOURCE.LEGACY.equals(source)) {
+            if (getDomain() != null || getSecure() != null) {
+                if (getHostTime() > 0) {
+                    source = Cookie.SOURCE.SERVER;
+                } else {
+                    source = Cookie.SOURCE.IMPORT;
+                }
+            } else if (getDomain() == null && "/".equals(getPath())) {
+                source = Cookie.SOURCE.MANUAL;
+            }
+        }
         final Cookie ret = source.newCookieInstance();
         ret.setHost(this.getHost());
+        final String originHost = getOriginHost();
+        if (originHost != null) {
+            ret.setHost(originHost);
+        }
         ret.setValue(this.getValue());
         ret.setKey(this.getKey());
         ret.setDomain(this.getDomain());

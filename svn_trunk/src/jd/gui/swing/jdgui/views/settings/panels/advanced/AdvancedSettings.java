@@ -88,7 +88,8 @@ public class AdvancedSettings extends AbstractConfigPanel implements AdvancedCon
                 this.addMouseListener(new MouseAdapter() {
                     @Override
                     public void mouseClicked(MouseEvent e) {
-                        if (StringUtils.isEmpty(getText()) && SwingUtilities.isLeftMouseButton(e)) {
+                        /* Consumed = click on the clear button: The field is empty now, but that click must not open the history */
+                        if (!e.isConsumed() && StringUtils.isEmpty(getText()) && SwingUtilities.isLeftMouseButton(e)) {
                             /* Click into the empty field shows the whole history */
                             updateHistoryPopup(true);
                         }

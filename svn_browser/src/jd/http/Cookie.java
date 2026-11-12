@@ -27,8 +27,8 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.logging2.extmanager.LoggerFactory;
 
-public class Cookie {
-    public static class ServerCookie extends Cookie {
+public abstract class Cookie {
+    public static final class ServerCookie extends Cookie {
         public ServerCookie() {
         }
 
@@ -48,6 +48,22 @@ public class Cookie {
         }
 
         @Override
+        public boolean equals(Object obj) {
+            if (obj == this) {
+                return true;
+            } else if (obj instanceof Cookie) {
+                switch (((Cookie) obj).getSource()) {
+                case SERVER:
+                case IMPORT:
+                    return super.equals(obj);
+                default:
+                    return false;
+                }
+            }
+            return false;
+        }
+
+        @Override
         public boolean isValid() {
             if (!super.isValid()) {
                 return false;
@@ -59,7 +75,7 @@ public class Cookie {
         }
     }
 
-    public static class ImportCookie extends Cookie {
+    public static final class ImportCookie extends Cookie {
         public ImportCookie() {
         }
 
@@ -74,13 +90,35 @@ public class Cookie {
         }
 
         @Override
+        public boolean equals(Object obj) {
+            if (obj == this) {
+                return true;
+            } else if (obj instanceof Cookie) {
+                switch (((Cookie) obj).getSource()) {
+                case SERVER:
+                case IMPORT:
+                    return super.equals(obj);
+                default:
+                    return false;
+                }
+            }
+            return false;
+        }
+
+        @Override
         public boolean isCustomCookie() {
             return false;
         }
     }
 
-    public static class ManualCookie extends Cookie {
+    public static final class ManualCookie extends Cookie {
         public ManualCookie() {
+        }
+
+        public ManualCookie(final String host, final String key, final String value) {
+            this.setHost(host);
+            this.setKey(key);
+            this.setValue(value);
         }
 
         @Override
@@ -93,13 +131,15 @@ public class Cookie {
             return new ManualCookie();
         }
 
+        
+
         @Override
         public boolean isCustomCookie() {
             return true;
         }
     }
 
-    public static class LegacyCookie extends Cookie {
+    public static final class LegacyCookie extends Cookie {
         public LegacyCookie() {
         }
 
@@ -112,6 +152,8 @@ public class Cookie {
         public LegacyCookie newCookieInstance() {
             return new LegacyCookie();
         }
+
+      
 
         @Override
         public boolean isCustomCookie() {
@@ -144,6 +186,7 @@ public class Cookie {
                 return new LegacyCookie();
             }
         };
+
         public abstract Cookie newCookieInstance();
 
         public boolean isSameSource(Cookie cookie) {
@@ -154,9 +197,7 @@ public class Cookie {
     public final static String UNSECURE_HTTP = "http";
     public final static String SECURE_HTTPS  = "https";
 
-    public SOURCE getSource() {
-        return SOURCE.MANUAL;
-    }
+    public abstract SOURCE getSource();
 
     private String protocol = null;
 
@@ -164,9 +205,7 @@ public class Cookie {
         return protocol;
     }
 
-    public Cookie newCookieInstance() {
-        return new Cookie();
-    }
+    public abstract Cookie newCookieInstance();
 
     public boolean isValid() {
         return getKey() != null;
@@ -183,12 +222,19 @@ public class Cookie {
 
     public boolean setProtocol(String protocol) {
         final String oldProtocol = this.protocol;
-        return StringUtils.equalsIgnoreCase(oldProtocol, this.protocol = protocol);
+        return !StringUtils.equalsIgnoreCase(oldProtocol, this.protocol = protocol);
     }
 
     public static <T extends Cookie> T copyOf(T cookie) {
         final T ret = (T) cookie.newCookieInstance();
-        ret.update(cookie);
+        ret.setCreationTime(cookie.getCreationTime());
+        ret.setExpireDate(cookie.getExpireDate());
+        ret.setValue(cookie.getValue());
+        ret.setHostTime(cookie.getHostTime());
+        ret.setHostOnly(cookie.isHostOnly());
+        ret.setSecure(cookie.isSecure());
+        ret.setDomain(cookie.getDomain());
+        ret.setSameSite(cookie.getSetSameSite());
         ret.setProtocol(cookie.getProtocol());
         ret.setPath(cookie.getPath());
         ret.setKey(cookie.getKey());
@@ -198,6 +244,7 @@ public class Cookie {
 
     private String  path     = null;
     private String  host     = null;
+    private String  originHost     = null;
     private String  value    = null;
     private String  key      = null;
     private Boolean secure   = null;
@@ -262,13 +309,6 @@ public class Cookie {
     private Cookie() {
     }
 
-    @Deprecated
-    public Cookie(final String host, final String key, final String value) {
-        this.setHost(host);
-        this.setKey(key);
-        this.setValue(value);
-    }
-
     public boolean isCustomCookie() {
         if (SOURCE.MANUAL.equals(getSource())) {
             return true;
@@ -281,9 +321,6 @@ public class Cookie {
 
     @Override
     public boolean equals(final Object obj) {
-        if (obj == null) {
-            return false;
-        }
         if (this == obj) {
             return true;
         }
@@ -339,6 +376,16 @@ public class Cookie {
             }
         }
         return true;
+    }
+    
+    private boolean persistent=true;
+    
+    public boolean isPersistent() {
+        return persistent;
+    }
+
+    public void setPersistent(boolean persistent) {
+        this.persistent = persistent;
     }
 
     public boolean matches(final URL url) {
@@ -451,6 +498,7 @@ public class Cookie {
     }
 
     public boolean setDomain(String domain) {
+        final String oldDomain = this.domain;
         if (domain != null) {
             domain = cleanAttributeValue(domain);
             /** RFC 6265, remove leading dot **/
@@ -459,17 +507,15 @@ public class Cookie {
             try {
                 domain = IDN.toASCII(domain).toLowerCase(Locale.ROOT);
             } catch (IllegalArgumentException e) {
-                e.printStackTrace();
+                LoggerFactory.getDefaultLogger().log(e);
                 DebugMode.debugger();
                 return false;
             }
         }
         if (StringUtils.isEmpty(domain)) {
-            this.domain = null;
-            return false;
+            domain = null;
         }
-        this.domain = domain;
-        return true;
+        return !StringUtils.equalsIgnoreCase(oldDomain, this.domain = domain);
     }
 
     public boolean setExpireDate(final long time) {
@@ -491,10 +537,18 @@ public class Cookie {
         LoggerFactory.getDefaultLogger().severe("Cookie: no Format for " + expires + " found!");
         return;
     }
+    
+    public String getOriginHost() {
+        final String ret=originHost;
+        if (ret!=null) {
+            return ret;
+        }
+        return getHost();
+    }
 
     public boolean setHost(final String host) {
         final String oldHost = this.host;
-        return !StringUtils.equalsIgnoreCase(oldHost, this.host = Browser.getHost(host, false));
+        return !StringUtils.equalsIgnoreCase(oldHost, this.host = Browser.getHost(this.originHost=Browser.getHost(host, true), false));
     }
 
     public boolean setHostTime(final long time) {
@@ -503,14 +557,13 @@ public class Cookie {
     }
 
     public boolean updateHost(String newHost) {
+        if (newHost == null) {
+            return false;
+        }
         final String oldHost = getHost();
         if (StringUtils.equalsIgnoreCase(oldHost, newHost)) {
-            if (StringUtils.isNotEmpty(oldHost)) {
-                /* oldHost equals newHost */
-                return true;
-            }
-            /* host is null */
-            return false;
+            /* oldHost equals newHost */
+            return true;
         }
         newHost = newHost.toLowerCase(Locale.ROOT);
         String domain = getDomain();
@@ -583,39 +636,8 @@ public class Cookie {
 
     @Override
     public String toString() {
-        return this.getKey() + "=" + this.getValue() + " @Host:" + this.getHost() + "|Domain:" + getDomain() + "|HostOnly:" + isHostOnly() + "|Path:" + getPath() + "|SameSite:" + getSameSite() + "|Secure:" + isSecure() + "|Source:" + getSource();
+        return (isExpired() ? "EXPIRED:" : "") + getKey() + "=" + this.getValue() + " @Host:" + this.getHost() + "|Domain:" + getDomain() + "|HostOnly:" + isHostOnly() + "|Path:" + getPath() + "|SameSite:" + getSameSite() + "|Secure:" + isSecure() + "|Source:" + getSource();
     }
 
-    protected synchronized boolean update(final Cookie source) {
-        if (Boolean.TRUE.equals(isSecure()) && UNSECURE_HTTP.equals(source.getProtocol())) {
-            /** unsecure http cookie never can change a secure(d) cookie **/
-            DebugMode.debugger();
-            return false;
-        }
-        boolean ret = this.setCreationTime(source.getCreationTime());
-        ret |= this.setExpireDate(source.getExpireDate());
-        ret |= this.setValue(source.getValue());
-        ret |= this.setHostTime(source.getHostTime());
-        final Boolean hostOnly = source.isHostOnly();
-        if (hostOnly != null || source.isCustomCookie()) {
-            ret |= setHostOnly(hostOnly);
-        }
-        final Boolean secure = source.isSecure();
-        if (secure != null || source.isCustomCookie()) {
-            ret |= setSecure(secure);
-        }
-        final String domain = source.getDomain();
-        if (domain != null || source.isCustomCookie()) {
-            ret |= setDomain(domain);
-        }
-        final String sameSite = source.getSetSameSite();
-        if (sameSite != null || source.isCustomCookie()) {
-            ret |= setSameSite(sameSite);
-        }
-        if (source.isCustomCookie()) {
-            ret |= setProtocol(source.getProtocol());
-            ret |= setPath(source.getPath());
-        }
-        return ret;
-    }
+   
 }

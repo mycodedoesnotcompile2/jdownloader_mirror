@@ -82,9 +82,13 @@ public class PackageControllerTableModelData<PackageType extends AbstractPackage
                             if (childIndex >= 0) {
                                 if (isHiddenPackageSingleChildIndex(packageIndex)) {
                                     return packageIndex;
-                                } else {
+                                } else if (dataPackage.isExpanded()) {
                                     return packageIndex + childIndex + 1;
                                 }
+                                /*
+                                 * Collapsed package: getVisibleChildren also contains its children passing the filter, but they have no rows.
+                                 * packageIndex + childIndex + 1 would be the row of another node.
+                                 */
                             }
                             return -1;
                         }

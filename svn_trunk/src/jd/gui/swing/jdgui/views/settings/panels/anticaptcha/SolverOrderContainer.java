@@ -158,7 +158,28 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
                 updateTimingButton();
             }
         });
-        add(timingButton, "gaptop 6, alignx left, growx 0, wrap");
+        /*
+         * Button row below the table, left aligned: the captcha wizard (only if the debug panel is available) comes first, then the timing button.
+         */
+        final MigPanel buttonRow = new MigPanel("ins 0", "[][]", "[]");
+        SwingUtils.setOpaque(buttonRow, false);
+        if (CaptchaConfigPanel.isDebugPanelAvailable()) {
+            final JButton wizardButton = new JButton(new AppAction() {
+                {
+                    setIconKey(IconKey.ICON_WIZARD);
+                    setName(_GUI.T.CaptchaWizard_button());
+                    setTooltipText(_GUI.T.CaptchaWizard_button_tooltip());
+                }
+
+                @Override
+                public void actionPerformed(final ActionEvent e) {
+                    CaptchaWizardDialog.showWizard();
+                }
+            });
+            buttonRow.add(wizardButton);
+        }
+        buttonRow.add(timingButton);
+        add(buttonRow, "gaptop 6, alignx left, growx 0, wrap");
         /* Header label shown above the detail table; separated from the solver table above by a gap. */
         detailLabel = new JLabel();
         detailLabel.setVisible(false);

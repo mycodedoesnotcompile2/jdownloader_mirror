@@ -2,6 +2,7 @@ package jd.gui.swing.jdgui.views.settings.panels.anticaptcha;
 
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import java.awt.Component;
+import java.util.Set;
 
 import javax.swing.Icon;
 import javax.swing.JLabel;
@@ -172,6 +173,24 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
         if (captchaConfigPanel != null) {
             captchaConfigPanel.selectInComparisonTable(solvers);
         }
+    }
+
+    /**
+     * Result of the {@link CaptchaWizardDialog}: Shows the "Solver comparison table" tab with the needed captcha types selected. See
+     * {@link SolverComparisonContainer#applyWizardResult(Set, java.util.Collection)}.
+     */
+    public static void showCaptchaWizardResult(final Set<CAPTCHA_TYPE> types, final java.util.Collection<SolverService> wizardSolvers) {
+        showCaptchaSettings();
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                final CaptchaConfigPanel captchaConfigPanel = ConfigurationView.getInstance().getSubPanel(CaptchaConfigPanel.class);
+                if (captchaConfigPanel != null) {
+                    captchaConfigPanel.tabs.setSelectedComponent(captchaConfigPanel.solverComparisonContainer);
+                    captchaConfigPanel.solverComparisonContainer.applyWizardResult(types, wizardSolvers);
+                }
+            }
+        });
     }
 
     /** Shows the "Captcha Rules" tab and opens the "add captcha rule" dialog there with the given solver preselected. */

@@ -13,6 +13,7 @@ import org.jdownloader.scripting.JavaScriptEngineFactory;
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookie;
+import jd.http.Cookie.ManualCookie;
 import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
@@ -31,7 +32,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 52654 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53969 $", interfaceVersion = 3, names = {}, urls = {})
 public class XFileSharingProBasicSpecialFilejoker extends XFileSharingProBasic {
     public XFileSharingProBasicSpecialFilejoker(final PluginWrapper wrapper) {
         super(wrapper);
@@ -540,18 +541,18 @@ public class XFileSharingProBasicSpecialFilejoker extends XFileSharingProBasic {
             final Cookies cookies = new Cookies();
             cookies.add(br.getCookies(account.getHoster()));
             cookies.remove("xfss");
-            cookies.add(new Cookie(account.getHoster(), "xfss", sessionid));
+            cookies.add(new ManualCookie(account.getHoster(), "xfss", sessionid));
             final String email = account.getStringProperty(PROPERTY_EMAIL, null);
             if (!StringUtils.isEmpty(email)) {
                 /* 2019-09-12: E.g. required for filejoker.net */
                 cookies.remove("email");
-                cookies.add(new Cookie(account.getHoster(), "email", email));
+                cookies.add(new ManualCookie(account.getHoster(), "email", email));
             }
             final String username = account.getStringProperty(PROPERTY_USERNAME, null);
             if (!StringUtils.isEmpty(username)) {
                 /* 2019-09-12: E.g. required for novafile.com */
                 cookies.remove("login");
-                cookies.add(new Cookie(account.getHoster(), "login", username));
+                cookies.add(new ManualCookie(account.getHoster(), "login", username));
             }
             /*
              * 2019-09-12: E.g.filejoker.net website needs xfss and email cookies, novafile.com needs xfss and login cookies. Both websites

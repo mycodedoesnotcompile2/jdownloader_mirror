@@ -257,6 +257,24 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
         _fireTableStructureChanged(rows, true);
     }
 
+    /**
+     * Moves the given solvers to the top of the current rows once, without sorting again (the order of the rows is kept otherwise). The
+     * next rebuild or sort by the user replaces this order.
+     */
+    public void moveToTop(final java.util.Collection<SolverService> solvers) {
+        final List<SolverService> rows = new ArrayList<SolverService>();
+        final List<SolverService> rest = new ArrayList<SolverService>();
+        for (final SolverService solver : getTableData()) {
+            if (solvers.contains(solver)) {
+                rows.add(solver);
+            } else {
+                rest.add(solver);
+            }
+        }
+        rows.addAll(rest);
+        _fireTableStructureChanged(rows, false);
+    }
+
     /** Enables/disables hiding of all solvers that do not support every selected captcha type. */
     public void setOnlyFullSupport(final boolean onlyFullSupport) {
         this.onlyFullSupport = onlyFullSupport;

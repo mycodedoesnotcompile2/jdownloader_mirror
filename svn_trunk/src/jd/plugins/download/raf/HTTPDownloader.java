@@ -612,7 +612,7 @@ public class HTTPDownloader extends DownloadInterface implements FileBytesCacheF
         }
     }
 
-    private static class ConnectionHashInfo extends HashInfo {
+    public static class ConnectionHashInfo extends HashInfo {
         private ConnectionHashInfo(String hash, TYPE type, final boolean trustworthy) {
             super(hash, type, trustworthy, false);
         }
@@ -634,43 +634,57 @@ public class HTTPDownloader extends DownloadInterface implements FileBytesCacheF
                 return true;
             }
         }
-    }
 
-    private static HashInfo newConnectionHashInfo(final LogInterface logger, String hash, TYPE type) {
-        try {
-            final HashInfo ret = new ConnectionHashInfo(hash, type);
-            if (ret != null && ret.getHash().matches("^0+$")) {
-                // suspicious all 0/zeros hash, don't trust it
-                return ret.clone(false, false);
+        public static HashInfo newConnectionHashInfo(final LogInterface logger, String hash, TYPE type) {
+            try {
+                final HashInfo ret = new ConnectionHashInfo(hash, type);
+                if (ret != null && ret.getHash().matches("^0+$")) {
+                    // suspicious all 0/zeros hash, don't trust it
+                    return ret.clone(false, false);
+                }
+                return ret;
+            } catch (IllegalArgumentException e) {
+                if (logger != null) {
+                    logger.log(e);
+                } else {
+                    e.printStackTrace();
+                }
+                return null;
             }
-            return ret;
-        } catch (IllegalArgumentException e) {
-            if (logger != null) {
-                logger.log(e);
-            } else {
-                e.printStackTrace();
-            }
-            return null;
         }
     }
 
     public static HashInfo getHashInfoFromHeaders(final LogInterface logger, final URLConnectionAdapter con) {
-        HashInfo hashInfo = HTTPDownloader.parseXGoogHash(logger, con);
-        if (hashInfo == null) {
-            hashInfo = HTTPDownloader.parseAmazonHash(logger, con);
+        final HashInfo googHash = HTTPDownloader.parseXGoogHash(logger, con);
+        if (googHash != null) {
+            return googHash;
         }
-        if (hashInfo == null) {
-            /* only trust contentHash from noneRanged & noneEncoded */
-            final String contentEncoding = con.getHeaderField(HTTPConstants.HEADER_RESPONSE_CONTENT_ENCODING);
-            final String requestContentRange = con.getRequestProperty(HTTPConstants.HEADER_REQUEST_RANGE);
-            if (con.getHeaderField("X-Mod-H264-Streaming") == null && isNoneContentEncoding(contentEncoding) && requestContentRange == null && getCompleteContentLength(logger, con, false) >= 0) {
-                final String contentSHA1 = con.getHeaderField("Content-SHA1");
-                final String contentMD5 = con.getHeaderField("Content-MD5"); // e.g. terabox.com
-                hashInfo = contentSHA1 != null ? newConnectionHashInfo(logger, contentSHA1, TYPE.SHA1) : null;
-                hashInfo = hashInfo == null ? (contentMD5 != null ? newConnectionHashInfo(logger, contentMD5, TYPE.MD5) : null) : hashInfo;
+        final HashInfo amazonHash = HTTPDownloader.parseAmazonHash(logger, con);
+        if (amazonHash != null) {
+            return amazonHash;
+        }
+        /* only trust contentHash from noneRanged & noneEncoded */
+        final String contentEncoding = con.getHeaderField(HTTPConstants.HEADER_RESPONSE_CONTENT_ENCODING);
+        final String requestContentRange = con.getRequestProperty(HTTPConstants.HEADER_REQUEST_RANGE);
+        if (con.getHeaderField("X-Mod-H264-Streaming") != null || !isNoneContentEncoding(contentEncoding) || requestContentRange != null || getCompleteContentLength(logger, con, false) < 0) {
+            return null;
+        }
+        final String contentSHA1 = con.getHeaderField("Content-SHA1");
+        if (contentSHA1 != null) {
+            final HashInfo sha1Hash = ConnectionHashInfo.newConnectionHashInfo(logger, contentSHA1, TYPE.SHA1);
+            if (sha1Hash != null) {
+                return sha1Hash;
             }
         }
-        return hashInfo;
+        /**
+         * e.g. terabox.com <br>
+         * e.g. invalid value: mypikpak.com
+         */
+        final String contentMD5 = con.getHeaderField("Content-MD5");
+        if (contentMD5 != null) {
+            return ConnectionHashInfo.newConnectionHashInfo(logger, contentMD5, TYPE.MD5);
+        }
+        return null;
     }
 
     public static HashInfo parseXGoogHash(LogInterface logger, final URLConnectionAdapter con) {
@@ -689,9 +703,9 @@ public class HTTPDownloader extends DownloadInterface implements FileBytesCacheF
                     final String crc32c = new Regex(googleHash, "crc32c\\s*=\\s*([^,]+)").getMatch(0);
                     final HashInfo hashInfo;
                     if (md5 != null) {
-                        hashInfo = newConnectionHashInfo(logger, md5, HashInfo.TYPE.MD5);
+                        hashInfo = ConnectionHashInfo.newConnectionHashInfo(logger, md5, HashInfo.TYPE.MD5);
                     } else if (crc32c != null) {
-                        hashInfo = newConnectionHashInfo(logger, crc32c, HashInfo.TYPE.CRC32C);
+                        hashInfo = ConnectionHashInfo.newConnectionHashInfo(logger, crc32c, HashInfo.TYPE.CRC32C);
                     } else {
                         continue;
                     }
@@ -715,7 +729,7 @@ public class HTTPDownloader extends DownloadInterface implements FileBytesCacheF
                 if (amazonHash == null) {
                     continue;
                 }
-                final HashInfo ret = newConnectionHashInfo(logger, amazonHash, HashInfo.TYPE.MD5);
+                final HashInfo ret = ConnectionHashInfo.newConnectionHashInfo(logger, amazonHash, HashInfo.TYPE.MD5);
                 if (ret != null) {
                     /* Take first result */
                     return ret;

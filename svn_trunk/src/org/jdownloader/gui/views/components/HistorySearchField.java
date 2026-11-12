@@ -78,6 +78,8 @@ public abstract class HistorySearchField extends ExtTextField {
             @Override
             public void mouseClicked(MouseEvent e) {
                 if (SwingUtilities.isLeftMouseButton(e) && isOverClearButton(e)) {
+                    /* Consumed: Other click handlers (e.g. "click into the empty field opens the history") must ignore this click */
+                    e.consume();
                     setText("");
                 }
             }
@@ -187,7 +189,7 @@ public abstract class HistorySearchField extends ExtTextField {
         return isClearButtonEnabled() && getText().length() > 0;
     }
 
-    private boolean isOverClearButton(final MouseEvent e) {
+    protected boolean isOverClearButton(final MouseEvent e) {
         return isClearButtonVisible() && clearXPos > 0 && e.getX() >= clearXPos;
     }
 
@@ -331,6 +333,10 @@ public abstract class HistorySearchField extends ExtTextField {
             if (!arg0.isTemporary()) {
                 /* Not accepted completion must not end up in the history */
                 removeInlineCompletion();
+                /*
+                 * Permanent focus loss counts as confirmation, same as Enter: The other histories (download destination, package name) are
+                 * saved on focus loss as well. Temporary focus loss (e.g. switching to another window) does not.
+                 */
                 addToSearchHistory();
             }
         }

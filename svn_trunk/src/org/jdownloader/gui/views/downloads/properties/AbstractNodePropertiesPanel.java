@@ -717,6 +717,7 @@ public abstract class AbstractNodePropertiesPanel<E extends AbstractNodeProperti
                 final String oldName = abstractNodes.loadPackageName();
                 if (!StringUtils.equals(newName, oldName)) {
                     abstractNodes.savePackageName(newName);
+                    /* save() also runs on focus loss (see Listener.focusLost) -> Name gets added to the history on focus loss, too */
                     PackageHistoryManager.getInstance().add(newName);
                 }
             }

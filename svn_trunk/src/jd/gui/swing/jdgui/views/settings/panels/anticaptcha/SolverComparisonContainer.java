@@ -678,6 +678,52 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
         });
     }
 
+    /**
+     * Result of the {@link CaptchaWizardDialog}: Selects exactly the captcha types the user needs (replacing the current selection) and
+     * shows all solvers (the "only full support" filter is switched off). The solvers the wizard recommended are selected and moved to the
+     * top once. This order is only the initial one: as soon as the user sorts the table, it is gone.
+     *
+     * @param wizardSolvers
+     *            the solvers which were shown in the last step of the wizard
+     */
+    public void applyWizardResult(final Set<CAPTCHA_TYPE> types, final java.util.Collection<SolverService> wizardSolvers) {
+        final SolverTypePreselect typePreset = SolverTypePreselect.CUSTOM;
+        adjustingSolverTypes = true;
+        try {
+            solverTypePresetCombo.setSelectedItem(typePreset);
+        } finally {
+            adjustingSolverTypes = false;
+        }
+        applySolverTypePreset(typePreset);
+        /* The needed captcha types replace the current selection. */
+        rememberedSelection = new LinkedHashSet<CAPTCHA_TYPE>(types);
+        adjusting = true;
+        try {
+            presetCombo.setSelectedItem(Preselect.SELECTION);
+        } finally {
+            adjusting = false;
+        }
+        applyPreset(Preselect.SELECTION);
+        onlyFullSupportCheckBox.setSelected(false);
+        model.setOnlyFullSupport(false);
+        updateFullSupportCheckBox();
+        /* The rows are rebuilt on the EDT: move and select the recommended solvers once that is done. */
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                model.moveToTop(wizardSolvers);
+                table.getSelectionModel().clearSelection();
+                for (final SolverService solver : wizardSolvers) {
+                    final int row = model.getRowforObject(solver);
+                    if (row >= 0) {
+                        table.getSelectionModel().addSelectionInterval(row, row);
+                    }
+                }
+                table.scrollRectToVisible(table.getCellRect(0, 0, true));
+            }
+        });
+    }
+
     /** Shows the hint below the table only if at least one external solver is in the table. */
     private void updateDisclaimerVisibility() {
         boolean externalSolverShown = false;

@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-@DecrypterPlugin(revision = "$Revision: 53883 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53979 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -135,6 +135,11 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         hosterplugin = (SankakucomplexCom) this.getNewPluginForHostInstance(this.getHost());
+        /*
+         * Let the hoster plugin work with the Browser of this crawler so that cookies of the account login are also available for the
+         * website requests done by this crawler.
+         */
+        hosterplugin.setBrowser(this.br);
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
         if (account != null) {
             hosterplugin.login(account, false);
@@ -219,23 +224,34 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         final int maxPageUserLimit = cfg.getPostTagCrawlerMaxPageLimit();
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(tags);
+        fp.setPackageKey("sankakucomplex://tags/" + tags);
         int page = targetPage != null ? targetPage.intValue() : 1;
         String numberofItemsStr = br.getRegex("class=\"tag-count\"[^>]*>([^<]+)</span>").getMatch(0);
         final int numberofItems;
+        /* 0 = number of items is exact, else: Number is rounded (e.g. "1.2K") and the real number can differ by up to this value. */
+        final int numberofItemsTolerance;
         if (numberofItemsStr == null) {
             logger.warning("Failed to find expected number of items");
             numberofItems = -1;
+            numberofItemsTolerance = 0;
         } else if (numberofItemsStr.endsWith("K") || numberofItemsStr.endsWith("k")) {
-            String numPart = numberofItemsStr.substring(0, numberofItemsStr.length() - 1);
-            double num = Double.parseDouble(numPart);
-            numberofItems = (int) (num * 1000);
+            final String numPart = numberofItemsStr.substring(0, numberofItemsStr.length() - 1).trim().replace(",", ".");
+            final double num = Double.parseDouble(numPart);
+            numberofItems = (int) Math.round(num * 1000);
+            final int dotIndex = numPart.indexOf('.');
+            final int decimals = dotIndex == -1 ? 0 : numPart.length() - dotIndex - 1;
+            /* "12K" -> +-500, "1.2K" -> +-50, "1.25K" -> +-5 */
+            numberofItemsTolerance = (int) Math.ceil(500 / Math.pow(10, decimals));
         } else if (numberofItemsStr.matches("\\d+")) {
             numberofItems = Integer.parseInt(numberofItemsStr);
+            numberofItemsTolerance = 0;
         } else {
             logger.warning("Total number of items string has unsupported format: " + numberofItemsStr);
             numberofItems = -1;
+            numberofItemsTolerance = 0;
         }
-        logger.info("Total number of items: " + numberofItems);
+        logger.info("Total number of items: " + numberofItems + " | tolerance: " + numberofItemsTolerance);
+        boolean reachedUserPageLimit = false;
         final HashSet<String> dupes = new HashSet<String>();
         int position = 1;
         pagination: do {
@@ -269,7 +285,14 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             html = XFileSharingProBasic.removeDiv(this, html, new Regex(html, "(<div[^>]*class\\s*=\\s*\"[^\"]*carousel-data-companion\"[^>]*>)").getMatch(0));
             final String[] postIDs = new Regex(html, "(?i)PostModeMenu.click\\('([A-Za-z0-9]+)'\\)").getColumn(0);
             if (postIDs == null || postIDs.length == 0) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                if (ret.isEmpty()) {
+                    logger.info("Looks like users' given tag does not lead to any search results");
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                } else {
+                    /* Do not throw an exception here: Items have already been returned/distributed. */
+                    logger.info("Stopping because: Current page contains no items");
+                    break pagination;
+                }
             }
             int numberofNewItemsThisPage = 0;
             for (final String postID : postIDs) {
@@ -324,6 +347,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
                 break pagination;
             } else if (page == maxPageUserLimit) {
                 logger.info("Stopping because: Reached user defined max page limit of " + maxPageUserLimit);
+                reachedUserPageLimit = true;
                 this.displayBubbleNotification("Tags: " + tags, "Stopping early because: Reached max user defined page: " + maxPageUserLimit + "\r\nYou can adjust this limit in the plugin settings.");
                 break pagination;
             } else if (nextPageURL == null) {
@@ -332,7 +356,8 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             } else if (numberofNewItemsThisPage == 0) {
                 logger.info("Stopping because: Current page contains no new items");
                 break pagination;
-            } else if (numberofItems != -1 && ret.size() >= numberofItems) {
+            } else if (numberofItems != -1 && numberofItemsTolerance == 0 && ret.size() >= numberofItems) {
+                /* Only trust the number of items as stop criterion if it is exact (not rounded). */
                 logger.info("Stopping because: Found all items -> " + numberofItems);
                 break pagination;
             }
@@ -341,7 +366,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             page++;
             continue pagination;
         } while (true);
-        if (targetPage == null && ret.size() < numberofItems) {
+        if (targetPage == null && !reachedUserPageLimit && numberofItems != -1 && ret.size() < numberofItems - numberofItemsTolerance) {
             this.displayBubbleNotification("Missing items!", "Tags: " + tags + "\r\nSome items look to be missing!\r\nFound only " + ret.size() + "/" + numberofItemsStr + " items");
         }
         return ret;
@@ -357,6 +382,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         final int maxPage = cfg.getPostTagCrawlerMaxPageLimit();
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(tags);
+        fp.setPackageKey("sankakucomplex://tags/" + tags);
         final String tagsUrlEncoded = URLEncode.encodeURIComponent(tags);
         final int maxItemsPerPage = 40;
         final UrlQuery query = new UrlQuery();
@@ -377,6 +403,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             final Browser brc = createNewBrowserInstanceAPI();
             final Request request = hosterplugin.addAPIToken(brc.createGetRequest(API_BASE + "/posts/keyset?" + query.toString()), account);
             brc.getPage(request);
+            checkAPIResponseCode(brc, account);
             final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
             if ("snackbar__anonymous_tags-limit".equals(entries.get("code"))) {
                 throw new AccountRequiredException("Account required: Your search query contains too many tags");
@@ -456,18 +483,20 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         tags = URLEncode.decodeURIComponent(tags.replace("+", " "));
+        final String tagsUrlEncoded = URLEncode.encodeURIComponent(tags);
         final int maxItemsPerPage = 20;
         final UrlQuery query = new UrlQuery();
         query.appendEncoded("lang", languageFromURL);
         query.appendEncoded("limit", Integer.toString(maxItemsPerPage));
         query.appendEncoded("includes[]", "series");
-        query.add("tags", URLEncode.encodeURIComponent(tags));
+        query.add("tags", tagsUrlEncoded);
         query.appendEncoded("pool_type", "0");
         int page = 1;
         pagination: do {
             final Browser brc = createNewBrowserInstanceAPI();
             final Request request = hosterplugin.addAPIToken(brc.createGetRequest(API_BASE + "/pools/keyset?" + query.toString()), account);
             brc.getPage(request);
+            checkAPIResponseCode(brc, account);
             final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
             final Map<String, Object> meta = (Map<String, Object>) entries.get("meta");
             final String nextPageHash = (String) meta.get("next");
@@ -482,7 +511,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
                 }
             }
             for (final Map<String, Object> book : data) {
-                final DownloadLink link = this.createDownloadlink("https://beta.sankakucomplex.com/" + languageFromURL + "/books/" + book.get("id") + "?tags=" + tags);
+                final DownloadLink link = this.createDownloadlink("https://beta.sankakucomplex.com/" + languageFromURL + "/books/" + book.get("id") + "?tags=" + tagsUrlEncoded);
                 ret.add(link);
                 distribute(link);
             }
@@ -525,10 +554,13 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final Browser brc = this.createNewBrowserInstanceAPI();
-        brc.setAllowedResponseCodes(400);
+        /* Keep 429 allowed (see createNewBrowserInstanceAPI) as setAllowedResponseCodes replaces previously allowed codes. */
+        brc.setAllowedResponseCodes(400, 429);
         final Request request = hosterplugin.addAPIToken(brc.createGetRequest(SankakucomplexComCrawler.API_BASE + "/pools/" + bookID + "?lang=" + language + "&includes[]=series&exceptStatuses[]=deleted"), account);
         brc.getPage(request);
-        if (brc.getHttpConnection().getResponseCode() == 404) {
+        checkAPIResponseCode(brc, account);
+        if (brc.getHttpConnection().getResponseCode() == 400 || brc.getHttpConnection().getResponseCode() == 404) {
+            /* E.g. {"success":false,"code":"invalid id","error":"invalid id","errorId":"error_<someHash>"} */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
@@ -554,8 +586,24 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         }
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(author.get("name") + " - " + bookTitle);
+        fp.setPackageKey("sankakucomplex://book/" + bookID);
         fp.addLinks(ret);
         return ret;
+    }
+
+    /**
+     * Handles HTTP response code 429 of API requests: This is not only used for rate limiting but also for items which can only be accessed
+     * when logged in.
+     */
+    private void checkAPIResponseCode(final Browser brc, final Account account) throws PluginException {
+        if (brc.getHttpConnection().getResponseCode() != 429) {
+            return;
+        }
+        if (account == null) {
+            throw new AccountRequiredException();
+        } else {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "API rate limit (HTTP 429)");
+        }
     }
 
     private static String generateSinglePostURL(final String postID, String language, final String tagsUrlEncoded) {

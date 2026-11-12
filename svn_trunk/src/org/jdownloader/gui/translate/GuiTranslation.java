@@ -5745,7 +5745,7 @@ public interface GuiTranslation extends TranslateInterface {
     String AbstractCaptchaDialog_avoidExternalSolversForLoginCaptchas_description();
 
     @Default(lngs = { "en" }, values = { "Affects login captchas only: If enabled, the manual captcha solvers (browser, dialog, MyJDownloader) are asked first for a login captcha, before the external captcha solvers. The external solvers are still used afterwards as usual (see the setting \"Start the next solver after\" of the solvers). Background: When the user is adding an account or an account gets checked and a captcha is required, it should be solved fast and the user is typically faster than external solvers. If you disable this setting, login captchas are handled exactly the same way as any other captchas, in the order of the solver table." })
-String AbstractCaptchaDialog_avoidExternalSolversForLoginCaptchas_tooltip();
+    String AbstractCaptchaDialog_avoidExternalSolversForLoginCaptchas_tooltip();
 
     @Default(lngs = { "en" }, values = { "Solver comparison table" })
     String CaptchaSolverComparison_tab_title();
@@ -7768,4 +7768,182 @@ String AbstractCaptchaDialog_avoidExternalSolversForLoginCaptchas_tooltip();
 
     @Default(lngs = { "en" }, values = { "Click to remove" })
     String MultiClickCaptchaDialog_marker_tooltip();
+
+    @Default(lngs = { "en" }, values = { "Captcha Wizard" })
+    String CaptchaWizard_button();
+
+    @Default(lngs = { "en" }, values = { "Helps you to find the captcha solvers which fit your needs." })
+    String CaptchaWizard_button_tooltip();
+
+    @Default(lngs = { "en" }, values = { "Captcha Wizard" })
+    String CaptchaWizard_title();
+
+    @Default(lngs = { "en" }, values = { "Step %s1/%s2" })
+    String CaptchaWizard_progress(int step, int steps);
+
+    @Default(lngs = { "en" }, values = { "Next" })
+    String CaptchaWizard_next();
+
+    @Default(lngs = { "en" }, values = { "Back" })
+    String CaptchaWizard_back();
+
+    @Default(lngs = { "en" }, values = { "Finish & open captcha comparison table" })
+    String CaptchaWizard_finish();
+
+    @Default(lngs = { "en" }, values = { "Solver pre-check" })
+    String CaptchaWizard_precheck_header();
+
+    @Default(lngs = { "en" }, values = { "External solver usage globally enabled" })
+    String CaptchaWizard_precheck_globalEnabled();
+
+    @Default(lngs = { "en" }, values = { "External solver usage is globally disabled" })
+    String CaptchaWizard_precheck_globalDisabled();
+
+    @Default(lngs = { "en" }, values = { "%s1 captcha solvers are disabled" })
+    String CaptchaWizard_precheck_solversDisabled(int count);
+
+    @Default(lngs = { "en" }, values = { "Fix potential configuration problems: Automatically apply the following settings when you click \"Next\"" })
+    String CaptchaWizard_precheck_fixHeader();
+
+    @Default(lngs = { "en" }, values = { "Disabling any of the suggested fixes may affect the functionality of this wizard in a negative way." })
+    String CaptchaWizard_precheck_fixDisabledWarning();
+
+    @Default(lngs = { "en" }, values = { "Silent mode is disabled" })
+    String CaptchaWizard_precheck_silentDisabled();
+
+    @Default(lngs = { "en" }, values = { "Silent mode is enabled or set to automatic: Captcha dialogs may be suppressed" })
+    String CaptchaWizard_precheck_silentEnabled();
+
+    @Default(lngs = { "en" }, values = { "Disable silent mode" })
+    String CaptchaWizard_precheck_disableSilent();
+
+    @Default(lngs = { "en" }, values = { "All captcha solver accounts are enabled" })
+    String CaptchaWizard_precheck_allAccountsEnabled();
+
+    @Default(lngs = { "en" }, values = { "%s1 captcha solver accounts are disabled" })
+    String CaptchaWizard_precheck_accountsDisabled(int count);
+
+    @Default(lngs = { "en" }, values = { "Enable %s1 deactivated captcha solver accounts" })
+    String CaptchaWizard_precheck_enableAccounts(int count);
+
+    @Default(lngs = { "en" }, values = { "Enable global external solver usage" })
+    String CaptchaWizard_precheck_enableGlobal();
+
+    @Default(lngs = { "en" }, values = { "All captcha solvers are enabled" })
+    String CaptchaWizard_precheck_allSolversEnabled();
+
+    @Default(lngs = { "en" }, values = { "Enable %s1 deactivated captcha solvers" })
+    String CaptchaWizard_precheck_enableSolvers(int count);
+
+    @Default(lngs = { "en" }, values = { "How do you prefer to solve captchas?" })
+    String CaptchaWizard_step1_header();
+
+    @Default(lngs = { "en" }, values = { "This wizard helps you find the captcha solvers that fit your needs." })
+    String CaptchaWizard_step1_intro();
+
+    @Default(lngs = { "en" }, values = { "Close the wizard?" })
+    String CaptchaWizard_confirmClose_title();
+
+    @Default(lngs = { "en" }, values = { "You made changes in the wizard. If you close it now, they will be lost. Do you really want to close the wizard?" })
+    String CaptchaWizard_confirmClose_message();
+
+    @Default(lngs = { "en" }, values = { "Captchas can be solved by you or fully automatically by a paid external captcha solver service." })
+    String CaptchaWizard_step1_text();
+
+    @Default(lngs = { "en" }, values = { "Manual captcha solving only" })
+    String CaptchaWizard_step1_manual();
+
+    @Default(lngs = { "en" }, values = { "Automatic captcha solving via paid external captcha solver" })
+    String CaptchaWizard_step1_paid();
+
+    @Default(lngs = { "en" }, values = { "Both manual & automatic captcha solving via paid external captcha solver" })
+    String CaptchaWizard_step1_both();
+
+    @Default(lngs = { "en" }, values = { "For which websites do you need to solve captchas?" })
+    String CaptchaWizard_step2_header();
+
+    @Default(lngs = { "en" }, values = { "Tick the websites you want to download from or crawl." })
+    String CaptchaWizard_step2_text();
+
+    @Default(lngs = { "en" }, values = { "Add further services that you plan on using in JDownloader." })
+    String CaptchaWizard_step2_addHint();
+
+    @Default(lngs = { "en" }, values = { "The presented entries are a mix of services you've used with this JDownloader installation in the past and the entries you added when you last used this wizard." })
+    String CaptchaWizard_step2_mixedInfo();
+
+    @Default(lngs = { "en" }, values = { "Add at least one entry." })
+    String CaptchaWizard_step2_nothingAdded();
+
+    @Default(lngs = { "en" }, values = { "Select at least one entry." })
+    String CaptchaWizard_step2_nothingSelected();
+
+    @Default(lngs = { "en" }, values = { "Add" })
+    String CaptchaWizard_step2_add();
+
+    @Default(lngs = { "en" }, values = { "Enabled" })
+    String CaptchaWizard_column_enabled();
+
+    @Default(lngs = { "en" }, values = { "Domain" })
+    String CaptchaWizard_column_domain();
+
+    @Default(lngs = { "en" }, values = { "Captcha type" })
+    String CaptchaWizard_column_captchaType();
+
+    @Default(lngs = { "en" }, values = { "Request type" })
+    String CaptchaWizard_column_requestType();
+
+    @Default(lngs = { "en" }, values = { "Add domain" })
+    String CaptchaWizard_addDomain_title();
+
+    @Default(lngs = { "en" }, values = { "Based on your selection, you need to solve the following types of captchas:" })
+    String CaptchaWizard_step3_header();
+
+    @Default(lngs = { "en" }, values = { "Notes" })
+    String CaptchaWizard_notes_header();
+
+    @Default(lngs = { "en" }, values = { "Already usable" })
+    String CaptchaWizard_column_alreadyUsable();
+
+    @Default(lngs = { "en" }, values = { "Relevant for you" })
+    String CaptchaWizard_column_relevant();
+
+    @Default(lngs = { "en" }, values = { "In the next step, JDownloader will suggest captcha solvers which fit your needs." })
+    String CaptchaWizard_step3_nextInfo();
+
+    @Default(lngs = { "en" }, values = { "Captcha solvers which fit your needs" })
+    String CaptchaWizard_step4_header();
+
+    @Default(lngs = { "en" }, values = { "%s1 solvers that are already usable have been automatically deselected." })
+    String CaptchaWizard_info_deselectedUsable(int count);
+
+    @Default(lngs = { "en" }, values = { "Captcha solver" })
+    String CaptchaWizard_column_solver();
+
+    @Default(lngs = { "en" }, values = { "Solves all your required captcha types" })
+    String CaptchaWizard_column_solvesAll();
+
+    @Default(lngs = { "en" }, values = { "Yes (%s1/%s2)" })
+    String CaptchaWizard_solvesAll_yes(int solved, int required);
+
+    @Default(lngs = { "en" }, values = { "No (%s1/%s2)" })
+    String CaptchaWizard_solvesAll_no(int solved, int required);
+
+    /*
+     * The following texts are used twice: in an info dialog and in the list below the solver table of the wizard. Each text is one
+     * translation, the captcha types it is about (if any) are listed below it.
+     */
+    @Default(lngs = { "en" }, values = { "You prefer to solve captchas manually, but JDownloader cannot offer a manual way to solve the captcha types listed below. For these captcha types you need a paid captcha solver. Paid solvers are included in the result of this wizard." })
+    String CaptchaWizard_info_manualNotPossible();
+
+    @Default(lngs = { "en" }, values = { "No captcha solver supports all captcha types you need. The smallest combination of solvers which covers as many of them as possible is: %s1" })
+    String CaptchaWizard_info_multipleSolvers(String solvers);
+
+    @Default(lngs = { "en" }, values = { "No captcha solver supports the captcha types listed below." })
+    String CaptchaWizard_info_unsolvable();
+
+    @Default(lngs = { "en" }, values = { "You already have usable captcha solver for all captcha types you need." })
+    String CaptchaWizard_info_alreadyUsable();
+
+    @Default(lngs = { "en" }, values = { "You prefer automatic captcha solving, however currently some of the captcha types you need can only be solved manually (listed below). Use the solvers in the table to find an automatic captcha solver that fits your needs." })
+    String CaptchaWizard_info_automaticButManual();
 }

@@ -50,7 +50,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 52664 $", interfaceVersion = 3, names = { "uploadgig.com" }, urls = { "https?://(?:www\\.)?uploadgig\\.com/file/download/([A-Za-z0-9]+)(/[A-Za-z0-9%\\.\\-_]+)?" })
+@HostPlugin(revision = "$Revision: 53969 $", interfaceVersion = 3, names = { "uploadgig.com" }, urls = { "https?://(?:www\\.)?uploadgig\\.com/file/download/([A-Za-z0-9]+)(/[A-Za-z0-9%\\.\\-_]+)?" })
 public class UploadgigCom extends antiDDoSForHost {
     @Override
     protected long getStartInterval(DownloadLink downloadLink, Account account) {
@@ -379,7 +379,9 @@ public class UploadgigCom extends antiDDoSForHost {
     }
 
     private void errorhandlingGeneral(final Browser br) throws PluginException {
-        if (br.containsHTML("File not found")) {
+        if (br.containsHTML(">\\s*This file can be downloaded by Premium Member only")) {
+            throw new AccountRequiredException("This file can be downloaded by Premium Member only");
+        } else if (br.containsHTML("File not found")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             // File not found, for more information contact the file owner(uploader) or send us a ticket
         } else if (br.containsHTML("The download link has expired")) {

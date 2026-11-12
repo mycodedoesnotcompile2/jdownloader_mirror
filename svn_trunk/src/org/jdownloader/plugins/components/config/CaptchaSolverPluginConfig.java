@@ -22,8 +22,8 @@ public interface CaptchaSolverPluginConfig extends CaptchaSolverConfigV3 {
 
     /*
      * "Start the next solver after": All external solvers use the default of the base config, which is the same as
-     * SolverType.DEFAULT_START_NEXT_AFTER_SECONDS_EXTERNAL (both are 60 seconds). If the external default ever differs from the base default, override
-     * getStartNextSolverAfterSeconds here (with all annotations repeated, they are not inherited).
+     * SolverType.DEFAULT_START_NEXT_AFTER_SECONDS_EXTERNAL (both are 60 seconds). If the external default ever differs from the base
+     * default, override getStartNextSolverAfterSeconds here (with all annotations repeated, they are not inherited).
      */
     public static class TRANSLATION {
         public String getWarnOnLowBalance_label() {
@@ -57,7 +57,7 @@ public interface CaptchaSolverPluginConfig extends CaptchaSolverConfigV3 {
     void setLowBalanceWarningThreshold(double threshold);
 
     @AboutConfig
-    @DescriptionForConfigEntry("Polling interval in seconds for captcha status checks")
+    @DescriptionForConfigEntry("Polling interval in seconds for captcha status checks. Your selection can be overridden by a solvers' server side restrictions.")
     @SpinnerValidator(min = 1, max = 15, step = 1)
     @DefaultIntValue(5)
     @Order(700)
