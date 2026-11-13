@@ -86,25 +86,6 @@ public class NewTheme extends Theme {
         return ret;
     }
 
-    protected String getCacheKey(final Object... objects) {
-        if (objects != null) {
-            if (objects.length == 1 && objects[0] != null) {
-                return objects[0].toString();
-            }
-            final StringBuilder sb = new StringBuilder();
-            for (final Object o : objects) {
-                if (o != null) {
-                    if (sb.length() > 0) {
-                        sb.append("_");
-                    }
-                    sb.append(o.toString());
-                }
-            }
-            return sb.toString();
-        }
-        return null;
-    }
-
     public Icon getCheckBoxImage(String path, boolean selected, int size) {
         return getCheckBoxImage(path, selected, size, null);
     }

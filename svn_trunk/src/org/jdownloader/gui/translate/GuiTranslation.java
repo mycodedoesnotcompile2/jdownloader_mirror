@@ -5690,9 +5690,6 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Select browser" })
     String SolverOrderTable_context_selectBrowser();
 
-    @Default(lngs = { "en" }, values = { "Silent Mode" })
-    String SolverOrderTable_context_silentMode();
-
     @Default(lngs = { "en" }, values = { "Choose browser..." })
     String SolverOrderContainer_chooseBrowser();
 
@@ -7787,8 +7784,95 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Back" })
     String CaptchaWizard_back();
 
-    @Default(lngs = { "en" }, values = { "Finish & open captcha comparison table" })
+    @Default(lngs = { "en" }, values = { "Finish" })
     String CaptchaWizard_finish();
+
+    @Default(lngs = { "en" }, values = { "Update captcha solver sort order according to my preferences" })
+    String CaptchaWizard_finish_sortOrder();
+
+    @Default(lngs = { "en" }, values = { "Open captcha comparison table" })
+    String CaptchaWizard_finish_openComparison();
+
+    @Default(lngs = { "en" }, values = { "How do you want to handle login captchas?" })
+    String CaptchaWizard_login_header();
+
+    @Default(lngs = { "en" }, values = { "Login captchas can appear when JDownloader logs in to an account, e.g. when you add an account or when an account gets checked. They should be solved quickly, and you are typically faster than an automatic solver." })
+    String CaptchaWizard_login_text();
+
+    @Default(lngs = { "en" }, values = { "More information:" })
+    String CaptchaWizard_login_linkPrefix();
+
+    @Default(lngs = { "en" }, values = { "Click here" })
+    String CaptchaWizard_login_link();
+
+    @Default(lngs = { "en" }, values = { "Like any other (use solver sort order from solver order table)" })
+    String CaptchaWizard_login_likeOther();
+
+    @Default(lngs = { "en" }, values = { "Preferably manually" })
+    String CaptchaWizard_login_manual();
+
+    @Default(lngs = { "en" }, values = { "Prefers manual captcha solving for login captchas, ignores your solver order from the captcha solver table." })
+    String CaptchaWizard_login_manualDescription();
+
+    @Default(lngs = { "en" }, values = { "Choose your preference" })
+    String CaptchaWizard_step1_preference();
+
+    @Default(lngs = { "en" }, values = { "What should happen if nobody solves a captcha in time?" })
+    String CaptchaWizard_timeout_header();
+
+    @Default(lngs = { "en" }, values = { "This applies if neither you nor any captcha solver answers a captcha before it runs into a timeout." })
+    String CaptchaWizard_timeout_text();
+
+    @Default(lngs = { "en" }, values = { "Hoster (downloads and account checks):" })
+    String CaptchaWizard_timeout_hoster();
+
+    @Default(lngs = { "en" }, values = { "Crawler:" })
+    String CaptchaWizard_timeout_crawler();
+
+    @Default(lngs = { "en" }, values = { "Skip the link" })
+    String CaptchaWizard_timeout_skip();
+
+    @Default(lngs = { "en" }, values = { "Skip all links of this hoster" })
+    String CaptchaWizard_timeout_skipHoster();
+
+    @Default(lngs = { "en" }, values = { "Request a new captcha" })
+    String CaptchaWizard_timeout_retry();
+
+    @Default(lngs = { "en" }, values = { "Ask me what to do" })
+    String CaptchaWizard_timeout_ask();
+
+    @Default(lngs = { "en" }, values = { "Show notifications for external captcha solvers" })
+    String CaptchaWizard_bubble();
+
+    @Default(lngs = { "en" }, values = { "Notifications" })
+    String CaptchaWizard_notification_header();
+
+    @Default(lngs = { "en" }, values = { "Disable all manual solvers" })
+    String CaptchaWizard_finish_disableManual();
+
+    @Default(lngs = { "en" }, values = { "Your paid captcha solvers are enough to solve all captcha types you need automatically. Disabling the manual solvers (captcha dialog, browser dialog and MyJDownloader) means JDownloader never interrupts you with a captcha again and no captcha window pops up. Be aware of the effects: If all paid solvers fail (e.g. no balance left, service down or captcha not solved), you will NOT be asked to solve the captcha yourself any more. Depending on your timeout settings, the affected links are skipped or retried. This also applies to login captchas. You can enable the manual solvers again at any time in the solver table." })
+    String CaptchaWizard_finish_disableManualInfo();
+
+    @Default(lngs = { "en" }, values = { "Do this when clicking on finish:" })
+    String CaptchaWizard_finish_header();
+
+    @Default(lngs = { "en" }, values = { "Captcha mode is normal" })
+    String CaptchaWizard_precheck_modeNormal();
+
+    @Default(lngs = { "en" }, values = { "Captcha mode is set to \"skip all\": JDownloader does not ask for or solve any captchas" })
+    String CaptchaWizard_precheck_modeSkipAll();
+
+    @Default(lngs = { "en" }, values = { "Set captcha mode to normal" })
+    String CaptchaWizard_precheck_resetMode();
+
+    @Default(lngs = { "en" }, values = { "Premium accounts are globally enabled" })
+    String CaptchaWizard_precheck_premiumEnabled();
+
+    @Default(lngs = { "en" }, values = { "Premium accounts are globally disabled" })
+    String CaptchaWizard_precheck_premiumDisabled();
+
+    @Default(lngs = { "en" }, values = { "Enable premium accounts globally" })
+    String CaptchaWizard_precheck_enablePremium();
 
     @Default(lngs = { "en" }, values = { "Solver pre-check" })
     String CaptchaWizard_precheck_header();
@@ -7799,8 +7883,14 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "External solver usage is globally disabled" })
     String CaptchaWizard_precheck_globalDisabled();
 
-    @Default(lngs = { "en" }, values = { "%s1 captcha solvers are disabled" })
-    String CaptchaWizard_precheck_solversDisabled(int count);
+    @Default(lngs = { "en" }, values = { "%s1 external captcha solvers are disabled" })
+    String CaptchaWizard_precheck_externalDisabled(int count);
+
+    @Default(lngs = { "en" }, values = { "%s1 manual captcha solvers are disabled" })
+    String CaptchaWizard_precheck_manualDisabled(int count);
+
+    @Default(lngs = { "en" }, values = { "JAntiCaptcha solver is disabled" })
+    String CaptchaWizard_precheck_jacDisabled();
 
     @Default(lngs = { "en" }, values = { "Fix potential configuration problems: Automatically apply the following settings when you click \"Next\"" })
     String CaptchaWizard_precheck_fixHeader();
@@ -7832,8 +7922,14 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "All captcha solvers are enabled" })
     String CaptchaWizard_precheck_allSolversEnabled();
 
-    @Default(lngs = { "en" }, values = { "Enable %s1 deactivated captcha solvers" })
-    String CaptchaWizard_precheck_enableSolvers(int count);
+    @Default(lngs = { "en" }, values = { "Enable %s1 disabled external captcha solvers" })
+    String CaptchaWizard_precheck_enableExternal(int count);
+
+    @Default(lngs = { "en" }, values = { "Enable %s1 disabled manual captcha solvers" })
+    String CaptchaWizard_precheck_enableManual(int count);
+
+    @Default(lngs = { "en" }, values = { "Enable the JAntiCaptcha solver" })
+    String CaptchaWizard_precheck_enableJac();
 
     @Default(lngs = { "en" }, values = { "How do you prefer to solve captchas?" })
     String CaptchaWizard_step1_header();
@@ -7904,7 +8000,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Already usable" })
     String CaptchaWizard_column_alreadyUsable();
 
-    @Default(lngs = { "en" }, values = { "Relevant for you" })
+    @Default(lngs = { "en" }, values = { "Highlight in comparison table" })
     String CaptchaWizard_column_relevant();
 
     @Default(lngs = { "en" }, values = { "In the next step, JDownloader will suggest captcha solvers which fit your needs." })
@@ -7912,9 +8008,6 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Captcha solvers which fit your needs" })
     String CaptchaWizard_step4_header();
-
-    @Default(lngs = { "en" }, values = { "%s1 solvers that are already usable have been automatically deselected." })
-    String CaptchaWizard_info_deselectedUsable(int count);
 
     @Default(lngs = { "en" }, values = { "Captcha solver" })
     String CaptchaWizard_column_solver();

@@ -43,18 +43,14 @@ public class CaptchaWizardSolverTable extends BasicJDTable<SolverService> {
     }
 
     /**
-     * Sets the solvers to show and the captcha types the user needs. Solvers which solve most of the needed types come first. Solvers
-     * which are already usable are not relevant for the comparison table by default (the user can tick them).
+     * Sets the solvers to show and the captcha types the user needs. Solvers which solve most of the needed types come first. All
+     * solvers are ticked (highlighted in the comparison table) by default, the user can untick them.
      * <p>
-     * Rows which are not relevant (not ticked) are NOT greyed out in this table, on purpose: Not ticked does not mean disabled, it is only
-     * a recommendation, and the solvers must stay easy to read.
-     *
-     * @param deselectAll
-     *            true: no solver is relevant by default (the user already has usable solvers for all needed captcha types)
-     * @return the number of already usable solvers in the table, they are deselected
+     * Rows which are not ticked are NOT greyed out in this table, on purpose: Not ticked does not mean disabled, it only means that the
+     * solver is not highlighted, and the solvers must stay easy to read.
      */
-    public int setSolvers(final Collection<SolverService> solvers, final Set<CAPTCHA_TYPE> requiredTypes, final boolean deselectAll) {
-        return ((Model) getModel()).setSolvers(solvers, requiredTypes, deselectAll);
+    public void setSolvers(final Collection<SolverService> solvers, final Set<CAPTCHA_TYPE> requiredTypes) {
+        ((Model) getModel()).setSolvers(solvers, requiredTypes);
     }
 
     /** The solvers whose check box is ticked, i.e. the ones to mark in the comparison table. */
@@ -97,19 +93,16 @@ public class CaptchaWizardSolverTable extends BasicJDTable<SolverService> {
         /* True if at least one solver in the table is already usable: Then the "Already usable" column is shown by default. */
         private volatile boolean anyUsable = false;
 
-        private int setSolvers(final Collection<SolverService> solvers, final Set<CAPTCHA_TYPE> requiredTypes, final boolean deselectAll) {
+        private void setSolvers(final Collection<SolverService> solvers, final Set<CAPTCHA_TYPE> requiredTypes) {
             this.requiredTypes = requiredTypes;
             relevant.clear();
-            int usableCount = 0;
+            boolean usableFound = false;
             for (final SolverService solver : solvers) {
-                if (solver.isUsable()) {
-                    usableCount++;
-                } else if (!deselectAll) {
-                    relevant.add(solver);
-                }
+                /* Every solver is ticked, no matter whether the user can already use it. */
+                relevant.add(solver);
+                usableFound |= solver.isUsable();
             }
-            anyUsable = usableCount > 0;
-            final int deselected = usableCount;
+            anyUsable = usableFound;
             final List<SolverService> rows = new ArrayList<SolverService>(solvers);
             Collections.sort(rows, new Comparator<SolverService>() {
                 @Override
@@ -126,7 +119,6 @@ public class CaptchaWizardSolverTable extends BasicJDTable<SolverService> {
                 /* The default visibility of the "Already usable" column depends on anyUsable. */
                 getTable().updateColumns();
             }
-            return deselected;
         }
 
         @Override

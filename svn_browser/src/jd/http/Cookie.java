@@ -52,6 +52,10 @@ public abstract class Cookie {
             if (obj == this) {
                 return true;
             } else if (obj instanceof Cookie) {
+                /*
+                 * we only want Server and Import cookies to be handled/supported by equals method, Legacy/Manual should never equal
+                 * Server/Import cookies
+                 */
                 switch (((Cookie) obj).getSource()) {
                 case SERVER:
                 case IMPORT:
@@ -94,6 +98,10 @@ public abstract class Cookie {
             if (obj == this) {
                 return true;
             } else if (obj instanceof Cookie) {
+                /*
+                 * we only want Server and Import cookies to be handled/supported by equals method, Legacy/Manual should never equal
+                 * Server/Import cookies
+                 */
                 switch (((Cookie) obj).getSource()) {
                 case SERVER:
                 case IMPORT:
@@ -131,8 +139,6 @@ public abstract class Cookie {
             return new ManualCookie();
         }
 
-        
-
         @Override
         public boolean isCustomCookie() {
             return true;
@@ -152,8 +158,6 @@ public abstract class Cookie {
         public LegacyCookie newCookieInstance() {
             return new LegacyCookie();
         }
-
-      
 
         @Override
         public boolean isCustomCookie() {
@@ -228,6 +232,7 @@ public abstract class Cookie {
     public static <T extends Cookie> T copyOf(T cookie) {
         final T ret = (T) cookie.newCookieInstance();
         ret.setCreationTime(cookie.getCreationTime());
+        ret.setPersistent(cookie.isPersistent());
         ret.setExpireDate(cookie.getExpireDate());
         ret.setValue(cookie.getValue());
         ret.setHostTime(cookie.getHostTime());
@@ -238,18 +243,18 @@ public abstract class Cookie {
         ret.setProtocol(cookie.getProtocol());
         ret.setPath(cookie.getPath());
         ret.setKey(cookie.getKey());
-        ret.setHost(cookie.getHost());
+        ret.setHost(cookie.getOriginHost());
         return ret;
     }
 
-    private String  path     = null;
-    private String  host     = null;
-    private String  originHost     = null;
-    private String  value    = null;
-    private String  key      = null;
-    private Boolean secure   = null;
-    private Boolean hostOnly = null;
-    private String  sameSite = null;
+    private String  path       = null;
+    private String  host       = null;
+    private String  originHost = null;
+    private String  value      = null;
+    private String  key        = null;
+    private Boolean secure     = null;
+    private Boolean hostOnly   = null;
+    private String  sameSite   = null;
 
     public String getSetSameSite() {
         return sameSite;
@@ -377,9 +382,9 @@ public abstract class Cookie {
         }
         return true;
     }
-    
-    private boolean persistent=true;
-    
+
+    private boolean persistent = true;
+
     public boolean isPersistent() {
         return persistent;
     }
@@ -440,6 +445,7 @@ public abstract class Cookie {
         return this.expireTime;
     }
 
+    /* returns host without subdomain */
     public String getHost() {
         return this.host;
     }
@@ -537,10 +543,11 @@ public abstract class Cookie {
         LoggerFactory.getDefaultLogger().severe("Cookie: no Format for " + expires + " found!");
         return;
     }
-    
+
+    /* returns full host if available, else getHost() */
     public String getOriginHost() {
-        final String ret=originHost;
-        if (ret!=null) {
+        final String ret = originHost;
+        if (ret != null) {
             return ret;
         }
         return getHost();
@@ -548,7 +555,7 @@ public abstract class Cookie {
 
     public boolean setHost(final String host) {
         final String oldHost = this.host;
-        return !StringUtils.equalsIgnoreCase(oldHost, this.host = Browser.getHost(this.originHost=Browser.getHost(host, true), false));
+        return !StringUtils.equalsIgnoreCase(oldHost, this.host = Browser.getHost(this.originHost = Browser.getHost(host, true), false));
     }
 
     public boolean setHostTime(final long time) {
@@ -560,23 +567,34 @@ public abstract class Cookie {
         if (newHost == null) {
             return false;
         }
+        final class UpdateOriginHost {
+            String update(final Cookie cookie, String newHost) {
+                final String oldOriginHost = cookie.getOriginHost();
+                final String oldHost = cookie.getHost();
+                if (oldHost == null || oldOriginHost == null || oldHost.equals(oldOriginHost)) {
+                    return newHost;
+                }
+                final String ret = oldOriginHost.replaceFirst("(?i)\\." + Pattern.quote(oldHost) + "$", "." + newHost);
+                return ret;
+            }
+        }
         final String oldHost = getHost();
         if (StringUtils.equalsIgnoreCase(oldHost, newHost)) {
             /* oldHost equals newHost */
             return true;
         }
         newHost = newHost.toLowerCase(Locale.ROOT);
-        String domain = getDomain();
-        if (domain == null) {
-            return setHost(newHost);
-        } else if (StringUtils.equalsIgnoreCase(oldHost, domain)) {
+        final String oldDomain = getDomain();
+        if (oldDomain == null) {
+            return setHost(new UpdateOriginHost().update(this, newHost));
+        } else if (StringUtils.equalsIgnoreCase(oldHost, oldDomain)) {
             boolean ret = setDomain(newHost);
-            ret |= setHost(newHost);
+            ret |= setHost(new UpdateOriginHost().update(this, newHost));
             return ret;
-        } else if (StringUtils.endsWithCaseInsensitive(domain, "." + oldHost)) {
-            domain = domain.replaceFirst("(?i)\\." + Pattern.quote(oldHost) + "$", "." + newHost);
-            boolean ret = setDomain(domain);
-            ret |= setHost(newHost);
+        } else if (StringUtils.endsWithCaseInsensitive(oldDomain, "." + oldHost)) {
+            final String updatedDomain = oldDomain.replaceFirst("(?i)\\." + Pattern.quote(oldHost) + "$", "." + newHost);
+            boolean ret = setDomain(updatedDomain);
+            ret |= setHost(new UpdateOriginHost().update(this, newHost));
             return ret;
         }
         return false;
@@ -636,8 +654,6 @@ public abstract class Cookie {
 
     @Override
     public String toString() {
-        return (isExpired() ? "EXPIRED:" : "") + getKey() + "=" + this.getValue() + " @Host:" + this.getHost() + "|Domain:" + getDomain() + "|HostOnly:" + isHostOnly() + "|Path:" + getPath() + "|SameSite:" + getSameSite() + "|Secure:" + isSecure() + "|Source:" + getSource();
+        return (isExpired() ? "EXPIRED:" : "") + getKey() + "=" + this.getValue() + " @Host:" + this.getOriginHost() + "(" + getHost() + ")" + "|Domain:" + getDomain() + "|HostOnly:" + isHostOnly() + "|Path:" + getPath() + "|SameSite:" + getSameSite() + "|Secure:" + isSecure() + "|Source:" + getSource();
     }
-
-   
 }

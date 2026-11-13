@@ -102,7 +102,11 @@ public class CookieStorable implements Storable {
         if (cookie != null) {
             return cookie.getOriginHost();
         }
-        return originHost;
+        final String ret = originHost;
+        if (ret != null) {
+            return ret;
+        }
+        return getHost();
     }
 
     public void setOriginHost(String originHost) {
@@ -174,22 +178,16 @@ public class CookieStorable implements Storable {
         } catch (IllegalArgumentException e) {
         }
         if (Cookie.SOURCE.LEGACY.equals(source)) {
-            if (getDomain() != null || getSecure() != null) {
-                if (getHostTime() > 0) {
-                    source = Cookie.SOURCE.SERVER;
-                } else {
-                    source = Cookie.SOURCE.IMPORT;
-                }
+            if (getHostTime() > 0) {
+                source = Cookie.SOURCE.SERVER;
+            } else if (getDomain() != null || getSecure() != null) {
+                source = Cookie.SOURCE.IMPORT;
             } else if (getDomain() == null && "/".equals(getPath())) {
                 source = Cookie.SOURCE.MANUAL;
             }
         }
         final Cookie ret = source.newCookieInstance();
-        ret.setHost(this.getHost());
-        final String originHost = getOriginHost();
-        if (originHost != null) {
-            ret.setHost(originHost);
-        }
+        ret.setHost(getOriginHost());
         ret.setValue(this.getValue());
         ret.setKey(this.getKey());
         ret.setDomain(this.getDomain());

@@ -174,6 +174,8 @@ public class SolverOrderContainer extends org.appwork.swing.MigPanel implements 
                 @Override
                 public void actionPerformed(final ActionEvent e) {
                     CaptchaWizardDialog.showWizard();
+                    /* The wizard may have changed the solver order: show it in the table. */
+                    ((SolverOrderTableModel) solverOrder.getModel()).reloadOrder();
                 }
             });
             buttonRow.add(wizardButton);

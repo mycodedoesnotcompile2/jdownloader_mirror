@@ -19,15 +19,18 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.appwork.exceptions.WTFException;
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.config.ChipDeConfig;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
@@ -46,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 53275 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53986 $", interfaceVersion = 2, names = {}, urls = {})
 public class ChipDe extends PluginForHost {
     public ChipDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -73,6 +76,11 @@ public class ChipDe extends PluginForHost {
     }
 
     private static final Pattern PATTERN_FILE    = Pattern.compile("/downloads/[A-Za-z0-9_\\-]+_(\\d+)\\.html", Pattern.CASE_INSENSITIVE);
+    /*
+     * 2026-11-13: New URL format with UUID instead of numeric ID, example:
+     * /download/android-apps/google-play-store-apk_842b45fc-4803-46d5-b95e-9981d992b517.html
+     */
+    private static final Pattern PATTERN_FILE_2  = Pattern.compile("/download/[a-z0-9\\-]+/[A-Za-z0-9_\\-]+_([a-f0-9\\-]+)\\.html", Pattern.CASE_INSENSITIVE);
     private static final Pattern PATTERN_FILE_EU = Pattern.compile("/.{2}/[A-Za-z0-9_\\-]+_(\\d+)\\.html", Pattern.CASE_INSENSITIVE);
     private static final Pattern PATTERN_VIDEO   = Pattern.compile("/[^/]+/[^/]+_(\\d+)\\.html", Pattern.CASE_INSENSITIVE);
 
@@ -80,7 +88,7 @@ public class ChipDe extends PluginForHost {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
             if (domains[0].equals("chip.de")) {
-                ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(" + PATTERN_FILE.pattern().substring(1) + "|" + PATTERN_VIDEO.pattern().substring(1) + ")");
+                ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(" + PATTERN_FILE.pattern().substring(1) + "|" + PATTERN_FILE_2.pattern().substring(1) + "|" + PATTERN_VIDEO.pattern().substring(1) + ")");
             } else {
                 // TODO: 2026-06-22: Check if these still exist, for me the eu domain redirects to de
                 ret.add("https?://download\\." + buildHostsPatternPart(domains) + PATTERN_FILE_EU.pattern());
@@ -99,7 +107,7 @@ public class ChipDe extends PluginForHost {
         return Integer.MAX_VALUE;
     }
 
-    private static final String type_chip_de_file         = "(?i)https?://(?:www\\.)?chip\\.de/downloads/[^/]+_\\d+\\.html";
+    private static final String type_chip_de_file         = "(?i)https?://(?:www\\.)?chip\\.de/(?:downloads/[^/]+_\\d+|download/[^/]+/[^/]+_[a-f0-9\\-]{36})\\.html";
     private static final String type_chip_eu_file         = "(?i)https?://(?:www\\.)?download\\.chip\\.(?:eu|asia)/.+";
     public static final String  type_chip_de_video        = "(?i)https?://(?:www\\.)?chip\\.de/video/[^/]+_(\\d+)\\.html";
     public static final String  type_chip_de_pictures     = "(?i)https?://(?:www\\.)?chip\\.de/bildergalerie/[^/]+_\\d+\\.html";
@@ -137,11 +145,13 @@ public class ChipDe extends PluginForHost {
         String date = null;
         String date_formatted = null;
         String filename = null;
+        /* Trustworthy original filename (if available) which can be set as final filename. */
+        String filenameOriginal = null;
         String md5 = null;
         String title_URL = null;
         String description = null;
         final String contentID_URL;
-        final Regex linkinfo = new Regex(link.getPluginPatternMatcher(), "(?i)/([^/]+)_(\\d+)\\.html$");
+        final Regex linkinfo = new Regex(link.getPluginPatternMatcher(), "(?i)/([^/]+)_(\\d+|[a-f0-9\\-]{36})\\.html$");
         title_URL = linkinfo.getMatch(0);
         contentID_URL = linkinfo.getMatch(1);
         if (link.getPluginPatternMatcher().matches(type_chip_de_file) || link.getPluginPatternMatcher().matches(type_chip_eu_file)) {
@@ -191,6 +201,87 @@ public class ChipDe extends PluginForHost {
             /* Sometimes contains a comma and trash after that (wtf?) */
             final String filesizeBytesStr = br.getRegex("itemprop=\"fileSize\" content=\"(\\d+)(\\.\\d+)?\"").getMatch(0);
             final String filesizeMB = br.getRegex("\"downloadFileSize\":\"?(\\d+)").getMatch(0); // 2026-06-22
+            /*
+             * 2026-11-13: New website layout: The exact filesize in bytes is only contained in the compressed page context (flat array with
+             * index references): <script id="vike_pageContext" type="application/json">{"islandsCompressed":"[...]"}</script> Example:
+             * {"operatingSystems":519,"architecture":520,"sizeBytes":521,...} --> the value of "sizeBytes" is the index of the array
+             * element which contains the filesize. The filesize is optional (index -1 or non-numeric value if not available). The same goes
+             * for the original filename: {"headline":...,"originalName":515,...}
+             */
+            Long filesizeBytesPageContext = null;
+            String originalFilename = null;
+            extract_precise_info_from_json: try {
+                /* Step 1: Get the page context json which contains the compressed data as a string. */
+                final String pageContextJson = br.getRegex("<script id=\"vike_pageContext\" type=\"application/json\">(\\{.*?\\})</script>").getMatch(0);
+                if (pageContextJson == null) {
+                    break extract_precise_info_from_json;
+                }
+                /* Step 2: "islandsCompressed" is itself a json string containing a flat array. */
+                final Map<String, Object> pageContext = restoreFromString(pageContextJson, TypeRef.MAP);
+                final String islandsCompressed = (String) pageContext.get("islandsCompressed");
+                if (islandsCompressed == null) {
+                    break extract_precise_info_from_json;
+                }
+                final List<Object> compressedValues = restoreFromString(islandsCompressed, TypeRef.LIST);
+                /*
+                 * Step 3: Objects in this array do not contain values but indexes of the array element which holds the actual value. Find
+                 * the objects containing "sizeBytes"/"originalName" and resolve their values via the given index.
+                 */
+                for (final Object compressedValue : compressedValues) {
+                    if (!(compressedValue instanceof Map)) {
+                        /* Only objects can contain the fields we are looking for. */
+                        continue;
+                    }
+                    final Map<String, Object> compressedMap = (Map<String, Object>) compressedValue;
+                    /* Filesize in bytes: Index is -1 if the information is not available. */
+                    final Object sizeBytesIndex = compressedMap.get("sizeBytes");
+                    if (filesizeBytesPageContext == null && sizeBytesIndex instanceof Number) {
+                        final int index = ((Number) sizeBytesIndex).intValue();
+                        if (index >= 0 && index < compressedValues.size() && compressedValues.get(index) instanceof Number) {
+                            filesizeBytesPageContext = ((Number) compressedValues.get(index)).longValue();
+                        }
+                    }
+                    /* Original filename of the file offered for download. */
+                    final Object originalNameIndex = compressedMap.get("originalName");
+                    if (originalFilename == null && originalNameIndex instanceof Number) {
+                        final int index = ((Number) originalNameIndex).intValue();
+                        if (index >= 0 && index < compressedValues.size() && compressedValues.get(index) instanceof String) {
+                            originalFilename = (String) compressedValues.get(index);
+                        }
+                    }
+                    if (filesizeBytesPageContext != null && originalFilename != null) {
+                        /* Found everything we need. */
+                        break;
+                    }
+                }
+            } catch (final Exception e) {
+                /* Optional information: Continue with the other filesize/filename sources if parsing of the page context fails. */
+                logger.log(e);
+                logger.warning("Failed to parse page context json");
+            }
+            /*
+             * 2026-11-13: New website layout: The download URLs contain a tracking parameter "a017" which equals "chip" for downloads
+             * hosted on chip.de servers and the (url-encoded) external target URL otherwise e.g. apkmirror.com. Such items are only offered
+             * as a redirect to a third party thus cannot be downloaded via this plugin. Example:
+             * https://www.chip.de/downloads/Google-Play-Store-APK_54923571.html
+             */
+            String downloadTarget = null;
+            for (final String decodedUrl : findDecodedDownloadUrls(br.getRequest().getHtmlCode())) {
+                final String downloadSource = new Regex(decodedUrl, "[&?]a017=([^&\"\\\\\\s]+)").getMatch(0);
+                if (downloadSource == null) {
+                    continue;
+                } else if (!downloadSource.equalsIgnoreCase("chip")) {
+                    /* External source: Final result. */
+                    downloadTarget = downloadSource;
+                    break;
+                } else {
+                    /* "intern" = hosted on chip.de servers, see isExternalDownload(). */
+                    downloadTarget = "intern";
+                }
+            }
+            if (downloadTarget != null) {
+                link.setProperty(PROPERTY_DOWNLOAD_TARGET, downloadTarget);
+            }
             if (StringUtils.isEmpty(title)) {
                 title = br.getRegex("property=\"og:title\" content=\"([^<>\"]*?)\"").getMatch(0);
             }
@@ -207,6 +298,8 @@ public class ChipDe extends PluginForHost {
             }
             if (filesizeBytesStr != null) {
                 link.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
+            } else if (filesizeBytesPageContext != null && filesizeBytesPageContext.longValue() > 0) {
+                link.setVerifiedFileSize(filesizeBytesPageContext);
             } else if (filesizeMB != null) {
                 link.setDownloadSize(Long.parseLong(filesizeMB) * 1024 * 1024);
             } else if (filesizeStr != null) {
@@ -241,6 +334,7 @@ public class ChipDe extends PluginForHost {
             } else {
                 filename = title + "_" + contentID_URL;
             }
+            filenameOriginal = originalFilename;
         } else {
             /* type_chip_de_video and type_chip_de_video_others */
             /* 2021-07-23: This seems to be broken */
@@ -291,11 +385,17 @@ public class ChipDe extends PluginForHost {
             /* Basically a warning for chip.eu downloads as there is no way around their adware installers! */
             filename = "THIS_FILE_CONTAINS_ADWARE_" + filename + ".exe";
         }
-        filename = Encoding.htmlDecode(filename).trim();
+        /* Mark externally hosted items which cannot be downloaded via this plugin. */
+        final String prefixExternal = this.isExternalDownload(link) ? "EXTERNAL_NOT_DOWNLOADABLE_" : "";
+        filename = prefixExternal + Encoding.htmlDecode(filename).trim();
         if (set_final_filename) {
             link.setFinalFileName(filename);
         } else {
             link.setName(filename);
+        }
+        if (!StringUtils.isEmpty(filenameOriginal) && link.getDownloadURL().contains(host_chip_de + "/")) {
+            /* Not for chip.eu: Those are adware installers which do not match the original filename. */
+            link.setFinalFileName(prefixExternal + Encoding.htmlDecode(filenameOriginal).trim());
         }
         /*
          * Do not allow chip.eu hashes because at the moment we can only download their adware installers so even though they give us the
@@ -358,6 +458,8 @@ public class ChipDe extends PluginForHost {
                 handleServerErrors();
                 if (!br.getHost().contains("chip")) {
                     errorExternalDownloadImpossible();
+                    /* Unreachable code */
+                    throw new WTFException();
                 }
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -372,127 +474,114 @@ public class ChipDe extends PluginForHost {
             final boolean resume = true;
             final int maxchunks = 1;
             /* Re-Use saved downloadlinks */
-            if (!attemptStoredDownloadurlDownload(link, directlinkproperty, resume, maxchunks)) {
-                requestFileInformation(link);
-                if (isExternalDownload(link)) {
-                    /* This will throw an Exception. */
-                    errorExternalDownloadImpossible();
-                }
-                final boolean looksLikeDownloadIsPossible = br.containsHTML("js_manual_installation") || br.containsHTML("DownloadPageWidget-DownloadButton");
-                final String textNoDownloadAvailable = "No download button available";
-                /*
-                 * 2026-08-31: New website layout. The download links point to an internal redirect URL of the following form:
-                 * https://x.chip.de/intern/dl/?url=<url-encoded getfile-url> </br> The "url" parameter contains the (percent-encoded)
-                 * getfile URL. </br> The same getfile URL exists with different "deliver" values: "deliver=web" leads to the original
-                 * download while "deliver=installer" leads to the Chip installer. The "deliver=web" variant is only present inside the
-                 * embedded JSON (not in the visible download button) and carries its own signature ("s" parameter) so we must use it as-is
-                 * - modifying "deliver" of another variant would invalidate that signature. </br> The inner "url" value is purely
-                 * percent-encoded (no quotes/backslashes) thus we can grab it directly regardless of the surrounding JSON escaping.
-                 */
-                /*
-                 * 2026-09-01: Detect externally hosted downloads early (new website layout). The download button URL carries a tracking
-                 * parameter "a017" which equals "chip" for downloads hosted on chip.de servers and the (url-encoded) external target URL
-                 * otherwise, e.g. the Google Play Store / apkmirror.com. Such items are only offered as a redirect to a third party thus
-                 * cannot be downloaded via this plugin.
-                 */
-                final String downloadSource = br.getRegex("[&?]a017=([^&\"\\\\]+)").getMatch(0);
+            if (attemptStoredDownloadurlDownload(link, directlinkproperty, resume, maxchunks)) {
+                this.dl.startDownload();
+                return;
+            }
+            requestFileInformation(link);
+            if (isExternalDownload(link)) {
+                /* This will throw an Exception. */
+                errorExternalDownloadImpossible();
+                /* Unreachable code */
+                throw new WTFException();
+            }
+            final boolean looksLikeDownloadIsPossible = br.containsHTML("js_manual_installation") || br.containsHTML("DownloadPageWidget-DownloadButton");
+            final String textNoDownloadAvailable = "No download button available";
+            /*
+             * 2026-08-31: New website layout. The download links point to an internal redirect URL of the following form:
+             * https://x.chip.de/intern/dl/?url=<url-encoded getfile-url> </br> The "url" parameter contains the (percent-encoded) getfile
+             * URL. </br> The same getfile URL exists with different "deliver" values: "deliver=web" leads to the original download while
+             * "deliver=installer" leads to the Chip installer. The "deliver=web" variant is only present inside the embedded JSON (not in
+             * the visible download button) and carries its own signature ("s" parameter) so we must use it as-is - modifying "deliver" of
+             * another variant would invalidate that signature. </br> The inner "url" value is purely percent-encoded (no
+             * quotes/backslashes) thus we can grab it directly regardless of the surrounding JSON escaping.
+             */
+            /*
+             * 2026-09-01: Detect externally hosted downloads early (new website layout). The download button URL carries a tracking
+             * parameter "a017" which equals "chip" for downloads hosted on chip.de servers and the (url-encoded) external target URL
+             * otherwise, e.g. the Google Play Store / apkmirror.com. Such items are only offered as a redirect to a third party thus cannot
+             * be downloaded via this plugin.
+             */
+            /*
+             * 2026-11-13: The download button URLs are no longer present in plain text. The visible button only has
+             * href="javascript:void(0)" and the real URLs are embedded as base64 strings (which themselves are percent-encoded) inside the
+             * JSON of the page (attribute "data-cpx-submit"). Decode them and look for the wanted URL and the "a017" parameter in there.
+             */
+            final String getfilePatternStart = "url=(https%3A%2F%2F(?:www\\.)?chip\\.de%2Fdownloads%2Fgetfile%2F[^\"&\\\\]*";
+            final String getfilePatternEnd = "[^\"&\\\\]*)";
+            String getfileUrl = null;
+            final Set<String> decodedurls = findDecodedDownloadUrls(br.getRequest().getHtmlCode());
+            /*
+             * Check for externally hosted items first: They also contain a "deliver=web" getfile URL so finding one does not mean that the
+             * item is downloadable.
+             */
+            for (final String decodedurl : decodedurls) {
+                final String downloadSource = new Regex(decodedurl, "[&?]a017=([^&\"\\\\\\s]+)").getMatch(0);
                 if (downloadSource != null && !downloadSource.equalsIgnoreCase("chip")) {
                     /* Example: https://www.chip.de/downloads/Google-Play-Store-APK_54923571.html */
                     errorExternalDownloadImpossible();
+                    /* Unreachable code */
+                    throw new WTFException();
                 }
-                final String getfilePatternStart = "url=(https%3A%2F%2F(?:www\\.)?chip\\.de%2Fdownloads%2Fgetfile%2F[^\"&\\\\]*";
-                final String getfilePatternEnd = "[^\"&\\\\]*)";
-                String getfileUrl = br.getRegex(getfilePatternStart + "deliver%3Dweb" + getfilePatternEnd).getMatch(0);
+            }
+            for (final String decodedurl : decodedurls) {
+                /* Look for the wanted getfile URL ("deliver=web") inside the decoded base64 strings. */
+                getfileUrl = new Regex(decodedurl, getfilePatternStart + "deliver%3Dweb" + getfilePatternEnd).getMatch(0);
                 if (getfileUrl != null) {
-                    /* isUrl=true only decodes the percent-sequences present in the URL and keeps the base64 "dl" parameter untouched. */
-                    getfileUrl = Encoding.urlDecode(getfileUrl, true);
-                    br.getPage(getfileUrl);
-                    /*
-                     * The getfile page embeds the final "securedl" download URL inside an HTML-entity-encoded JSON blob, e.g.
-                     * &quot;downloadUrl&quot;&#x3A;&quot;https&#x3A;&#x5C;&#x2F;&#x5C;&#x2F;securedl...&quot;
-                     */
-                    final String htmlDecoded = Encoding.htmlDecode(br.getRequest().getHtmlCode());
-                    dllink = new Regex(htmlDecoded, "\"downloadUrl\"\\s*:\\s*\"(https?:[^\"]*securedl[^\"]*)\"").getMatch(0);
-                    if (dllink != null) {
-                        /* Unescape JSON forward-slashes. */
-                        dllink = dllink.replace("\\/", "/");
-                    }
+                    logger.info("Found getfileUrl in base64 string: " + decodedurl);
+                    /* Early break */
+                    break;
+                }
+            }
+            if (getfileUrl == null) {
+                logger.warning("Failed to find getfileUrl in " + decodedurls.size() + " decoded URLs");
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            /* isUrl=true only decodes the percent-sequences present in the URL and keeps the base64 "dl" parameter untouched. */
+            getfileUrl = Encoding.urlDecode(getfileUrl, true);
+            br.getPage(getfileUrl);
+            /*
+             * The getfile page embeds the final "securedl" download URL inside an HTML-entity-encoded JSON blob, e.g.
+             * &quot;downloadUrl&quot;&#x3A;&quot;https&#x3A;&#x5C;&#x2F;&#x5C;&#x2F;securedl...&quot;
+             */
+            final String htmlDecoded = Encoding.htmlDecode(br.getRequest().getHtmlCode());
+            dllink = new Regex(htmlDecoded, "\"downloadUrl\"\\s*:\\s*\"(https?:[^\"]*securedl[^\"]*)\"").getMatch(0);
+            if (dllink != null) {
+                /* Unescape JSON forward-slashes. */
+                dllink = dllink.replace("\\/", "/");
+            }
+            if (dllink == null) {
+                if (!looksLikeDownloadIsPossible) {
+                    /* 2023-12-04: Example: https://www.chip.de/downloads/Adobe-Flash-Player_13003561.html */
+                    throw new PluginException(LinkStatus.ERROR_FATAL, textNoDownloadAvailable);
                 } else {
-                    /* Old website layout */
-                    // TODO: Delete this when website layout is changed again
-                    logger.warning("Trying fallback to old website");
-                    final String step1 = br.getRegex("class=\"[^\"]*download_button[^\"]+\"[^>]*>\\s*<a rel=\"nofollow\"[^>]*href=\"(https?://[^\"]+)").getMatch(0);
-                    if (step1 == null) {
-                        /*
-                         * 2021-07-22: Treat such files as non-downloadable although this could also mean there is a plugin failure. Some
-                         * items are just "dummy" items which don't have any download options e.g.
-                         * https://www.chip.de/downloads/WordPress-Android-App_54778552.html
-                         */
-                        // throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                        throw new PluginException(LinkStatus.ERROR_FATAL, textNoDownloadAvailable);
-                    }
-                    final String step1decoded = Encoding.htmlOnlyDecode(step1);
-                    String step1_query_url = UrlQuery.parse(step1decoded).get("url");
-                    if (step1_query_url != null) {
-                        step1_query_url = Encoding.htmlDecode(step1_query_url);
-                        br.getPage(step1_query_url);
-                    } else {
-                        br.getPage(step1decoded);
-                    }
-                    final String step2 = br.getRegex("(/downloads/c1_downloads_hs_getfile[^<>\"]+)\"").getMatch(0);
-                    if (step2 != null) {
-                        final String step2decoded = Encoding.htmlOnlyDecode(step2);
-                        br.getPage(step2decoded);
-                    } else {
-                        logger.warning("Failed to find step2 URL");
-                    }
-                    dllink = br.getRegex("Falls der Download nicht beginnt,\\&nbsp;<a class=\"b\" href=\"(http.*?)\"").getMatch(0);
-                    if (dllink == null) {
-                        dllink = br.getRegex("class=\"dl\\-btn\"><a href=\"(http.*?)\"").getMatch(0);
-                    }
-                    if (dllink == null) {
-                        dllink = br.getRegex("</span></a></div><a href=\"(http.*?)\"").getMatch(0);
-                    }
-                    if (dllink == null) {
-                        dllink = br.getRegex("var adtech_dl_url = \\'(https?://[^<>\"]*?)\\';").getMatch(0);
-                    }
-                    if (dllink == null) {
-                        dllink = br.getRegex("(?:\"|\\')(https?://dl\\.cdn\\.chip\\.de/downloads/\\d+/.*?)(?:\"|\\')").getMatch(0);
-                    }
-                }
-                if (dllink == null) {
-                    if (!looksLikeDownloadIsPossible) {
-                        /* 2023-12-04: Example: https://www.chip.de/downloads/Adobe-Flash-Player_13003561.html */
-                        throw new PluginException(LinkStatus.ERROR_FATAL, textNoDownloadAvailable);
-                    } else {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                }
-                dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 1);
-                if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-                    br.followConnection(true);
-                    handleServerErrors();
-                    if (!br.getHost().contains("chip")) {
-                        /*
-                         * Happens for software whos manufactors do not allow direct mirrors from chip servers e.g.
-                         * http://www.chip.de/downloads/Windows-10-64-Bit_72189999.html
-                         */
-                        throw new PluginException(LinkStatus.ERROR_FATAL, "External download - not possible via JDownloader!");
-                    }
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                String etag = br.getRequest().getResponseHeader("ETag");
-                if (etag != null) {
-                    /* chip.de servers will often return md5 file hash via headers! */
-                    try {
-                        etag = etag.replace("\"", "");
-                        final String[] etagInfo = etag.split(":");
-                        final String md5 = etagInfo[0];
-                        if (md5.matches("[A-Fa-f0-9]{32}")) {
-                            link.setMD5Hash(md5);
-                        }
-                    } catch (final Throwable ignore) {
+            }
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 1);
+            if (!this.looksLikeDownloadableContent(dl.getConnection())) {
+                br.followConnection(true);
+                handleServerErrors();
+                if (!br.getHost().contains("chip")) {
+                    /*
+                     * Happens for software whos manufactors do not allow direct mirrors from chip servers e.g.
+                     * http://www.chip.de/downloads/Windows-10-64-Bit_72189999.html
+                     */
+                    throw new PluginException(LinkStatus.ERROR_FATAL, "External download - not possible via JDownloader!");
+                }
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            String etag = br.getRequest().getResponseHeader("ETag");
+            if (etag != null) {
+                /* chip.de servers will often return md5 file hash via headers! */
+                try {
+                    etag = etag.replace("\"", "");
+                    final String[] etagInfo = etag.split(":");
+                    final String md5 = etagInfo[0];
+                    if (md5.matches("[A-Fa-f0-9]{32}")) {
+                        link.setMD5Hash(md5);
                     }
+                } catch (final Throwable ignore) {
                 }
             }
             link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
@@ -528,6 +617,38 @@ public class ChipDe extends PluginForHost {
     @Deprecated
     public static void accesscontainerIdBeitrag(final Browser br, final String containerIdBeitrag) throws PluginException, IOException {
         accessURL(br, "https://apps-rest.chip.de/api/v2/containerIdBeitrag/" + containerIdBeitrag + "/");
+    }
+
+    /**
+     * Returns all percent-decoded chip.de download redirect URLs ("https://x.chip.de/intern/dl/?url=...") which are embedded as base64
+     * strings inside the html (new website layout, 2026-11-13).
+     */
+    private Set<String> findDecodedDownloadUrls(final String html) {
+        final Set<String> ret = new HashSet<String>();
+        /*
+         * The base64 strings are located inside a json string which escapes forward slashes ("\/" or "\\\/"). Remove those escapes
+         * otherwise base64 strings containing "/" would be cut off and decoded wrongly.
+         */
+        final String htmlUnescapedSlashes = html.replaceAll("\\\\+/", "/");
+        final String[] base64Candidates = new Regex(htmlUnescapedSlashes, "(aHR0[A-Za-z0-9+/=_-]{40,})").getColumn(0);
+        if (base64Candidates == null || base64Candidates.length == 0) {
+            logger.info("Failed to find any base64 candidates");
+            return ret;
+        }
+        /* Same base64 strings are contained multiple times in the html -> Decode each string only once. */
+        final Set<String> dupes = new HashSet<String>();
+        for (final String base64Candidate : base64Candidates) {
+            if (!dupes.add(base64Candidate)) {
+                continue;
+            }
+            final String decoded = Encoding.Base64Decode(base64Candidate);
+            /* Ignore other base64 strings such as the ones used for ads/affiliate links. */
+            if (decoded != null && decoded.contains("intern%2Fdl")) {
+                /* Do NOT use isUrl=true here: It leaves "%25XX" untouched so the inner URL would stay double encoded. */
+                ret.add(Encoding.urlDecode(decoded, false));
+            }
+        }
+        return ret;
     }
 
     private void errorExternalDownloadImpossible() throws PluginException {
@@ -630,7 +751,7 @@ public class ChipDe extends PluginForHost {
 
     @Override
     protected String getDefaultFileName(final DownloadLink link) {
-        final Regex linkinfo = new Regex(link.getPluginPatternMatcher(), "(?i)/([^/]+)_(\\d+)\\.html$");
+        final Regex linkinfo = new Regex(link.getPluginPatternMatcher(), "(?i)/([^/]+)_(\\d+|[a-f0-9\\-]{36})\\.html$");
         final String title_URL = linkinfo.getMatch(0);
         final String contentID_URL = linkinfo.getMatch(1);
         if (title_URL != null && contentID_URL != null) {

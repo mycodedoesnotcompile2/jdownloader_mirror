@@ -45,6 +45,7 @@ import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.ConcatIterator;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
@@ -61,12 +62,11 @@ public class Cookies {
         if (setCookies == null || setCookies.size() == 0) {
             return ret;
         }
-        final String tldDomain = Browser.getHost(request.getURL());
         final String domain = request.getURL().getHost();
         for (int i = 0; i < setCookies.size(); i++) {
             final String setCookie = setCookies.get(i);
             final ServerCookie cookie = new ServerCookie();
-            cookie.setHost(tldDomain);
+            cookie.setHost(domain);
             cookie.setProtocol(protocol);
             /** default,changes on domain attribute **/
             cookie.setHostOnly(Boolean.TRUE);
@@ -139,7 +139,7 @@ public class Cookies {
             if (!cookie.isValid() || !isValidCookieDomain(request.getURL(), cookie)) {
                 LogV3.warning("Invalid cookie:" + cookie);
                 continue;
-            }
+            }                   
             ret.add(cookie);
         }
         return ret;
@@ -187,8 +187,12 @@ public class Cookies {
         final String header = cookieString;
         String path = null;
         String expires = null;
-        final String tldDomain = Browser.getHost(url);
-        String domain = isSetCookie ? url.getHost() : tldDomain;
+        final String host = url.getHost();
+        /*
+         * Set-Cookie without Domain attribute is bound to the full host (hostOnly). A Cookie header carries no attributes, so the cookie
+         * must stay valid for the whole site (e.g. other subdomains like CDN hosts), the full host is kept as origin host.
+         */
+        String domain = isSetCookie ? host : Browser.getHost(url);
         /** default,changes on domain attribute **/
         Boolean hostOnly = isSetCookie ? Boolean.TRUE : null;
         String sameSite = isSetCookie ? "Lax" : null;
@@ -258,10 +262,10 @@ public class Cookies {
              **/
             if (next.getValue() != null) {
                 final Cookie cookie = source.newCookieInstance();
-                cookie.setHost(tldDomain);
+                cookie.setHost(host);
                 cookie.setPath(path);
                 cookie.setProtocol(protocol);
-                cookie.setDomain(domain);
+                cookie.setDomain(domain != null ? domain : host);
                 cookie.setExpires(expires);
                 cookie.setHostOnly(hostOnly);
                 cookie.setValue(next.getValue());
@@ -499,6 +503,7 @@ public class Cookies {
                 return;
             }
             if (newCookie.equals(existingCookie) || existingCookie.equals(newCookie)) {
+                /* we want to collect/further process all *matching* cookie candidates, thus we use A.equals(B) and B.equals(A) */
                 List<Cookie> candidates = candidatesMap.get(existingCookie.getSource());
                 if (candidates == null) {
                     candidates = new ArrayList<Cookie>();
@@ -513,14 +518,13 @@ public class Cookies {
         } else {
             switch (newCookie.getSource()) {
             case SERVER:
-                checkSecure: if (!newCookie.isSecureProtocol()) {
-                    final List<Cookie> candidates = candidatesMap.get(Cookie.SOURCE.SERVER);
-                    if (candidates == null) {
-                        break checkSecure;
-                    }
-                    for (Cookie candidate : candidates) {
-                        if (Boolean.TRUE.equals(candidate.isSecure())) {
-                            return;
+                if (!newCookie.isSecureProtocol()) {
+                    /* insecure protocol cookies never can replace secure cookies */
+                    for (List<Cookie> candidates : candidatesMap.values()) {
+                        for (Cookie candidate : candidates) {
+                            if (Boolean.TRUE.equals(candidate.isSecure())) {
+                                return;
+                            }
                         }
                     }
                 }
@@ -646,29 +650,29 @@ public class Cookies {
         }
         for (final Entry<String, List<Cookie>> keyValue : keyValues.entrySet()) {
             if (cookieString.length() > 0) {
-            	cookieString.append("; ");
+                cookieString.append("; ");
             }
             final List<Cookie> values = keyValue.getValue();
             if (values.size() == 1) {
                 /* only one cookie */
-            	cookieString.append(keyValue.getKey()).append("=");
-            	cookieString.append(values.get(0).getValue());
+                cookieString.append(keyValue.getKey()).append("=");
+                cookieString.append(values.get(0).getValue());
             } else if (values.get(0).isCustomCookie()) {
                 /* first cookie is customized/preferred */
-            	cookieString.append(keyValue.getKey()).append("=");
+                cookieString.append(keyValue.getKey()).append("=");
                 cookieString.append(values.get(0).getValue());
             } else if (request == null || StringUtils.containsIgnoreCase(request.getHeaders().getValue(HTTPConstants.HEADER_REQUEST_USER_AGENT), "Firefox")) {
                 /* no request available or firefox useragent, choose default/firefox handling to send only one cookie */
-            	cookieString.append(keyValue.getKey()).append("=");
-            	cookieString.append(values.get(0).getValue());
+                cookieString.append(keyValue.getKey()).append("=");
+                cookieString.append(values.get(0).getValue());
             } else {
-                final StringBuilder sortedCookiesString=new StringBuilder();
-                for (final Cookie cookie:values) {                    
-                    if(cookie.isCustomCookie()) {
+                final StringBuilder sortedCookiesString = new StringBuilder();
+                for (final Cookie cookie : values) {
+                    if (cookie.isCustomCookie()) {
                         continue;
                     }
                     if (sortedCookiesString.length() > 0) {
-                    	sortedCookiesString.append("; ");
+                        sortedCookiesString.append("; ");
                     }
                     sortedCookiesString.append(keyValue.getKey()).append("=");
                     sortedCookiesString.append(cookie.getValue());

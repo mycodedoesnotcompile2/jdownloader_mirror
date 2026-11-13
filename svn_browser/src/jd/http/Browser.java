@@ -2623,12 +2623,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
             }
             final String host = getHost(url);
             final Cookies newSetCookies = new Cookies();
-            for (final Cookie setCookie : setCookies.getCookies()) {
-                if (host.equalsIgnoreCase(setCookie.getHost())) {
-                    /* no copy required, correct/same host */
-                    newSetCookies.add(setCookie);
-                    continue;
-                }
+            for (final Cookie setCookie : setCookies.getCookies()) {               
                 final Cookie copy = Cookie.copyOf(setCookie);
                 if (copy.updateHost(host)) {
                     newSetCookies.add(copy);

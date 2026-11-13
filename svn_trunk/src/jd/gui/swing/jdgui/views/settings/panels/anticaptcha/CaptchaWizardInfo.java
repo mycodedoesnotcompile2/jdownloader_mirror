@@ -28,6 +28,8 @@ import net.miginfocom.swing.MigLayout;
 public class CaptchaWizardInfo {
     public enum Level {
         INFO,
+        /** Everything is fine: shown with a green check mark. */
+        SUCCESS,
         WARNING
     }
 
@@ -41,10 +43,33 @@ public class CaptchaWizardInfo {
         this.types = types == null ? new ArrayList<CAPTCHA_TYPE>() : new ArrayList<CAPTCHA_TYPE>(types);
     }
 
+    /** Moves the warnings in front of the infos. The order within the warnings and within the infos stays the same. */
+    public static void sortWarningsFirst(final List<CaptchaWizardInfo> infos) {
+        final List<CaptchaWizardInfo> warnings = new ArrayList<CaptchaWizardInfo>();
+        final List<CaptchaWizardInfo> others = new ArrayList<CaptchaWizardInfo>();
+        for (final CaptchaWizardInfo info : infos) {
+            switch (info.level) {
+            case WARNING:
+                warnings.add(info);
+                break;
+            case SUCCESS:
+            case INFO:
+            default:
+                others.add(info);
+                break;
+            }
+        }
+        infos.clear();
+        infos.addAll(warnings);
+        infos.addAll(others);
+    }
+
     private Icon getIcon() {
         switch (level) {
         case WARNING:
             return NewTheme.I().getIcon(IconKey.ICON_WARNING, 18);
+        case SUCCESS:
+            return NewTheme.I().getIcon(IconKey.ICON_OK, 18);
         case INFO:
         default:
             return NewTheme.I().getIcon(IconKey.ICON_INFO, 18);

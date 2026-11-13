@@ -54,10 +54,26 @@ public class AbstractIcon implements Icon, IDIcon {
      */
     protected void lazyUpdate() {
         if (width == -1 || height == -1) {
-            final Icon icon = NewTheme.I().getIcon(getKey(), getSize());
+            final Icon icon = getIconInstance(getKey(), getSize());
             width = icon.getIconWidth();
             height = icon.getIconHeight();
         }
+    }
+
+    private Icon   icon    = null;
+    private String cacheID = null;
+
+    private Icon getIconInstance(String key, int size) {
+        if (false) {
+            /* cache disabled */
+            final Icon icon = this.icon;
+            final String cacheID = key + "/" + size;
+            if (icon != null && cacheID.equals(this.cacheID)) {
+                return icon;
+            }
+            this.cacheID = cacheID;
+        }
+        return this.icon = NewTheme.I().getIcon(key, size);
     }
 
     @Override
@@ -75,7 +91,7 @@ public class AbstractIcon implements Icon, IDIcon {
 
     @Override
     public void paintIcon(Component c, Graphics g, int x, int y) {
-        final Icon icon = NewTheme.I().getIcon(getKey(), getSize());
+        final Icon icon = getIconInstance(getKey(), getSize());
         if (width == -1 || height == -1) {
             width = icon.getIconWidth();
             height = icon.getIconHeight();

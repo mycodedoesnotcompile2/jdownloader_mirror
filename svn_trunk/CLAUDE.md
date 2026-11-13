@@ -4,35 +4,6 @@
 
 **This project uses SVN (Subversion).**
 
-When asked for a commit message, provide the message as **plain text with no svn-specific syntax** — no `svn commit -m` wrapper and no other svn wrappers.
-
-Always wrap the commit message in a fenced ```text code block so it can be copied with one click. The block must contain only the commit message itself (subject line, blank line, body), nothing else.
-
-Do **not** insert manual line breaks (hard wrapping) inside the message. The subject is one single line and every body paragraph is one single line, however long. Line breaks are only allowed between paragraphs (blank line) and between list items, each of which also stays on one line.
-
-**No manual line breaks inside the message.** Do not hard-wrap lines at a fixed width. Every paragraph and every list item is written as one single line; line breaks are only used to separate the subject, blank lines, headings and list items.
-
-**Describe the changes in the style of [Keep a Changelog 1.0.0](https://keepachangelog.com/en/1.0.0/).** After the subject line, group the body under the headings `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed` and `Security` (only the ones that apply, in that order). Each entry is a `-` list item written for a reader of the changelog: say what changed from the user's or caller's point of view, not how the code was edited. Also mention the names of the changed classes in the entries (e.g. `SelectBrowserDialog`, `ChallengeResponseController`), so the reader can tell where the change was made. Use `Fixed` for bug fixes and `Changed` for behaviour or performance changes of existing functionality.
-
-**No Markdown inside the commit message.** The message is plain text: no `###` or `**` headings, no bold/italic, no backticks around class names. Headings are the bare words (`Added`, `Changed`, ...) on their own line, list items start with a plain `- `.
-
-```text
-Short subject line
-
-Added
-- ...
-
-Changed
-- ...
-
-Fixed
-- ...
-```
-
-## Building / Compiling
-
-**Never compile the code yourself.** Do not invoke `javac`, Eclipse, Ant, or any other build tool to verify changes. The user compiles and tests in their own IDE. Just write the code correctly; do not run a build to check it.
-
 ## Comments
 
 **All code comments must be written in English.** This applies to every comment (line comments, block comments, Javadoc), regardless of the language used in the conversation.
@@ -188,11 +159,6 @@ A method that checks something and returns `true`/`false` can return a **veto re
 - Implement `LabelInterface` only if the reason is shown to the user. `NONE` returns `null` as label.
 - Document each constant (Javadoc) with when it is returned.
 
-**Do not change existing code on your own — ask first:**
-
-- Never convert an existing `boolean` method or an existing class to a veto enum without asking.
-- Also ask before creating a **new** veto enum, even for a new method, so the reasons and the need for them can be agreed on first.
-
 ## Throw After a Method That Only Ever Throws
 
 When a method's sole purpose is to throw (it never returns normally), any call to it must be followed by an explicit `throw` — even though that code is unreachable. This keeps the compiler's control-flow analysis happy (e.g. definite-assignment, missing-return-statement) and documents the intent at the call site.
@@ -208,8 +174,6 @@ if (account == null) {
 }
 ```
 where `errorAccountNeeded()` always throws (e.g. `AccountRequiredException`).
-
-Do not include a Co-Authored-By line or "Generated with Claude Code" footer in any commit message.
 
 ## Tables
 
@@ -230,8 +194,8 @@ Applies to every table created in the JDownloader project.
 ### Sorting and columns
 
 - All columns are sortable by default (provide a comparator).
-- Exception: interactive columns whose values change live or frequently (counters, countdowns, progress, speed). Do not decide on your own for such columns: **ask the user whether sorting is wanted.**
-- Columns are hideable, reorderable and their widths are persisted (default `ExtTable` behaviour; do not disable it without being asked).
+- Exception: interactive columns whose values change live or frequently (counters, countdowns, progress, speed) may be left unsortable.
+- Columns are hideable, reorderable and their widths are persisted (default `ExtTable` behaviour, keep it enabled).
 - Columns that only ever hold short values of a known maximum length (e.g. an "enabled" checkbox column) may use fixed minimum / maximum widths.
 
 ### Display size and scrolling
@@ -239,7 +203,6 @@ Applies to every table created in the JDownloader project.
 - Tables are often displayed completely, without any scrollbar. That is the right choice if the table always has a fixed number of rows or never contains "many" rows (rule of thumb: up to about 20).
 - To do so, override `isDisplayFullsizeAlways()` in the table and return `true` (see `SolverOrderTable`), and always put the table into the scroll pane returned by `createScrollPane()` instead of `new JScrollPane(table)`. It disables both scrollbars and forwards mouse wheel events to the next scroll pane above, so the surrounding panel still scrolls while the mouse is over the table. For manual sizing use `getFullDisplayHeight()` (includes the extra pixels that prevent a clipped last row and a scrollbar).
 - Tables that scroll themselves must also use `createScrollPane()`. Once such a table is at its top/bottom and the user keeps scrolling in that direction, the wheel events are forwarded to the surrounding panel.
-- **When in doubt, ask how the table shall be displayed (full size vs. scrollable) before building it. Always ask before building a new table.**
 
 ### Context menu and actions
 
@@ -288,17 +251,17 @@ Applies to every new text field that offers suggestions based on previous input.
   - Inline completion uses **prefix** matching: it appends the rest of the newest matching entry, selected, like a browser address bar. It keeps the spelling the user typed, only runs while the caret is at the end of the text, and is skipped when deleting text (Backspace / Delete).
   - The suggestion popup uses **contains** matching, newest first. An entry equal to the current text is not listed. An empty field lists all entries.
 - While an inline completion is pending, filtering uses only the typed part. Moving the caret or clicking accepts the completion.
-- The popup opens above the field when the field sits at the bottom of the window. It is non-focusable so focus and key events stay in the text field, shows at most 10 rows, and is ordered with the newest entry next to the field.
+- The popup is non-focusable so focus and key events stay in the text field, and shows at most 10 rows. Opening direction, order and deleting of entries: see "Search History Popup".
 
 ### Keyboard and mouse
 
 | Input | Behavior |
 |---|---|
-| Up / Down | Opens the popup if closed and moves the selection. The first selection is the entry next to the field. Moving past the first/last entry clears the selection. |
+| Up / Down | Opens the popup if closed and moves the selection (selection rules: see "Search History Popup" > "Sorting"). |
 | Enter | Accepts a pending inline completion, or applies the selected entry, or adds the typed text to the history. |
-| Delete | With a popup entry selected: removes that entry from the history (instead of deleting text) and selects its neighbor, so several entries can be removed in a row. |
+| Delete | Removes the selected entry, see "Search History Popup" > "Deleting entries". |
 | ESC | First press closes the popup / removes a pending inline completion. The next press clears the field. |
-| Mouse | Click on an entry applies it. Click on the remove icon at the right edge of a row removes it. Hovering selects a row. |
+| Mouse | Click on an entry applies it. Hovering selects a row. The remove icon is described under "Deleting entries". |
 
 ## Search Fields: Clear Button
 
@@ -318,5 +281,3 @@ Every **search field** (a field that only filters or looks something up, and is 
 ## File Names and Package Names in the GUI
 
 File names and package names can be very long. To display them safely in the GUI, prefer the existing components `jd.controlling.downloadcontroller.FileNameField` and `jd.controlling.downloadcontroller.PackageNameField` over plain labels / text fields.
-
-**Do not convert existing code to these components on your own. Ask first.**

@@ -178,9 +178,13 @@ public class CaptchaWizardAddDomainDialog extends AbstractDialog<Integer> {
     }
 
     @Override
-    protected void packed() {
-        super.packed();
-        filter.requestFocusInWindow();
+    protected void initFocus(final JComponent focus) {
+        /* Focus the search field instead of the default OK button. initFocus runs after the dialog is visible, so the focus request sticks here. */
+        if (filter != null) {
+            filter.requestFocusInWindow();
+        } else {
+            super.initFocus(focus);
+        }
     }
 
     @Override

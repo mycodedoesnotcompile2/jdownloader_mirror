@@ -240,6 +240,11 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> implemen
         };
     }
 
+    /** Reloads the rows in the stored order of the solvers, e.g. after the order was changed by the captcha wizard. */
+    public void reloadOrder() {
+        update();
+    }
+
     private void update() {
         new EDTRunner() {
             @Override

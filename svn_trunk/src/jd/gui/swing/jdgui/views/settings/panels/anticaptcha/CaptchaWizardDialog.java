@@ -1,6 +1,9 @@
 package jd.gui.swing.jdgui.views.settings.panels.anticaptcha;
 
 import java.awt.CardLayout;
+import java.awt.Cursor;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.LayoutManager;
@@ -26,7 +29,10 @@ import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JRadioButton;
+import javax.swing.DefaultListCellRenderer;
+import javax.swing.JComboBox;
 import javax.swing.JComponent;
+import javax.swing.JList;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
@@ -39,6 +45,7 @@ import org.appwork.exceptions.WTFException;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.dialog.AbstractDialog;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogNoAnswerException;
@@ -48,9 +55,11 @@ import org.jdownloader.captcha.v2.CaptchaHistoryEntry;
 import org.jdownloader.captcha.v2.CaptchaHistoryManager;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
 import org.jdownloader.captcha.v2.SolverService;
+import org.jdownloader.captcha.v2.solver.jac.JacSolverService;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
+import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSolverService;
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
@@ -60,6 +69,8 @@ import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 import org.jdownloader.settings.staticreferences.CFG_SILENTMODE;
 
 import jd.controlling.captcha.CaptchaSettings;
+import jd.controlling.captcha.CaptchaSettings.CAPTCHA_TIMEOUT_ACTION;
+import jd.controlling.captcha.CaptchaSettings.MODE;
 import jd.plugins.Account;
 import jd.plugins.CaptchaType;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
@@ -78,19 +89,33 @@ import net.miginfocom.swing.MigLayout;
 public class CaptchaWizardDialog extends AbstractDialog<Integer> {
     /* The number of steps follows this array, the progress bar and the buttons are derived from it. */
     private static final int    STEP_METHOD  = 0;
-    private static final int    STEP_DOMAINS = 1;
-    private static final int    STEP_TYPES   = 2;
-    private static final int    STEP_SOLVERS = 3;
-    private static final int    STEPS        = 4;
-    private static final String[] CARDS      = new String[] { "method", "domains", "types", "solvers" };
+    private static final int    STEP_PRECHECK = 1;
+    private static final int    STEP_DOMAINS = 2;
+    private static final int    STEP_TYPES   = 3;
+    private static final int    STEP_SOLVERS = 4;
+    private static final int    STEPS        = 5;
+    private static final String[] CARDS      = new String[] { "method", "precheck", "domains", "types", "solvers" };
     private int                 step         = STEP_METHOD;
-    /* Step 1 also contains the solver pre-check: the offered fixes. A checkbox is null if there is nothing to fix. */
+    /* Step 2 is the solver pre-check: the offered fixes. A checkbox is null if there is nothing to fix. */
     private JPanel              precheckPanel;
+    private JCheckBox           enablePremiumCheckBox;
     private JCheckBox           enableGlobalCheckBox;
-    private JCheckBox           enableSolversCheckBox;
+    private JCheckBox           enableExternalCheckBox;
+    private JCheckBox           enableManualCheckBox;
+    private JCheckBox           enableJacCheckBox;
     private JCheckBox           enableAccountsCheckBox;
     private JCheckBox           disableSilentCheckBox;
-    private List<SolverService> disabledSolvers = new ArrayList<SolverService>();
+    private JCheckBox           resetModeCheckBox;
+    /* Step 1: timeout actions and notifications (applied on Finish, like the login captcha setting). */
+    private JComboBox<CAPTCHA_TIMEOUT_ACTION> hosterTimeoutCombo;
+    private JComboBox<CAPTCHA_TIMEOUT_ACTION> crawlerTimeoutCombo;
+    private JCheckBox           bubbleCheckBox;
+    private CAPTCHA_TIMEOUT_ACTION initialHosterTimeout;
+    private CAPTCHA_TIMEOUT_ACTION initialCrawlerTimeout;
+    private boolean             initialBubble;
+    private List<SolverService> disabledExternal = new ArrayList<SolverService>();
+    private List<SolverService> disabledManual   = new ArrayList<SolverService>();
+    private List<SolverService> disabledJac      = new ArrayList<SolverService>();
     /* The accounts of external solvers which the user has disabled. */
     private List<Account>       disabledAccounts = new ArrayList<Account>();
     /* True as soon as the pre-check changed a setting. */
@@ -104,6 +129,15 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
     private JRadioButton        manualRadio;
     private JRadioButton        paidRadio;
     private JRadioButton        bothRadio;
+    /* Step 1: how login captchas are handled. */
+    private JRadioButton        loginLikeOtherRadio;
+    private JRadioButton        loginManualRadio;
+    private boolean             initialLoginManual;
+    /* Step 4: what happens when the user clicks Finish. */
+    private JCheckBox           sortOrderCheckBox;
+    private JCheckBox           openComparisonCheckBox;
+    private JCheckBox           disableManualCheckBox;
+    private JLabel              disableManualInfoLabel;
     /* State of step 1 and 2 when the wizard was opened, used to find out whether the user changed anything. */
     private Method              initialMethod;
     private Map<String, Boolean> initialEntryStates = new HashMap<String, Boolean>();
@@ -114,7 +148,6 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
     private JLabel              domainHintLabel;
     private JPanel              typesPanel;
     private CaptchaWizardSolverTable solverTable;
-    private JLabel              deselectedInfoLabel;
     private JPanel              infoPanel;
     private JPanel              cardPanel;
     private CardLayout          cardLayout;
@@ -136,8 +169,71 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
             return;
         }
         dialog.saveEntries();
+        /* The login captcha setting is only changed when the user finishes the wizard. */
+        JsonConfig.create(CaptchaSettings.class).setAvoidAutoSolverForLoginCaptchas(dialog.loginManualRadio.isSelected());
+        CaptchaSettings.CFG.setOnHosterCaptchaTimeoutAction((CAPTCHA_TIMEOUT_ACTION) dialog.hosterTimeoutCombo.getSelectedItem());
+        CaptchaSettings.CFG.setOnCrawlerCaptchaTimeoutAction((CAPTCHA_TIMEOUT_ACTION) dialog.crawlerTimeoutCombo.getSelectedItem());
+        CaptchaSettings.CFG.setRemoteCaptchaBubbleEnabled(dialog.bubbleCheckBox.isSelected());
+        /* Must happen before sorting: Disabled solvers are not usable any more and go to the end of the order. */
+        if (dialog.disableManualCheckBox.isVisible() && dialog.disableManualCheckBox.isSelected()) {
+            dialog.disableManualSolvers();
+        }
+        if (dialog.sortOrderCheckBox.isSelected()) {
+            dialog.applySortOrder();
+        }
         /* Finish is always possible, also with an empty table or if the user deselected all solvers. */
-        CaptchaConfigPanel.showCaptchaWizardResult(dialog.requiredTypes, dialog.solverTable.getRelevantSolvers());
+        if (dialog.openComparisonCheckBox.isSelected()) {
+            CaptchaConfigPanel.showCaptchaWizardResult(dialog.requiredTypes, dialog.solverTable.getRelevantSolvers());
+        }
+    }
+
+    /**
+     * Sorts the solver order according to the preferences: 1. The local JAC solver (if enabled) comes first, 2. the other usable solvers
+     * follow, the preferred kind first (automatic: external solvers, manual: solvers which need a human, both: the order stays), 3. all
+     * solvers which are not usable. The order within each group is kept.
+     */
+    private void applySortOrder() {
+        final List<SolverService> ordered = new ArrayList<SolverService>(ChallengeResponseController.getInstance().getOrderedServices());
+        final Method method = getMethod();
+        final List<SolverService> jac = new ArrayList<SolverService>();
+        final List<SolverService> preferred = new ArrayList<SolverService>();
+        final List<SolverService> otherUsable = new ArrayList<SolverService>();
+        final List<SolverService> unusable = new ArrayList<SolverService>();
+        for (final SolverService service : ordered) {
+            if (JacSolverService.ID.equals(service.getID()) && service.getConfigV3().isEnabled()) {
+                jac.add(service);
+            } else if (!service.isUsable()) {
+                unusable.add(service);
+            } else if (isPreferred(service, method)) {
+                preferred.add(service);
+            } else {
+                otherUsable.add(service);
+            }
+        }
+        final List<SolverService> result = new ArrayList<SolverService>(ordered.size());
+        result.addAll(jac);
+        result.addAll(preferred);
+        result.addAll(otherUsable);
+        result.addAll(unusable);
+        ChallengeResponseController.getInstance().setServiceOrder(result);
+    }
+
+    /** True if the usable solver belongs to the kind the user prefers. With both methods every solver counts as preferred (no sorting). */
+    private static boolean isPreferred(final SolverService service, final Method method) {
+        switch (method) {
+        case PAID:
+            switch (service.getType()) {
+            case EXTERNAL:
+                return true;
+            default:
+                return false;
+            }
+        case MANUAL:
+            return service.getType().requiresHuman();
+        case BOTH:
+        default:
+            return true;
+        }
     }
 
     private CaptchaWizardDialog() {
@@ -161,6 +257,7 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
         cardLayout = new CardLayout();
         cardPanel = new JPanel(cardLayout);
         cardPanel.add(createMethodPanel(), CARDS[STEP_METHOD]);
+        cardPanel.add(createPrecheckPanel(), CARDS[STEP_PRECHECK]);
         cardPanel.add(createDomainsPanel(), CARDS[STEP_DOMAINS]);
         cardPanel.add(createTypesPanel(), CARDS[STEP_TYPES]);
         cardPanel.add(createSolversPanel(), CARDS[STEP_SOLVERS]);
@@ -207,7 +304,7 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
             return;
         }
         if (e.getSource() == getOkButton() && step < STEPS - 1) {
-            if (step == STEP_METHOD) {
+            if (step == STEP_PRECHECK) {
                 applyPrecheck();
             }
             step++;
@@ -225,6 +322,7 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
     /** Part of step 1: Checks whether external solvers are globally enabled and whether all solvers are enabled, and offers to fix it. */
     private JComponent createPrecheckPanel() {
         precheckPanel = new JPanel(new MigLayout("ins 0, wrap 1", "[grow,fill]", "[]10[]5[]"));
+        /* The check runs as soon as the dialog opens. The step is always shown, also if there is nothing to fix. */
         buildPrecheckContent();
         return precheckPanel;
     }
@@ -234,61 +332,138 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
      * problem as a text with a green check icon.
      */
     private void buildPrecheckContent() {
-        disabledSolvers = new ArrayList<SolverService>();
+        disabledExternal = new ArrayList<SolverService>();
+        disabledManual = new ArrayList<SolverService>();
+        disabledJac = new ArrayList<SolverService>();
         disabledAccounts = new ArrayList<Account>();
         for (final SolverService service : ChallengeResponseController.getInstance().getOrderedServices()) {
             if (!service.getConfigV3().isEnabled()) {
-                disabledSolvers.add(service);
+                /* Three groups, each with its own warning and fix. */
+                switch (service.getType()) {
+                case EXTERNAL:
+                    disabledExternal.add(service);
+                    break;
+                case JD_LOCAL:
+                    disabledJac.add(service);
+                    break;
+                default:
+                    disabledManual.add(service);
+                    break;
+                }
             }
             if (service instanceof PluginForCaptchaSolverSolverService) {
                 disabledAccounts.addAll(((PluginForCaptchaSolverSolverService) service).getDisabledAccounts());
             }
         }
         precheckPanel.removeAll();
-        precheckPanel.add(new JSeparator());
         precheckPanel.add(createHeader(_GUI.T.CaptchaWizard_precheck_header()));
-        /* The findings: a warning triangle for a problem, a green check mark if everything is fine. */
+        /* The findings: a warning triangle for a problem, a green check mark if everything is fine. The warnings are shown first. */
+        final List<JLabel> warnings = new ArrayList<JLabel>();
+        final List<JLabel> okFindings = new ArrayList<JLabel>();
         final boolean globalOk = CFG_GENERAL.USE_AVAILABLE_CAPTCHA_SOLVER_ACCOUNTS.isEnabled();
-        final boolean solversOk = disabledSolvers.isEmpty();
+        final boolean externalOk = disabledExternal.isEmpty();
+        final boolean manualOk = disabledManual.isEmpty();
+        final boolean jacOk = disabledJac.isEmpty();
         if (globalOk) {
-            precheckPanel.add(new JLabel(_GUI.T.CaptchaWizard_precheck_globalEnabled(), NewTheme.I().getIcon(IconKey.ICON_OK, 18), JLabel.LEADING));
+            okFindings.add(createFinding(true, _GUI.T.CaptchaWizard_precheck_globalEnabled(), null));
         } else {
-            precheckPanel.add(new JLabel(_GUI.T.CaptchaWizard_precheck_globalDisabled(), NewTheme.I().getIcon(IconKey.ICON_WARNING, 18), JLabel.LEADING));
+            warnings.add(createFinding(false, _GUI.T.CaptchaWizard_precheck_globalDisabled(), null));
         }
-        if (solversOk) {
-            precheckPanel.add(new JLabel(_GUI.T.CaptchaWizard_precheck_allSolversEnabled(), NewTheme.I().getIcon(IconKey.ICON_OK, 18), JLabel.LEADING));
-        } else {
-            precheckPanel.add(new JLabel(_GUI.T.CaptchaWizard_precheck_solversDisabled(disabledSolvers.size()), NewTheme.I().getIcon(IconKey.ICON_WARNING, 18), JLabel.LEADING));
+        /* Disabled solvers: one warning per group (the names are in the tooltip), or one OK line if all solvers are enabled. */
+        if (externalOk && manualOk && jacOk) {
+            okFindings.add(createFinding(true, _GUI.T.CaptchaWizard_precheck_allSolversEnabled(), null));
+        }
+        if (!externalOk) {
+            warnings.add(createFinding(false, _GUI.T.CaptchaWizard_precheck_externalDisabled(disabledExternal.size()), joinNames(disabledExternal)));
+        }
+        if (!manualOk) {
+            warnings.add(createFinding(false, _GUI.T.CaptchaWizard_precheck_manualDisabled(disabledManual.size()), joinNames(disabledManual)));
+        }
+        if (!jacOk) {
+            warnings.add(createFinding(false, _GUI.T.CaptchaWizard_precheck_jacDisabled(), null));
         }
         final boolean accountsOk = disabledAccounts.isEmpty();
         if (accountsOk) {
-            precheckPanel.add(new JLabel(_GUI.T.CaptchaWizard_precheck_allAccountsEnabled(), NewTheme.I().getIcon(IconKey.ICON_OK, 18), JLabel.LEADING));
+            okFindings.add(createFinding(true, _GUI.T.CaptchaWizard_precheck_allAccountsEnabled(), null));
         } else {
-            precheckPanel.add(new JLabel(_GUI.T.CaptchaWizard_precheck_accountsDisabled(disabledAccounts.size()), NewTheme.I().getIcon(IconKey.ICON_WARNING, 18), JLabel.LEADING));
+            warnings.add(createFinding(false, _GUI.T.CaptchaWizard_precheck_accountsDisabled(disabledAccounts.size()), null));
         }
+        /* Premium accounts globally enabled? (The solver accounts are premium accounts of the solver plugins.) */
+        final boolean premiumOk = CFG_GENERAL.USE_AVAILABLE_ACCOUNTS.isEnabled();
+        if (premiumOk) {
+            okFindings.add(createFinding(true, _GUI.T.CaptchaWizard_precheck_premiumEnabled(), null));
+        } else {
+            warnings.add(createFinding(false, _GUI.T.CaptchaWizard_precheck_premiumDisabled(), null));
+        }
+        enablePremiumCheckBox = premiumOk ? null : new JCheckBox(_GUI.T.CaptchaWizard_precheck_enablePremium(), true);
         /* Silent mode (also its automatic variants) suppresses captcha dialogs, which defeats manual solving. */
-        final boolean silentOk = CFG_SILENTMODE.CFG.getSilentMode() == SilentModeSetting.DISABLED;
-        if (silentOk) {
-            precheckPanel.add(new JLabel(_GUI.T.CaptchaWizard_precheck_silentDisabled(), NewTheme.I().getIcon(IconKey.ICON_OK, 18), JLabel.LEADING));
-        } else {
-            precheckPanel.add(new JLabel(_GUI.T.CaptchaWizard_precheck_silentEnabled(), NewTheme.I().getIcon(IconKey.ICON_WARNING, 18), JLabel.LEADING));
+        final boolean silentOk;
+        switch (CFG_SILENTMODE.CFG.getSilentMode()) {
+        case DISABLED:
+            silentOk = true;
+            break;
+        default:
+            silentOk = false;
+            break;
         }
+        if (silentOk) {
+            okFindings.add(createFinding(true, _GUI.T.CaptchaWizard_precheck_silentDisabled(), null));
+        } else {
+            warnings.add(createFinding(false, _GUI.T.CaptchaWizard_precheck_silentEnabled(), null));
+        }
+        /* Captcha mode "skip all": JDownloader does not ask for any captcha, so the wizard would be pointless. */
+        final boolean modeOk;
+        switch (CaptchaSettings.CFG.getCaptchaMode()) {
+        case SKIP_ALL:
+            modeOk = false;
+            break;
+        case NORMAL:
+        default:
+            modeOk = true;
+            break;
+        }
+        if (modeOk) {
+            okFindings.add(createFinding(true, _GUI.T.CaptchaWizard_precheck_modeNormal(), null));
+        } else {
+            warnings.add(createFinding(false, _GUI.T.CaptchaWizard_precheck_modeSkipAll(), null));
+        }
+        for (final JLabel label : warnings) {
+            precheckPanel.add(label);
+        }
+        for (final JLabel label : okFindings) {
+            precheckPanel.add(label);
+        }
+        resetModeCheckBox = modeOk ? null : new JCheckBox(_GUI.T.CaptchaWizard_precheck_resetMode(), true);
         /* The fixes are offered separately at the bottom, only if there is a problem. They are applied when the user clicks "Next". */
         disableSilentCheckBox = silentOk ? null : new JCheckBox(_GUI.T.CaptchaWizard_precheck_disableSilent(), true);
         enableGlobalCheckBox = globalOk ? null : new JCheckBox(_GUI.T.CaptchaWizard_precheck_enableGlobal(), true);
-        enableSolversCheckBox = solversOk ? null : new JCheckBox(_GUI.T.CaptchaWizard_precheck_enableSolvers(disabledSolvers.size()), true);
+        enableExternalCheckBox = externalOk ? null : new JCheckBox(_GUI.T.CaptchaWizard_precheck_enableExternal(disabledExternal.size()), true);
+        enableManualCheckBox = manualOk ? null : new JCheckBox(_GUI.T.CaptchaWizard_precheck_enableManual(disabledManual.size()), true);
+        enableJacCheckBox = jacOk ? null : new JCheckBox(_GUI.T.CaptchaWizard_precheck_enableJac(), true);
         enableAccountsCheckBox = accountsOk ? null : new JCheckBox(_GUI.T.CaptchaWizard_precheck_enableAccounts(disabledAccounts.size()), true);
-        if (enableGlobalCheckBox != null || enableSolversCheckBox != null || enableAccountsCheckBox != null || disableSilentCheckBox != null) {
+        if (hasAnyFix()) {
             precheckPanel.add(new JSeparator(), "gaptop 15, pushy, aligny bottom");
             precheckPanel.add(createHeader(_GUI.T.CaptchaWizard_precheck_fixHeader()), "wmin 0");
+            if (resetModeCheckBox != null) {
+                precheckPanel.add(resetModeCheckBox);
+            }
             if (disableSilentCheckBox != null) {
                 precheckPanel.add(disableSilentCheckBox);
+            }
+            if (enablePremiumCheckBox != null) {
+                precheckPanel.add(enablePremiumCheckBox);
             }
             if (enableGlobalCheckBox != null) {
                 precheckPanel.add(enableGlobalCheckBox);
             }
-            if (enableSolversCheckBox != null) {
-                precheckPanel.add(enableSolversCheckBox);
+            if (enableExternalCheckBox != null) {
+                precheckPanel.add(enableExternalCheckBox);
+            }
+            if (enableManualCheckBox != null) {
+                precheckPanel.add(enableManualCheckBox);
+            }
+            if (enableJacCheckBox != null) {
+                precheckPanel.add(enableJacCheckBox);
             }
             if (enableAccountsCheckBox != null) {
                 precheckPanel.add(enableAccountsCheckBox);
@@ -302,7 +477,7 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
                     warning.setVisible(isAnyFixDisabled());
                 }
             };
-            for (final JCheckBox box : new JCheckBox[] { disableSilentCheckBox, enableGlobalCheckBox, enableSolversCheckBox, enableAccountsCheckBox }) {
+            for (final JCheckBox box : getFixCheckBoxes()) {
                 if (box != null) {
                     box.addItemListener(listener);
                 }
@@ -313,14 +488,42 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
         precheckPanel.repaint();
     }
 
+    /** One finding of the pre-check: a warning triangle for a problem, a green check mark if everything is fine. */
+    private static JLabel createFinding(final boolean ok, final String text, final String tooltip) {
+        final JLabel label = new JLabel(text, NewTheme.I().getIcon(ok ? IconKey.ICON_OK : IconKey.ICON_WARNING, 18), JLabel.LEADING);
+        label.setToolTipText(tooltip);
+        return label;
+    }
+
+    /** All fix checkboxes of the pre-check, a checkbox is null if there is nothing to fix. */
+    private JCheckBox[] getFixCheckBoxes() {
+        return new JCheckBox[] { resetModeCheckBox, disableSilentCheckBox, enablePremiumCheckBox, enableGlobalCheckBox, enableExternalCheckBox, enableManualCheckBox, enableJacCheckBox, enableAccountsCheckBox };
+    }
+
+    private boolean hasAnyFix() {
+        for (final JCheckBox box : getFixCheckBoxes()) {
+            if (box != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** True if a fix is offered but the user has unticked it. */
     private boolean isAnyFixDisabled() {
-        for (final JCheckBox box : new JCheckBox[] { disableSilentCheckBox, enableGlobalCheckBox, enableSolversCheckBox, enableAccountsCheckBox }) {
+        for (final JCheckBox box : getFixCheckBoxes()) {
             if (box != null && !box.isSelected()) {
                 return true;
             }
         }
         return false;
+    }
+
+    private void enableSolvers(final List<SolverService> solvers) {
+        for (final SolverService service : solvers) {
+            service.getConfigV3().setEnabled(true);
+        }
+        precheckChanged = true;
     }
 
     /** Applies the ticked fixes of the pre-check. This counts as a change of the user, see {@link #hasChanges()}. */
@@ -334,10 +537,26 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
             }
             precheckChanged = true;
         }
-        if (enableSolversCheckBox != null && enableSolversCheckBox.isSelected()) {
-            for (final SolverService service : disabledSolvers) {
-                service.getConfigV3().setEnabled(true);
+        if (enableExternalCheckBox != null && enableExternalCheckBox.isSelected()) {
+            enableSolvers(disabledExternal);
+        }
+        if (enableManualCheckBox != null && enableManualCheckBox.isSelected()) {
+            enableSolvers(disabledManual);
+        }
+        if (enableJacCheckBox != null && enableJacCheckBox.isSelected()) {
+            enableSolvers(disabledJac);
+        }
+        if (enablePremiumCheckBox != null && enablePremiumCheckBox.isSelected()) {
+            try {
+                CFG_GENERAL.USE_AVAILABLE_ACCOUNTS.setValue(true);
+            } catch (final ValidationException e) {
+                /* Should never happen for a plain boolean key. */
+                throw new WTFException(e);
             }
+            precheckChanged = true;
+        }
+        if (resetModeCheckBox != null && resetModeCheckBox.isSelected()) {
+            CaptchaSettings.CFG.setCaptchaMode(MODE.NORMAL);
             precheckChanged = true;
         }
         if (disableSilentCheckBox != null && disableSilentCheckBox.isSelected()) {
@@ -355,9 +574,10 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
     }
 
     private JComponent createMethodPanel() {
-        final JPanel panel = new JPanel(new MigLayout("ins 0, wrap 1", "[grow,fill]", "[]15[]5[]10[][][]15[grow,fill]"));
+        final JPanel panel = new JPanel(new MigLayout("ins 0, wrap 1", "[grow,fill]", "[]"));
+        panel.add(createHeader(_GUI.T.CaptchaWizard_step1_preference()));
         panel.add(new JLabel("<html>" + _GUI.T.CaptchaWizard_step1_intro() + "</html>"), "wmin 0");
-        panel.add(createHeader(_GUI.T.CaptchaWizard_step1_header()));
+        panel.add(createHeader(_GUI.T.CaptchaWizard_step1_header(), IconKey.ICON_OCR), "gaptop 15");
         panel.add(new JLabel("<html>" + _GUI.T.CaptchaWizard_step1_text() + "</html>"), "wmin 0");
         /* Exactly one method can be chosen, "both" is the default. */
         manualRadio = new JRadioButton(_GUI.T.CaptchaWizard_step1_manual());
@@ -370,10 +590,101 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
         panel.add(manualRadio);
         panel.add(paidRadio);
         panel.add(bothRadio);
-        /* The solver pre-check is part of this step: findings and the offered fixes (at the bottom). */
-        panel.add(createPrecheckPanel(), "grow, push, gaptop 10");
+        /* Changing the method above also updates the login captcha choice: manual -> "preferably manually", otherwise "like any other" (the user can still change it afterwards). */
+        final ItemListener methodListener = new ItemListener() {
+            @Override
+            public void itemStateChanged(final ItemEvent e) {
+                if (e.getStateChange() != ItemEvent.SELECTED || loginManualRadio == null || loginLikeOtherRadio == null) {
+                    return;
+                }
+                if (manualRadio.isSelected()) {
+                    loginManualRadio.setSelected(true);
+                } else {
+                    loginLikeOtherRadio.setSelected(true);
+                }
+            }
+        };
+        manualRadio.addItemListener(methodListener);
+        paidRadio.addItemListener(methodListener);
+        bothRadio.addItemListener(methodListener);
+        panel.add(new JSeparator(), "gaptop 10");
+        /* Login captchas: explanation, link and the choice (the preselection follows the setting). */
+        panel.add(createHeader(_GUI.T.CaptchaWizard_login_header(), IconKey.ICON_PREMIUM));
+        panel.add(new JLabel("<html>" + _GUI.T.CaptchaWizard_login_text() + "</html>"), "wmin 0");
+        /* Only "Click here" is the link, the text in front of it is plain. */
+        final JPanel linkPanel = new JPanel(new MigLayout("ins 0", "[][]", "[]"));
+        linkPanel.add(new JLabel(_GUI.T.CaptchaWizard_login_linkPrefix()), "gapright 4");
+        linkPanel.add(createLinkLabel(_GUI.T.CaptchaWizard_login_link(), "https://support.jdownloader.org/knowledgebase/article/captchas-in-premium-mode-and-during-account-login"));
+        panel.add(linkPanel);
+        final boolean avoidAuto = JsonConfig.create(CaptchaSettings.class).isAvoidAutoSolverForLoginCaptchas();
+        loginLikeOtherRadio = new JRadioButton(_GUI.T.CaptchaWizard_login_likeOther(), !avoidAuto);
+        loginManualRadio = new JRadioButton(_GUI.T.CaptchaWizard_login_manual(), avoidAuto);
+        final ButtonGroup loginGroup = new ButtonGroup();
+        loginGroup.add(loginLikeOtherRadio);
+        loginGroup.add(loginManualRadio);
+        panel.add(loginLikeOtherRadio);
+        panel.add(loginManualRadio);
+        /* Description of the second option, indented below its radio button. */
+        panel.add(new JLabel("<html>" + _GUI.T.CaptchaWizard_login_manualDescription() + "</html>"), "wmin 0, gapleft 25");
+        initialLoginManual = loginManualRadio.isSelected();
+        /* What happens if nobody solves a captcha in time. */
+        panel.add(new JSeparator(), "gaptop 10");
+        panel.add(createHeader(_GUI.T.CaptchaWizard_timeout_header(), IconKey.ICON_WAIT));
+        panel.add(new JLabel("<html>" + _GUI.T.CaptchaWizard_timeout_text() + "</html>"), "wmin 0");
+        initialHosterTimeout = CaptchaSettings.CFG.getOnHosterCaptchaTimeoutAction();
+        initialCrawlerTimeout = CaptchaSettings.CFG.getOnCrawlerCaptchaTimeoutAction();
+        hosterTimeoutCombo = createTimeoutCombo(initialHosterTimeout);
+        crawlerTimeoutCombo = createTimeoutCombo(initialCrawlerTimeout);
+        final JPanel timeoutPanel = new JPanel(new MigLayout("ins 0", "[][grow,fill]", "[][]"));
+        timeoutPanel.add(new JLabel(_GUI.T.CaptchaWizard_timeout_hoster()));
+        timeoutPanel.add(hosterTimeoutCombo, "wrap");
+        timeoutPanel.add(new JLabel(_GUI.T.CaptchaWizard_timeout_crawler()));
+        timeoutPanel.add(crawlerTimeoutCombo);
+        panel.add(timeoutPanel);
+        /* Notifications of external solvers. */
+        panel.add(new JSeparator(), "gaptop 10");
+        panel.add(createHeader(_GUI.T.CaptchaWizard_notification_header(), IconKey.ICON_BUBBLE));
+        initialBubble = CaptchaSettings.CFG.isRemoteCaptchaBubbleEnabled();
+        bubbleCheckBox = new JCheckBox(_GUI.T.CaptchaWizard_bubble(), initialBubble);
+        panel.add(bubbleCheckBox);
         initialMethod = getMethod();
-        return panel;
+        /* The step is long: it scrolls if the dialog is too small. */
+        final JScrollPane scroll = new JScrollPane(panel, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scroll.setBorder(null);
+        scroll.getVerticalScrollBar().setUnitIncrement(16);
+        return scroll;
+    }
+
+    private static JComboBox<CAPTCHA_TIMEOUT_ACTION> createTimeoutCombo(final CAPTCHA_TIMEOUT_ACTION selected) {
+        final JComboBox<CAPTCHA_TIMEOUT_ACTION> combo = new JComboBox<CAPTCHA_TIMEOUT_ACTION>(CAPTCHA_TIMEOUT_ACTION.values());
+        combo.setSelectedItem(selected);
+        combo.setRenderer(new DefaultListCellRenderer() {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public java.awt.Component getListCellRendererComponent(final JList<?> list, final Object value, final int index, final boolean isSelected, final boolean cellHasFocus) {
+                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                if (value instanceof CAPTCHA_TIMEOUT_ACTION) {
+                    setText(getTimeoutLabel((CAPTCHA_TIMEOUT_ACTION) value));
+                }
+                return this;
+            }
+        });
+        return combo;
+    }
+
+    private static String getTimeoutLabel(final CAPTCHA_TIMEOUT_ACTION action) {
+        switch (action) {
+        case SKIP_HOSTER:
+            return _GUI.T.CaptchaWizard_timeout_skipHoster();
+        case RETRY:
+            return _GUI.T.CaptchaWizard_timeout_retry();
+        case ASK:
+            return _GUI.T.CaptchaWizard_timeout_ask();
+        case SKIP:
+        default:
+            return _GUI.T.CaptchaWizard_timeout_skip();
+        }
     }
 
     /** The solving method chosen in step 1. */
@@ -415,7 +726,7 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
      * without changes ESC may close the wizard, so a few mouse clicks are not lost by accident.
      */
     private boolean hasChanges() {
-        if (precheckChanged || getMethod() != initialMethod) {
+        if (precheckChanged || getMethod() != initialMethod || loginManualRadio.isSelected() != initialLoginManual || bubbleCheckBox.isSelected() != initialBubble || hosterTimeoutCombo.getSelectedItem() != initialHosterTimeout || crawlerTimeoutCombo.getSelectedItem() != initialCrawlerTimeout) {
             return true;
         }
         return !getEntryStates().equals(initialEntryStates);
@@ -561,25 +872,60 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
 
     /** Step 4: The solvers. The content scrolls, as the notes below the table can take much space. */
     private JComponent createSolversPanel() {
-        final JPanel panel = new ViewportWidthPanel(new MigLayout("ins 0 0 0 5, wrap 1", "[grow,fill]", "[][][]"));
+        final JPanel panel = new ViewportWidthPanel(new MigLayout("ins 0 0 0 5, wrap 1", "[grow,fill]", "[][][][][][][]"));
         panel.add(createHeader(_GUI.T.CaptchaWizard_step4_header()));
         solverTable = new CaptchaWizardSolverTable();
         panel.add(solverTable.createScrollPane(), "grow");
-        deselectedInfoLabel = new JLabel("", NewTheme.I().getIcon(IconKey.ICON_INFO, 18), JLabel.LEADING);
-        deselectedInfoLabel.setVisible(false);
-        panel.add(deselectedInfoLabel, "wmin 0, hidemode 3");
         /* The informations which are also shown as dialogs, see onSolverStepEntered. */
         infoPanel = new JPanel(new MigLayout("ins 0, wrap 1", "[grow,fill]", "[]"));
         panel.add(infoPanel, "wmin 0");
+        /* What happens on Finish, both enabled by default. */
+        panel.add(new JSeparator(), "gaptop 10");
+        panel.add(createHeader(_GUI.T.CaptchaWizard_finish_header(), IconKey.ICON_OK));
+        sortOrderCheckBox = new JCheckBox(_GUI.T.CaptchaWizard_finish_sortOrder(), true);
+        openComparisonCheckBox = new JCheckBox(_GUI.T.CaptchaWizard_finish_openComparison(), true);
+        /* Only offered if it makes sense, see updateDisableManualOption(). Never ticked by default. It comes before sorting. */
+        disableManualCheckBox = new JCheckBox(_GUI.T.CaptchaWizard_finish_disableManual(), false);
+        panel.add(disableManualCheckBox, "hidemode 3");
+        disableManualCheckBox.setVisible(false);
+        /* Explains why disabling is useful and what it means, shown with the checkbox. */
+        disableManualInfoLabel = new JLabel("<html>" + _GUI.T.CaptchaWizard_finish_disableManualInfo() + "</html>", NewTheme.I().getIcon(IconKey.ICON_INFO, 18), JLabel.LEADING);
+        panel.add(disableManualInfoLabel, "wmin 0, gapleft 25, hidemode 3");
+        disableManualInfoLabel.setVisible(false);
+        panel.add(sortOrderCheckBox);
+        /* Always the last checkbox. */
+        panel.add(openComparisonCheckBox);
         final JScrollPane scroll = new JScrollPane(panel, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scroll.setBorder(null);
         scroll.getVerticalScrollBar().setUnitIncrement(16);
         return scroll;
     }
 
+    /** A label which looks like a link and opens the given URL in the browser when clicked. */
+    private static JLabel createLinkLabel(final String text, final String url) {
+        final JLabel label = new JLabel("<html><a href=\"" + url + "\">" + text + "</a></html>");
+        label.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        label.setToolTipText(url);
+        label.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(final MouseEvent e) {
+                CrossSystem.openURL(url);
+            }
+        });
+        return label;
+    }
+
     private static JLabel createHeader(final String text) {
         final JLabel label = new JLabel(text);
         label.setFont(label.getFont().deriveFont(Font.BOLD));
+        return label;
+    }
+
+    /** Header with an icon in front of the text. */
+    private static JLabel createHeader(final String text, final String iconKey) {
+        final JLabel label = createHeader(text);
+        label.setIcon(NewTheme.I().getIcon(iconKey, 18));
+        label.setIconTextGap(8);
         return label;
     }
 
@@ -590,12 +936,13 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
             return;
         }
         cardLayout.show(cardPanel, CARDS[step]);
-        progressBar.setValue(step + 1);
-        progressBar.setString(_GUI.T.CaptchaWizard_progress(step + 1, STEPS));
+        final int position = step + 1;
+        progressBar.setMaximum(STEPS);
+        progressBar.setValue(position);
+        progressBar.setString(_GUI.T.CaptchaWizard_progress(position, STEPS));
         final boolean lastStep = step == STEPS - 1;
         getOkButton().setText(lastStep ? _GUI.T.CaptchaWizard_finish() : _GUI.T.CaptchaWizard_next());
-        /* Finish opens the captcha comparison table: same icon as the other buttons which lead to it. */
-        getOkButton().setIcon(NewTheme.I().getIcon(lastStep ? IconKey.ICON_LIST : IconKey.ICON_GO_NEXT, 18));
+        getOkButton().setIcon(NewTheme.I().getIcon(lastStep ? IconKey.ICON_OK : IconKey.ICON_GO_NEXT, 18));
         if (backButton != null) {
             backButton.setEnabled(step > 0);
         }
@@ -608,6 +955,7 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
             getOkButton().setEnabled(anyDomain);
             break;
         case STEP_METHOD:
+        case STEP_PRECHECK:
         case STEP_TYPES:
         case STEP_SOLVERS:
         default:
@@ -766,6 +1114,8 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
         final Set<CAPTCHA_TYPE> unsolvable = new LinkedHashSet<CAPTCHA_TYPE>(requiredTypes);
         if (anySolverSolvesAll) {
             combination = null;
+            /* A single solver supports all captcha types: Nothing is unsolvable. */
+            unsolvable.clear();
         } else {
             combination = findSmallestCombination(candidates, requiredTypes);
             for (final SolverService service : combination) {
@@ -787,13 +1137,12 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
         }
         final Set<CAPTCHA_TYPE> usableTypes = new LinkedHashSet<CAPTCHA_TYPE>(usableAutomaticTypes);
         usableTypes.addAll(usableManualTypes);
-        /* If the user can already solve all captcha types with usable solvers, the warnings below are pointless and no solver is preselected. */
+        /* If the user can already solve all captcha types with usable solvers, the warnings below are pointless. */
         final boolean alreadyUsable = usableTypes.containsAll(requiredTypes);
         /* The table only lists solvers which solve everything, or the combination if there is no such solver. */
         shownSolvers = new ArrayList<SolverService>(combination == null ? solvers : combination);
-        final int deselected = solverTable.setSolvers(shownSolvers, requiredTypes, alreadyUsable);
-        deselectedInfoLabel.setText("<html>" + _GUI.T.CaptchaWizard_info_deselectedUsable(deselected) + "</html>");
-        deselectedInfoLabel.setVisible(deselected > 0);
+        solverTable.setSolvers(shownSolvers, requiredTypes);
+        updateDisableManualOption();
         /* Every information is one text which is shown in a dialog and in the list below the table. */
         final List<CaptchaWizardInfo> infos = new ArrayList<CaptchaWizardInfo>();
         if (manualImpossible && !alreadyUsable) {
@@ -807,7 +1156,7 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
             infos.add(new CaptchaWizardInfo(CaptchaWizardInfo.Level.WARNING, _GUI.T.CaptchaWizard_info_unsolvable(), unsolvable));
         }
         if (alreadyUsable) {
-            infos.add(new CaptchaWizardInfo(CaptchaWizardInfo.Level.INFO, _GUI.T.CaptchaWizard_info_alreadyUsable(), null));
+            infos.add(new CaptchaWizardInfo(CaptchaWizardInfo.Level.SUCCESS, _GUI.T.CaptchaWizard_info_alreadyUsable(), null));
         }
         /* The user prefers automatic solving, but for some types only a manual solver is usable at the moment. */
         final Set<CAPTCHA_TYPE> automaticButManual = new LinkedHashSet<CAPTCHA_TYPE>(requiredTypes);
@@ -816,10 +1165,12 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
         if (isPaidWanted() && !isManualWanted() && !automaticButManual.isEmpty()) {
             infos.add(new CaptchaWizardInfo(CaptchaWizardInfo.Level.WARNING, _GUI.T.CaptchaWizard_info_automaticButManual(), automaticButManual));
         }
+        /* Warnings first, then the infos (the order within each group stays). */
+        CaptchaWizardInfo.sortWarningsFirst(infos);
         /* The same content is shown below the table, with a heading. */
         infoPanel.removeAll();
         if (!infos.isEmpty()) {
-            infoPanel.add(createHeader(_GUI.T.CaptchaWizard_notes_header()));
+            infoPanel.add(createHeader(_GUI.T.CaptchaWizard_notes_header(), IconKey.ICON_INFO));
             infoPanel.add(CaptchaWizardInfo.createListComponent(infos));
         }
         infoPanel.revalidate();
@@ -834,6 +1185,66 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
                 CaptchaWizardInfo.showDialog(infos);
             }
         });
+    }
+
+    /**
+     * "Disable all manual solvers" is offered (regardless of the preference of step 1) if: 1. captcha types are required, 2. the usable
+     * paid solvers already solve all of them and 3. at least one manual solver is enabled (otherwise there is nothing to disable). An
+     * explanation of the effects is shown below it.
+     */
+    private void updateDisableManualOption() {
+        if (disableManualCheckBox == null) {
+            return;
+        }
+        /* Every condition is logged, so it is clear why the option is offered or not. */
+        final StringBuilder log = new StringBuilder("CaptchaWizard: \"Disable all manual solvers\" option");
+        final boolean typesEmpty = requiredTypes.isEmpty();
+        log.append("\r\n - requiredTypes=").append(requiredTypes).append(" (required: not empty): ").append(typesEmpty ? "FAILED" : "OK");
+        final Set<CAPTCHA_TYPE> usablePaidTypes = new LinkedHashSet<CAPTCHA_TYPE>();
+        boolean manualEnabled = false;
+        for (final SolverService service : ChallengeResponseController.getInstance().getOrderedServices()) {
+            if (service.getType().requiresHuman()) {
+                final boolean enabled = service.getConfigV3().isEnabled();
+                manualEnabled |= enabled;
+                log.append("\r\n - manual solver ").append(service.getID()).append(" (").append(service.getType()).append("): enabled=").append(enabled).append(", usable=").append(service.isUsable());
+                continue;
+            }
+            switch (service.getType()) {
+            case EXTERNAL:
+                final boolean usable = service.isUsable();
+                final Set<CAPTCHA_TYPE> supported = service.getSupportedCaptchaTypes();
+                log.append("\r\n - paid solver ").append(service.getID()).append(": enabled=").append(service.getConfigV3().isEnabled()).append(", usable=").append(usable).append(", supports=").append(supported);
+                if (usable && supported != null) {
+                    usablePaidTypes.addAll(supported);
+                }
+                break;
+            default:
+                log.append("\r\n - other solver ").append(service.getID()).append(" (").append(service.getType()).append("): ignored");
+                break;
+            }
+        }
+        final Set<CAPTCHA_TYPE> notCovered = new LinkedHashSet<CAPTCHA_TYPE>(requiredTypes);
+        notCovered.removeAll(usablePaidTypes);
+        log.append("\r\n - at least one manual solver enabled=").append(manualEnabled).append(" (required: true): ").append(manualEnabled ? "OK" : "FAILED");
+        log.append("\r\n - usable paid solvers cover ").append(usablePaidTypes).append(", not covered=").append(notCovered).append(" (required: none): ").append(notCovered.isEmpty() ? "OK" : "FAILED");
+        final boolean offer = !typesEmpty && manualEnabled && notCovered.isEmpty();
+        log.append("\r\n => ").append(offer ? "OFFERED" : "NOT offered");
+        LogController.CL().info(log.toString());
+        if (!offer) {
+            disableManualCheckBox.setSelected(false);
+        }
+        /* Never ticked by the wizard: It changes the behavior deeply, so the user has to decide. A choice of the user is kept when coming back to this step. */
+        disableManualCheckBox.setVisible(offer);
+        disableManualInfoLabel.setVisible(offer);
+    }
+
+    /** Disables all solvers where a human has to solve the captcha (dialog, browser, MyJDownloader). */
+    private void disableManualSolvers() {
+        for (final SolverService service : ChallengeResponseController.getInstance().getOrderedServices()) {
+            if (service.getType().requiresHuman()) {
+                service.getConfigV3().setEnabled(false);
+            }
+        }
     }
 
     private static String joinNames(final List<SolverService> services) {
