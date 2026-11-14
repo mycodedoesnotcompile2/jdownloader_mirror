@@ -433,8 +433,10 @@ public final class WindowsWebView2Browser {
          * {@link WindowsWebView2Browser#navigate(String)} to a local address shows the blocked page. Nothing is allowed
          * automatically; name the local hosts the browser may reach in {@link #allowedLocalHosts}.
          * <p>
-         * With {@link #filterProxy} (default) this covers every connection, also WebSockets and workers, and it is decided by the
-         * address a name really resolves to. Without the filter proxy it is a partial protection only: a WebSocket to a local address
+         * With {@link #filterProxy} (default) this covers every TCP connection, also WebSockets and workers, and it is decided by the
+         * address a name really resolves to. UDP does not pass the filter; WebRTC therefore uses no UDP that bypasses the proxy
+         * (profile setting {@code webrtc.ip_handling_policy = disable_non_proxied_udp}, written before the browser starts).
+         * Without the filter proxy it is a partial protection only: WebRTC may use UDP into the local network, a WebSocket to a local address
          * still connects, and so does any request to a public name that resolves to a local address (measured against runtime 157;
          * WebView2 offers no event for either).
          */
@@ -469,9 +471,11 @@ public final class WindowsWebView2Browser {
 
         /**
          * {@code true} (default): everything the browser sends goes through a filter inside this process ({@link WebView2FilterProxy}),
-         * also WebSockets, workers and connections to loopback addresses. Only with it {@link #blockLocalNetwork} and
-         * {@link #urlFilter} are complete, and only with it a {@link #proxySelector} is used. {@code false}: the browser connects by
-         * itself with the proxy settings of Windows, and the two protections only cover what WebView2 reports as a request.
+         * also WebSockets, workers and connections to loopback addresses. The browser talks SOCKS5 to it. Only with it
+         * {@link #blockLocalNetwork} covers every connection, the host rules of {@link #urlFilter} also apply to connections WebView2
+         * does not report (path rules only ever apply to reported requests, the filter sees host and port only), and only with it a
+         * {@link #proxySelector} is used. {@code false}: the browser connects by itself with the proxy settings of Windows, and the two
+         * protections only cover what WebView2 reports as a request.
          */
         public boolean          filterProxy             = true;
         /**
@@ -551,6 +555,9 @@ public final class WindowsWebView2Browser {
     private static final String                            BROWSER_ARGUMENTS_VARIABLE = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS";
     private static final String                            SELF_TEST_PREFIX       = "http://" + WebView2FilterProxy.SELF_TEST_HOST + "/";
     private static final long                              SELF_TEST_TIMEOUT_MS   = TimeUnit.SECONDS.toMillis(15);
+    /** The folder WebView2 creates in the user data folder, and in it the default profile. */
+    private static final String                            WEBVIEW2_PROFILE_FOLDER = "EBWebView" + File.separator + "Default";
+    private static final String                            WEBRTC_IP_HANDLING_POLICY = "disable_non_proxied_udp";
     private static final String                            SESSION_PREFIX         = "session-";
     /** Key and start of the envelope in which the bridge passes on the message of a frame, see {@link Options#bridgeScript}. */
     private static final String                            FRAME_MESSAGE_KEY      = "__awWebView2Frame";
@@ -767,6 +774,14 @@ public final class WindowsWebView2Browser {
                 releaseTemporaryProfile();
                 /* Never start the browser without the filter it was configured with. */
                 throw new WebView2Exception("Could not start the filter proxy", e);
+            }
+            try {
+                applyWebRtcPolicy(userData);
+            } catch (Exception e) {
+                releaseFilterProxy();
+                releaseTemporaryProfile();
+                /* WebRTC would send UDP past the filter. */
+                throw new WebView2Exception("Could not restrict WebRTC to the filter proxy", e);
             }
         }
         try {
@@ -2538,6 +2553,38 @@ public final class WindowsWebView2Browser {
         r.bottom = y + Math.max(1, height);
         r.write();
         return r;
+    }
+
+    /**
+     * UDP does not pass the filter proxy, and WebRTC would send it directly: into the local network and past the upstream proxy
+     * (real address). The profile setting {@code webrtc.ip_handling_policy = disable_non_proxied_udp} makes WebRTC use only what
+     * passes the proxy. The command line switch {@code --force-webrtc-ip-handling-policy} does not exist in WebView2 (runtime 157),
+     * so the setting is written into the {@code Preferences} file of the profile before the browser starts; an existing file is
+     * kept and only this value is set. A page cannot change it.
+     */
+    static void applyWebRtcPolicy(String userData) throws IOException {
+        final File preferences = new File(userData, WEBVIEW2_PROFILE_FOLDER + File.separator + "Preferences");
+        Map<String, Object> root = null;
+        if (preferences.isFile()) {
+            root = JSonStorage.restoreFromString(IO.readFileToString(preferences), TypeRef.LINKED_MAP);
+            if (root == null) {
+                throw new IOException("Unreadable " + preferences);
+            }
+        } else {
+            root = new HashMap<String, Object>();
+        }
+        Object webrtc = root.get("webrtc");
+        if (!(webrtc instanceof Map)) {
+            webrtc = new HashMap<String, Object>();
+            root.put("webrtc", webrtc);
+        }
+        @SuppressWarnings("unchecked")
+        final Map<String, Object> webrtcMap = (Map<String, Object>) webrtc;
+        if (WEBRTC_IP_HANDLING_POLICY.equals(webrtcMap.get("ip_handling_policy"))) {
+            return;
+        }
+        webrtcMap.put("ip_handling_policy", WEBRTC_IP_HANDLING_POLICY);
+        IO.secureWrite(preferences, JSonStorage.serializeToJson(root).getBytes("UTF-8"));
     }
 
     private String resolveUserDataFolder(Options opts) {

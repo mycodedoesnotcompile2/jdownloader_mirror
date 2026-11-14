@@ -36,6 +36,7 @@ package org.appwork.utils.os.windows.webview2;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -84,10 +85,13 @@ import com.sun.jna.ptr.IntByReference;
  * <li>applies the {@link WebView2UrlFilter} of the browser to the target,</li>
  * <li>connects directly or through the proxy chosen by the {@link WebView2ProxySelector}.</li>
  * </ul>
- * It listens on a random port of the loopback interface only and understands nothing but proxy requests ({@code CONNECT} and requests
- * with an absolute address), so a web page in another browser cannot use it either.
+ * It listens on a random port of the loopback interface only and speaks SOCKS5 with {@code CONNECT} only (no authentication, no
+ * {@code BIND}, no {@code UDP ASSOCIATE}). Every TCP connection of the browser is one SOCKS connection to one target, so a kept
+ * connection can never carry requests for another server past the checks.
  * <p>
- * Limits: for an encrypted connection only host and port are known, not the path. When a connection goes through a proxy that resolves
+ * Limits: only host and port of a connection are known here, never the path, also for plain http; path rules of the
+ * {@link WebView2UrlFilter} are applied by the browser to the requests WebView2 reports. UDP does not pass this filter; the profile
+ * of the browser is set so that WebRTC uses no UDP that bypasses the proxy. When a connection goes through a proxy that resolves
  * names itself ({@link HTTPProxy#isResolveHostname()} is {@code false}), the address is resolved by that proxy and cannot be pinned
  * here; the name is still looked up locally and refused if it points to a local address.
  */
@@ -126,6 +130,13 @@ public final class WebView2FilterProxy {
     private static final int                              MAX_HEAD_BYTES      = 64 * 1024;
     private static final int                              HEAD_TIMEOUT_MILLIS = (int) TimeUnit.SECONDS.toMillis(30);
     private static final int                              CONNECT_TIMEOUT     = (int) TimeUnit.SECONDS.toMillis(30);
+    private static final byte                             SOCKS_VERSION       = 0x05;
+    private static final int                              SOCKS_SUCCEEDED     = 0x00;
+    private static final int                              SOCKS_GENERAL_FAILURE = 0x01;
+    private static final int                              SOCKS_NOT_ALLOWED   = 0x02;
+    private static final int                              SOCKS_HOST_UNREACHABLE = 0x04;
+    private static final int                              SOCKS_COMMAND_NOT_SUPPORTED = 0x07;
+    private static final int                              SOCKS_ADDRESS_TYPE_NOT_SUPPORTED = 0x08;
     private static final int                              AF_INET             = 2;
     /** {@code TCP_TABLE_OWNER_PID_CONNECTIONS} */
     private static final int                              TCP_TABLE_OWNER_PID = 4;
@@ -190,13 +201,18 @@ public final class WebView2FilterProxy {
         return server.getLocalPort();
     }
 
-    /** The browser arguments that route everything through this filter, loopback addresses included. */
+    /**
+     * The browser arguments that route everything through this filter, loopback addresses included. {@code socks5://} makes the
+     * browser send the host name; it does not resolve names itself. SOCKS5 of the browser carries TCP only; that WebRTC sends no UDP
+     * past this filter is set in the profile, see {@code WindowsWebView2Browser.applyWebRtcPolicy} (WebView2 has no command line
+     * switch for it).
+     */
     String getBrowserArguments() {
         if (Boolean.getBoolean(TEST_OMIT_ARGUMENTS)) {
             /* Test only: simulates a browser that ignores the proxy. The self test must then refuse to start it. */
             return "";
         }
-        return "--proxy-server=http://127.0.0.1:" + getPort() + " --proxy-bypass-list=<-loopback>";
+        return "--proxy-server=socks5://127.0.0.1:" + getPort() + " --proxy-bypass-list=<-loopback>";
     }
 
     void addPolicy(Policy policy) {
@@ -268,117 +284,176 @@ public final class WebView2FilterProxy {
 
     private void handle(Socket client) throws IOException {
         client.setTcpNoDelay(true);
-        final OutputStream out = client.getOutputStream();
         if (!isBrowserConnection(client)) {
-            /* Another program on this PC, or the browser could not be identified: never serve it. */
-            respond(out, 403, "Forbidden");
+            /* Another program on this PC, or the browser could not be identified: never serve it, not even with a protocol answer. */
             closeQuietly(client);
             return;
         }
         client.setSoTimeout(HEAD_TIMEOUT_MILLIS);
-        final BufferedInputStream in = new BufferedInputStream(client.getInputStream());
-        final String head = readHead(in);
-        if (head == null) {
-            respond(out, 400, "Bad Request");
+        final DataInputStream in = new DataInputStream(new BufferedInputStream(client.getInputStream()));
+        final OutputStream out = client.getOutputStream();
+        final String authority;
+        try {
+            authority = readSocksRequest(in, out);
+        } catch (IOException e) {
+            /* Not SOCKS5, too slow, or the client closed. */
             closeQuietly(client);
             return;
         }
-        client.setSoTimeout(0);
-        final int lineEnd = head.indexOf("\r\n");
-        final String[] requestLine = head.substring(0, lineEnd).split(" ");
-        if (requestLine.length != 3) {
-            respond(out, 400, "Bad Request");
+        if (authority == null) {
             closeQuietly(client);
             return;
         }
-        final String method = requestLine[0].toUpperCase(Locale.ENGLISH);
-        final boolean tunnel = "CONNECT".equals(method);
-        final String host;
-        final int port;
-        final String url;
-        String forwardHead = null;
-        if (tunnel) {
-            final int colon = requestLine[1].lastIndexOf(':');
-            if (colon <= 0) {
-                respond(out, 400, "Bad Request");
-                closeQuietly(client);
-                return;
-            }
-            host = WebView2UrlFilter.hostOf("tcp://" + requestLine[1]);
-            port = parsePort(requestLine[1].substring(colon + 1));
-            url = "https://" + requestLine[1] + "/";
-        } else {
-            /* Only a proxy request names an absolute address. A request for this port itself (a web page trying to talk to us) does not. */
-            if (!requestLine[1].toLowerCase(Locale.ENGLISH).startsWith("http://")) {
-                respond(out, 400, "Bad Request");
-                closeQuietly(client);
-                return;
-            }
-            url = requestLine[1];
-            host = WebView2UrlFilter.hostOf(url);
-            final String afterScheme = url.substring("http://".length());
-            int authorityEnd = afterScheme.length();
-            for (int i = 0; i < afterScheme.length(); i++) {
-                final char c = afterScheme.charAt(i);
-                if (c == '/' || c == '?' || c == '#') {
-                    authorityEnd = i;
-                    break;
-                }
-            }
-            final String authority = afterScheme.substring(0, authorityEnd);
-            final int colon = authority.lastIndexOf(':');
-            port = colon > authority.lastIndexOf(']') && colon >= 0 ? parsePort(authority.substring(colon + 1)) : 80;
-            String path = afterScheme.substring(authorityEnd);
-            if (!path.startsWith("/")) {
-                path = "/" + path;
-            }
-            forwardHead = rewriteHead(requestLine[0] + " " + path + " " + requestLine[2], head.substring(lineEnd + 2));
-        }
+        final String host = WebView2UrlFilter.hostOf("tcp://" + authority);
+        final int port = parsePort(authority.substring(authority.lastIndexOf(':') + 1));
         if (host == null || port <= 0) {
-            respond(out, 400, "Bad Request");
+            socksReply(out, SOCKS_GENERAL_FAILURE);
             closeQuietly(client);
             return;
         }
-        if (!tunnel && SELF_TEST_HOST.equals(host)) {
-            /* The browser proves that its traffic arrives here. Nothing is forwarded. */
-            final int nonceStart = url.lastIndexOf('/') + 1;
-            final AtomicBoolean waiting = selfTests.remove(url.substring(nonceStart));
-            if (waiting != null) {
-                waiting.set(true);
-            }
-            respond(out, 204, "No Content");
+        /* Only host and port of the target are known. Port 80 is taken as plain http, every other port as an encrypted connection. */
+        final String url = (port == 80 ? "http://" : "https://") + authority + "/";
+        if (SELF_TEST_HOST.equals(host)) {
+            answerSelfTest(in, out);
             closeQuietly(client);
             return;
         }
         final Socket upstream;
         try {
-            upstream = connect(tunnel, host, port, url);
+            upstream = connect(host, port, url);
         } catch (BlockedException blocked) {
             for (Policy policy : policies) {
                 policy.onBlocked(url);
             }
-            respond(out, 403, "Blocked");
+            socksReply(out, SOCKS_NOT_ALLOWED);
             closeQuietly(client);
             return;
         } catch (IOException e) {
-            respond(out, 502, "Bad Gateway");
+            socksReply(out, SOCKS_HOST_UNREACHABLE);
             closeQuietly(client);
             return;
         }
         try {
-            if (tunnel) {
-                out.write("HTTP/1.1 200 Connection established\r\n\r\n".getBytes("ISO-8859-1"));
-                out.flush();
-            } else {
-                final OutputStream upstreamOut = upstream.getOutputStream();
-                upstreamOut.write(forwardHead.getBytes("ISO-8859-1"));
-                upstreamOut.flush();
-            }
+            socksReply(out, SOCKS_SUCCEEDED);
+            client.setSoTimeout(0);
             relay(client, in, upstream);
         } finally {
             closeQuietly(upstream);
             closeQuietly(client);
         }
+    }
+
+    /**
+     * Reads the SOCKS5 greeting and the request (RFC 1928). Only "no authentication" and {@code CONNECT} are accepted; {@code BIND},
+     * {@code UDP ASSOCIATE} and every other command are refused, so no UDP passes this filter.
+     *
+     * @return the target as {@code host:port} ({@code [address]:port} for IPv6), or {@code null} when the request was refused (the
+     *         refusal was already sent)
+     */
+    private static String readSocksRequest(DataInputStream in, OutputStream out) throws IOException {
+        if (in.readUnsignedByte() != SOCKS_VERSION) {
+            return null;
+        }
+        final int methodCount = in.readUnsignedByte();
+        boolean noAuthentication = false;
+        for (int i = 0; i < methodCount; i++) {
+            noAuthentication |= in.readUnsignedByte() == 0x00;
+        }
+        if (!noAuthentication) {
+            out.write(new byte[] { SOCKS_VERSION, (byte) 0xFF });
+            out.flush();
+            return null;
+        }
+        out.write(new byte[] { SOCKS_VERSION, 0x00 });
+        out.flush();
+        if (in.readUnsignedByte() != SOCKS_VERSION) {
+            return null;
+        }
+        final int command = in.readUnsignedByte();
+        in.readUnsignedByte();
+        final int addressType = in.readUnsignedByte();
+        String host;
+        switch (addressType) {
+        case 0x01: {
+            final byte[] address = new byte[4];
+            in.readFully(address);
+            host = InetAddress.getByAddress(address).getHostAddress();
+            break;
+        }
+        case 0x03: {
+            final byte[] name = new byte[in.readUnsignedByte()];
+            in.readFully(name);
+            host = new String(name, "ISO-8859-1");
+            if (!isValidHostName(host)) {
+                socksReply(out, SOCKS_GENERAL_FAILURE);
+                return null;
+            }
+            break;
+        }
+        case 0x04: {
+            final byte[] address = new byte[16];
+            in.readFully(address);
+            host = InetAddress.getByAddress(address).getHostAddress();
+            break;
+        }
+        default:
+            socksReply(out, SOCKS_ADDRESS_TYPE_NOT_SUPPORTED);
+            return null;
+        }
+        final int port = in.readUnsignedShort();
+        if (command != 0x01) {
+            /* Only CONNECT. */
+            socksReply(out, SOCKS_COMMAND_NOT_SUPPORTED);
+            return null;
+        }
+        if (host.indexOf(':') >= 0) {
+            host = "[" + host + "]";
+        }
+        return host + ":" + port;
+    }
+
+    /** Letters, digits, dot, hyphen, underscore, and colons of an IPv6 literal; nothing that could change how the address is read. */
+    private static boolean isValidHostName(String host) {
+        if (host.length() == 0) {
+            return false;
+        }
+        for (int i = 0; i < host.length(); i++) {
+            final char c = host.charAt(i);
+            if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '_' || c == ':')) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Reply to the SOCKS5 request; the bound address is not used by the browser and sent as {@code 0.0.0.0:0}. */
+    private static void socksReply(OutputStream out, int code) {
+        try {
+            out.write(new byte[] { SOCKS_VERSION, (byte) code, 0x00, 0x01, 0, 0, 0, 0, 0, 0 });
+            out.flush();
+        } catch (IOException ignored) {
+            /* The client is gone. */
+        }
+    }
+
+    /**
+     * The browser proves that its traffic arrives here: it opened a connection to {@link #SELF_TEST_HOST} and sends
+     * {@code GET /nonce} through it. Nothing is forwarded.
+     */
+    private void answerSelfTest(InputStream in, OutputStream out) throws IOException {
+        socksReply(out, SOCKS_SUCCEEDED);
+        final String head = readHead(in);
+        if (head == null) {
+            return;
+        }
+        final String[] requestLine = head.substring(0, head.indexOf("\r\n")).split(" ");
+        if (requestLine.length == 3) {
+            final AtomicBoolean waiting = selfTests.remove(requestLine[1].substring(requestLine[1].lastIndexOf('/') + 1));
+            if (waiting != null) {
+                waiting.set(true);
+            }
+        }
+        respond(out, 204, "No Content");
     }
 
     private static final class BlockedException extends IOException {
@@ -390,7 +465,7 @@ public final class WebView2FilterProxy {
     }
 
     /** Applies the policies and opens the connection to the target. */
-    private Socket connect(boolean tunnel, String host, int port, String url) throws IOException {
+    private Socket connect(String host, int port, String url) throws IOException {
         if (policies.isEmpty()) {
             throw new BlockedException("No browser is using this filter");
         }
@@ -405,9 +480,8 @@ public final class WebView2FilterProxy {
             }
             final WebView2UrlFilter filter = policy.getUrlFilter();
             if (filter != null) {
-                /* Of a tunnel only host and port are known; it may carry https, wss or ws. */
-                final boolean allowed = tunnel ? (filter.isConnectionAllowed(true, host, port) || filter.isConnectionAllowed(false, host, port)) : filter.isAllowed(url, false);
-                if (!allowed) {
+                /* Only host and port are known; the connection may carry http, https, ws or wss. Paths are judged by the browser. */
+                if (!filter.isConnectionAllowed(true, host, port) && !filter.isConnectionAllowed(false, host, port)) {
                     throw new BlockedException("URL filter: " + url);
                 }
             }
@@ -566,26 +640,6 @@ public final class WebView2FilterProxy {
             }
         }
         return null;
-    }
-
-    /**
-     * Turns a proxy request into a request for the server itself: the request line names the path only, proxy headers are dropped and
-     * the connection is used for this one request. The browser may put the next request for another server on a kept connection,
-     * which would skip the checks.
-     */
-    private static String rewriteHead(String requestLine, String headers) {
-        final StringBuilder result = new StringBuilder(requestLine).append("\r\n");
-        for (String line : headers.split("\r\n")) {
-            if (line.length() == 0) {
-                continue;
-            }
-            final String lower = line.toLowerCase(Locale.ENGLISH);
-            if (lower.startsWith("proxy-") || lower.startsWith("connection:") || lower.startsWith("keep-alive:")) {
-                continue;
-            }
-            result.append(line).append("\r\n");
-        }
-        return result.append("Connection: close\r\n\r\n").toString();
     }
 
     private static int parsePort(String text) {

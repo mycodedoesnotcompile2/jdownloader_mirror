@@ -46,6 +46,7 @@ import jd.http.Request;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.CaptchaException.CaptchaRefreshException;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.utils.JDUtilities;
 
@@ -839,6 +840,20 @@ public abstract class PluginForDecrypt extends Plugin {
     }
 
     /**
+     * Returns the captcha types that may be requested if we try to crawl the given link with/without account. <br>
+     * Return null or an empty Set if no captcha is expected.<br>
+     * Use within plugin only.
+     *
+     * @param link
+     * @param acc
+     * @return Possible captcha types or null/empty Set if no captcha is expected.
+     */
+    public Set<CAPTCHA_TYPE> getExpectedCaptchaTypes(CryptedLink link, Account acc) {
+        /* Default: Fall back to the legacy variant without parameters. */
+        return getExpectedCaptchaTypesAsSet();
+    }
+
+    /**
      *
      * Can we expect a captcha if we try to load link with/without account?
      *
@@ -848,9 +863,13 @@ public abstract class PluginForDecrypt extends Plugin {
      * @param link
      * @param acc
      * @return
+     * @deprecated Override {@link #getExpectedCaptchaTypes(CryptedLink, Account)} instead. By default this method returns true if that
+     *             method returns at least one captcha type.
      */
+    @Deprecated
     public boolean hasCaptcha(CryptedLink link, Account acc) {
-        return false;
+        final Set<CAPTCHA_TYPE> types = getExpectedCaptchaTypes(link, acc);
+        return types != null && !types.isEmpty();
     }
 
     protected boolean isAbort() {

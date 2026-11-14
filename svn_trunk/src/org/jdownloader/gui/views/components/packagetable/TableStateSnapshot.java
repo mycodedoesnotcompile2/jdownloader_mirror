@@ -27,7 +27,8 @@ import jd.controlling.packagecontroller.AbstractPackageNode;
  * The scroll position is stored as the first visible node plus the pixel offset of its row, not as plain y value, because the rows may
  * change in the meantime (nodes added or removed, other filter).
  *
- * All nodes are only weakly referenced, so a remembered state does not keep removed nodes in memory.
+ * The snapshot holds the SelectionInfo and the nodes with normal (strong) references: a remembered state keeps removed nodes in memory
+ * until it is restored or dropped.
  *
  * A node counts as present in the table if it has its own row, or if it is a child hidden inside a collapsed package which passes the
  * filter. In the latter case its package is used instead (selected / scrolled to), the expanded state is not changed.
@@ -36,77 +37,161 @@ import jd.controlling.packagecontroller.AbstractPackageNode;
  * new links are usually added at the end of the list, the user expects to see them again (and not the row which was the last one before
  * they were added).
  */
-public class TableStateSnapshot<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> {
-    private final PackageControllerTableSelectionModelInfo<PackageType, ChildrenType> selectionModelInfo;
+public abstract class TableStateSnapshot<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> {
+    private TableStateSnapshot() {
+    }
 
-    private TableStateSnapshot(PackageControllerTableSelectionModelInfo<PackageType, ChildrenType> selectionModelInfo) {
-        this.selectionModelInfo = selectionModelInfo;
+    public static enum EDGE {
+        /* Somewhere in between, or the whole table fits into the viewport (no scrolling) */
+        NONE,
+        TOP,
+        BOTTOM
+    }
+
+    public abstract SelectionInfo<PackageType, ChildrenType> getSelectionInfo();
+
+    public abstract AbstractNode getLead();
+
+    public abstract AbstractNode getAnchor();
+
+    public abstract EDGE getEdge();
+
+    public abstract AbstractNode getFirstVisible();
+
+    public abstract Integer getLeadViewportOffset();
+
+    public abstract int getFirstVisibleOffset();
+
+    protected static AbstractNode getObjectByRow(final PackageControllerTableModel<?, ?> model, final int row) {
+        return row >= 0 && row < model.getRowCount() ? model.getObjectbyRow(row) : null;
     }
 
     /**
      * Remembers selection and scroll position of the table. May be called from any thread: the table may only be accessed in the EDT,
-     * therefore the values are read via EDTHelper (blocks until done).
+     * therefore the values are read in the EDT (blocks until done).
+     *
+     * Only the selection is taken from the SelectionInfo. Lead, anchor and scroll position are read from the table right now: a cached
+     * SelectionInfo (same selection and table data version) is not updated by scrolling, and without a selection getSelectionInfo returns
+     * an EmptySelectionInfo.
      */
     public static <PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> TableStateSnapshot<PackageType, ChildrenType> create(final PackageControllerTable<PackageType, ChildrenType> table) {
         return new EDT<TableStateSnapshot<PackageType, ChildrenType>, RuntimeException>() {
             @Override
             protected TableStateSnapshot<PackageType, ChildrenType> runInEDT() throws RuntimeException {
-                final SelectionInfo<PackageType, ChildrenType> selectionInfo = table.getSelectionInfo(true, true);
-                if (selectionInfo instanceof PackageControllerTableSelectionModelInfo) {
-                    return new TableStateSnapshot<PackageType, ChildrenType>((PackageControllerTableSelectionModelInfo<PackageType, ChildrenType>) selectionInfo);
-                } else {
-                    return new TableStateSnapshot<PackageType, ChildrenType>(new PackageControllerTableSelectionModelInfo<PackageType, ChildrenType>() {
-                        @Override
-                        public SelectionInfo<PackageType, ChildrenType> getSelectionInfo() {
-                            return selectionInfo;
-                        }
-
-                        @Override
-                        public AbstractNode getSelectionModelLead() {
-                            return null;
-                        }
-
-                        @Override
-                        public AbstractNode getSelectionModelAnchor() {
-                            return null;
-                        }
-
-                        @Override
-                        public AbstractNode getSelectionModelFirstVisible() {
-                            return null;
-                        }
-
-                        @Override
-                        public EDGE getSelectionModeltEdge() {
-                            return EDGE.NONE;
-                        }
-
-                        @Override
-                        public int getSelectionModelOffset() {
-                            return 0;
-                        }
-                    });
+                SelectionInfo<PackageType, ChildrenType> selectionInfo = table.getSelectionInfo(true, true);
+                if (selectionInfo == null) {
+                    selectionInfo = new EmptySelectionInfo<>(table.getController());
                 }
+                final PackageControllerTableModel<PackageType, ChildrenType> tableModel = table.getModel();
+                final ListSelectionModel selectionModel = table.getSelectionModel();
+                final AbstractNode lead = getObjectByRow(tableModel, selectionModel.getLeadSelectionIndex());
+                final AbstractNode anchor = getObjectByRow(tableModel, selectionModel.getAnchorSelectionIndex());
+                AbstractNode firstVisible = null;
+                EDGE edge = EDGE.NONE;
+                int firstVisibleOffset = 0;
+                Integer leadViewportOffset = null;
+                if (table.getParent() instanceof JViewport) {
+                    final JViewport viewport = (JViewport) table.getParent();
+                    final Point position = viewport.getViewPosition();
+                    final int maxY = table.getPreferredSize().height - viewport.getExtentSize().height;
+                    if (maxY > 0) {
+                        if (position.y <= 0) {
+                            edge = EDGE.TOP;
+                        } else if (position.y >= maxY) {
+                            edge = EDGE.BOTTOM;
+                        }
+                    }
+                    /* Row at the top edge of the viewport, may be only partly visible */
+                    final int row = table.rowAtPoint(new Point(0, position.y));
+                    if (row >= 0) {
+                        firstVisible = getObjectByRow(tableModel, row);
+                        firstVisibleOffset = position.y - table.getCellRect(row, 0, true).y;
+                    }
+                    if (lead != null) {
+                        final Rectangle leadRect = table.getCellRect(selectionModel.getLeadSelectionIndex(), 0, true);
+                        final int extentHeight = viewport.getExtentSize().height;
+                        if (leadRect.y + leadRect.height > position.y && leadRect.y < position.y + extentHeight) {
+                            /* Lead row is (partly) visible */
+                            leadViewportOffset = Integer.valueOf(leadRect.y - position.y);
+                        }
+                    }
+                }
+                final int finalFirstVisibleOffset = firstVisibleOffset;
+                final EDGE finalEdge = edge;
+                final AbstractNode finalFirstVisible = firstVisible;
+                final Integer finalLeadViewportOffset = leadViewportOffset;
+                final SelectionInfo<PackageType, ChildrenType> finalSelectionInfo = selectionInfo;
+                return new TableStateSnapshot<PackageType, ChildrenType>() {
+                    @Override
+                    public SelectionInfo<PackageType, ChildrenType> getSelectionInfo() {
+                        return finalSelectionInfo;
+                    }
+
+                    @Override
+                    public AbstractNode getLead() {
+                        return lead;
+                    }
+
+                    @Override
+                    public AbstractNode getAnchor() {
+                        return anchor;
+                    }
+
+                    @Override
+                    public EDGE getEdge() {
+                        return finalEdge;
+                    }
+
+                    @Override
+                    public AbstractNode getFirstVisible() {
+                        return finalFirstVisible;
+                    }
+
+                    @Override
+                    public int getFirstVisibleOffset() {
+                        return finalFirstVisibleOffset;
+                    }
+
+                    @Override
+                    public Integer getLeadViewportOffset() {
+                        return finalLeadViewportOffset;
+                    }
+                };
             }
         }.waitForAndSwallowInterrupt();
     }
 
     /**
-     * Takes over the remembered selection into the (rebuilt) table: selects all remembered nodes which are present in the table, restores
-     * lead and anchor and scrolls the lead node (or else the topmost selected node) into view, but only if it is not visible yet. Has to
-     * run in the EDT after the table has been rebuilt.
+     * Takes over the remembered selection into the (rebuilt) table: selects all remembered nodes which are present in the table and
+     * restores lead and anchor. Scrolling: if the lead node was visible and is present with its own row, it is kept at the same height on
+     * screen, so switching a filter and back returns to the same scroll position (limited by the start / end of the table). Otherwise the
+     * lead node (or else the topmost selected node) is scrolled into view, but only if it is not visible yet. Has to run in the EDT after
+     * the table has been rebuilt.
      *
      * @return false if none of the remembered selected nodes is present in the table (nothing has been changed then)
      */
     public boolean carryOverSelection(final PackageControllerTable<?, ?> table) {
         final RowLookup lookup = new RowLookup(table.getModel());
-        final List<AbstractNode> selection = selectionModelInfo.getSelectionInfo().getRawSelection();
+        final List<AbstractNode> selection = getSelectionInfo().getRawSelection();
         final List<AbstractNode> nodes = lookup.resolveAll(selection);
         if (nodes.size() == 0) {
             return false;
         }
         applySelection(table, lookup, nodes);
-        int row = lookup.getRow(lookup.resolve(selectionModelInfo.getSelectionModelLead()));
+        final int leadRow = lookup.getRow(getLead());
+        if (leadRow >= 0 && getLeadViewportOffset() != null && table.getParent() instanceof JViewport) {
+            /*
+             * Lead node has its own row (not hidden in a collapsed package): same height on screen as before. Only the vertical position is
+             * changed, clamped to the table.
+             */
+            final JViewport viewport = (JViewport) table.getParent();
+            final Point position = viewport.getViewPosition();
+            final int maxY = Math.max(0, table.getPreferredSize().height - viewport.getExtentSize().height);
+            position.y = Math.min(maxY, Math.max(0, table.getCellRect(leadRow, 0, true).y - getLeadViewportOffset().intValue()));
+            viewport.setViewPosition(position);
+            return true;
+        }
+        int row = lookup.getRow(lookup.resolve(getLead()));
         if (row < 0) {
             /* Lead node is not present: Topmost selected row */
             for (final AbstractNode node : nodes) {
@@ -128,22 +213,14 @@ public class TableStateSnapshot<PackageType extends AbstractPackageNode<Children
     }
 
     /**
-     * @return true if this snapshot has a selected node which is not selected in the other snapshot, i.e. the selection has been extended
-     *         or changed in between. False if nothing is selected, or only nodes which were already selected in the other one.
+     * Takes over the state of this snapshot into the rebuilt table without going back to an older state: the selected nodes stay selected
+     * (see carryOverSelection); without a selection the scroll position is kept, i.e. the top or bottom edge, else the first visible node,
+     * if present. Used for the current state right before a filter or view switch. Has to run in the EDT after the rebuild.
      */
-    public boolean hasSelectionNotIn(final TableStateSnapshot<PackageType, ChildrenType> other) {
-        final Map<AbstractNode, Boolean> otherSelection = new IdentityHashMap<AbstractNode, Boolean>();
-        for (final AbstractNode node : other.selectionModelInfo.getSelectionInfo().getRawSelection()) {
-            if (node != null) {
-                otherSelection.put(node, Boolean.TRUE);
-            }
+    public void carryOverSelectionOrPosition(final PackageControllerTable<?, ?> table) {
+        if (!carryOverSelection(table)) {
+            restore(table);
         }
-        for (final AbstractNode node : selectionModelInfo.getSelectionInfo().getRawSelection()) {
-            if (node != null && !otherSelection.containsKey(node)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
@@ -153,7 +230,7 @@ public class TableStateSnapshot<PackageType extends AbstractPackageNode<Children
     public void restore(final PackageControllerTable<?, ?> table) {
         final RowLookup lookup = new RowLookup(table.getModel());
         /* Also clears the selection if nothing was selected */
-        final List<AbstractNode> selection = selectionModelInfo.getSelectionInfo().getRawSelection();
+        final List<AbstractNode> selection = getSelectionInfo().getRawSelection();
         applySelection(table, lookup, lookup.resolveAll(selection));
         if (!(table.getParent() instanceof JViewport)) {
             return;
@@ -161,7 +238,7 @@ public class TableStateSnapshot<PackageType extends AbstractPackageNode<Children
         if (selection.size() == 0 && restoreEdge(table, (JViewport) table.getParent())) {
             return;
         }
-        final AbstractNode node = selectionModelInfo.getSelectionModelFirstVisible();
+        final AbstractNode node = getFirstVisible();
         final AbstractNode resolved = lookup.resolve(node);
         final int row = lookup.getRow(resolved);
         if (row < 0) {
@@ -169,7 +246,7 @@ public class TableStateSnapshot<PackageType extends AbstractPackageNode<Children
             return;
         }
         /* The offset belongs to the row of the node itself, not to the row of its collapsed package */
-        final int offset = resolved == node ? selectionModelInfo.getSelectionModelOffset() : 0;
+        final int offset = resolved == node ? getFirstVisibleOffset() : 0;
         final JViewport viewport = (JViewport) table.getParent();
         final Point position = viewport.getViewPosition();
         /* Do not scroll beyond the end if the table has become shorter */
@@ -186,7 +263,7 @@ public class TableStateSnapshot<PackageType extends AbstractPackageNode<Children
      */
     private boolean restoreEdge(final PackageControllerTable<?, ?> table, final JViewport viewport) {
         final Point position = viewport.getViewPosition();
-        switch (selectionModelInfo.getSelectionModeltEdge()) {
+        switch (getEdge()) {
         case TOP:
             position.y = 0;
             break;
@@ -206,8 +283,8 @@ public class TableStateSnapshot<PackageType extends AbstractPackageNode<Children
         if (nodes.size() == 0) {
             return;
         }
-        final int anchorRow = lookup.getRow(lookup.resolve(selectionModelInfo.getSelectionModelAnchor()));
-        final int leadRow = lookup.getRow(lookup.resolve(selectionModelInfo.getSelectionModelLead()));
+        final int anchorRow = lookup.getRow(lookup.resolve(getAnchor()));
+        final int leadRow = lookup.getRow(lookup.resolve(getLead()));
         final ListSelectionModel selectionModel = table.getSelectionModel();
         /* Both setAnchorSelectionIndex and moveLeadSelectionIndex do not change the selection itself */
         if (anchorRow >= 0) {

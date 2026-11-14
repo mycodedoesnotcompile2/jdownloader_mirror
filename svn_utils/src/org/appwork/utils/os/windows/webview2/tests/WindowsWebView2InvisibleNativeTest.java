@@ -35,11 +35,19 @@
 package org.appwork.utils.os.windows.webview2.tests;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.Inet4Address;
 import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.util.Enumeration;
 import java.util.List;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -48,6 +56,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.appwork.testframework.AWTest;
 import org.appwork.utils.Application;
+import org.appwork.utils.IO;
 import org.appwork.utils.Time;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.os.windows.webview2.WebView2Exception;
@@ -163,6 +172,8 @@ public class WindowsWebView2InvisibleNativeTest extends AWTest {
             testLocalNetworkBlocked(browser);
             testIframeOfLocalPageBlocked(browser);
             testFilterProxy(browser);
+            testWebRtcSendsNoUdp(browser);
+            testWebRtcPolicyInExistingProfile();
             testUrlFilter(browser);
             testFailsClosedWithoutFilter();
         } finally {
@@ -320,21 +331,27 @@ public class WindowsWebView2InvisibleNativeTest extends AWTest {
             browser.navigate("http://plain.invalid/page");
             awaitTitle(browser, "Plain");
             browser.executeScriptInMainWorld("try{new WebSocket('ws://rebind.example:" + port + "/ws-name');}catch(e){}" + "fetch('http://rebind.example:" + port + "/fetch-name',{mode:'no-cors'}).catch(function(){});" + "try{new WebSocket('ws://127.0.0.1:" + port + "/ws-literal-plain');}catch(e){}" + "try{new WebSocket('wss://ads.blocked.example/ws-filtered');}catch(e){}");
+            /* The filter knows host and port only: WebSocket and fetch to rebind.example are reported with the same target. */
             awaitContains(blocked, "https://rebind.example:" + port + "/");
-            awaitContains(blocked, "http://rebind.example:" + port + "/fetch-name");
             awaitContains(blocked, "https://ads.blocked.example:443/");
             Thread.sleep(1500L);
             if (!arrived.isEmpty()) {
                 throw new Exception("A website reached the local server: " + arrived);
             }
-            /* Another program on this PC (here: this JVM) is not served by the filter. */
+            /* Another program on this PC (here: this JVM) is not served by the filter: it gets no SOCKS answer, only a closed connection. */
             final Socket foreign = new Socket("127.0.0.1", browser.getFilterProxyPort());
             try {
                 foreign.setSoTimeout((int) TimeUnit.SECONDS.toMillis(10));
-                foreign.getOutputStream().write("CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n".getBytes("ISO-8859-1"));
+                foreign.getOutputStream().write(new byte[] { 0x05, 0x01, 0x00 });
                 foreign.getOutputStream().flush();
-                final String status = new BufferedReader(new InputStreamReader(foreign.getInputStream(), "ISO-8859-1")).readLine();
-                assertTrue(status != null && status.startsWith("HTTP/1.1 403"));
+                int answer;
+                try {
+                    answer = foreign.getInputStream().read();
+                } catch (SocketException reset) {
+                    /* Closed with the greeting unread. */
+                    answer = -1;
+                }
+                assertEquals(-1, answer);
             } finally {
                 foreign.close();
             }
@@ -348,6 +365,115 @@ public class WindowsWebView2InvisibleNativeTest extends AWTest {
             awaitTitle(browser, "A");
         } finally {
             server.close();
+        }
+    }
+
+    /**
+     * WebRTC must not send UDP: it would bypass the filter (local network, real address behind the upstream proxy). A page asks a
+     * STUN server on this PC (its LAN address if it has one) for its address; with the filter nothing may arrive there. A browser
+     * without the filter proxy (and so without the WebRTC policy) is the counter test: its STUN request must arrive, otherwise this
+     * test could not see UDP at all and would prove nothing.
+     */
+    private void testWebRtcSendsNoUdp(WindowsWebView2Browser browser) throws Exception {
+        final InetAddress address = stunAddress();
+        final DatagramSocket stun = new DatagramSocket(0, address);
+        try {
+            browser.executeScriptInMainWorld(webRtcScript(address, stun.getLocalPort()));
+            if (receivesUdp(stun, TimeUnit.SECONDS.toMillis(5))) {
+                throw new Exception("WebRTC of the filtered browser sent UDP to " + address.getHostAddress());
+            }
+        } finally {
+            stun.close();
+        }
+        final WindowsWebView2Browser.Options options = new WindowsWebView2Browser.Options();
+        options.userDataFolder = Application.getResource("tmp/webview2-awtest-unfiltered").getAbsolutePath();
+        options.filterProxy = false;
+        final WindowsWebView2Browser unfiltered = WindowsWebView2Browser.createInvisible(options);
+        final DatagramSocket control = new DatagramSocket(0, address);
+        try {
+            unfiltered.setRequestHandler(new WindowsWebView2Browser.RequestHandler() {
+                public WindowsWebView2Browser.Response handle(WindowsWebView2Browser.Request request) {
+                    return html("<title>Rtc</title>");
+                }
+            });
+            unfiltered.navigate("https://rtc.invalid/");
+            awaitTitle(unfiltered, "Rtc");
+            unfiltered.executeScriptInMainWorld(webRtcScript(address, control.getLocalPort()));
+            if (!receivesUdp(control, TimeUnit.SECONDS.toMillis(10))) {
+                throw new Exception("Counter test failed: a browser without the filter sent no STUN request to " + address.getHostAddress() + ", so the WebRTC test proves nothing");
+            }
+        } finally {
+            control.close();
+            unfiltered.dispose();
+        }
+    }
+
+    /**
+     * A persistent profile whose {@code Preferences} allow WebRTC UDP: the setting is changed before the start, the rest of the file is
+     * kept, and no UDP is sent.
+     */
+    private void testWebRtcPolicyInExistingProfile() throws Exception {
+        final File folder = Application.getResource("tmp/webview2-awtest-persistent");
+        final File preferences = new File(folder, "EBWebView/Default/Preferences");
+        preferences.getParentFile().mkdirs();
+        IO.secureWrite(preferences, "{\"aw_test_marker\":\"kept\",\"webrtc\":{\"ip_handling_policy\":\"default\"}}".getBytes("UTF-8"));
+        final WindowsWebView2Browser.Options options = new WindowsWebView2Browser.Options();
+        options.userDataFolder = folder.getAbsolutePath();
+        options.persistentProfile = true;
+        final WindowsWebView2Browser persistent = WindowsWebView2Browser.createInvisible(options);
+        final InetAddress address = stunAddress();
+        final DatagramSocket stun = new DatagramSocket(0, address);
+        try {
+            final String written = IO.readFileToString(preferences);
+            assertTrue(written.contains("aw_test_marker"));
+            assertTrue(written.contains("disable_non_proxied_udp"));
+            persistent.setRequestHandler(new WindowsWebView2Browser.RequestHandler() {
+                public WindowsWebView2Browser.Response handle(WindowsWebView2Browser.Request request) {
+                    return html("<title>Rtc</title>");
+                }
+            });
+            persistent.navigate("https://rtc.invalid/");
+            awaitTitle(persistent, "Rtc");
+            persistent.executeScriptInMainWorld(webRtcScript(address, stun.getLocalPort()));
+            if (receivesUdp(stun, TimeUnit.SECONDS.toMillis(5))) {
+                throw new Exception("WebRTC of a browser with an existing profile sent UDP to " + address.getHostAddress());
+            }
+        } finally {
+            stun.close();
+            persistent.dispose();
+        }
+    }
+
+    private static String webRtcScript(InetAddress address, int port) {
+        return "window.__awPc=new RTCPeerConnection({iceServers:[{urls:'stun:" + address.getHostAddress() + ":" + port + "'}]});" + "window.__awPc.createDataChannel('aw');" + "window.__awPc.createOffer().then(function(o){return window.__awPc.setLocalDescription(o);}).catch(function(){});void 0;";
+    }
+
+    /** An IPv4 address of this PC in the local network, or loopback when there is none. */
+    private static InetAddress stunAddress() throws IOException {
+        final Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+        while (interfaces != null && interfaces.hasMoreElements()) {
+            final NetworkInterface networkInterface = interfaces.nextElement();
+            if (!networkInterface.isUp() || networkInterface.isLoopback()) {
+                continue;
+            }
+            final Enumeration<InetAddress> addresses = networkInterface.getInetAddresses();
+            while (addresses.hasMoreElements()) {
+                final InetAddress candidate = addresses.nextElement();
+                if (candidate instanceof Inet4Address && candidate.isSiteLocalAddress()) {
+                    return candidate;
+                }
+            }
+        }
+        return InetAddress.getByName("127.0.0.1");
+    }
+
+    private static boolean receivesUdp(DatagramSocket socket, long timeoutMillis) throws IOException {
+        socket.setSoTimeout((int) timeoutMillis);
+        try {
+            socket.receive(new DatagramPacket(new byte[2048], 2048));
+            return true;
+        } catch (SocketTimeoutException nothing) {
+            return false;
         }
     }
 

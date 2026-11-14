@@ -427,11 +427,12 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
         } else {
             warnings.add(createFinding(false, _GUI.T.CaptchaWizard_precheck_modeSkipAll(), null));
         }
+        /* wmin 0: the texts wrap when the dialog gets narrower. */
         for (final JLabel label : warnings) {
-            precheckPanel.add(label);
+            precheckPanel.add(label, "wmin 0");
         }
         for (final JLabel label : okFindings) {
-            precheckPanel.add(label);
+            precheckPanel.add(label, "wmin 0");
         }
         resetModeCheckBox = modeOk ? null : new JCheckBox(_GUI.T.CaptchaWizard_precheck_resetMode(), true);
         /* The fixes are offered separately at the bottom, only if there is a problem. They are applied when the user clicks "Next". */
@@ -490,7 +491,7 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
 
     /** One finding of the pre-check: a warning triangle for a problem, a green check mark if everything is fine. */
     private static JLabel createFinding(final boolean ok, final String text, final String tooltip) {
-        final JLabel label = new JLabel(text, NewTheme.I().getIcon(ok ? IconKey.ICON_OK : IconKey.ICON_WARNING, 18), JLabel.LEADING);
+        final JLabel label = new JLabel("<html>" + text + "</html>", NewTheme.I().getIcon(ok ? IconKey.ICON_OK : IconKey.ICON_WARNING, 18), JLabel.LEADING);
         label.setToolTipText(tooltip);
         return label;
     }
@@ -574,7 +575,8 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
     }
 
     private JComponent createMethodPanel() {
-        final JPanel panel = new JPanel(new MigLayout("ins 0, wrap 1", "[grow,fill]", "[]"));
+        /* Always as wide as the viewport, so the texts wrap on resize instead of being cut off. */
+        final JPanel panel = new ViewportWidthPanel(new MigLayout("ins 0 0 0 5, wrap 1", "[grow,fill]", "[]"));
         panel.add(createHeader(_GUI.T.CaptchaWizard_step1_preference()));
         panel.add(new JLabel("<html>" + _GUI.T.CaptchaWizard_step1_intro() + "</html>"), "wmin 0");
         panel.add(createHeader(_GUI.T.CaptchaWizard_step1_header(), IconKey.ICON_OCR), "gaptop 15");
@@ -635,7 +637,7 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
         initialCrawlerTimeout = CaptchaSettings.CFG.getOnCrawlerCaptchaTimeoutAction();
         hosterTimeoutCombo = createTimeoutCombo(initialHosterTimeout);
         crawlerTimeoutCombo = createTimeoutCombo(initialCrawlerTimeout);
-        final JPanel timeoutPanel = new JPanel(new MigLayout("ins 0", "[][grow,fill]", "[][]"));
+        final JPanel timeoutPanel = new JPanel(new MigLayout("ins 0", "[][]", "[][]"));
         timeoutPanel.add(new JLabel(_GUI.T.CaptchaWizard_timeout_hoster()));
         timeoutPanel.add(hosterTimeoutCombo, "wrap");
         timeoutPanel.add(new JLabel(_GUI.T.CaptchaWizard_timeout_crawler()));
@@ -670,6 +672,17 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
                 return this;
             }
         });
+        /* The combo box is only as wide as the longest label, not as wide as the available space. */
+        final java.awt.FontMetrics metrics = combo.getFontMetrics(combo.getFont());
+        int maxWidth = 0;
+        for (final CAPTCHA_TIMEOUT_ACTION action : CAPTCHA_TIMEOUT_ACTION.values()) {
+            maxWidth = Math.max(maxWidth, metrics.stringWidth(getTimeoutLabel(action)));
+        }
+        /* Extra space for the cell insets and the arrow button. */
+        final java.awt.Dimension size = combo.getPreferredSize();
+        size.width = maxWidth + 50;
+        combo.setPreferredSize(size);
+        combo.setMaximumSize(size);
         return combo;
     }
 

@@ -51,8 +51,8 @@ public interface WebView2ProxySelector {
      * Called on a background thread for every connection the browser opens.
      *
      * @param url
-     *            the address that is requested. For an encrypted connection (https, wss) and for WebSockets only the target is known:
-     *            {@code https://host:port/}. For a plain http request it is the whole address.
+     *            the target of the connection; path and scheme are never known, only host and port. Port 80 is passed as
+     *            {@code http://host:80/}, every other port as {@code https://host:port/}.
      * @return the proxies to try, in this order, until one connects. {@code null}, an empty list, or a proxy of type {@code NONE} or
      *         {@code DIRECT} mean a direct connection.
      */

@@ -22,8 +22,10 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
+import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.logging2.extmanager.LoggerFactory;
 
@@ -44,6 +46,16 @@ public abstract class Cookie {
 
         @Override
         public boolean isCustomCookie() {
+            return false;
+        }
+
+        @Override
+        public boolean isPersistent() {
+            return true;
+        }
+
+        @Override
+        public boolean setPersistent(boolean b) {
             return false;
         }
 
@@ -94,6 +106,16 @@ public abstract class Cookie {
         }
 
         @Override
+        public boolean isPersistent() {
+            return true;
+        }
+
+        @Override
+        public boolean setPersistent(boolean b) {
+            return false;
+        }
+
+        @Override
         public boolean equals(Object obj) {
             if (obj == this) {
                 return true;
@@ -132,6 +154,12 @@ public abstract class Cookie {
         @Override
         public SOURCE getSource() {
             return SOURCE.MANUAL;
+        }
+        
+        public void setExpired() {
+            final long now=System.currentTimeMillis();
+            setExpireDate(now+1);
+            setHostTime(now);
         }
 
         @Override
@@ -259,6 +287,8 @@ public abstract class Cookie {
     public String getSetSameSite() {
         return sameSite;
     }
+    
+    
 
     public String getSameSite() {
         final String ret = getSetSameSite();
@@ -314,15 +344,7 @@ public abstract class Cookie {
     private Cookie() {
     }
 
-    public boolean isCustomCookie() {
-        if (SOURCE.MANUAL.equals(getSource())) {
-            return true;
-        }
-        if (getDomain() == null) {
-            return true;
-        }
-        return false;
-    }
+    public abstract boolean isCustomCookie();
 
     @Override
     public boolean equals(final Object obj) {
@@ -389,19 +411,26 @@ public abstract class Cookie {
         return persistent;
     }
 
-    public void setPersistent(boolean persistent) {
-        this.persistent = persistent;
+    public boolean setPersistent(boolean persistent) {
+        final boolean oldPersistent = isPersistent();
+        return oldPersistent != (this.persistent = persistent);
     }
 
     public boolean matches(final URL url) {
         if (Boolean.TRUE.equals(isSecure()) && !Cookie.SECURE_HTTPS.equalsIgnoreCase(url.getProtocol())) {
             return false;
         }
+        String urlHost = url.getHost();
+        try {
+            urlHost = IDN.toASCII(urlHost);
+        } catch (IllegalArgumentException ignore) {
+            LogV3.log(ignore);
+        }
         final String domain = getDomain();
-        if (Boolean.TRUE.equals(isHostOnly()) && !StringUtils.equalsIgnoreCase(url.getHost(), domain)) {
+        if (Boolean.TRUE.equals(isHostOnly()) && !StringUtils.equalsIgnoreCase(urlHost, domain)) {
             return false;
         }
-        if (domain != null && !StringUtils.endsWithCaseInsensitive("." + url.getHost(), "." + domain)) {
+        if (domain != null && !StringUtils.endsWithCaseInsensitive("." + urlHost, "." + domain)) {
             return false;
         }
         if (!isCookiePathMatch(url)) {
@@ -503,12 +532,19 @@ public abstract class Cookie {
         return oldCreationTime != (this.creationTime = time);
     }
 
+    protected String removeLeadingDot(String value) {
+        if (value == null || !value.startsWith(".")) {
+            return value;
+        }
+        /** RFC 6265, remove leading dot **/
+        return value.replaceFirst("^\\.+", "");
+    }
+
     public boolean setDomain(String domain) {
         final String oldDomain = this.domain;
         if (domain != null) {
             domain = cleanAttributeValue(domain);
-            /** RFC 6265, remove leading dot **/
-            domain = domain.replaceFirst("^\\.+", "");
+            domain = removeLeadingDot(domain);
             /** normalize domain */
             try {
                 domain = IDN.toASCII(domain).toLowerCase(Locale.ROOT);
@@ -555,18 +591,14 @@ public abstract class Cookie {
 
     public boolean setHost(final String host) {
         final String oldHost = this.host;
-        return !StringUtils.equalsIgnoreCase(oldHost, this.host = Browser.getHost(this.originHost = Browser.getHost(host, true), false));
-    }
-
-    public boolean setHostTime(final long time) {
-        final long oldHostTime = this.hostTime;
-        return oldHostTime != (this.hostTime = time);
+        return !StringUtils.equalsIgnoreCase(oldHost, this.host = Browser.getHost(this.originHost = removeLeadingDot(Browser.getHost(host, true)), false));
     }
 
     public boolean updateHost(String newHost) {
         if (newHost == null) {
             return false;
         }
+        newHost = removeLeadingDot(newHost);
         final class UpdateOriginHost {
             String update(final Cookie cookie, String newHost) {
                 final String oldOriginHost = cookie.getOriginHost();
@@ -600,19 +632,21 @@ public abstract class Cookie {
         return false;
     }
 
-    public void setHostTime(final String date) {
+    public boolean setHostTime(final long hostTime) {
+        final long oldHostTime = this.hostTime;
+        return oldHostTime != (this.hostTime = hostTime);
+    }
+
+    public boolean setHostTime(final String date) {
         if (date == null) {
-            this.hostTime = -1;
-            return;
+            return setHostTime(-1);
         }
         final Date responseDate = TimeFormatter.parseDateString(date);
         if (responseDate != null) {
-            this.hostTime = responseDate.getTime();
-            return;
+            return setHostTime(responseDate.getTime());
         }
-        this.hostTime = -1;
         LoggerFactory.getDefaultLogger().severe("Cookie: no Format for " + date + " found!");
-        return;
+        return setHostTime(-1);
     }
 
     public boolean setKey(final String key) {
@@ -623,7 +657,7 @@ public abstract class Cookie {
     public boolean setPath(String path) {
         final String oldPath = this.path;
         path = cleanAttributeValue(path);
-        if (StringUtils.isEmpty(path)) {
+        if (StringUtils.isEmpty(path) || !path.startsWith("/")) {
             this.path = null;
         } else {
             this.path = path;

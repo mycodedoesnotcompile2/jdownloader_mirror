@@ -312,12 +312,11 @@ public class SearchField<SearchCat extends SearchCatInterface, PackageType exten
             table2Filter.getModel().addFilter(newFilter);
         }
         /*
-         * Selection and scroll position from before the search are restored when the search ends, unless the user selected something in
-         * the search results (see UnfilteredTableState, shared with other filters like the linkgrabber quick filters). Has to be reported
-         * before recreateModel: the table still shows the old rows until then. Changing the search text while searching, or switching
-         * the category, is no start or end.
+         * Selection and scroll position from before the search are restored when the search ends, unless the user changed the selection
+         * while searching (see UnfilteredTableState). Has to be reported before recreateModel: the table still shows the old rows until
+         * then. Changing the search text while searching, or switching the category, is no start or end.
          */
-        table2Filter.getUnfilteredState().setFilterActive(this, enabled, true);
+        table2Filter.getUnfilteredState().setFilterActive(this, enabled);
         table2Filter.getModel().recreateModel(true);
     }
 

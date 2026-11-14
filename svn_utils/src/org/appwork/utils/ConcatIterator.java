@@ -56,6 +56,7 @@ public class ConcatIterator<E> implements Iterator<E>, Iterable<E> {
         this.iterators = new ArrayList<Iterator<? extends E>>(Arrays.asList(iterators));
     }
 
+    @SafeVarargs
     public ConcatIterator(final Iterable<? extends E>... iterables) {
         final List<Iterator<? extends E>> ret = new ArrayList<Iterator<? extends E>>();
         for (final Iterable<? extends E> it : iterables) {

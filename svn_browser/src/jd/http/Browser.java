@@ -319,6 +319,10 @@ public class Browser implements HTTPConnectionFactoryInterface {
             /* without procotol */
             ret = new Regex(trimURL, Browser.HOST_DOMAIN_PATTERN2).getMatch(0);
         }
+        if (ret != null && ret.startsWith(".")) {
+            /* remove leading dots */
+            ret = ret.replaceFirst("^\\.+", "");
+        }
         if (ret != null && includeSubDomains == false) {
             /* cut off all subdomains */
             final PublicSuffixList psl = PublicSuffixList.getInstance();
@@ -354,11 +358,17 @@ public class Browser implements HTTPConnectionFactoryInterface {
         return Browser.getSubdomain(new URL(url), removeTrailingDelimiter);
     }
 
+   
+
     public static String getHost(final URL uri, final boolean includeSubDomains) {
         if (uri == null) {
             return null;
         }
         String ret = uri.getHost();
+        if (ret != null && ret.startsWith(".")) {
+            /* remove leading dots */
+            ret = ret.replaceFirst("^\\.+", "");
+        }
         if (Browser.HOST_IP_PATTERN2.matcher(ret).matches()) {
             return ret;
         }
@@ -2559,15 +2569,15 @@ public class Browser implements HTTPConnectionFactoryInterface {
             }
             setCookie(new URL(url), key, value);
         } catch (MalformedURLException e) {
-            final Cookies cookies = this.getCookies(url);            
-            final ManualCookie newCookie = new ManualCookie(Browser.getHost(url),key,value);
+            final Cookies cookies = this.getCookies(url);
+            final ManualCookie newCookie = new ManualCookie(Browser.getHost(url), key, value);
             cookies.add(newCookie);
         }
     }
 
     public void setCookie(final URL url, final String key, final String value) {
         final Cookies cookies = this.getCookies(url);
-        final ManualCookie newCookie = new ManualCookie(Browser.getHost(url),key,value);
+        final ManualCookie newCookie = new ManualCookie(Browser.getHost(url), key, value);
         cookies.add(newCookie);
     }
 
@@ -2623,13 +2633,13 @@ public class Browser implements HTTPConnectionFactoryInterface {
             }
             final String host = getHost(url);
             final Cookies newSetCookies = new Cookies();
-            for (final Cookie setCookie : setCookies.getCookies()) {               
+            for (final Cookie setCookie : setCookies.getCookies()) {
                 final Cookie copy = Cookie.copyOf(setCookie);
                 if (copy.updateHost(host)) {
                     newSetCookies.add(copy);
                 } else {
                     final LogInterface logger = getLogger();
-                    if (logger != null && isDebug()) {
+                    if (logger != null) {
                         logger.info("Cookie.update(" + host + ") failed for " + copy);
                     }
                     DebugMode.debugger();

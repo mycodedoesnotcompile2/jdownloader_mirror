@@ -8,14 +8,19 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
+import org.appwork.loggingv3.LogV3;
 import org.appwork.remoteapi.annotations.AllowNonStorableObjects;
+import org.appwork.serializer.Deser;
+import org.appwork.serializer.SC;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.URLHelper;
 import org.jdownloader.controlling.UniqueAlltimeID;
 
 import jd.http.Browser;
 import jd.http.Cookie;
+import jd.http.Cookie.ManualCookie;
 import jd.http.Cookies;
+import jd.plugins.CookieStorable;
 
 public class LinkCrawlerRule {
     public static enum RULE {
@@ -62,13 +67,14 @@ public class LinkCrawlerRule {
         }
         final List<String[]> cookielist = new ArrayList<String[]>();
         for (final Cookie cookie : cookies.getCookies()) {
-            if (cookie.getHost() != null) {
-                final String[] cookiearray = new String[] { cookie.getKey(), cookie.getValue(), cookie.getHost() };
-                cookielist.add(cookiearray);
-            } else {
-                final String[] cookiearray = new String[] { cookie.getKey(), cookie.getValue() };
-                cookielist.add(cookiearray);
+            if (cookie.isExpired()) {
+                continue;
+            } else if (!cookie.isValid()) {
+                continue;
+            } else if (!cookie.isPersistent()) {
+                continue;
             }
+            cookielist.add(new String[] { Deser.toString(new CookieStorable(cookie), SC.NETWORK_TRANSFER) });
         }
         _setCookies(cookielist);
     }
@@ -190,9 +196,14 @@ public class LinkCrawlerRule {
             final Cookies cookies = br.getCookies(url);
             final List<String[]> updateCookies = new ArrayList<String[]>();
             for (final Cookie cookie : cookies.getCookies()) {
-                if (!cookie.isExpired()) {
-                    updateCookies.add(new String[] { cookie.getKey(), cookie.getValue() });
+                if (cookie.isExpired()) {
+                    continue;
+                } else if (!cookie.isValid()) {
+                    continue;
+                } else if (!cookie.isPersistent()) {
+                    continue;
                 }
+                updateCookies.add(new String[] { Deser.toString(new CookieStorable(cookie), SC.NETWORK_TRANSFER) });
             }
             _setCookies(updateCookies);
             // TODO: add support for length==3, url pattern matching support
@@ -223,40 +234,57 @@ public class LinkCrawlerRule {
         if (onlyOnPatternMatch && !matches(url)) {
             return false;
         }
-        final List<String[]> cookies = _getCookies();
-        if (cookies == null || cookies.size() == 0) {
+        final List<String[]> cookieEntries = _getCookies();
+        if (cookieEntries == null || cookieEntries.size() == 0) {
             return false;
         }
-        int cookiesSet = 0;
         final String host = Browser.getHost(url);
-        for (final String cookie[] : cookies) {
-            if (cookie == null) {
+        final Cookies cookies = new Cookies();
+        for (final String cookieEntry[] : cookieEntries) {
+            if (cookieEntry == null) {
                 continue;
             }
-            switch (cookie.length) {
-            case 1:
-                br.setCookie(url, cookie[0], null);
-                cookiesSet++;
-                break;
-            case 2:
-                br.setCookie(url, cookie[0], cookie[1]);
-                cookiesSet++;
-                break;
-            case 3:
-                if (cookie[2] != null && !StringUtils.equalsIgnoreCase(host, cookie[2])) {
+            switch (cookieEntry.length) {
+            case 0:
+                continue;
+            case 1: {
+                try {
+                    if (cookieEntry[0].startsWith("{")) {
+                        cookies.add(Deser.fromString(cookieEntry[0], CookieStorable.TYPE_REF)._restore());
+                        continue;
+                    }
+                } catch (Exception e) {
+                    LogV3.log(e);
                     continue;
                 }
-                br.setCookie(url, cookie[0], cookie[1]);
-                cookiesSet++;
+            } // fallthrough
+            case 2: {
+                final ManualCookie cookie = new ManualCookie();
+                cookie.setHost(host);
+                cookie.setKey(cookieEntry[0]);
+                cookie.setKey(cookieEntry[1]);
+                cookies.add(cookie);
+                break;
+            }
+            case 3:
+                if (cookieEntry[2] != null && !StringUtils.equalsIgnoreCase(host, cookieEntry[2])) {
+                    continue;
+                }
+                final ManualCookie cookie = new ManualCookie();
+                cookie.setHost(host);
+                cookie.setKey(cookieEntry[0]);
+                cookie.setKey(cookieEntry[1]);
+                cookies.add(cookie);
                 break;
             default:
                 break;
             }
         }
-        if (cookiesSet > 0) {
-            return true;
-        } else {
+        if (cookies.isEmpty()) {
             return false;
+        } else {
+            br.setCookies(url, cookies);
+            return true;
         }
     }
 

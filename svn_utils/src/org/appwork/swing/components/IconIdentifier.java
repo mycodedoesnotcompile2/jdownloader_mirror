@@ -34,10 +34,12 @@
 package org.appwork.swing.components;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.appwork.remoteapi.annotations.AllowNonStorableObjects;
 import org.appwork.storage.Storable;
+import org.appwork.storage.simplejson.MinimalMemoryMap;
 
 /**
  * @author Thomas
@@ -50,14 +52,14 @@ public class IconIdentifier implements Storable {
     public IconIdentifier(/* Storable */) {
     }
 
-    private HashMap<String, Object> prps;
+    private Map<String, Object> prps;
 
     @AllowNonStorableObjects
-    public HashMap<String, Object> getPrps() {
+    public Map<String, Object> getPrps() {
         return prps;
     }
 
-    public void setPrps(HashMap<String, Object> prps) {
+    public void setPrps(Map<String, Object> prps) {
         this.prps = prps;
     }
 
@@ -88,15 +90,15 @@ public class IconIdentifier implements Storable {
         this.cls = cls;
     }
 
-    public ArrayList<IconIdentifier> getRsc() {
+    public List<IconIdentifier> getRsc() {
         return rsc;
     }
 
-    public void setRsc(ArrayList<IconIdentifier> rsc) {
+    public void setRsc(List<IconIdentifier> rsc) {
         this.rsc = rsc;
     }
 
-    private ArrayList<IconIdentifier> rsc;
+    private List<IconIdentifier> rsc;
 
     /**
     *
@@ -122,6 +124,9 @@ public class IconIdentifier implements Storable {
             rsc = new ArrayList<IconIdentifier>();
         }
         rsc.add(iconResource);
+        if (rsc instanceof ArrayList) {
+            ((ArrayList<IconIdentifier>) rsc).trimToSize();
+        }
     }
 
     /**
@@ -130,7 +135,7 @@ public class IconIdentifier implements Storable {
      */
     public void addProperty(String key, Object value) {
         if (prps == null) {
-            prps = new HashMap<String, Object>();
+            prps = new MinimalMemoryMap<String, Object>();
         }
         prps.put(key, value);
     }

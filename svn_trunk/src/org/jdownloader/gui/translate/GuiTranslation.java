@@ -7817,7 +7817,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Choose your preference" })
     String CaptchaWizard_step1_preference();
 
-    @Default(lngs = { "en" }, values = { "What should happen if nobody solves a captcha in time?" })
+    @Default(lngs = { "en" }, values = { "What should happen if a captcha can't be solved in time?" })
     String CaptchaWizard_timeout_header();
 
     @Default(lngs = { "en" }, values = { "This applies if neither you nor any captcha solver answers a captcha before it runs into a timeout." })

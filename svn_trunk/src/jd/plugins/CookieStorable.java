@@ -1,10 +1,14 @@
 package jd.plugins;
 
 import org.appwork.storage.Storable;
+import org.appwork.storage.TypeRef;
 
 import jd.http.Cookie;
 
 public class CookieStorable implements Storable {
+    public static final TypeRef<CookieStorable> TYPE_REF = new TypeRef<CookieStorable>() {
+    };
+
     public String getPath() {
         if (this.cookie != null) {
             return this.cookie.getPath();

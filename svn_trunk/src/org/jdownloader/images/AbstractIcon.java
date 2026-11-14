@@ -10,6 +10,7 @@ import javax.swing.Icon;
 
 import org.appwork.swing.components.IDIcon;
 import org.appwork.swing.components.IconIdentifier;
+import org.appwork.utils.LongUtils;
 
 public class AbstractIcon implements Icon, IDIcon {
     private final String key;
@@ -22,11 +23,14 @@ public class AbstractIcon implements Icon, IDIcon {
         return size;
     }
 
-    private final int size;
-    private int       width  = -1;
-    private int       height = 1;
-    private boolean   autoDisabledIconEnabled;
-    private Composite composite;
+    private final int     size;
+    private volatile long dimension = LongUtils.pack(-1, -1);// high=height, low=width
+    private boolean       autoDisabledIconEnabled;
+    private Composite     composite;
+
+    public static void main(String[] args) {
+        System.out.println(LongUtils.pack(-1, -1));
+    }
 
     public Composite getComposite() {
         return composite;
@@ -42,38 +46,23 @@ public class AbstractIcon implements Icon, IDIcon {
     }
 
     public AbstractIcon getIcon(final int size) {
-        if (size == getSize()) {
-            return this;
-        } else {
-            return new AbstractIcon(getKey(), size);
-        }
+        final AbstractIcon ret = new AbstractIcon(getKey(), size);
+        ret.setComposite(getComposite());
+        ret.setAutoDisabledIconEnabled(isAutoDisabledIconEnabled());
+        return ret;
     }
 
     /**
      *
      */
-    protected void lazyUpdate() {
-        if (width == -1 || height == -1) {
-            final Icon icon = getIconInstance(getKey(), getSize());
-            width = icon.getIconWidth();
-            height = icon.getIconHeight();
+    protected long lazyUpdate() {
+        final long ret = dimension;
+        if (ret != -1) {
+            // -1,-1
+            return ret;
         }
-    }
-
-    private Icon   icon    = null;
-    private String cacheID = null;
-
-    private Icon getIconInstance(String key, int size) {
-        if (false) {
-            /* cache disabled */
-            final Icon icon = this.icon;
-            final String cacheID = key + "/" + size;
-            if (icon != null && cacheID.equals(this.cacheID)) {
-                return icon;
-            }
-            this.cacheID = cacheID;
-        }
-        return this.icon = NewTheme.I().getIcon(key, size);
+        final Icon icon = NewTheme.I().getIcon(getKey(), getSize());
+        return dimension = LongUtils.pack(icon.getIconHeight(), icon.getIconWidth());
     }
 
     @Override
@@ -91,11 +80,8 @@ public class AbstractIcon implements Icon, IDIcon {
 
     @Override
     public void paintIcon(Component c, Graphics g, int x, int y) {
-        final Icon icon = getIconInstance(getKey(), getSize());
-        if (width == -1 || height == -1) {
-            width = icon.getIconWidth();
-            height = icon.getIconHeight();
-        }
+        final Icon icon = NewTheme.I().getIcon(getKey(), getSize());
+        dimension = LongUtils.pack(icon.getIconHeight(), icon.getIconWidth());
         Composite old = null;
         if (composite != null) {
             old = ((Graphics2D) g).getComposite();
@@ -116,19 +102,20 @@ public class AbstractIcon implements Icon, IDIcon {
 
     @Override
     public int getIconWidth() {
-        lazyUpdate();
-        return width;
+        return LongUtils.getLowInt(lazyUpdate());
     }
 
     @Override
     public int getIconHeight() {
-        lazyUpdate();
-        return height;
+        return LongUtils.getHighInt(lazyUpdate());
     }
 
     @Override
     public IconIdentifier getIdentifier() {
-        return new IconIdentifier(null, key);
+        final IconIdentifier ret = new IconIdentifier(null, getKey());
+        ret.addProperty("height", getIconHeight());
+        ret.addProperty("width", getIconWidth());
+        return ret;
     }
 
     public void setAutoDisabledIconEnabled(boolean b) {

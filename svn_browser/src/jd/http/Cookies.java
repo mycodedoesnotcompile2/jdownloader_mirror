@@ -31,11 +31,14 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.StringTokenizer;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
 
 import jd.http.Cookie.ImportCookie;
 import jd.http.Cookie.LegacyCookie;
+import jd.http.Cookie.ManualCookie;
 import jd.http.Cookie.ServerCookie;
 import jd.parser.Regex;
 
@@ -74,6 +77,7 @@ public class Cookies {
             cookie.setSecure(Boolean.FALSE);
             cookie.setDomain(domain);
             cookie.setHostTime(date);
+            boolean isMaxAgeSet = false;
             final StringTokenizer st = new StringTokenizer(setCookie, ";");
             while (st.hasMoreTokens()) {
                 final String cookieKeyValueString = st.nextToken().trim();
@@ -97,49 +101,57 @@ public class Cookies {
                 } else {
                     continue;
                 }
-                if (key != null) {
-                    if ("samesite".equalsIgnoreCase(key)) {
-                        cookie.setSameSite(value);
-                    } else if ("path".equalsIgnoreCase(key)) {
-                        cookie.setPath(value);
-                    } else if ("expires".equalsIgnoreCase(key)) {
-                        cookie.setExpires(value);
-                    } else if ("domain".equalsIgnoreCase(key)) {
-                        if (cookie.newCookieInstance().setDomain(value)) {
-                            /** no longer hostOnly **/
-                            cookie.setDomain(value);
-                            cookie.setHostOnly(Boolean.FALSE);
-                        }
-                    } else if ("secure".equalsIgnoreCase(key)) {
-                        /** now secure **/
-                        cookie.setSecure(Boolean.TRUE);
-                    } else if ("HttpOnly".equalsIgnoreCase(key)) {
-                        /** HttpOnly **/
-                    } else if ("Max-Age".equalsIgnoreCase(key)) {
-                        /** Max-Age **/
-                        try {
-                            /** RFC 6265, section 5.2.2 **/
-                            final long maxAge = Long.parseLong(value);
-                            if (maxAge <= 0) {
-                                /** 01/01/1970 **/
-                                cookie.setExpireDate(1l);
-                            } else if (cookie.getHostTime() > 0) {
-                                cookie.setExpireDate(cookie.getHostTime() + maxAge * 1000l);
-                            }
-                        } catch (final Throwable e) {
-                        }
-                    } else {
-                        if (cookie.getKey() == null) {
-                            cookie.setKey(key);
-                            cookie.setValue(value);
-                        }
+                if (StringUtils.isEmpty(key)) {
+                    continue;
+                }
+                if ("samesite".equalsIgnoreCase(key)) {
+                    cookie.setSameSite(value);
+                } else if ("path".equalsIgnoreCase(key)) {
+                    cookie.setPath(value);
+                } else if ("expires".equalsIgnoreCase(key) && !isMaxAgeSet) {
+                    cookie.setExpires(value);
+                } else if ("domain".equalsIgnoreCase(key)) {
+                    if (cookie.newCookieInstance().setDomain(value)) {
+                        /** no longer hostOnly **/
+                        cookie.setDomain(value);
+                        cookie.setHostOnly(Boolean.FALSE);
+                    }
+                } else if ("secure".equalsIgnoreCase(key)) {
+                    /** now secure **/
+                    cookie.setSecure(Boolean.TRUE);
+                } else if ("Partitioned".equalsIgnoreCase(key)) {
+                    /** Partitioned **/
+                } else if ("HttpOnly".equalsIgnoreCase(key)) {
+                    /** HttpOnly **/
+                } else if ("Max-Age".equalsIgnoreCase(key)) {
+                    /** Max-Age **/
+                    try {
+                        /** RFC 6265, section 5.2.2 **/
+                        final long maxAge = Long.parseLong(value);
+                        final long now = System.currentTimeMillis();
+                        cookie.setHostTime(now);
+                        cookie.setExpireDate(now + Math.max(1, maxAge) * 1000l);
+                        isMaxAgeSet = true;
+                    } catch (final Throwable e) {
+                        LogV3.log(e);
+                    }
+                } else {
+                    if (cookie.getKey() == null) {
+                        cookie.setKey(key);
+                        cookie.setValue(value);
                     }
                 }
             }
-            if (!cookie.isValid() || !isValidCookieDomain(request.getURL(), cookie)) {
+            try {
+                if (!cookie.isValid() || !isValidCookieDomain(request.getURL(), cookie)) {
+                    LogV3.warning("Invalid cookie:" + cookie);
+                    continue;
+                }
+            } catch (IllegalArgumentException e) {
+                LogV3.log(e);
                 LogV3.warning("Invalid cookie:" + cookie);
                 continue;
-            }                   
+            }
             ret.add(cookie);
         }
         return ret;
@@ -152,7 +164,7 @@ public class Cookies {
      * @param cookie
      * @return
      */
-    protected static boolean isValidCookieDomain(final URL url, Cookie cookie) {
+    protected static boolean isValidCookieDomain(final URL url, Cookie cookie) throws IllegalArgumentException {
         final String host = url.getHost();
         if (StringUtils.isEmpty(host)) {
             DebugMode.debugger();
@@ -187,6 +199,7 @@ public class Cookies {
         final String header = cookieString;
         String path = null;
         String expires = null;
+        String maxAgeValue = null;
         final String host = url.getHost();
         /*
          * Set-Cookie without Domain attribute is bound to the full host (hostOnly). A Cookie header carries no attributes, so the cookie
@@ -225,60 +238,80 @@ public class Cookies {
             } else {
                 continue;
             }
-            if (key != null) {
-                if ("samesite".equalsIgnoreCase(key)) {
-                    sameSite = value;
-                } else if ("path".equalsIgnoreCase(key)) {
-                    path = value;
-                } else if ("expires".equalsIgnoreCase(key)) {
-                    expires = value;
-                } else if ("domain".equalsIgnoreCase(key)) {
-                    if (source.newCookieInstance().setDomain(value)) {
-                        /** no longer hostOnly **/
-                        domain = value;
-                        hostOnly = Boolean.FALSE;
-                    }
-                } else if ("secure".equalsIgnoreCase(key)) {
-                    /** now secure **/
-                    secure = Boolean.TRUE;
-                } else if ("HttpOnly".equalsIgnoreCase(key)) {
-                    /** HttpOnly **/
-                } else if ("Max-Age".equalsIgnoreCase(key)) {
-                    /** Max-Age **/
-                } else {
-                    if (!isSetCookie || tmp.size() == 0) {
-                        /**
-                         * SetCookie only contains a single cookie
-                         **/
-                        tmp.put(key, value);
-                    }
+            if (StringUtils.isEmpty(key)) {
+                continue;
+            }
+            if ("samesite".equalsIgnoreCase(key)) {
+                sameSite = value;
+            } else if ("path".equalsIgnoreCase(key)) {
+                path = value;
+            } else if ("expires".equalsIgnoreCase(key)) {
+                expires = value;
+            } else if ("domain".equalsIgnoreCase(key)) {
+                if (source.newCookieInstance().setDomain(value)) {
+                    /** no longer hostOnly **/
+                    domain = value;
+                    hostOnly = Boolean.FALSE;
+                }
+            } else if ("secure".equalsIgnoreCase(key)) {
+                /** now secure **/
+                secure = Boolean.TRUE;
+            } else if ("Partitioned".equalsIgnoreCase(key)) {
+                /** Partitioned **/
+            } else if ("HttpOnly".equalsIgnoreCase(key)) {
+                /** HttpOnly **/
+            } else if ("Max-Age".equalsIgnoreCase(key)) {
+                /** Max-Age **/
+                maxAgeValue = value;
+            } else {
+                if (!isSetCookie || tmp.size() == 0) {
+                    /**
+                     * SetCookie only contains a single cookie
+                     **/
+                    tmp.put(key, value);
                 }
             }
         }
         final Cookies cookies = new Cookies();
         for (final Entry<String, String> next : tmp.entrySet()) {
-            /**
-             * no cookies are cookies without a value
-             **/
-            if (next.getValue() != null) {
-                final Cookie cookie = source.newCookieInstance();
-                cookie.setHost(host);
-                cookie.setPath(path);
-                cookie.setProtocol(protocol);
-                cookie.setDomain(domain != null ? domain : host);
-                cookie.setExpires(expires);
-                cookie.setHostOnly(hostOnly);
-                cookie.setValue(next.getValue());
-                cookie.setKey(next.getKey());
+            final Cookie cookie = source.newCookieInstance();
+            cookie.setHost(host);
+            cookie.setPath(path);
+            cookie.setProtocol(protocol);
+            cookie.setDomain(domain != null ? domain : host);
+            boolean isMaxAgeSet = false;
+            if (maxAgeValue != null) {
+                try {
+                    /** RFC 6265, section 5.2.2 **/
+                    final long maxAge = Long.parseLong(maxAgeValue);
+                    final long now = System.currentTimeMillis();
+                    cookie.setHostTime(now);
+                    cookie.setExpireDate(now + Math.max(1, maxAge) * 1000l);
+                    isMaxAgeSet = true;
+                } catch (final Throwable e) {
+                    LogV3.log(e);
+                }
+            }
+            if (!isMaxAgeSet) {
                 cookie.setHostTime(serverTime);
-                cookie.setSecure(secure);
-                cookie.setSameSite(sameSite);
+                cookie.setExpires(expires);
+            }
+            cookie.setHostOnly(hostOnly);
+            cookie.setValue(next.getValue());
+            cookie.setKey(next.getKey());
+            cookie.setSecure(secure);
+            cookie.setSameSite(sameSite);
+            try {
                 if (!cookie.isValid() || (isSetCookie && !isValidCookieDomain(url, cookie))) {
                     LogV3.warning("Invalid cookie:" + cookie);
                     continue;
                 }
-                cookies.add(cookie);
+            } catch (IllegalArgumentException e) {
+                LogV3.log(e);
+                LogV3.warning("Invalid cookie:" + cookie);
+                continue;
             }
+            cookies.add(cookie);
         }
         return cookies;
     }
@@ -325,6 +358,32 @@ public class Cookies {
                 return null;
             }
         }
+        final class BooleanHelper {
+            Boolean convert(Object value) {
+                if (value instanceof Boolean) {
+                    return (Boolean) value;
+                }
+                if (value instanceof String) {
+                    if ("true".equals(value)) {
+                        return Boolean.TRUE;
+                    }
+                    if ("false".equals(value)) {
+                        return Boolean.FALSE;
+                    }
+                }
+                if (value instanceof Number) {
+                    final Number num = (Number) value;
+                    if (num.intValue() == 1) {
+                        return Boolean.TRUE;
+                    }
+                    if (num.intValue() == 0) {
+                        return Boolean.FALSE;
+                    }
+                }
+                return null;
+            }
+        }
+        final BooleanHelper booleanHelper = new BooleanHelper();
         try {
             final List<Object> entries = ReflectionUtils.wrapList(input, false, Object.class);
             if (entries != null) {
@@ -357,8 +416,8 @@ public class Cookies {
                         final String value = (String) cookieInfo.get("value");
                         final String path = (String) cookieInfo.get("path");
                         final String sameSite = (String) cookieInfo.get("sameSite");
-                        final Boolean secure = (Boolean) cookieInfo.get("secure");
-                        final Boolean hostOnly = (Boolean) cookieInfo.get("hostOnly");
+                        final Boolean secure = booleanHelper.convert(cookieInfo.get("secure"));
+                        Boolean hostOnly = booleanHelper.convert(cookieInfo.get("hostOnly"));
                         if (StringUtils.isEmpty(domain) || StringUtils.isEmpty(key) || StringUtils.isEmpty(value) || StringUtils.isEmpty(path)) {
                             /** Skip invalid objects **/
                             continue;
@@ -370,6 +429,9 @@ public class Cookies {
                         cookie.setKey(key);
                         cookie.setValue(value);
                         cookie.setSecure(secure);
+                        if (domain != null && domain.startsWith(".") && !Boolean.TRUE.equals(hostOnly)) {
+                            hostOnly = Boolean.TRUE;
+                        }
                         cookie.setHostOnly(hostOnly);
                         if (Boolean.TRUE.equals(secure)) {
                             cookie.setProtocol(Cookie.SECURE_HTTPS);
@@ -421,8 +483,8 @@ public class Cookies {
                             final String value = (String) cookieInfo.get("value");
                             final String path = (String) cookieInfo.get("path");
                             final String sameSite = (String) cookieInfo.get("sameSite");
-                            final Boolean secure = (Boolean) cookieInfo.get("secure");
-                            final Boolean hostOnly = (Boolean) cookieInfo.get("hostOnly");
+                            final Boolean secure = booleanHelper.convert(cookieInfo.get("secure"));
+                            Boolean hostOnly = booleanHelper.convert(cookieInfo.get("hostOnly"));
                             if (StringUtils.isEmpty(domain) || StringUtils.isEmpty(key) || StringUtils.isEmpty(value) || StringUtils.isEmpty(path)) {
                                 /* Skip invalid objects */
                                 continue;
@@ -435,6 +497,9 @@ public class Cookies {
                             cookie.setKey(key);
                             cookie.setValue(value);
                             cookie.setSecure(secure);
+                            if (domain != null && domain.startsWith(".") && !Boolean.TRUE.equals(hostOnly)) {
+                                hostOnly = Boolean.TRUE;
+                            }
                             cookie.setHostOnly(hostOnly);
                             if (Boolean.TRUE.equals(secure)) {
                                 cookie.setProtocol(Cookie.SECURE_HTTPS);
@@ -492,6 +557,10 @@ public class Cookies {
             return;
         }
         final Map<Cookie.SOURCE, List<Cookie>> candidatesMap = new HashMap<Cookie.SOURCE, List<Cookie>>();
+        for (Cookie.SOURCE source : Cookie.SOURCE.values()) {
+            candidatesMap.put(source, new ArrayList<Cookie>(0));
+        }
+        boolean hasAtLeastOneCandidate = false;
         final List<Cookie> cookies = getCookies();
         for (final Cookie existingCookie : cookies) {
             if (!StringUtils.equalsIgnoreCase(existingCookie.getHost(), newCookie.getHost())) {
@@ -504,15 +573,12 @@ public class Cookies {
             }
             if (newCookie.equals(existingCookie) || existingCookie.equals(newCookie)) {
                 /* we want to collect/further process all *matching* cookie candidates, thus we use A.equals(B) and B.equals(A) */
-                List<Cookie> candidates = candidatesMap.get(existingCookie.getSource());
-                if (candidates == null) {
-                    candidates = new ArrayList<Cookie>();
-                    candidatesMap.put(existingCookie.getSource(), candidates);
-                }
+                final List<Cookie> candidates = candidatesMap.get(existingCookie.getSource());
                 candidates.add(existingCookie);
+                hasAtLeastOneCandidate = true;
             }
         }
-        if (candidatesMap.isEmpty()) {
+        if (!hasAtLeastOneCandidate) {
             cookies.add(newCookie);
             return;
         } else {
@@ -522,26 +588,73 @@ public class Cookies {
                     /* insecure protocol cookies never can replace secure cookies */
                     for (List<Cookie> candidates : candidatesMap.values()) {
                         for (Cookie candidate : candidates) {
-                            if (Boolean.TRUE.equals(candidate.isSecure())) {
+                            if (candidate.isValid() && !candidate.isExpired() && Boolean.TRUE.equals(candidate.isSecure())) {
                                 return;
                             }
                         }
                     }
                 }
                 /* fallthrough */
-            case IMPORT:
-                cookies.add(newCookie);
+            case IMPORT: {
                 /* new server/import cookie replaces all matching cookies */
+                final ManualCookie dummyCookie = new ManualCookie();
+                dummyCookie.setPersistent(false);
+                dummyCookie.setExpired();
+                final IdentityHashMap<Cookie, Object> replaceMap = new IdentityHashMap<Cookie, Object>();
                 for (List<Cookie> candidates : candidatesMap.values()) {
-                    removeCookiesByIdentity(candidates);
+                    for (Cookie candidate : candidates) {
+                        replaceMap.put(candidate, this);
+                    }
                 }
+                final AtomicReference<Cookie> newCookieReplaced = new AtomicReference<Cookie>(newCookie);
+                cookies.replaceAll(new UnaryOperator<Cookie>() {
+                    @Override
+                    public Cookie apply(Cookie t) {
+                        if (replaceMap.remove(t) != null) {
+                            return newCookieReplaced.getAndSet(dummyCookie);
+                        }
+                        return t;
+                    }
+                });
+                if (newCookieReplaced.get() == newCookie) {
+                    cookies.add(newCookie);
+                    removeCookiesByIdentity(new ArrayList<Cookie>(replaceMap.keySet()));
+                } else {
+                    removeCookieByIdentity(dummyCookie);
+                }
+            }
                 break;
             case LEGACY:
-            case MANUAL:
+            case MANUAL: {
                 /* new manual/legacy cookie only replaces matching manual/legacy cookies */
                 cookies.add(newCookie);
-                removeCookiesByIdentity(candidatesMap.get(Cookie.SOURCE.MANUAL));
-                removeCookiesByIdentity(candidatesMap.get(Cookie.SOURCE.LEGACY));
+                final ManualCookie dummyCookie = new ManualCookie();
+                dummyCookie.setPersistent(false);
+                dummyCookie.setExpired();
+                final IdentityHashMap<Cookie, Object> replaceMap = new IdentityHashMap<Cookie, Object>();
+                for (Cookie candidate : candidatesMap.get(Cookie.SOURCE.MANUAL)) {
+                    replaceMap.put(candidate, this);
+                }
+                for (Cookie candidate : candidatesMap.get(Cookie.SOURCE.LEGACY)) {
+                    replaceMap.put(candidate, this);
+                }
+                final AtomicReference<Cookie> newCookieReplaced = new AtomicReference<Cookie>(newCookie);
+                cookies.replaceAll(new UnaryOperator<Cookie>() {
+                    @Override
+                    public Cookie apply(Cookie t) {
+                        if (replaceMap.remove(t) != null) {
+                            return newCookieReplaced.getAndSet(dummyCookie);
+                        }
+                        return t;
+                    }
+                });
+                if (newCookieReplaced.get() == newCookie) {
+                    cookies.add(newCookie);
+                    removeCookiesByIdentity(new ArrayList<Cookie>(replaceMap.keySet()));
+                } else {
+                    removeCookieByIdentity(dummyCookie);
+                }
+            }
                 break;
             default:
                 DebugMode.debugger();
@@ -550,7 +663,7 @@ public class Cookies {
         }
     }
 
-    public void add(final Cookies newcookies) {
+    public synchronized void add(final Cookies newcookies) {
         if (newcookies == null) {
             return;
         }
@@ -661,7 +774,7 @@ public class Cookies {
                 /* first cookie is customized/preferred */
                 cookieString.append(keyValue.getKey()).append("=");
                 cookieString.append(values.get(0).getValue());
-            } else if (request == null || StringUtils.containsIgnoreCase(request.getHeaders().getValue(HTTPConstants.HEADER_REQUEST_USER_AGENT), "Firefox")) {
+            } else if (request == null || StringUtils.containsIgnoreCase(request.getHeaders().getValue(HTTPConstants.HEADER_REQUEST_USER_AGENT), "Firefox") || !DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                 /* no request available or firefox useragent, choose default/firefox handling to send only one cookie */
                 cookieString.append(keyValue.getKey()).append("=");
                 cookieString.append(values.get(0).getValue());

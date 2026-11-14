@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -35,6 +36,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.regex.Matcher;
@@ -1649,6 +1651,21 @@ public abstract class Plugin implements ActionListener {
      */
     public CAPTCHA_TYPE[] getExpectedCaptchaTypes() {
         return null;
+    }
+
+    /**
+     * Returns the result of {@link #getExpectedCaptchaTypes()} as Set. Used as default for the link specific variants in
+     * {@link PluginForHost} and {@link PluginForDecrypt}. <br>
+     * Returns null if no captcha is expected.
+     */
+    protected final Set<CAPTCHA_TYPE> getExpectedCaptchaTypesAsSet() {
+        final CAPTCHA_TYPE[] types = getExpectedCaptchaTypes();
+        if (types == null || types.length == 0) {
+            return null;
+        }
+        final Set<CAPTCHA_TYPE> ret = EnumSet.noneOf(CAPTCHA_TYPE.class);
+        ret.addAll(Arrays.asList(types));
+        return ret;
     }
 
     protected void displayBubbleNotification(final String title, final String text) {

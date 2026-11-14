@@ -1927,6 +1927,44 @@ public abstract class PluginForHost extends Plugin {
     }
 
     /**
+     * Returns the captcha types that may be requested if we try to load the given link with/without account. <br>
+     * Return null or an empty Set if no captcha is expected.<br>
+     * Use within plugin only.
+     *
+     * @param link
+     * @param acc
+     * @return Possible captcha types or null/empty Set if no captcha is expected.
+     */
+    public Set<CAPTCHA_TYPE> getExpectedCaptchaTypes(DownloadLink link, Account acc) {
+        /* Default: Fall back to the legacy variant without parameters. */
+        return getExpectedCaptchaTypesAsSet();
+    }
+
+    /**
+     * Returns the captcha types that may be requested when using the given account (e.g. login, but also account specific actions). <br>
+     * Return null or an empty Set if no captcha is expected. <br>
+     * Default: Accounts which use an API key login or which have user cookies never get captchas. Override this for all other cases. <br>
+     * Use within plugin only.
+     *
+     * @param account
+     *            The account. Can be null.
+     * @return Possible captcha types or null/empty Set if no captcha is expected.
+     */
+    public Set<CAPTCHA_TYPE> getExpectedCaptchaTypes(final Account account) {
+        if (account != null) {
+            if (hasFeature(FEATURE.API_KEY_LOGIN)) {
+                /* API key login: No captchas. */
+                return null;
+            } else if (account.loadUserCookies() != null) {
+                /* User provided cookies: No captchas. */
+                return null;
+            }
+        }
+        /* Default: Fall back to the legacy variant without parameters. */
+        return getExpectedCaptchaTypesAsSet();
+    }
+
+    /**
      *
      * Can we expect a captcha if we try to load link with/without account?
      *
@@ -1936,9 +1974,13 @@ public abstract class PluginForHost extends Plugin {
      * @param link
      * @param acc
      * @return
+     * @deprecated Override {@link #getExpectedCaptchaTypes(DownloadLink, Account)} instead. By default this method returns true if that
+     *             method returns at least one captcha type.
      */
+    @Deprecated
     public boolean hasCaptcha(DownloadLink link, Account acc) {
-        return false;
+        final Set<CAPTCHA_TYPE> types = getExpectedCaptchaTypes(link, acc);
+        return types != null && !types.isEmpty();
     }
 
     private static WeakHashMap<Account, HashMap<String, Boolean>> AUTOCAPTCHAMAP = new WeakHashMap<Account, HashMap<String, Boolean>>();
