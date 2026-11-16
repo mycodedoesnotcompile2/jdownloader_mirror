@@ -53,6 +53,7 @@ import jd.controlling.reconnect.pluginsinc.liveheader.translate.T;
 import jd.gui.UserIO;
 import jd.nutils.JDFlags;
 import net.miginfocom.swing.MigLayout;
+import org.jdownloader.utils.HelpLinks;
 
 public class Gui extends AbstractDialog<Object> {
     public class JDRRInfoPopup extends AbstractDialog<Object> {
@@ -212,7 +213,7 @@ public class Gui extends AbstractDialog<Object> {
         final JButton help = new JButton(T.T.gui_btn_help());
         help.addActionListener(new ActionListener() {
             public void actionPerformed(final ActionEvent e) {
-                CrossSystem.openURL("https://jdownloader.org/knowledge/wiki/reconnect/reconnect-recorder");
+                CrossSystem.openURL(HelpLinks.RECONNECT_RECORDER);
             }
         });
         buttonBar.add(help, "tag help, sizegroup confirms");

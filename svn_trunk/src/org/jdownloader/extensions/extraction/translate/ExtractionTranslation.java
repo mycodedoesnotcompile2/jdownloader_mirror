@@ -147,6 +147,9 @@ public interface ExtractionTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Set Extraction Path" })
     String contextmenu_extract_to();
 
+    @Default(lngs = { "en" }, values = { "Open Extraction Directory" })
+    String contextmenu_open_extraction_directory();
+
     @Default(lngs = { "en" }, values = { "Validate %s1" })
     String ValidateArchiveAction_ValidateArchiveAction(String name);
 

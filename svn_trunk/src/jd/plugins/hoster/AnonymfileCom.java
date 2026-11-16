@@ -39,7 +39,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51841 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53996 $", interfaceVersion = 3, names = {}, urls = {})
 public class AnonymfileCom extends PluginForHost {
     public AnonymfileCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -191,8 +191,6 @@ public class AnonymfileCom extends PluginForHost {
     /**
      * Docs: https://filefa.st/docs/api </br>
      * Docs2: https://anonfilesnew.com/docs/api </br>
-     * Old API that also existed back in 2024: </br>
-     * https://svn.jdownloader.org/projects/jd/repository/revisions/48795/entry/trunk/src/jd/plugins/hoster/AnonfilesMe.java
      */
     private AvailableStatus requestFileInformationAPI(final DownloadLink link) throws Exception {
         final String fid = this.getFID(link);

@@ -86,7 +86,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 53754 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53996 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends PluginForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -799,7 +799,7 @@ public abstract class KernelVideoSharingComV2 extends PluginForHost {
                  */
                 String realURL = this.findRealVideoURLOnEmbedPage(br);
                 if (realURL == null) {
-                    /* 2020-11-10: Experimental feature: This can fix "broken" embed URLs: https://svn.jdownloader.org/issues/89009 */
+                    /* 2020-11-10: Experimental feature: This can fix "broken" embed URLs */
                     realURL = this.generateContentURLFromEmbedURLVideoID(link);
                 } else {
                     logger.info("Found real URL corresponding to embed URL: " + realURL);

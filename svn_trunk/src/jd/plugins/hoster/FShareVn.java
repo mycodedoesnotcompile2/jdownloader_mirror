@@ -67,8 +67,9 @@ import org.jdownloader.plugins.components.config.FshareVnConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.jdownloader.utils.HelpLinks;
 
-@HostPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = { "fshare.vn" }, urls = { "https?://(?:www\\.)?(?:mega\\.1280\\.com|fshare\\.vn)/file/([0-9A-Z]+)" })
+@HostPlugin(revision = "$Revision: 53997 $", interfaceVersion = 3, names = { "fshare.vn" }, urls = { "https?://(?:www\\.)?(?:mega\\.1280\\.com|fshare\\.vn)/file/([0-9A-Z]+)" })
 public class FShareVn extends PluginForHost {
     private final String         SERVERERROR                            = "Tài nguyên bạn yêu cầu không tìm thấy";
     private final String         IPBLOCKED                              = "<li>Tài khoản của bạn thuộc GUEST nên chỉ tải xuống";
@@ -91,7 +92,7 @@ public class FShareVn extends PluginForHost {
     private static final String  PROPERTY_ACCOUNT_TOKEN                 = "token";
     private static final String  PROPERTY_ACCOUNT_COOKIES               = "apicookies";
     private static final String  PROPERTY_ACCOUNT_API_HELP_DIALOG_SHOWN = "api_help_dialog_shown";
-    private static final String  apiCredentialsHelpPage                 = "https://support.jdownloader.org/Knowledgebase/Article/View/fshare-custom-api-credentials";
+    private static final String  apiCredentialsHelpPage                 = HelpLinks.PLUGINS_FSHARE_CUSTOM_API_CREDENTIALS;
     private static final Object  apiCredentialsHelpDialogLock           = new Object();
 
     public FShareVn(PluginWrapper wrapper) {

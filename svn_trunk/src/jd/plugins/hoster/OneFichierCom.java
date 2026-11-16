@@ -101,8 +101,9 @@ import org.jdownloader.plugins.components.config.OneFichierConfigInterface.SSLMo
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
+import org.jdownloader.utils.HelpLinks;
 
-@HostPlugin(revision = "$Revision: 53943 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53997 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     /* Account properties */
     private final String        PROPERTY_ACCOUNT_USE_CDN_CREDITS                                  = "use_cdn_credits";
@@ -1811,7 +1812,7 @@ public class OneFichierCom extends PluginForHost {
                         message += "<br><br><b>Wenn das Problem weiterhin besteht:</b>";
                         message += "<br>Falls du denkst, dass dies ein Fehler ist, kontaktiere den 1fichier-Support: <a href=\"https://1fichier.com/contact.html\">1fichier.com/contact.html</a>";
                         message += "<br><br>Dies ist <b>kein JDownloader-Fehler</b>, sondern eine serverseitige Meldung, die hier weitergeleitet wird.";
-                        message += "<br>Weitere Infos: <a href=\"https://support.jdownloader.org/knowledgebase/article/plugins-1fichiercom-settings-and-troubleshooting\">Support-Artikel</a>";
+                        message += "<br>Weitere Infos: <a href=\"" + HelpLinks.PLUGINS_1FICHIER_SETTINGS_AND_TROUBLESHOOTING + "\">Support-Artikel</a>";
                     } else if ("es".equals(language)) {
                         title = "¡VPN/proxy o IP de centro de datos detectada!";
                         message += "<br>Parece que estás usando una <b>VPN/proxy o IP de centro de datos</b> que, según los <b>términos de servicio de 1fichier</b>, los usuarios premium no pueden usar.";
@@ -1824,7 +1825,7 @@ public class OneFichierCom extends PluginForHost {
                         message += "<br><br><b>Si el problema persiste:</b>";
                         message += "<br>Si crees que es un error, contacta con el soporte de 1fichier: <a href=\"https://1fichier.com/contact.html\">1fichier.com/contact.html</a>";
                         message += "<br><br>Esto <b>no es un error de JDownloader</b> sino un mensaje del servidor que simplemente reenviamos.";
-                        message += "<br>Más información: <a href=\"https://support.jdownloader.org/knowledgebase/article/plugins-1fichiercom-settings-and-troubleshooting\">Artículo de soporte</a>";
+                        message += "<br>Más información: <a href=\"" + HelpLinks.PLUGINS_1FICHIER_SETTINGS_AND_TROUBLESHOOTING + "\">Artículo de soporte</a>";
                     } else if ("fr".equals(language)) {
                         title = "VPN/proxy ou IP de centre de données détecté !";
                         message += "<br>Il semble que tu utilises une <b>VPN/proxy ou IP de centre de données</b> qui, selon les <b>conditions d'utilisation de 1fichier</b>, n'est pas autorisée pour les utilisateurs premium.";
@@ -1837,7 +1838,7 @@ public class OneFichierCom extends PluginForHost {
                         message += "<br><br><b>Si le problème persiste :</b>";
                         message += "<br>Si tu penses qu'il s'agit d'une erreur, contacte le support de 1fichier : <a href=\"https://1fichier.com/contact.html\">1fichier.com/contact.html</a>";
                         message += "<br><br>Ce n'est <b>pas un bug de JDownloader</b> mais un message du serveur que nous transmettons.";
-                        message += "<br>Plus d'informations : <a href=\"https://support.jdownloader.org/knowledgebase/article/plugins-1fichiercom-settings-and-troubleshooting\">Article de support</a>";
+                        message += "<br>Plus d'informations : <a href=\"" + HelpLinks.PLUGINS_1FICHIER_SETTINGS_AND_TROUBLESHOOTING + "\">Article de support</a>";
                     } else {
                         title = "VPN/proxy or datacenter IP detected!";
                         message += "<br>It looks like you are using a <b>VPN/proxy or datacenter IP</b> which, according to the <b>terms of service of 1fichier</b>, is not allowed for premium users.";
@@ -1850,7 +1851,7 @@ public class OneFichierCom extends PluginForHost {
                         message += "<br><br><b>If the problem does not disappear:</b>";
                         message += "<br>If you think this is a mistake, contact 1fichier support: <a href=\"https://1fichier.com/contact.html\">1fichier.com/contact.html</a>";
                         message += "<br><br>This is <b>not a JDownloader bug</b> but a server-side error message that we are forwarding to you.";
-                        message += "<br>More information: <a href=\"https://support.jdownloader.org/knowledgebase/article/plugins-1fichiercom-settings-and-troubleshooting\">Support article</a>";
+                        message += "<br>More information: <a href=\"" + HelpLinks.PLUGINS_1FICHIER_SETTINGS_AND_TROUBLESHOOTING + "\">Support article</a>";
                     }
                     message += "</html>";
                     final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN | Dialog.STYLE_HTML, title, message);

@@ -114,7 +114,7 @@ import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.translate._JDT;
 
-@HostPlugin(revision = "$Revision: 52799 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53996 $", interfaceVersion = 2, names = {}, urls = {})
 public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     private final String       USED_PLUGIN = "usedPlugin";
     private final String       encrypted   = ".encrypted";
@@ -1142,7 +1142,7 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
 
     private String getPreviewURL(final DownloadLink link) throws Exception {
         if (false) {
-            // decryption still missing, see ticket https://svn.jdownloader.org/issues/90021
+            // decryption still missing
             // type 0 = thumbnail
             // type 1 = preview
             final String fa = link.getStringProperty("fa");

@@ -71,8 +71,9 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import net.miginfocom.swing.MigLayout;
+import org.jdownloader.utils.HelpLinks;
 
-@HostPlugin(revision = "$Revision: 52974 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53997 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendNow extends XFileSharingProBasic {
     public SendNow(final PluginWrapper wrapper) {
         super(wrapper);
@@ -871,12 +872,12 @@ public class SendNow extends XFileSharingProBasic {
                 freeAccountPanel.add(freeInstructionsLabel);
                 freeAccountPanel.add(freeInstructionsLink);
                 JLabel freeUsersLabel = new JLabel("Free account users:");
-                JLink cookieInstructionsLink = new JLink("Enter username & cookies", "https://support.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions");
+                JLink cookieInstructionsLink = new JLink("Enter username & cookies", HelpLinks.ACCOUNT_COOKIE_LOGIN_INSTRUCTIONS);
                 freeAccountPanel.add(freeUsersLabel);
                 freeAccountPanel.add(cookieInstructionsLink);
             } else {
                 JLabel freeUsersLabel = new JLabel("Free account users:");
-                JLink loginInstructionsLink = new JLink("Enter username & pass or cookies", "https://support.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions");
+                JLink loginInstructionsLink = new JLink("Enter username & pass or cookies", HelpLinks.ACCOUNT_COOKIE_LOGIN_INSTRUCTIONS);
                 freeAccountPanel.add(freeUsersLabel);
                 freeAccountPanel.add(loginInstructionsLink);
             }
@@ -908,13 +909,13 @@ public class SendNow extends XFileSharingProBasic {
             freeAccountPanel.add(name);
             // Password field
             if (websiteLoginCookieLoginOnly) {
-                passwordOrCookiesLabel = new JLink("<HTML><U>" + _GUI.T.jd_gui_swing_components_AccountDialog_cookies() + "</U></HTML>", "https://support.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions");
+                passwordOrCookiesLabel = new JLink("<HTML><U>" + _GUI.T.jd_gui_swing_components_AccountDialog_cookies() + "</U></HTML>", HelpLinks.ACCOUNT_COOKIE_LOGIN_INSTRUCTIONS);
             } else if (websiteLoginCookieLoginOptional) {
                 String labelTxt = _GUI.T.jd_gui_swing_components_AccountDialog_pass_or_cookies();
                 labelTxt = labelTxt.replaceFirst("(?i)" + Pattern.quote(_GUI.T.jd_gui_swing_components_AccountDialog_cookies()), "<U>" + _GUI.T.jd_gui_swing_components_AccountDialog_cookies() + "</U>");
                 if (!_GUI.T.jd_gui_swing_components_AccountDialog_pass_or_cookies().matches(labelTxt)) {
                     labelTxt = "<HTML>" + labelTxt + "</HTML>";
-                    passwordOrCookiesLabel = new JLink(labelTxt, "https://support.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions");
+                    passwordOrCookiesLabel = new JLink(labelTxt, HelpLinks.ACCOUNT_COOKIE_LOGIN_INSTRUCTIONS);
                 } else {
                     passwordOrCookiesLabel = new JLabel(labelTxt);
                 }

@@ -32,6 +32,7 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.logging.LogController;
+import org.jdownloader.utils.HelpLinks;
 
 public class AutoDetectUpnpAction extends BasicAction {
     private UPNPRouterPlugin plugin;
@@ -82,10 +83,10 @@ public class AutoDetectUpnpAction extends BasicAction {
                     Dialog.getInstance().showDialog(d);
                     if (modemChoose) {
                         Dialog.getInstance().showErrorDialog(_GUI.T.AutoSetupAction_actionPerformed_noautoformodem());
-                        CrossSystem.openURL("https://jdownloader.org/knowledge/wiki/reconnect/modem");
+                        CrossSystem.openURL(HelpLinks.RECONNECT_MODEM);
                         return;
                     }
-                    CrossSystem.openURL("https://jdownloader.org/knowledge/wiki/reconnect/modem");
+                    CrossSystem.openURL(HelpLinks.RECONNECT_MODEM);
                     // don't know
                 } catch (DialogCanceledException e1) {
                     // router

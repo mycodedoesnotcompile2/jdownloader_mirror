@@ -524,7 +524,7 @@ public class DownloadLink extends Property implements AbstractPackageChildrenNod
      * Definition:<br>
      * The url to the content. if we copy the content url and paste it back to jdownloader, we should get exactly the same download (if
      * possible). This url should be a valid url for every browser as well. Try to append additional information as get parameters to define
-     * variants. http://svn.jdownloader.org/issues/51004
+     * variants.
      */
     public String getContentUrl() {
         final PluginForHost plugin = getDefaultPlugin();
@@ -607,7 +607,6 @@ public class DownloadLink extends Property implements AbstractPackageChildrenNod
     /**
      * Definition:<br>
      * The nearest crawler url that does not equal the content url <br>
-     * http://svn.jdownloader.org/issues/51004
      */
     public String getContainerUrl() {
         final PluginForHost plugin = getDefaultPlugin();
@@ -646,7 +645,6 @@ public class DownloadLink extends Property implements AbstractPackageChildrenNod
     /**
      * Definition:<br>
      * The origin Url. This is the url, that has been entered by the user.<br>
-     * http://svn.jdownloader.org/issues/51004
      */
     public String getOriginUrl() {
         return getStringProperty(URL_ORIGIN);
@@ -690,7 +688,7 @@ public class DownloadLink extends Property implements AbstractPackageChildrenNod
     /**
      * {@link #setPluginPatternMatcher(String)} Definition:<br>
      * the url or pattern that matches the plugins' regular expresssions. it is generally use by the plugin to download. The PluginPattern
-     * may be an invalid pseudo url, or event no valid url at all. http://svn.jdownloader.org/issues/51004
+     * may be an invalid pseudo url, or event no valid url at all.
      */
     public String getPluginPatternMatcher() {
         return urlDownload;

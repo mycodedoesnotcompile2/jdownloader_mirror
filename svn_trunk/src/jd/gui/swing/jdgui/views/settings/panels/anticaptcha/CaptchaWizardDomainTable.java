@@ -1,8 +1,5 @@
 package jd.gui.swing.jdgui.views.settings.panels.anticaptcha;
 
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -15,7 +12,6 @@ import java.util.Set;
 import java.awt.Component;
 
 import javax.swing.Icon;
-import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
 import javax.swing.JTable;
 import javax.swing.table.JTableHeader;
@@ -126,25 +122,8 @@ public class CaptchaWizardDomainTable extends BasicJDTable<CaptchaWizardEntry> {
                 CaptchaWizardDomainTable.this.repaint();
             }
         });
-        final JMenuItem remove = new JMenuItem(_GUI.T.literally_remove(), NewTheme.I().getIcon(IconKey.ICON_REMOVE, 18));
-        remove.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(final ActionEvent e) {
-                getWizardModel().removeEntries(selection);
-            }
-        });
-        popup.add(remove);
+        /* On purpose no "Remove" and no Delete shortcut: The entries can only be disabled, not removed. */
         return popup;
-    }
-
-    /*
-     * Delete removes the selected rows from this list only (nothing else is deleted). They can be added again with "Add", so there is no
-     * confirmation.
-     */
-    @Override
-    protected boolean onShortcutDelete(final List<CaptchaWizardEntry> selectedObjects, final KeyEvent evt, final boolean direct) {
-        getWizardModel().removeEntries(selectedObjects);
-        return true;
     }
 
     private static class Model extends ExtTableModel<CaptchaWizardEntry> {
@@ -195,13 +174,6 @@ public class CaptchaWizardDomainTable extends BasicJDTable<CaptchaWizardEntry> {
             _fireTableStructureChanged(sorted(all), true);
             fireChanged();
             return added;
-        }
-
-        private void removeEntries(final Collection<CaptchaWizardEntry> entries) {
-            final List<CaptchaWizardEntry> rest = new ArrayList<CaptchaWizardEntry>(getTableData());
-            rest.removeAll(entries);
-            _fireTableStructureChanged(rest, true);
-            fireChanged();
         }
 
         @Override

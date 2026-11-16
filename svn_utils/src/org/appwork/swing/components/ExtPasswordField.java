@@ -282,7 +282,6 @@ public class ExtPasswordField extends MigPanel implements FocusListener, Documen
             this.setRendererMode(false);
             this.editor.requestFocus();
         } else {
-            // http://svn.jdownloader.org/issues/49542
             if (this.password.length == 0) {
                 this.setEditorText("");
             }

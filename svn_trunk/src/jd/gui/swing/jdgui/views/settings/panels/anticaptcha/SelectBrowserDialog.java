@@ -55,6 +55,7 @@ import org.jdownloader.updatev2.gui.LAFOptions;
 
 import jd.gui.swing.jdgui.BasicJDTable;
 import net.miginfocom.swing.MigLayout;
+import org.jdownloader.utils.HelpLinks;
 
 /**
  * Lets the user choose the browser used by the browser captcha solver. The first entry is always the "OS Default" dummy entry (path ==
@@ -208,7 +209,7 @@ public class SelectBrowserDialog extends AbstractDialog<InstalledBrowser> {
 
             @Override
             public void actionPerformed(final ActionEvent e) {
-                CrossSystem.openURL("https://support.jdownloader.org/knowledgebase/article/define-custom-browser-solver-captcha-browser");
+                CrossSystem.openURL(HelpLinks.CAPTCHA_CUSTOM_BROWSER_SOLVER);
             }
         };
     }

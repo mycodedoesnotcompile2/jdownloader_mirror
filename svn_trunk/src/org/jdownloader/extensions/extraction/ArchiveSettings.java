@@ -106,22 +106,45 @@ public class ArchiveSettings implements Storable {
         }
     }
 
+    /**
+     * Fires an update for a change of a value that influences the extraction destination (auto extract, extract path, extraction info). Not
+     * fired while the settings are restored (no controller assigned yet).
+     */
+    private void fireDestinationUpdate() {
+        if (archiveController != null) {
+            ArchiveController.onDestinationSettingsChanged();
+        }
+        fireUpdate();
+    }
+
     public void setAutoExtract(BooleanStatus overwriteFiles) {
         if (overwriteFiles == null) {
             overwriteFiles = BooleanStatus.UNSET;
         }
         this.autoExtract = overwriteFiles;
+        fireDestinationUpdate();
+    }
+
+    /**
+     * Applies the default auto extract value of a new settings object. It is no change by the user, so it does not count as destination
+     * change.
+     */
+    protected void _setInitialAutoExtract(BooleanStatus autoExtract) {
+        if (autoExtract == null) {
+            autoExtract = BooleanStatus.UNSET;
+        }
+        this.autoExtract = autoExtract;
         fireUpdate();
     }
 
     public void setExtractionInfo(ExtractionInfo extractionInfo) {
         this.extractionInfo = extractionInfo;
-        fireUpdate();
+        fireDestinationUpdate();
     }
 
     public void setExtractPath(String extractPath) {
         this.extractPath = extractPath;
-        fireUpdate();
+        fireDestinationUpdate();
     }
 
     public void setFinalPassword(String password) {

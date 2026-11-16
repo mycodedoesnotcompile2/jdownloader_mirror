@@ -47,7 +47,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 50777 $", interfaceVersion = 2, names = { "filesmonster.com" }, urls = { "https?://[\\w\\.\\d]*?filesmonsterdecrypted\\.com/(download\\.php\\?id=|dl/.*?/free/2/).+" })
+@HostPlugin(revision = "$Revision: 53996 $", interfaceVersion = 2, names = { "filesmonster.com" }, urls = { "https?://[\\w\\.\\d]*?filesmonsterdecrypted\\.com/(download\\.php\\?id=|dl/.*?/free/2/).+" })
 public class FilesMonsterCom extends PluginForHost {
     private static final String POSTTHATREGEX            = "\"((?:https?://(?:www\\.)?filesmonster\\.com)?/dl/.*?/free/.*?)\"";
     private static final String POSTTHATREGEX2           = "((?:https?://(?:www\\.)?filesmonster\\.com)?/dl/.*?/free/.+)";
@@ -139,7 +139,7 @@ public class FilesMonsterCom extends PluginForHost {
             if (isOffline(this.br)) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            // link not possible due to ip ban http://svn.jdownloader.org/issues/27798
+            // link not possible due to ip ban
             if (br.containsHTML(">You do not have permission to access the requested resource on this server.<|>Perhaps your IP address is blocked due to suspicious activity.<")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }

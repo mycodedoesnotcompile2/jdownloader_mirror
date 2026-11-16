@@ -38,7 +38,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 51660 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53996 $", interfaceVersion = 2, names = {}, urls = {})
 public class UnknownPornScript9 extends PluginForHost {
     public UnknownPornScript9(PluginWrapper wrapper) {
         super(wrapper);
@@ -235,7 +235,7 @@ public class UnknownPornScript9 extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         if (StringUtils.containsIgnoreCase(link.getPluginPatternMatcher(), "iceporn") || StringUtils.containsIgnoreCase(link.getPluginPatternMatcher(), "viptube")) {
-            free_maxchunks = 1; // https://svn.jdownloader.org/issues/84428, /84735
+            free_maxchunks = 1; // https://svn.jdownloader.org/issues/84735
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, free_resume, free_maxchunks);
         if (!looksLikeDownloadableContent(dl.getConnection())) {

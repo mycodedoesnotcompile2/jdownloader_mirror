@@ -87,6 +87,7 @@ import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPluginFilter;
 import org.jdownloader.updatev2.UpdateController;
+import org.jdownloader.utils.HelpLinks;
 
 public class ChallengeResponseController {
     private static final ChallengeResponseController INSTANCE         = new ChallengeResponseController();
@@ -586,7 +587,7 @@ public class ChallengeResponseController {
                     showNoSolverInfoDialog(c, false);
                 }
             }
-            /* See: https://support.jdownloader.org/knowledgebase/article/error-skipped-captcha-is-required */
+            /* See: HelpLinks.CAPTCHA_ERROR_SKIPPED_REQUIRED */
             throw new SkipException(c, SkipRequest.BLOCK_HOSTER, "No solver available!");
         }
         final SolverJob<T> job = new SolverJob<T>(this, c, solvers);
@@ -742,8 +743,8 @@ public class ChallengeResponseController {
     /* The captcha was skipped because of the silent mode. */
     private static final int                   TEXT_TITLE_SILENT_MODE       = 21;
     private static final int                   TEXT_INTRO_SILENT_MODE       = 22;
-    private static final String                HELP_URL_PREMIUM_MODE        = "https://support.jdownloader.org/knowledgebase/article/captchas-in-premium-mode-and-during-account-login";
-    private static final String                HELP_URL_DOWNLOADS_NOT_START = "https://support.jdownloader.org/knowledgebase/article/warum-starten-meine-downloads-nicht";
+    private static final String                HELP_URL_PREMIUM_MODE        = HelpLinks.CAPTCHA_IN_PREMIUM_MODE;
+    private static final String                HELP_URL_DOWNLOADS_NOT_START = HelpLinks.GENERAL_DOWNLOADS_NOT_START;
     private static final Map<String, String[]> NO_SOLVER_DIALOG_TEXTS       = new HashMap<String, String[]>();
     static {
         NO_SOLVER_DIALOG_TEXTS.put("en", new String[] { "External solver required for this captcha challenge", "No enabled captcha solver available", "The interactive type of captcha challenge '{type}' cannot currently be solved locally in your browser.<br><br>" + "Therefore, in JD your only option is to use a captcha solving service that may require payment and is capable of handling this type of captcha.<br><br>", "No solver is currently available for the captcha challenge '{type}', although there are solvers that could solve this captcha type.<br><br>", "The usage of captcha solver accounts is globally disabled in the settings.<br><br>", "Ensure that at least one of the following {count} solvers is configured and enabled:", "For more detailed information, please read the help article below:<br>", "Disabled captcha solvers: {disabled}", "Go to captcha settings",
@@ -939,7 +940,7 @@ public class ChallengeResponseController {
             }
         }
         if (explainExternalSolverRequired) {
-            helpLinks.add(new String[] { texts[TEXT_HELP_PROMPT], "https://support.jdownloader.org/knowledgebase/article/error-skipped-captcha-is-required" });
+            helpLinks.add(new String[] { texts[TEXT_HELP_PROMPT], HelpLinks.CAPTCHA_ERROR_SKIPPED_REQUIRED });
         }
         /* The settings are only available in the GUI. */
         final boolean gui = !Application.isHeadless();
@@ -949,7 +950,8 @@ public class ChallengeResponseController {
             public void run() {
                 try {
                     if (UIOManager.I().show(ConfirmDialogInterface.class, dialog).getCloseReason() == CloseReason.OK && gui) {
-                        CaptchaConfigPanel.showCaptchaSettings();
+                        /* The solvers listed in the dialog are selected in the solver table. */
+                        CaptchaConfigPanel.showCaptchaSettings(candidates);
                     }
                 } catch (final Throwable e) {
                     logger.log(e);
@@ -1314,8 +1316,10 @@ public class ChallengeResponseController {
 
     /**
      * Order of the solvers for login captchas if the manual solvers are asked first (see
-     * {@link #applyLoginCaptchaPolicy(Challenge, List)}): Local automatic solvers first (they answer within moments), then the browser
-     * solver, the dialog solver and the remote solver (MyJDownloader), then the external solvers.
+     * {@link #applyLoginCaptchaPolicy(Challenge, List)}): JAntiCaptcha (JD_LOCAL) first, then the browser solver, the dialog solver and the
+     * remote solver (MyJDownloader), then the external solvers. <br>
+     * JAntiCaptcha is not more important than the other solvers (it only solves a few simple, mostly very old captchas), but it usually
+     * needs far less than a second and may solve the captcha completely automatically, so it is worth trying first.
      */
     private static int getLoginCaptchaOrderRank(final SolverType type) {
         switch (type) {
@@ -1460,7 +1464,10 @@ public class ChallengeResponseController {
 
     /**
      * Rank of a solver type, defining the default order of the solvers: JD_LOCAL, then JD_LOCAL_DIALOG, then JD_LOCAL_BROWSER, then
-     * JD_REMOTE_MYJD, and EXTERNAL last.
+     * JD_REMOTE_MYJD, and EXTERNAL last. <br>
+     * JD_LOCAL (JAntiCaptcha) is first although it is of minor importance for the user (it only solves a few simple, mostly very old
+     * captchas): It usually needs far less than a second and may solve the captcha completely automatically, so it is worth trying
+     * first.
      */
     private static int getDefaultOrderRank(final SolverType type) {
         switch (type) {

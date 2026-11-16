@@ -199,6 +199,7 @@ import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 import org.jdownloader.translate._JDT;
 import org.jdownloader.updatev2.UpdateController;
 import org.jdownloader.updatev2.UpdateHandler;
+import org.jdownloader.utils.HelpLinks;
 
 /**
  * Dies ist die Oberklasse fuer alle Plugins, die von einem Anbieter Dateien herunterladen koennen
@@ -3622,7 +3623,7 @@ public abstract class PluginForHost extends Plugin {
         final Thread thread = new Thread() {
             public void run() {
                 try {
-                    final String help_article_url = "https://support.jdownloader.org/knowledgebase/article/account-cookie-login-instructions";
+                    final String help_article_url = HelpLinks.ACCOUNT_COOKIE_LOGIN_INSTRUCTIONS;
                     String message = "";
                     final String title;
                     if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {

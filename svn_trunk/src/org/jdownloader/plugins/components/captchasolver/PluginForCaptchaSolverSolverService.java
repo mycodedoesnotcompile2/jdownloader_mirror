@@ -35,6 +35,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.host.LazyHostPluginFilter;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
+import org.jdownloader.utils.HelpLinks;
 
 public class PluginForCaptchaSolverSolverService extends AbstractSolverService implements ServicePanelExtender {
     protected final abstractPluginForCaptchaSolver plugin;
@@ -470,7 +471,7 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
 
     @Override
     public String getHelpArticleURL() {
-        return "https://support.jdownloader.org/knowledgebase/article/error-skipped-captcha-is-required";
+        return HelpLinks.CAPTCHA_ERROR_SKIPPED_REQUIRED;
     }
 
     @Override

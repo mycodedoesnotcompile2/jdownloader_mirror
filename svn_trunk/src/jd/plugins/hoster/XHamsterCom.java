@@ -78,7 +78,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-@HostPlugin(revision = "$Revision: 53628 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53996 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -1598,7 +1598,7 @@ public class XHamsterCom extends PluginForHost {
             if (isPasswordProtected(br)) {
                 final boolean passwordHandlingBroken = true;
                 if (passwordHandlingBroken) {
-                    throw new PluginException(LinkStatus.ERROR_FATAL, "Password-protected handling broken svn.jdownloader.org/issues/88690");
+                    throw new PluginException(LinkStatus.ERROR_FATAL, "Password-protected handling broken");
                 }
                 String passCode = link.getDownloadPassword();
                 if (passCode == null) {

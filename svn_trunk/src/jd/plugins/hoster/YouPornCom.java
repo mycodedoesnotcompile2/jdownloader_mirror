@@ -42,7 +42,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51315 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53996 $", interfaceVersion = 2, names = {}, urls = {})
 public class YouPornCom extends PluginForHost {
     /* DEV NOTES */
     /* Porn_plugin */
@@ -312,8 +312,7 @@ public class YouPornCom extends PluginForHost {
         }
         if (dllink == null) {
             /**
-             * 2020-05-27: Workaround/Fallback for some users who seem to get a completely different pornhub page (???) RE:
-             * https://svn.jdownloader.org/issues/88346 </br>
+             * 2020-05-27: Workaround/Fallback for some users who seem to get a completely different pornhub page (???) </br>
              * This source will be lower quality than their other sources!
              */
             dllink = br.getRegex("meta name=\"twitter:player:stream\" content=\"(http[^<>\"\\']+)\"").getMatch(0);

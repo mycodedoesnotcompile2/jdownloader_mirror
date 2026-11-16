@@ -63,7 +63,7 @@ import org.jdownloader.plugins.components.hls.HlsContainerStorable;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 53875 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53996 $", interfaceVersion = 4, names = {}, urls = {})
 public class ArteMediathekV3 extends PluginForDecrypt {
     public ArteMediathekV3(PluginWrapper wrapper) {
         super(wrapper);
@@ -992,7 +992,6 @@ public class ArteMediathekV3 extends PluginForDecrypt {
         }
     }
 
-    /** see https://svn.jdownloader.org/issues/90569 **/
     public static interface VersionInfo {
         VersionType getVersionType();
 

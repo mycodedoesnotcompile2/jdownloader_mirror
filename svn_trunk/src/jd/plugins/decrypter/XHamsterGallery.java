@@ -51,7 +51,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.XHamsterCom;
 
-@DecrypterPlugin(revision = "$Revision: 53473 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53996 $", interfaceVersion = 3, names = {}, urls = {})
 public class XHamsterGallery extends PluginForDecrypt {
     public XHamsterGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -760,7 +760,7 @@ public class XHamsterGallery extends PluginForDecrypt {
         if (br.containsHTML(gallery_password_regex)) {
             final boolean passwordHandlingBroken = true;
             if (passwordHandlingBroken) {
-                throw new PluginException(LinkStatus.ERROR_FATAL, "Password-protected handling broken svn.jdownloader.org/issues/88690");
+                throw new PluginException(LinkStatus.ERROR_FATAL, "Password-protected handling broken");
             }
             boolean success = false;
             for (int i = 1; i <= 3; i++) {

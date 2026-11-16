@@ -32,7 +32,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
  *
  * Please note: right now, if a model has multiple pages worth of galleries, paging must be done manually.
  */
-@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53996 $", interfaceVersion = 2, names = {}, urls = {})
 @Deprecated
 public class SimpleHtmlBasedGalleryPlugin extends PluginForDecrypt {
     @Override
@@ -221,7 +221,7 @@ public class SimpleHtmlBasedGalleryPlugin extends PluginForDecrypt {
         }
         String[] galleryUrls = getGalleryUrls(galleryHrefRegex);
         if (galleryUrls == null || galleryUrls.length == 0) {
-            // do not throw PluginException(LinkStatus.ERROR_PLUGIN_DEFECT), see e.g. https://svn.jdownloader.org/issues/88913
+            // do not throw PluginException(LinkStatus.ERROR_PLUGIN_DEFECT)
             logger.warning("found 0 galleries for " + url);
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -302,7 +302,7 @@ public class SimpleHtmlBasedGalleryPlugin extends PluginForDecrypt {
     protected void populateGalleryImageLinks(ArrayList<DownloadLink> imageLinks, Browser brc) throws PluginException, IOException {
         final String[] imageUrls = determineImageUrls(brc);
         if (imageUrls == null || imageUrls.length == 0) {
-            // do not throw PluginException(LinkStatus.ERROR_PLUGIN_DEFECT), see e.g. https://svn.jdownloader.org/issues/88913
+            // do not throw PluginException(LinkStatus.ERROR_PLUGIN_DEFECT)
             logger.warning("found 0 images for " + brc.getURL());
             imageLinks.add(this.createOfflinelink(brc.getURL()));
         } else {

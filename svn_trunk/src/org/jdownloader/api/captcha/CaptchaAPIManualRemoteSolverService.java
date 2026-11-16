@@ -23,6 +23,7 @@ import org.jdownloader.settings.staticreferences.CFG_MYJD;
 import jd.gui.swing.jdgui.JDGui;
 import jd.gui.swing.jdgui.views.myjd.MyJDownloaderView;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import org.jdownloader.utils.HelpLinks;
 
 public class CaptchaAPIManualRemoteSolverService extends AbstractSolverService {
     private CaptchaMyJDownloaderRemoteSolverSettingsV3 config;
@@ -171,6 +172,6 @@ public class CaptchaAPIManualRemoteSolverService extends AbstractSolverService {
 
     @Override
     public String getHelpArticleURL() {
-        return "https://support.jdownloader.org/knowledgebase/article/what-is-myjdownloader";
+        return HelpLinks.MYJD_WHAT_IS_MYJDOWNLOADER;
     }
 }

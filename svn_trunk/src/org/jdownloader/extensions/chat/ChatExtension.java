@@ -496,7 +496,6 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
                 final int sel = ChatExtension.this.tabbedPane.getSelectedIndex();
                 ChatExtension.this.tabbedPane.setForegroundAt(sel, Color.black);
                 // it's important to have this code here instead of the released callback.
-                // this solves this bug: http://svn.jdownloader.org/issues/58941
                 if (e.getKeyCode() == KeyEvent.VK_ENTER) {
                     if (ChatExtension.this.textField.getText().length() == 0) {
                         return;
@@ -513,7 +512,6 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
                 final int sel = ChatExtension.this.tabbedPane.getSelectedIndex();
                 ChatExtension.this.tabbedPane.setForegroundAt(sel, Color.black);
                 // it's important to have this code here instead of the released callback.
-                // this solves this bug: http://svn.jdownloader.org/issues/58941
                 if (e.getKeyCode() == KeyEvent.VK_TAB) {
                     if (ChatExtension.this.textField.getText().length() == 0) {
                         if (ChatExtension.this.lastCommand != null) {

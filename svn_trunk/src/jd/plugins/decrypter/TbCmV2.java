@@ -101,8 +101,9 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import org.jdownloader.utils.HelpLinks;
 
-@DecrypterPlugin(revision = "$Revision: 53537 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53997 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int     DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -670,7 +671,7 @@ public class TbCmV2 extends PluginForDecrypt {
                 if (playListAction == IfUrlisAPlaylistAction.ASK) {
                     String messageDialogText = "<html>JDownloader does not support crawling all playlists of a channel!";
                     messageDialogText += "<br>What would you like JDownloader to do instead?";
-                    messageDialogText += "<br><a href=\"https://support.jdownloader.org/knowledgebase/article/collect-and-download-links-from-unsupported-websites\">Hint on how to collect & add all playlists of a YouTube channel</a>";
+                    messageDialogText += "<br><a href=\"" + HelpLinks.GENERAL_COLLECT_LINKS_FROM_UNSUPPORTED_WEBSITES + "\">Hint on how to collect & add all playlists of a YouTube channel</a>";
                     messageDialogText += "<br>If you wish to hide this dialog, you can pre-select your preferred action under Settings -> Plugins -> youtube.com.</html>";
                     final ConfirmDialog confirm = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN | Dialog.STYLE_HTML, title, messageDialogText, null, "Crawl channel videos instead", "Do nothing") {
                         @Override

@@ -50,7 +50,7 @@ import org.jdownloader.controlling.filter.CompiledFiletypeFilter.ExtensionsFilte
 import org.jdownloader.plugins.components.config.Rule34xxxConfig;
 import org.jdownloader.plugins.components.config.Rule34xxxConfig.AccessMode;
 
-@DecrypterPlugin(revision = "$Revision: 52581 $", interfaceVersion = 3, names = { "rule34.xxx" }, urls = { "https?://(?:www\\.)?rule34\\.xxx/index\\.php\\?page=post\\&s=(view\\&id=\\d+|list\\&tags=.+)" })
+@DecrypterPlugin(revision = "$Revision: 53996 $", interfaceVersion = 3, names = { "rule34.xxx" }, urls = { "https?://(?:www\\.)?rule34\\.xxx/index\\.php\\?page=post\\&s=(view\\&id=\\d+|list\\&tags=.+)" })
 public class Rule34Xxx extends PluginForDecrypt {
     private final String        prefixLinkID                          = getHost().replaceAll("[\\.\\-]+", "") + "://";
     private static final String ERROR_MESSAG_API_CREDENTIALS_REQUIRED = "API credentials required. Add them in plugin settings or change access mode to website and try again.";
@@ -295,7 +295,7 @@ public class Rule34Xxx extends PluginForDecrypt {
                 dl.setAvailable(true);
                 final String id = new Regex(contenturl, "id=(\\d+)").getMatch(0);
                 // set by decrypter from list, but not set by view!
-                try { // Pevent NPE: https://svn.jdownloader.org/issues/84419
+                try { // Pevent NPE
                     if (!StringUtils.equals(this.getCurrentLink().getSourceLink().getLinkID(), prefixLinkID + id)) {
                         dl.setLinkID(prefixLinkID + id);
                     }

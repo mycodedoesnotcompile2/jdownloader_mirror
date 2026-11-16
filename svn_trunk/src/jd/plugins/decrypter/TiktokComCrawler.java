@@ -61,7 +61,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TiktokCom;
 
-@DecrypterPlugin(revision = "$Revision: 52887 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 53996 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TiktokCom.class })
 public class TiktokComCrawler extends PluginForDecrypt {
     public TiktokComCrawler(PluginWrapper wrapper) {
@@ -548,8 +548,7 @@ public class TiktokComCrawler extends PluginForDecrypt {
             return new ArrayList<DownloadLink>();
         }
         /**
-         * See: https://board.jdownloader.org/showthread.php?t=91365 </br>
-         * and: https://svn.jdownloader.org/issues/90292
+         * See: https://board.jdownloader.org/showthread.php?t=91365
          */
         final boolean profileCrawlerPermanentlyBroken = true;
         if (profileCrawlerPermanentlyBroken) {
@@ -574,7 +573,7 @@ public class TiktokComCrawler extends PluginForDecrypt {
     /**
      * Use website to crawl all videos of a user. </br>
      * Pagination hasn't been implemented so this will only find the first batch of items - usually around 30 items! </br>
-     * 2024-06-19: This is broken, see: https://svn.jdownloader.org/issues/90216
+     * 2024-06-19: This is broken
      */
     public ArrayList<DownloadLink> crawlProfileWebsite(final CryptedLink param, final String contenturl) throws Exception {
         prepBRWebsite(br);

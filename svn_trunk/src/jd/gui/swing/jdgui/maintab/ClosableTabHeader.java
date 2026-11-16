@@ -39,7 +39,6 @@ public class ClosableTabHeader extends JPanel implements CustomTabHeader {
 
     public void setBounds(int x, int y, int width, int height) {
         // workaround to have proper pixel exact layouting of the tab header
-        // http://svn.jdownloader.org/issues/43349
         if (selected) {
             super.setBounds(x - 2, y + 1, width + 2, height - 1);
         } else {

@@ -4,6 +4,7 @@ import org.appwork.txtresource.Default;
 import org.appwork.txtresource.Defaults;
 import org.appwork.txtresource.DescriptionForTranslationEntry;
 import org.appwork.txtresource.TranslateInterface;
+import org.jdownloader.utils.HelpLinks;
 
 @Defaults(lngs = { "en" })
 public interface JdownloaderTranslation extends TranslateInterface {
@@ -86,7 +87,7 @@ public interface JdownloaderTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Network problems" })
     String download_error_message_networkreset();
 
-    @Default(lngs = { "en" }, values = { "<b><u>No Reconnect selected</u></b><br/><p>Reconnection is an advanced approach for skipping long waits that some hosts impose on free users. <br>It is not helpful while using a premium account.</p><p>Read more about Reconnect <a href='https://support.jdownloader.org/knowledgebase/article/router-reconnect'>here</a></p>" })
+    @Default(lngs = { "en" }, values = { "<b><u>No Reconnect selected</u></b><br/><p>Reconnection is an advanced approach for skipping long waits that some hosts impose on free users. <br>It is not helpful while using a premium account.</p><p>Read more about Reconnect <a href='" + HelpLinks.RECONNECT_ROUTER + "'>here</a></p>" })
     String jd_controlling_reconnect_plugins_DummyRouterPlugin_getGUI2();
 
     @Default(lngs = { "en" }, values = { "[%s1] CRC OK" })

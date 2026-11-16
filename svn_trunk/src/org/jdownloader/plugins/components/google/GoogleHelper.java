@@ -52,6 +52,7 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.plugins.components.config.GoogleConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.translate._JDT;
+import org.jdownloader.utils.HelpLinks;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 
@@ -203,7 +204,7 @@ public class GoogleHelper {
         final Thread thread = new Thread() {
             public void run() {
                 try {
-                    final String help_article_url = "https://support.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions";
+                    final String help_article_url = HelpLinks.ACCOUNT_COOKIE_LOGIN_INSTRUCTIONS;
                     String message = "";
                     final String title;
                     if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {

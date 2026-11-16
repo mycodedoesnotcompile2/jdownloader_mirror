@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -13,7 +12,6 @@ import javax.swing.Icon;
 import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtDefaultRowSorter;
-import org.appwork.swing.exttable.columns.ExtCheckColumn;
 import org.appwork.swing.exttable.columns.ExtIconColumn;
 import org.appwork.swing.exttable.columns.ExtTextColumn;
 import org.jdownloader.captcha.v2.SolverService;
@@ -42,27 +40,9 @@ public class CaptchaWizardSolverTable extends BasicJDTable<SolverService> {
         return true;
     }
 
-    /**
-     * Sets the solvers to show and the captcha types the user needs. Solvers which solve most of the needed types come first. All
-     * solvers are ticked (highlighted in the comparison table) by default, the user can untick them.
-     * <p>
-     * Rows which are not ticked are NOT greyed out in this table, on purpose: Not ticked does not mean disabled, it only means that the
-     * solver is not highlighted, and the solvers must stay easy to read.
-     */
+    /** Sets the solvers to show and the captcha types the user needs. Solvers which solve most of the needed types come first. */
     public void setSolvers(final Collection<SolverService> solvers, final Set<CAPTCHA_TYPE> requiredTypes) {
         ((Model) getModel()).setSolvers(solvers, requiredTypes);
-    }
-
-    /** The solvers whose check box is ticked, i.e. the ones to mark in the comparison table. */
-    public List<SolverService> getRelevantSolvers() {
-        final Model model = (Model) getModel();
-        final List<SolverService> ret = new ArrayList<SolverService>();
-        for (final SolverService solver : model.getTableData()) {
-            if (model.relevant.contains(solver)) {
-                ret.add(solver);
-            }
-        }
-        return ret;
     }
 
     /** Number of the needed captcha types the solver can solve. */
@@ -87,19 +67,13 @@ public class CaptchaWizardSolverTable extends BasicJDTable<SolverService> {
             super("CaptchaWizardSolverTable");
         }
 
-        /* The solvers which are relevant for the comparison table (ticked). */
-        private final Set<SolverService> relevant = new HashSet<SolverService>();
-
         /* True if at least one solver in the table is already usable: Then the "Already usable" column is shown by default. */
         private volatile boolean anyUsable = false;
 
         private void setSolvers(final Collection<SolverService> solvers, final Set<CAPTCHA_TYPE> requiredTypes) {
             this.requiredTypes = requiredTypes;
-            relevant.clear();
             boolean usableFound = false;
             for (final SolverService solver : solvers) {
-                /* Every solver is ticked, no matter whether the user can already use it. */
-                relevant.add(solver);
                 usableFound |= solver.isUsable();
             }
             anyUsable = usableFound;
@@ -123,33 +97,6 @@ public class CaptchaWizardSolverTable extends BasicJDTable<SolverService> {
 
         @Override
         protected void initColumns() {
-            addColumn(new ExtCheckColumn<SolverService>(_GUI.T.CaptchaWizard_column_relevant()) {
-                private static final long serialVersionUID = 1L;
-
-                @Override
-                public boolean isEditable(final SolverService obj) {
-                    return true;
-                }
-
-                @Override
-                protected boolean getBooleanValue(final SolverService value) {
-                    return relevant.contains(value);
-                }
-
-                @Override
-                protected void setBooleanValue(final boolean value, final SolverService object) {
-                    if (value) {
-                        relevant.add(object);
-                    } else {
-                        relevant.remove(object);
-                    }
-                }
-
-                @Override
-                public boolean isHidable() {
-                    return false;
-                }
-            });
             addColumn(new ExtTextColumn<SolverService>(_GUI.T.CaptchaWizard_column_solver()) {
                 private static final long serialVersionUID = 1L;
 
@@ -207,8 +154,11 @@ public class CaptchaWizardSolverTable extends BasicJDTable<SolverService> {
 
                 @Override
                 public String getStringValue(final SolverService value) {
-                    final int solved = getSolvedCount(value, requiredTypes);
-                    return solvesAll(value) ? _GUI.T.CaptchaWizard_solvesAll_yes(solved, requiredTypes.size()) : _GUI.T.CaptchaWizard_solvesAll_no(solved, requiredTypes.size());
+                    if (solvesAll(value)) {
+                        /* The counter (e.g. 10/10) is only interesting if the solver does not support all types. */
+                        return _GUI.T.lit_yes();
+                    }
+                    return _GUI.T.CaptchaWizard_solvesAll_no(getSolvedCount(value, requiredTypes), requiredTypes.size());
                 }
 
                 @Override

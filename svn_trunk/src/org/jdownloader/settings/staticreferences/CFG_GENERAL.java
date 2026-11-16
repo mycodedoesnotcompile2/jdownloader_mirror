@@ -213,7 +213,7 @@ public class CFG_GENERAL {
      **/
     public static final LongKeyHandler                  ACCOUNT_TEMPORARILY_DISABLED_DEFAULT_TIMEOUT                     = SH.getKeyHandler("AccountTemporarilyDisabledDefaultTimeout", LongKeyHandler.class);
     /**
-     * http://jdownloader.org/knowledge/wiki/glossary/chunkload
+     * https://jdownloader.org/knowledge/wiki/glossary/chunkload
      **/
     public static final IntegerKeyHandler               MAX_CHUNKS_PER_FILE                                              = SH.getKeyHandler("MaxChunksPerFile", IntegerKeyHandler.class);
     /**

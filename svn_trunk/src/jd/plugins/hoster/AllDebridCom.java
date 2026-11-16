@@ -87,7 +87,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 53996 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
 public class AllDebridCom extends PluginForHost {
     public AllDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -715,7 +715,6 @@ public class AllDebridCom extends PluginForHost {
             /* Do not change url and assume protocol is https. */
             return dllink;
         }
-        // https://svn.jdownloader.org/issues/87886
         final URL url = new URL(dllink);
         if (StringUtils.equals("https", url.getProtocol())) {
             logger.info("https for final downloadurls is disabled:" + dllink);

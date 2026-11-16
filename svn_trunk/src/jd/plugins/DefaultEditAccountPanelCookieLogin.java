@@ -20,6 +20,7 @@ import org.jdownloader.gui.InputChangedCallbackInterface;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.accounts.AccountBuilderInterface;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+import org.jdownloader.utils.HelpLinks;
 
 public class DefaultEditAccountPanelCookieLogin extends MigPanel implements AccountBuilderInterface {
     /**
@@ -80,7 +81,7 @@ public class DefaultEditAccountPanelCookieLogin extends MigPanel implements Acco
         this.cookieLoginOptional = this.plg.hasFeature(FEATURE.COOKIE_LOGIN_OPTIONAL);
         if (cookieLoginOnly) {
             add(new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_generic_instructions()));
-            add(new JLink(_GUI.T.jd_gui_swing_components_AccountDialog_generic_instructions_click_here_for_instructions(), "https://support.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions"));
+            add(new JLink(_GUI.T.jd_gui_swing_components_AccountDialog_generic_instructions_click_here_for_instructions(), HelpLinks.ACCOUNT_COOKIE_LOGIN_INSTRUCTIONS));
         }
         if (this.usernameIsEmail) {
             add(usernameLabel = new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_email()));
@@ -106,13 +107,13 @@ public class DefaultEditAccountPanelCookieLogin extends MigPanel implements Acco
             name.setHelpText(_GUI.T.jd_gui_swing_components_AccountDialog_help_username());
         }
         if (cookieLoginOnly) {
-            add(passwordOrCookiesLabel = new JLink("<HTML><U>" + _GUI.T.jd_gui_swing_components_AccountDialog_cookies() + "</U></HTML>", "https://support.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions"));
+            add(passwordOrCookiesLabel = new JLink("<HTML><U>" + _GUI.T.jd_gui_swing_components_AccountDialog_cookies() + "</U></HTML>", HelpLinks.ACCOUNT_COOKIE_LOGIN_INSTRUCTIONS));
         } else if (cookieLoginOptional) {
             String labelTxt = _GUI.T.jd_gui_swing_components_AccountDialog_pass_or_cookies();
             labelTxt = labelTxt.replaceFirst("(?i)" + Pattern.quote(_GUI.T.jd_gui_swing_components_AccountDialog_cookies()), "<U>" + _GUI.T.jd_gui_swing_components_AccountDialog_cookies() + "</U>");
             if (!_GUI.T.jd_gui_swing_components_AccountDialog_pass_or_cookies().matches(labelTxt)) {
                 labelTxt = "<HTML>" + labelTxt + "</HTML>";
-                add(passwordOrCookiesLabel = new JLink(labelTxt, "https://support.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions"));
+                add(passwordOrCookiesLabel = new JLink(labelTxt, HelpLinks.ACCOUNT_COOKIE_LOGIN_INSTRUCTIONS));
             } else {
                 add(passwordOrCookiesLabel = new JLabel(labelTxt));
             }

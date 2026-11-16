@@ -154,6 +154,7 @@ import org.jdownloader.updatev2.SmartRlyRestartRequest;
 import org.jdownloader.updatev2.UpdateController;
 import org.jdownloader.updatev2.UpdateHandler;
 import org.jdownloader.updatev2.UpdaterListener;
+import org.jdownloader.utils.HelpLinks;
 
 public class JDGui implements UpdaterListener, OwnerFinder {
     private static final String TITLE_PATTERN_UPDATE            = "\\|([^\\|]*)\\#UPDATENOTIFY([^\\|]*)\\|";
@@ -549,7 +550,7 @@ public class JDGui implements UpdaterListener, OwnerFinder {
 
                                                 @Override
                                                 public void actionPerformed(ActionEvent e) {
-                                                    CrossSystem.openURL("https://jdownloader.org/knowledge/chat");
+                                                    CrossSystem.openURL(HelpLinks.GENERAL_KNOWLEDGE_CHAT);
                                                 }
                                             }));
                                             return ret;
@@ -565,7 +566,7 @@ public class JDGui implements UpdaterListener, OwnerFinder {
                             // installation.\r\nPlease Download the latest JDownloader 2 Installer, or visit our supportchat to ask for
                             // help.");
                             // CrossSystem.openURL("http://jdownloader.org/download/offline");
-                            // CrossSystem.openURL("http://jdownloader.org/knowledge/chat");
+                            // CrossSystem.openURL(HelpLinks.GENERAL_KNOWLEDGE_CHAT);
                         }
                     }
                 };

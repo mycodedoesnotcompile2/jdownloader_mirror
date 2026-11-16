@@ -46,7 +46,36 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.HanimeTv;
 
-@DecrypterPlugin(revision = "$Revision: 51530 $", interfaceVersion = 3, names = {}, urls = {})
+/**
+ * <b>STATUS (2026-11): DEFECT - website was completely rebuilt, this crawler is outdated and needs a rewrite.</b> <br>
+ * Findings so far:
+ * <ul>
+ * <li>The website is now an Astro page with a Vue island (HTVPlayer). <code>window.__NUXT__</code> no longer exists. The HTML only contains
+ * title/slug (ld+json VideoObject, <code>data-video-id</code>, astro-island props "slug"). No streams/manifest/description in the HTML.</li>
+ * <li>The old flow (/downloads/&lt;base64 slug&gt; + reCAPTCHA v2 + h.freeanimehentai.net/rapi/v7/downloads) is no longer referenced by the
+ * player JS. The page now uses a Turnstile site key (0x4AAAAAABsjKGKilqEiCHWo).</li>
+ * <li>New flow according to the player JS (/_astro/BLboX1K_.js):
+ * <ol>
+ * <li>GET https://ct.hanime.tv/csrf-token -> {"csrf_token": "...", "csrf_token_expires_at": ...} and sets cookie "htv_csrf_proof".</li>
+ * <li>POST https://auth.hanime.tv/api/v11/handshake with JSON body {"token": &lt;encrypted blob&gt;} and headers content-type/accept
+ * application/json, x-signature-version: web2, x-signature, x-time, x-csrf-token.</li>
+ * <li>Plaintext of the token: {"timestamp_unix": &lt;unix seconds&gt;, "directive": "htv_player_handshake", "slug": "...", "playlist_slug":
+ * optional}.</li>
+ * <li>Encryption ("htv-insecure" scheme, /_astro/CwylGxhk2.js): AES-256-GCM, key = SHA-256("htv-insecure-handshake-v1"), random 12 byte IV,
+ * AAD = "htv-insecure-v1", 128 bit tag. Output = base64url(JSON {"v":1,"alg":"AES-256-GCM","iv":b64url,"tag":b64url,"data":b64url}), data
+ * = ciphertext without tag.</li>
+ * <li>The response header "x-token" is encrypted the same way. Decrypted it is JSON containing "sources" (+ preroll ad info).</li>
+ * </ol>
+ * </li>
+ * <li><b>Blocker:</b> x-signature and x-time come from an Emscripten WASM module (embedded as base64 in
+ * hanime-cdn.com/js/vendor.&lt;hash&gt;.min.js, exports window.ssignature / window.stime, recalculated on every "e" window event). The server
+ * validates the signature: a random 32 char hex value results in HTTP 401 {"error_id":"UA1","message":"Unauthorized"}. The WASM contains
+ * SHA-256 constants and the strings ",Xkdi29," and ",mn2,", so the signature is most likely a SHA-256 over a string built with these
+ * salts, the unix time and probably location/origin. The exact formula is not reversed yet.</li>
+ * <li>Unknown: whether "sources" contains direct download URLs or only HLS streams, and whether Cloudflare/Turnstile is required.</li>
+ * </ul>
+ */
+@DecrypterPlugin(revision = "$Revision: 53999 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { HanimeTv.class })
 public class HanimeTvCrawler extends PluginForDecrypt {
     public HanimeTvCrawler(PluginWrapper wrapper) {
@@ -98,6 +127,7 @@ public class HanimeTvCrawler extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        /* TODO: OUTDATED - window.__NUXT__ no longer exists, see class comment for the new website structure. */
         final String json = br.getRegex("window\\.__NUXT__=(.*?);</script>").getMatch(0);
         final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
         final Map<String, Object> video = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "state/data/video");
@@ -190,7 +220,9 @@ public class HanimeTvCrawler extends PluginForDecrypt {
 
     /**
      * Generates a random 32-character hexadecimal string for x-signature <br>
-     * This might have worked for their apiv6 but not for v7(?)
+     * This might have worked for their apiv6 but not for v7(?) <br>
+     * Verified 2026-11: A random signature is rejected by the new API (auth.hanime.tv/api/v11/handshake) with HTTP 401 "UA1". The real
+     * signature is calculated by a WASM module, see class comment.
      */
     public static String generateXSignature() {
         Random random = new Random();

@@ -49,7 +49,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "evilangel.legacy" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 53996 $", interfaceVersion = 2, names = { "evilangel.legacy" }, urls = { "" })
 @Deprecated
 // 2021-09-01: TODO: Rewrite all plugins which still make use of this to to use EvilangelCore!
 public class EvilAngelLegacy extends antiDDoSForHost {
@@ -128,7 +128,7 @@ public class EvilAngelLegacy extends antiDDoSForHost {
 
     /**
      * NOTE: While making the plugin, the testaccount was banned temporarily and we didn't get new password/username from the user->Plugin
-     * isn't 100% done yet! http://svn.jdownloader.org/issues/6793
+     * isn't 100% done yet!
      */
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {

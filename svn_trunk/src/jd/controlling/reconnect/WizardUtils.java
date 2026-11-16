@@ -15,6 +15,7 @@ import org.appwork.utils.swing.dialog.DialogNoAnswerException;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.utils.HelpLinks;
 
 public class WizardUtils {
     /**
@@ -41,10 +42,10 @@ public class WizardUtils {
                     Dialog.getInstance().showDialog(d);
                     if (modemChoose[0]) {
                         Dialog.getInstance().showErrorDialog(_GUI.T.AutoSetupAction_actionPerformed_noautoformodem());
-                        CrossSystem.openURL("http://jdownloader.org/knowledge/wiki/reconnect/modem");
+                        CrossSystem.openURL(HelpLinks.RECONNECT_MODEM);
                         return true;
                     }
-                    CrossSystem.openURL("http://jdownloader.org/knowledge/wiki/reconnect/modem");
+                    CrossSystem.openURL(HelpLinks.RECONNECT_MODEM);
                     // don't know
                 } catch (DialogCanceledException e1) {
                     // router

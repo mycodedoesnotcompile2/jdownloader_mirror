@@ -137,7 +137,7 @@ public class MyJDownloaderPanel extends SwitchPanel implements ListSelectionList
         right.removeAll();
         right.add(selectedPanel, "pushx,growx,pushy,growy");
         right.revalidate();
-        // without the repaint, we get ugly glitches: http://svn.jdownloader.org/issues/8853
+        // without the repaint, we get ugly glitches
         right.repaint();
         panel = selectedPanel;
         panel.setShown();

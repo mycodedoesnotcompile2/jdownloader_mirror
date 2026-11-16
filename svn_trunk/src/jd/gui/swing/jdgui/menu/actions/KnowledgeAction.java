@@ -21,6 +21,7 @@ import org.appwork.utils.os.CrossSystem;
 import org.jdownloader.controlling.contextmenu.CustomizableAppAction;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.utils.HelpLinks;
 
 public class KnowledgeAction extends CustomizableAppAction {
     private static final long serialVersionUID = 2227665710503234763L;
@@ -33,6 +34,6 @@ public class KnowledgeAction extends CustomizableAppAction {
 
     @Override
     public void actionPerformed(ActionEvent e) {
-        CrossSystem.openURL("https://jdownloader.org/knowledge/index");
+        CrossSystem.openURL(HelpLinks.GENERAL_KNOWLEDGE_INDEX);
     }
 }

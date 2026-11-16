@@ -101,6 +101,7 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.updatev2.UpdateController;
+import org.jdownloader.utils.HelpLinks;
 
 public class AboutDialog extends AbstractDialog<Integer> {
     private int labelHeight = 0;
@@ -188,9 +189,9 @@ public class AboutDialog extends AbstractDialog<Integer> {
             }
             links1stRow.add(new JLink(_GUI.T.jd_gui_swing_components_AboutDialog_homepage(), new AbstractIcon(IconKey.ICON_HOME, 16), new URL("https://jdownloader.org/home")));
             links1stRow.add(new JLink(_GUI.T.jd_gui_swing_components_AboutDialog_forum(), new AbstractIcon(IconKey.ICON_BOARD, 16), new URL("https://board.jdownloader.org/")));
-            links1stRow.add(new JLink(_GUI.T.jd_gui_swing_components_AboutDialog_ticket(), new AbstractIcon(IconKey.ICON_BOARD, 16), new URL("https://support.jdownloader.org/")));
-            links1stRow.add(new JLink(_GUI.T.jd_gui_swing_components_AboutDialog_uninstall(), new AbstractIcon(IconKey.ICON_CLEAR, 16), new URL("https://support.jdownloader.org/Knowledgebase/Article/View/how-can-i-uninstall-jdownloader")));
-            links2ndRow.add(new JLink(_GUI.T.jd_gui_swing_components_AboutDialog_contributers(), new AbstractIcon(IconKey.ICON_EDIT, 16), new URL("https://support.jdownloader.org/Knowledgebase/Article/View/setup-ide-eclipse")));
+            links1stRow.add(new JLink(_GUI.T.jd_gui_swing_components_AboutDialog_ticket(), new AbstractIcon(IconKey.ICON_BOARD, 16), new URL(HelpLinks.GENERAL_SUPPORT_HOME)));
+            links1stRow.add(new JLink(_GUI.T.jd_gui_swing_components_AboutDialog_uninstall(), new AbstractIcon(IconKey.ICON_CLEAR, 16), new URL(HelpLinks.GENERAL_UNINSTALL_JDOWNLOADER)));
+            links2ndRow.add(new JLink(_GUI.T.jd_gui_swing_components_AboutDialog_contributers(), new AbstractIcon(IconKey.ICON_EDIT, 16), new URL(HelpLinks.DEVELOPMENT_SETUP_IDE_ECLIPSE)));
             links2ndRow.add(new JLink(_GUI.T.jd_gui_swing_components_AboutDialog_imprint(), new AbstractIcon(IconKey.ICON_ABOUT, 16), new URL("https://jdownloader.org/impressum")));
             links2ndRow.add(new JLink(_GUI.T.jd_gui_swing_components_AboutDialog_privacy(), new AbstractIcon(IconKey.ICON_ABOUT, 16), new URL("https://my.jdownloader.org/legal/privacy.html#jdownloader")));
         } catch (MalformedURLException e1) {
@@ -294,7 +295,7 @@ public class AboutDialog extends AbstractDialog<Integer> {
                 final long max = memory.getMax();
                 final long minimumWarningLevel = max / 100 * 20;// less than 20% free, warning
                 if (max - used < minimumWarningLevel) {
-                    stats.add(comp = createLink("Usage: " + SizeFormatter.formatBytes(NumberFormat.getInstance(Locale.ROOT), used) + " - Allocated: " + SizeFormatter.formatBytes(NumberFormat.getInstance(Locale.ROOT), committed) + " - Max: " + SizeFormatter.formatBytes(NumberFormat.getInstance(Locale.ROOT), max), "https://support.jdownloader.org/Knowledgebase/Article/View/troubleshooting-jdownloader-is-slow"));
+                    stats.add(comp = createLink("Usage: " + SizeFormatter.formatBytes(NumberFormat.getInstance(Locale.ROOT), used) + " - Allocated: " + SizeFormatter.formatBytes(NumberFormat.getInstance(Locale.ROOT), committed) + " - Max: " + SizeFormatter.formatBytes(NumberFormat.getInstance(Locale.ROOT), max), HelpLinks.GENERAL_TROUBLESHOOTING_JDOWNLOADER_IS_SLOW));
                     final long minimumRedWarning = max / 100 * 10;// less than 10% free, warning
                     if (max - used < minimumRedWarning) {
                         comp.setForeground(Color.RED);
@@ -302,7 +303,7 @@ public class AboutDialog extends AbstractDialog<Integer> {
                         comp.setForeground(Color.ORANGE.darker());
                     }
                 } else {
-                    stats.add(comp = createLink("Usage: " + SizeFormatter.formatBytes(NumberFormat.getInstance(Locale.ROOT), used) + " - Allocated: " + SizeFormatter.formatBytes(NumberFormat.getInstance(Locale.ROOT), committed) + " - Max: " + SizeFormatter.formatBytes(NumberFormat.getInstance(Locale.ROOT), max), "https://support.jdownloader.org/Knowledgebase/Article/View/vmoptions-file"));
+                    stats.add(comp = createLink("Usage: " + SizeFormatter.formatBytes(NumberFormat.getInstance(Locale.ROOT), used) + " - Allocated: " + SizeFormatter.formatBytes(NumberFormat.getInstance(Locale.ROOT), committed) + " - Max: " + SizeFormatter.formatBytes(NumberFormat.getInstance(Locale.ROOT), max), HelpLinks.GENERAL_VMOPTIONS_FILE));
                 }
                 try {
                     final List<MemoryPoolMXBean> memoryPoolMXBeans = java.lang.management.ManagementFactory.getMemoryPoolMXBeans();

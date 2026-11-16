@@ -230,6 +230,59 @@ public class CaptchaConfigPanel extends AbstractConfigPanel {
     }
 
     /**
+     * Opens the captcha settings with the given solvers selected in the solver table (can be called from any thread), e.g. all solvers
+     * which are listed in the "no solver available" dialog.
+     */
+    public static void showCaptchaSettings(final java.util.Collection<SolverService> solvers) {
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                JsonConfig.create(GraphicalUserInterfaceSettings.class).setConfigViewVisible(true);
+                JDGui.getInstance().setContent(ConfigurationView.getInstance(), true);
+                ConfigurationView.getInstance().setSelectedSubPanel(CaptchaConfigPanel.class);
+                final CaptchaConfigPanel captchaConfigPanel = ConfigurationView.getInstance().getSubPanel(CaptchaConfigPanel.class);
+                if (captchaConfigPanel != null) {
+                    captchaConfigPanel.selectSolvers(solvers);
+                }
+            }
+        });
+    }
+
+    /**
+     * Shows the "Solver overview & settings" tab and selects the given solvers in its table (the first one is scrolled into view). Deferred
+     * like {@link #selectSolver(String)}.
+     */
+    private void selectSolvers(final java.util.Collection<SolverService> solvers) {
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                tabs.setSelectedComponent(solversScrollPane);
+                final ExtTableModel<SolverService> model = solverOrderTable.getModel();
+                int firstRow = -1;
+                /* One selection event for all rows. */
+                solverOrderTable.getSelectionModel().setValueIsAdjusting(true);
+                try {
+                    solverOrderTable.clearSelection();
+                    for (int row = 0; row < model.getRowCount(); row++) {
+                        final SolverService solver = model.getObjectbyRow(row);
+                        if (solver != null && solvers.contains(solver)) {
+                            solverOrderTable.getSelectionModel().addSelectionInterval(row, row);
+                            if (firstRow < 0) {
+                                firstRow = row;
+                            }
+                        }
+                    }
+                } finally {
+                    solverOrderTable.getSelectionModel().setValueIsAdjusting(false);
+                }
+                if (firstRow >= 0) {
+                    solverOrderTable.scrollRectToVisible(solverOrderTable.getCellRect(firstRow, 0, true));
+                }
+            }
+        });
+    }
+
+    /**
      * Opens the captcha settings with the solver of the given ID (the host of a captcha solver plugin) preselected. Captcha solver plugins
      * always link here instead of to the plugin settings.
      */

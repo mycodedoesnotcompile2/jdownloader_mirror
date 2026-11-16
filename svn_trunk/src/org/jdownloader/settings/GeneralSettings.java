@@ -38,6 +38,7 @@ import org.jdownloader.gui.packagehistorycontroller.SearchHistoryEntry;
 import org.jdownloader.gui.translate._GUI;
 
 import com.sun.jna.platform.win32.KnownFolders;
+import org.jdownloader.utils.HelpLinks;
 
 public interface GeneralSettings extends ConfigInterface {
     class DefaultDownloadFolder extends AbstractDefaultFactory<String> {
@@ -356,7 +357,7 @@ public interface GeneralSettings extends ConfigInterface {
     int getMaxBufferSize();
 
     @AboutConfig
-    @DescriptionForConfigEntry("http://jdownloader.org/knowledge/wiki/glossary/chunkload")
+    @DescriptionForConfigEntry(HelpLinks.SETTINGS_CHUNKLOAD)
     @SpinnerValidator(min = 1, max = 20)
     @DefaultIntValue(1)
     int getMaxChunksPerFile();
@@ -406,7 +407,7 @@ public interface GeneralSettings extends ConfigInterface {
     void setKeepXOldLists(int x);
 
     @AboutConfig
-    @DescriptionForConfigEntry("Allows the user to copy single(!) 'protected' URLs which is not possible by default. This applies e.g. to URLs added via Click and Load or DLC containers.  See: https://support.jdownloader.org/Knowledgebase/Article/View/copy-view-added-urls")
+    @DescriptionForConfigEntry("Allows the user to copy single(!) 'protected' URLs which is not possible by default. This applies e.g. to URLs added via Click and Load or DLC containers.  See: " + HelpLinks.GENERAL_COPY_VIEW_ADDED_URLS)
     @DefaultBooleanValue(false)
     boolean isCopySingleRealURL();
 

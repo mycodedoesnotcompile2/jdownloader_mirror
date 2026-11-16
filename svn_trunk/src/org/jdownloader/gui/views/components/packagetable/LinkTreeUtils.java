@@ -200,7 +200,7 @@ public class LinkTreeUtils {
         }
         /**
          * Allows to skip url content protection for single links. <br>
-         * See: https://support.jdownloader.org/knowledgebase/article/copy-view-added-urls
+         * See: HelpLinks.GENERAL_COPY_VIEW_ADDED_URLS
          */
         if (!openInBrowser && copySingleRealURL && children.size() == 1 && rawURL != null && rawURL.matches("((?-i)ftps?|https?)://.+")) {
             urls.clear();

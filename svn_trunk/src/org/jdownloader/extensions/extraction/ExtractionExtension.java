@@ -82,6 +82,7 @@ import org.jdownloader.extensions.extraction.contextmenu.downloadlist.action.Cle
 import org.jdownloader.extensions.extraction.contextmenu.downloadlist.action.CleanupAutoDeleteLinksEnabledToggleAction;
 import org.jdownloader.extensions.extraction.contextmenu.downloadlist.action.ExtractArchiveNowAction;
 import org.jdownloader.extensions.extraction.contextmenu.downloadlist.action.SetExtractPasswordAction;
+import org.jdownloader.extensions.extraction.contextmenu.downloadlist.action.OpenExtractionDirectoryAction;
 import org.jdownloader.extensions.extraction.contextmenu.downloadlist.action.SetExtractToAction;
 import org.jdownloader.extensions.extraction.contextmenu.downloadlist.action.ValidateArchivesAction;
 import org.jdownloader.extensions.extraction.gui.bubble.ExtractionBubbleSupport;
@@ -1005,6 +1006,15 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
     }
 
     public File getFinalExtractToFolder(Archive archive, boolean raw) {
+        return getFinalExtractToFolder(archive, raw, true);
+    }
+
+    /**
+     * @param appendSubFolder
+     *            false: do not append the configured subfolder. Its existence depends on the archive content (thresholds), which is not
+     *            always known (e.g. before the archive was validated).
+     */
+    public File getFinalExtractToFolder(Archive archive, boolean raw, final boolean appendSubFolder) {
         String path = null;
         if (StringUtils.isEmpty(path)) {
             path = archive.getSettings().getExtractPath();
@@ -1015,7 +1025,9 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
                 }
                 path = archive.getFactory().createExtractSubPath(path, archive);
                 File ret = new File(path);
-                ret = appendSubFolder(archive, ret);
+                if (appendSubFolder) {
+                    ret = appendSubFolder(archive, ret);
+                }
                 return ret;
             }
         }
@@ -1035,7 +1047,9 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
         }
         path = archive.getFactory().createExtractSubPath(path, archive);
         File ret = new File(path);
-        ret = appendSubFolder(archive, ret);
+        if (appendSubFolder) {
+            ret = appendSubFolder(archive, ret);
+        }
         return ret;
     }
 
@@ -1107,6 +1121,7 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
             root.add(new SeparatorData());
             root.add(new MenuItemData(new ActionData(AutoExtractEnabledToggleAction.class)));
             root.add(new MenuItemData(new ActionData(SetExtractToAction.class)));
+            root.add(new MenuItemData(new ActionData(OpenExtractionDirectoryAction.class)));
             root.add(new MenuItemData(new ActionData(SetExtractPasswordAction.class)));
             final CleanupSubMenu cleanup = new CleanupSubMenu();
             cleanup.add(new MenuItemData(new ActionData(CleanupAutoDeleteFilesEnabledToggleAction.class)));

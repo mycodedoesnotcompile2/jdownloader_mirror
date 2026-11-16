@@ -85,8 +85,9 @@ import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PornHubComVideoCrawler;
+import org.jdownloader.utils.HelpLinks;
 
-@HostPlugin(revision = "$Revision: 53482 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53997 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornHubComVideoCrawler.class })
 public class PornHubCom extends PluginForHost {
     /* Connection stuff */
@@ -1346,7 +1347,7 @@ public class PornHubCom extends PluginForHost {
          */
         // final Boolean rememberMe = (Boolean) entries.get("remember_me");
         // final String username = (String) entries.get("username");
-        final String defaultTextLoginFailed_EN = "Login failed.\r\nIf you believe this message is incorrect, try cookie login.\r\nInstructions:\r\nsupport.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions";
+        final String defaultTextLoginFailed_EN = "Login failed.\r\nIf you believe this message is incorrect, try cookie login.\r\nInstructions:\r\n" + HelpLinks.ACCOUNT_COOKIE_LOGIN_INSTRUCTIONS;
         if ((Integer) ReflectionUtils.cast(entries.get("success"), Integer.class) != 1) {
             if (!StringUtils.isEmpty(message)) {
                 throw new AccountInvalidException(message);

@@ -93,14 +93,13 @@ public class DownloadFolderChooserDialog extends ExtFileChooserDialog {
     @Override
     public void dispose() {
         try {
+            /*
+             * Remember the selected view for every way of closing the dialog. The path is NOT checked here: dispose() is called multiple times
+             * for one close and also for cancel/close, where the selected folder is not used. The check of the path (and the history) is done
+             * in open(), and only if the dialog was approved.
+             */
             if (isInitialized()) {
-                final File[] dest = createReturnValue();
-                if (dest != null && dest.length > 0) {
-                    dest[0] = FolderChooser.checkPath(dest[0], null);
-                    if (dest[0] != null) {
-                        DownloadPathHistoryManager.getInstance().add(dest[0].getAbsolutePath());
-                    }
-                }
+                CFG_GUI.CFG.setFileChooserView(getView());
             }
         } finally {
             super.dispose();
@@ -241,10 +240,12 @@ public class DownloadFolderChooserDialog extends ExtFileChooserDialog {
         if (dest == null || dest.length == 0) {
             return null;
         }
+        /* Only reached if the dialog was approved (cancel/close throw an exception above). */
         dest[0] = FolderChooser.checkPath(dest[0], null);
         if (dest[0] == null) {
             return null;
         }
+        DownloadPathHistoryManager.getInstance().add(dest[0].getAbsolutePath());
         return dest[0];
     }
 

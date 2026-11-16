@@ -49,7 +49,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.ChoMikujPl;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52930 $", interfaceVersion = 2, names = { "chomikuj.pl" }, urls = { "https?://((?:www\\.)?chomikuj\\.pl//?[^<>\"]+|chomikujpagedecrypt\\.pl/result/.+)" })
+@DecrypterPlugin(revision = "$Revision: 53996 $", interfaceVersion = 2, names = { "chomikuj.pl" }, urls = { "https?://((?:www\\.)?chomikuj\\.pl//?[^<>\"]+|chomikujpagedecrypt\\.pl/result/.+)" })
 public class ChoMikujPlFolder extends PluginForDecrypt {
     public ChoMikujPlFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -107,7 +107,7 @@ public class ChoMikujPlFolder extends PluginForDecrypt {
         loadHosterPlugin();
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         if (new Regex(param.getCryptedUrl(), Pattern.compile(VIDEO_DIRECTURL, Pattern.CASE_INSENSITIVE)).patternFind()) {
-            /* 2019-07-16: Very rare case e.g. https://svn.jdownloader.org/issues/81525 */
+            /* 2019-07-16: Very rare case */
             ret.add(this.createDownloadlink(DirectHTTP.createURLForThisPlugin(param.getCryptedUrl())));
             return ret;
         }

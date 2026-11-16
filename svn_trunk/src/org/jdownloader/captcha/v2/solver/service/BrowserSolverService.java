@@ -3,8 +3,6 @@ package org.jdownloader.captcha.v2.solver.service;
 import java.io.File;
 import java.util.EnumSet;
 import java.util.Set;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.swing.Icon;
@@ -26,6 +24,7 @@ import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 
 import jd.gui.swing.jdgui.views.settings.panels.anticaptcha.SelectBrowserDialog;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
+import org.jdownloader.utils.HelpLinks;
 
 public class BrowserSolverService extends AbstractSolverService {
     public static final String                  ID       = "browser";
@@ -213,13 +212,7 @@ public class BrowserSolverService extends AbstractSolverService {
 
     @Override
     public Set<CAPTCHA_TYPE> getSupportedCaptchaTypes() {
-        return EnumSet.of(
-                CAPTCHA_TYPE.HCAPTCHA,
-                CAPTCHA_TYPE.RECAPTCHA_V3,
-                CAPTCHA_TYPE.RECAPTCHA_V3_ENTERPRISE,
-                CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE,
-                CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE,
-                CAPTCHA_TYPE.RECAPTCHA_V2);
+        return EnumSet.of(CAPTCHA_TYPE.HCAPTCHA, CAPTCHA_TYPE.RECAPTCHA_V3, CAPTCHA_TYPE.RECAPTCHA_V3_ENTERPRISE, CAPTCHA_TYPE.RECAPTCHA_V2_INVISIBLE, CAPTCHA_TYPE.RECAPTCHA_V2_ENTERPRISE, CAPTCHA_TYPE.RECAPTCHA_V2);
     }
 
     /** Typed config accessor used by the browser solver subsystem. */
@@ -237,7 +230,7 @@ public class BrowserSolverService extends AbstractSolverService {
 
     @Override
     public String getHelpArticleURL() {
-        return "https://support.jdownloader.org/de/knowledgebase/article/jd-opens-my-browser-to-display-captchas";
+        return HelpLinks.CAPTCHA_JD_OPENS_BROWSER;
     }
 
     @Override

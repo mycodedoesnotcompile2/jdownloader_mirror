@@ -1486,6 +1486,21 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Save to" })
     String LinkGrabberTableModel_initColumns_folder();
 
+    @Default(lngs = { "en" }, values = { "Extract to" })
+    String ExtractToColumn_name();
+
+    @Default(lngs = { "en" }, values = { "Extraction disabled" })
+    String ExtractToColumn_extraction_disabled();
+
+    @Default(lngs = { "en" }, values = { "Auto extract disabled" })
+    String ExtractToColumn_auto_extract_disabled();
+
+    @Default(lngs = { "en" }, values = { "Multiple destinations" })
+    String ExtractToColumn_multiple_destinations();
+
+    @Default(lngs = { "en" }, values = { "The subfolder is only created if the archive content meets the configured subfolder thresholds." })
+    String ExtractToColumn_subfolder_hint();
+
     @Default(lngs = { "en" }, values = { "Download from" })
     String LinkGrabberTableModel_initColumns_url();
 
@@ -6152,7 +6167,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "There are several ways to solve a captcha in JDownloader. You can change the general order/priority of these \"Solvers\" and the time a solver waits for its predecessors.\r\nExample:\r\nBy default, the manual Dialog solvers wait upto 60 seconds for all automated solvers." })
     String CaptchaConfigPanel_order_description();
 
-    @Default(lngs = { "en" }, values = { "Solver Overview & Settings" })
+    @Default(lngs = { "en" }, values = { "Solver Order & Settings" })
     String CaptchaConfigPanel_solverOverviewAndSettings();
 
     @Default(lngs = { "en" }, values = { "Captcha types to display:" })
@@ -7787,8 +7802,20 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Finish" })
     String CaptchaWizard_finish();
 
-    @Default(lngs = { "en" }, values = { "Update captcha solver sort order according to my preferences" })
+    @Default(lngs = { "en" }, values = { "Update captcha sort order" })
     String CaptchaWizard_finish_sortOrder();
+
+    @Default(lngs = { "en" }, values = { "Update captcha sort order (manual first)" })
+    String CaptchaWizard_finish_sortOrderManual();
+
+    @Default(lngs = { "en" }, values = { "Update captcha sort order (automatic first)" })
+    String CaptchaWizard_finish_sortOrderAutomatic();
+
+    @Default(lngs = { "en" }, values = { "Sorts all usable solvers by your preference from step 1." })
+    String CaptchaWizard_finish_sortOrderInfo();
+
+    @Default(lngs = { "en" }, values = { "Opens a table to compare solvers and find a combination that covers all your captcha types. The solvers listed above are highlighted as a suggestion, the choice is yours." })
+    String CaptchaWizard_finish_openComparisonInfo();
 
     @Default(lngs = { "en" }, values = { "Open captcha comparison table" })
     String CaptchaWizard_finish_openComparison();
@@ -7952,7 +7979,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Automatic captcha solving via paid external captcha solver" })
     String CaptchaWizard_step1_paid();
 
-    @Default(lngs = { "en" }, values = { "Both manual & automatic captcha solving via paid external captcha solver" })
+    @Default(lngs = { "en" }, values = { "I don't care:\r\nBoth manual & automatic captcha solving via paid external captcha solver" })
     String CaptchaWizard_step1_both();
 
     @Default(lngs = { "en" }, values = { "For which websites do you need to solve captchas?" })
@@ -7994,14 +8021,44 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Based on your selection, you need to solve the following types of captchas:" })
     String CaptchaWizard_step3_header();
 
+    @Default(lngs = { "en" }, values = { "Solvable in JD with any method" })
+    String CaptchaWizard_column_solvableAny();
+
+    @Default(lngs = { "en" }, values = { "Solvable in JD automatically" })
+    String CaptchaWizard_column_solvableAutomatically();
+
+    @Default(lngs = { "en" }, values = { "Solvable in JD manually" })
+    String CaptchaWizard_column_solvableManually();
+
+    @Default(lngs = { "en" }, values = { "Solvable automatically and manually: You can choose whether a captcha solver or you solves it." })
+    String CaptchaWizard_tooltip_solvableBoth();
+
+    @Default(lngs = { "en" }, values = { "Solvable automatically only: With the current configuration, only a captcha solver can solve it. There is no way to solve it yourself." })
+    String CaptchaWizard_tooltip_solvableAutomaticOnly();
+
+    @Default(lngs = { "en" }, values = { "Solvable manually only: With the current configuration, only you can solve it. No captcha solver supports it." })
+    String CaptchaWizard_tooltip_solvableManualOnly();
+
+    @Default(lngs = { "en" }, values = { "Currently not covered: With the current configuration, neither a captcha solver nor a manual method supports this captcha type. This can change if you add or enable other solvers." })
+    String CaptchaWizard_tooltip_solvableNone();
+
+    @Default(lngs = { "en" }, values = { "At least one automatic captcha solver (e.g. a paid solver or JAntiCaptcha) supports this captcha type." })
+    String CaptchaWizard_tooltip_automaticYes();
+
+    @Default(lngs = { "en" }, values = { "Currently no automatic captcha solver supports this captcha type. This can change if you add or enable other solvers." })
+    String CaptchaWizard_tooltip_automaticNo();
+
+    @Default(lngs = { "en" }, values = { "You can solve this captcha type yourself (dialog, browser or MyJDownloader)." })
+    String CaptchaWizard_tooltip_manualYes();
+
+    @Default(lngs = { "en" }, values = { "Currently no manual solving method (dialog, browser or MyJDownloader) supports this captcha type." })
+    String CaptchaWizard_tooltip_manualNo();
+
     @Default(lngs = { "en" }, values = { "Notes" })
     String CaptchaWizard_notes_header();
 
     @Default(lngs = { "en" }, values = { "Already usable" })
     String CaptchaWizard_column_alreadyUsable();
-
-    @Default(lngs = { "en" }, values = { "Highlight in comparison table" })
-    String CaptchaWizard_column_relevant();
 
     @Default(lngs = { "en" }, values = { "In the next step, JDownloader will suggest captcha solvers which fit your needs." })
     String CaptchaWizard_step3_nextInfo();
@@ -8014,9 +8071,6 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Solves all your required captcha types" })
     String CaptchaWizard_column_solvesAll();
-
-    @Default(lngs = { "en" }, values = { "Yes (%s1/%s2)" })
-    String CaptchaWizard_solvesAll_yes(int solved, int required);
 
     @Default(lngs = { "en" }, values = { "No (%s1/%s2)" })
     String CaptchaWizard_solvesAll_no(int solved, int required);

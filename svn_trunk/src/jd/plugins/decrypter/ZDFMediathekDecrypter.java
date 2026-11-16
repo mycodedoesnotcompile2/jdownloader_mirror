@@ -68,7 +68,7 @@ import jd.plugins.hoster.ZdfDeMediathek;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface.SubtitleType;
 
-@DecrypterPlugin(revision = "$Revision: 53305 $", interfaceVersion = 3, names = { "zdf.de", "logo.de", "zdfheute.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?logo\\.de/.+", "https?://(?:www\\.)?zdfheute\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
+@DecrypterPlugin(revision = "$Revision: 53996 $", interfaceVersion = 3, names = { "zdf.de", "logo.de", "zdfheute.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/.+", "https?://(?:www\\.)?logo\\.de/.+", "https?://(?:www\\.)?zdfheute\\.de/.+", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
 public class ZDFMediathekDecrypter extends PluginForDecrypt {
     private boolean                          fastlinkcheck             = false;
     private final String                     TYPE_ZDF                  = "(?i)https?://(?:www\\.)?(?:zdf\\.de|3sat\\.de)/.+";
@@ -189,7 +189,7 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         final String[] knownProtocols = { "http", "hls" };
         /** 2021-02-01: Removed all .webm qualities from settings */
         final String[] knownExtensions = { "mp4", "webm" };
-        /* 2021-07-22: medium and high are swapped --> https://svn.jdownloader.org/issues/89857 */
+        /* 2021-07-22: medium and high are swapped */
         final String[] knownQualityNames = { "uhd", "fhd", "1080", "hd", "veryhigh", "720", "480", "360", "medium", "high", "low", "170" };
         final String[] knownAudioClasses = { "main", "ad", "ot" };
         for (final String protocol : knownProtocols) {

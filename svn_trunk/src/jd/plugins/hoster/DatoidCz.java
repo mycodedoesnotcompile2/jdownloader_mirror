@@ -47,7 +47,7 @@ import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 52513 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 53996 $", interfaceVersion = 2, names = {}, urls = {})
 public class DatoidCz extends PluginForHost {
     public DatoidCz(PluginWrapper wrapper) {
         super(wrapper);
@@ -228,7 +228,7 @@ public class DatoidCz extends PluginForHost {
         if (br.containsHTML("<div class=\"bPopup free-popup file-on-page big-file\">")) {
             throw new AccountRequiredException();
         } else if (br.containsHTML(">\\s*Soubor byl zablokován\\.")) {
-            /* 2019-08-12: WTF: Log: 6759186935451 : svn.jdownloader.org/issues/87302 */
+            /* 2019-08-12: WTF: Log: 6759186935451 */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Soubor byl zablokován.", 30 * 60 * 1000l);
         }
         final String continue_url = br.getRegex("class=\"[^\"]*?btn btn-large btn-download detail-download\" href=\"(/f/[^<>\"]+)\"").getMatch(0);

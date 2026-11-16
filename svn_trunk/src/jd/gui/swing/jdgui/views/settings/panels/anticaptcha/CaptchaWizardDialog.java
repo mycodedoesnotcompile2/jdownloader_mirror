@@ -75,6 +75,7 @@ import jd.plugins.Account;
 import jd.plugins.CaptchaType;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import net.miginfocom.swing.MigLayout;
+import org.jdownloader.utils.HelpLinks;
 
 /**
  * Wizard which helps the user to find the captcha solvers which fit the needs: <br>
@@ -84,7 +85,10 @@ import net.miginfocom.swing.MigLayout;
  * At the end the captcha comparison table is opened with the needed captcha types selected, see
  * {@link CaptchaConfigPanel#showCaptchaWizardResult(Set, boolean, boolean, boolean)}. <br>
  * The selected entries are stored in {@link CaptchaSettings#getCaptchaWizardEntries()} when the wizard is finished and are preselected the
- * next time.
+ * next time. <br>
+ * <b>JAntiCaptcha ({@link JacSolverService}) is of minor importance for this wizard:</b> It only solves a few simple image captchas, so
+ * all other solvers are more important than it. It is still shown and mentioned (pre-check, tables, notes), but wherever solvers are
+ * ordered, preferred or suggested, every other solver comes before it. Keep this in mind when changing the wizard.
  */
 public class CaptchaWizardDialog extends AbstractDialog<Integer> {
     /* The number of steps follows this array, the progress bar and the buttons are derived from it. */
@@ -146,7 +150,7 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
     private CaptchaWizardDomainTable domainTable;
     private JLabel              mixedInfoLabel;
     private JLabel              domainHintLabel;
-    private JPanel              typesPanel;
+    private CaptchaWizardTypeTable typeTable;
     private CaptchaWizardSolverTable solverTable;
     private JPanel              infoPanel;
     private JPanel              cardPanel;
@@ -156,7 +160,7 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
     /* The result of the last time step 3 was entered, used to open the comparison table. */
     private Set<CAPTCHA_TYPE>   requiredTypes = new LinkedHashSet<CAPTCHA_TYPE>();
     private boolean             anySolverSolvesAll = false;
-    /* The solvers the table of step 3 showed, they are marked in the comparison table. */
+    /* The solvers the table of the last step showed, they are highlighted in the comparison table. */
     private List<SolverService> shownSolvers       = new ArrayList<SolverService>();
 
     /** Shows the wizard, and opens the captcha comparison table if the user finishes it. */
@@ -183,7 +187,7 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
         }
         /* Finish is always possible, also with an empty table or if the user deselected all solvers. */
         if (dialog.openComparisonCheckBox.isSelected()) {
-            CaptchaConfigPanel.showCaptchaWizardResult(dialog.requiredTypes, dialog.solverTable.getRelevantSolvers());
+            CaptchaConfigPanel.showCaptchaWizardResult(dialog.requiredTypes, dialog.shownSolvers);
         }
     }
 
@@ -616,7 +620,7 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
         /* Only "Click here" is the link, the text in front of it is plain. */
         final JPanel linkPanel = new JPanel(new MigLayout("ins 0", "[][]", "[]"));
         linkPanel.add(new JLabel(_GUI.T.CaptchaWizard_login_linkPrefix()), "gapright 4");
-        linkPanel.add(createLinkLabel(_GUI.T.CaptchaWizard_login_link(), "https://support.jdownloader.org/knowledgebase/article/captchas-in-premium-mode-and-during-account-login"));
+        linkPanel.add(createLinkLabel(_GUI.T.CaptchaWizard_login_link(), HelpLinks.CAPTCHA_IN_PREMIUM_MODE));
         panel.add(linkPanel);
         final boolean avoidAuto = JsonConfig.create(CaptchaSettings.class).isAvoidAutoSolverForLoginCaptchas();
         loginLikeOtherRadio = new JRadioButton(_GUI.T.CaptchaWizard_login_likeOther(), !avoidAuto);
@@ -735,7 +739,7 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
     }
 
     /**
-     * True if the user changed anything: the solving method of step 1, or the entries of step 2 (added, removed, (de)selected). Only
+     * True if the user changed anything: the solving method of step 1, or the entries of step 2 (added, (de)selected). Only
      * without changes ESC may close the wizard, so a few mouse clicks are not lost by accident.
      */
     private boolean hasChanges() {
@@ -841,12 +845,17 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
 
     /** Step 3: The captcha types the user needs and the hint that the next step suggests captcha solvers. */
     private JComponent createTypesPanel() {
-        final JPanel panel = new JPanel(new MigLayout("ins 0, wrap 1", "[grow,fill]", "[][][]"));
-        panel.add(createHeader(_GUI.T.CaptchaWizard_step3_header()));
-        typesPanel = new JPanel(new MigLayout("ins 0, wrap 4", "[]20[]20[]20[]", "[]"));
-        panel.add(typesPanel, "gaptop 5, gapbottom 10");
+        final JPanel panel = new ViewportWidthPanel(new MigLayout("ins 0 0 0 5, wrap 1", "[grow,fill]", "[][][]"));
+        /* The bold text is above the table, the text with the light bulb below. */
+        panel.add(createHeader(_GUI.T.CaptchaWizard_step3_header()), "wmin 0");
+        typeTable = new CaptchaWizardTypeTable();
+        panel.add(typeTable.createScrollPane(), "grow, gaptop 5, gapbottom 10");
         panel.add(new JLabel("<html>" + _GUI.T.CaptchaWizard_step3_nextInfo() + "</html>", NewTheme.I().getIcon(IconKey.ICON_INFO, 18), JLabel.LEADING), "wmin 0");
-        return panel;
+        /* The content scrolls if the dialog is too small. */
+        final JScrollPane scroll = new JScrollPane(panel, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scroll.setBorder(null);
+        scroll.getVerticalScrollBar().setUnitIncrement(16);
+        return scroll;
     }
 
     /** A panel which is always as wide as the viewport of its scroll pane, so the text in it wraps instead of being cut off. */
@@ -906,12 +915,35 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
         panel.add(disableManualInfoLabel, "wmin 0, gapleft 25, hidemode 3");
         disableManualInfoLabel.setVisible(false);
         panel.add(sortOrderCheckBox);
+        panel.add(createCheckBoxInfo(_GUI.T.CaptchaWizard_finish_sortOrderInfo()), "wmin 0, gapleft 25");
         /* Always the last checkbox. */
         panel.add(openComparisonCheckBox);
+        panel.add(createCheckBoxInfo(_GUI.T.CaptchaWizard_finish_openComparisonInfo()), "wmin 0, gapleft 25");
         final JScrollPane scroll = new JScrollPane(panel, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scroll.setBorder(null);
         scroll.getVerticalScrollBar().setUnitIncrement(16);
         return scroll;
+    }
+
+    /** The explanation below a checkbox of the last step: a text with a light bulb. */
+    private static JLabel createCheckBoxInfo(final String text) {
+        return new JLabel("<html>" + text + "</html>", NewTheme.I().getIcon(IconKey.ICON_INFO, 18), JLabel.LEADING);
+    }
+
+    /** The sort order checkbox tells which kind of solver comes first. Nothing is added if the user does not care (both methods). */
+    private void updateSortOrderLabel() {
+        switch (getMethod()) {
+        case MANUAL:
+            sortOrderCheckBox.setText(_GUI.T.CaptchaWizard_finish_sortOrderManual());
+            break;
+        case PAID:
+            sortOrderCheckBox.setText(_GUI.T.CaptchaWizard_finish_sortOrderAutomatic());
+            break;
+        case BOTH:
+        default:
+            sortOrderCheckBox.setText(_GUI.T.CaptchaWizard_finish_sortOrder());
+            break;
+        }
     }
 
     /** A label which looks like a link and opens the given URL in the browser when clicked. */
@@ -1079,12 +1111,35 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
         for (final CaptchaWizardEntry entry : domainTable.getEnabledEntries()) {
             requiredTypes.add(entry.getCaptchaType());
         }
-        typesPanel.removeAll();
-        for (final CAPTCHA_TYPE type : requiredTypes) {
-            typesPanel.add(new JLabel(type.getDisplayName(), type.getIcon(), JLabel.LEADING));
+        /* What JDownloader can solve at all (usable or not): automatically (paid solvers, JAntiCaptcha) and manually (the user solves it). */
+        final Set<CAPTCHA_TYPE> automaticTypes = new LinkedHashSet<CAPTCHA_TYPE>();
+        final Set<CAPTCHA_TYPE> manualTypes = new LinkedHashSet<CAPTCHA_TYPE>();
+        for (final SolverService service : ChallengeResponseController.getInstance().getOrderedServices()) {
+            final Set<CAPTCHA_TYPE> supported = service.getSupportedCaptchaTypes();
+            if (supported == null) {
+                continue;
+            }
+            if (service.getType().requiresHuman()) {
+                manualTypes.addAll(supported);
+            } else {
+                automaticTypes.addAll(supported);
+            }
         }
-        typesPanel.revalidate();
-        typesPanel.repaint();
+        /* The column shown by default depends on the solving method of step 1. */
+        final CaptchaWizardTypeTable.DefaultColumn defaultColumn;
+        switch (getMethod()) {
+        case MANUAL:
+            defaultColumn = CaptchaWizardTypeTable.DefaultColumn.MANUAL;
+            break;
+        case PAID:
+            defaultColumn = CaptchaWizardTypeTable.DefaultColumn.AUTOMATIC;
+            break;
+        case BOTH:
+        default:
+            defaultColumn = CaptchaWizardTypeTable.DefaultColumn.ANY;
+            break;
+        }
+        typeTable.setTypes(requiredTypes, automaticTypes, manualTypes, defaultColumn);
     }
 
     /**
@@ -1155,6 +1210,7 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
         /* The table only lists solvers which solve everything, or the combination if there is no such solver. */
         shownSolvers = new ArrayList<SolverService>(combination == null ? solvers : combination);
         solverTable.setSolvers(shownSolvers, requiredTypes);
+        updateSortOrderLabel();
         updateDisableManualOption();
         /* Every information is one text which is shown in a dialog and in the list below the table. */
         final List<CaptchaWizardInfo> infos = new ArrayList<CaptchaWizardInfo>();

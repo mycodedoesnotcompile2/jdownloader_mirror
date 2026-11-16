@@ -79,8 +79,9 @@ import org.jdownloader.controlling.FileStateManager.FILESTATE;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.utils.HelpLinks;
 
-@HostPlugin(revision = "$Revision: 51834 $", interfaceVersion = 2, names = { "wetransfer.com" }, urls = { "https?://wetransferdecrypted/[a-f0-9]{46}/[a-f0-9]{4,12}/[a-f0-9]{46}" })
+@HostPlugin(revision = "$Revision: 53997 $", interfaceVersion = 2, names = { "wetransfer.com" }, urls = { "https?://wetransferdecrypted/[a-f0-9]{46}/[a-f0-9]{4,12}/[a-f0-9]{46}" })
 public class WeTransferCom extends PluginForHost {
     public WeTransferCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -138,7 +139,7 @@ public class WeTransferCom extends PluginForHost {
     public static final String   PROPERTY_ACCOUNT_ACCESS_TOKEN                  = "access_token";
     public static final String   PROPERTY_ACCOUNT_ACCESS_TOKEN_EXPIRE_TIMESTAMP = "access_token_expire_timestamp";
     public static final String   PROPERTY_ACCOUNT_REFRESH_TOKEN                 = "refresh_token";
-    private static final String  LOGIN_HELP_URL                                 = "https://support.jdownloader.org/knowledgebase/article/wetransfer-account-login-instructions";
+    private static final String  LOGIN_HELP_URL                                 = HelpLinks.PLUGINS_WETRANSFER_ACCOUNT_LOGIN_INSTRUCTIONS;
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {

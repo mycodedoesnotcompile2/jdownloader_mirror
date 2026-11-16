@@ -69,8 +69,9 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
+import org.jdownloader.utils.HelpLinks;
 
-@HostPlugin(revision = "$Revision: 53175 $", interfaceVersion = 2, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "ardmediathek\\.dedecrypted://.+", "(?:mediathek\\.)?daserste\\.dedecrypted://.+", "sandmann\\.dedecrypted://.+", "wdr.dedecrypted://.+", "sportschau\\.dedecrypted://.+", "wdrmaus\\.dedecrypted://.+", "eurovision\\.dedecrypted://.+", "sputnik\\.dedecrypted://.+", "mdr\\.dedecrypted://.+", "ndr\\.dedecrypted://.+", "tagesschau\\.dedecrypted://.+" })
+@HostPlugin(revision = "$Revision: 53997 $", interfaceVersion = 2, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "ardmediathek\\.dedecrypted://.+", "(?:mediathek\\.)?daserste\\.dedecrypted://.+", "sandmann\\.dedecrypted://.+", "wdr.dedecrypted://.+", "sportschau\\.dedecrypted://.+", "wdrmaus\\.dedecrypted://.+", "eurovision\\.dedecrypted://.+", "sputnik\\.dedecrypted://.+", "mdr\\.dedecrypted://.+", "ndr\\.dedecrypted://.+", "tagesschau\\.dedecrypted://.+" })
 public class ARDMediathek extends PluginForHost {
     private String              dllink                                                             = null;
     public static final String  PROPERTY_CRAWLER_FORCED_FILENAME                                   = "crawler_forced_filename";
@@ -80,7 +81,7 @@ public class ARDMediathek extends PluginForHost {
     private static final String PROPERTY_ACCOUNT_ARDMEDIATHEK_IDTOKEN                              = "ardmediathek_idtoken";
     private static final String PROPERTY_ACCOUNT_ARDMEDIATHEK_USER_ID                              = "ardmediathek_user_id";
     private static final String PROPERTY_ACCOUNT_ARDMEDIATHEK_TIMESTAMP_SPECIAL_LOGIN_DIALOG_SHOWN = "ardmediathek_timestamp_special_login_dialog_shown";
-    private static final String ARDMEDIATHEK_SPECIAL_LOGIN_INSTRUCTIONS_URL                        = "https://support.jdownloader.org/knowledgebase/article/ardmediathek-login-instructions";
+    private static final String ARDMEDIATHEK_SPECIAL_LOGIN_INSTRUCTIONS_URL                        = HelpLinks.PLUGINS_ARDMEDIATHEK_LOGIN_INSTRUCTIONS;
 
     public ARDMediathek(final PluginWrapper wrapper) {
         super(wrapper);

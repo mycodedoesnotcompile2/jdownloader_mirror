@@ -359,6 +359,21 @@ public interface AWUTranslation extends TranslateInterface {
     @Default(lngs = { "en", "de" }, values = { "Directory", "Verzeichnis" })
     String DIALOG_FILECHOOSER_directoryDescriptionText();
 
+    @Default(lngs = { "en", "de" }, values = { "Delete folder", "Ordner löschen" })
+    String DIALOG_FILECHOOSER_deleteFolder();
+
+    @Default(lngs = { "en", "de" }, values = { "Do you really want to delete the folder \"%s1\" including all of its content?\r\n\r\nThis cannot be undone.", "Möchten Sie den Ordner \"%s1\" wirklich mit seinem gesamten Inhalt löschen?\r\n\r\nDies kann nicht rückgängig gemacht werden." })
+    String DIALOG_FILECHOOSER_deleteFolderConfirm(@Name("folder") @Example("C:\\Temp\\test") String folder);
+
+    @Default(lngs = { "en", "de" }, values = { "Delete file", "Datei löschen" })
+    String DIALOG_FILECHOOSER_deleteFile();
+
+    @Default(lngs = { "en", "de" }, values = { "Do you really want to delete the file \"%s1\"?\r\n\r\nThis cannot be undone.", "Möchten Sie die Datei \"%s1\" wirklich löschen?\r\n\r\nDies kann nicht rückgängig gemacht werden." })
+    String DIALOG_FILECHOOSER_deleteFileConfirm(@Name("file") @Example("C:\\Temp\\test.txt") String file);
+
+    @Default(lngs = { "en", "de" }, values = { "Could not delete \"%s1\".", "\"%s1\" konnte nicht gelöscht werden." })
+    String DIALOG_FILECHOOSER_deleteError(@Name("path") @Example("C:\\Temp\\test") String path);
+
     // FileChooser =Directory
     @Default(lngs = { "en", "de" }, values = { "Save", "Speichern" })
     String DIALOG_FILECHOOSER_saveButtonText();

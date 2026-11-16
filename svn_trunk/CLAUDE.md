@@ -280,3 +280,12 @@ Every **search field** (a field that only filters or looks something up, and is 
 ## File Names and Package Names in the GUI
 
 File names and package names can be very long. To display them safely in the GUI, prefer the existing components `jd.controlling.downloadcontroller.FileNameField` and `jd.controlling.downloadcontroller.PackageNameField` over plain labels / text fields.
+
+## Captcha Wizard: JAntiCaptcha Is Minor
+
+Applies to the Captcha Wizard (`CaptchaWizardDialog` and its tables) and everything else that orders, prefers or suggests captcha solvers to the user (rankings, recommendations, solver tables, notes). It does **not** apply to the order in which solvers are started while a captcha is solved, see the last point.
+
+- The JAntiCaptcha solver (`JacSolverService`, `SolverType.JD_LOCAL`) is of minor importance: it only solves a few simple image captchas. **Every other solver is more important than JAntiCaptcha.**
+- It must still be shown and mentioned (pre-check warning, solver tables, notes). Do not remove it.
+- Wherever solvers are ordered, preferred or suggested to the user (sort order, "solves most types" ranking, combinations), JAntiCaptcha comes after all other solvers, never before an equal alternative.
+- **Exception, the order in which the solvers are started while solving a captcha** (default order, order for login captchas, see `ChallengeResponseController#getDefaultOrderRank` and `#getLoginCaptchaOrderRank`): JAntiCaptcha stays **first**. It usually needs far less than a second and may solve some very old simple captchas completely automatically, so it is worth trying first. This does not make it more important than the other solvers, it is only cheap to try.

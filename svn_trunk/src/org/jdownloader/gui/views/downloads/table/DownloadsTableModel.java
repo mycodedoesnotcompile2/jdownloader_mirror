@@ -8,6 +8,7 @@ import org.appwork.utils.Application;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTableModel;
 import org.jdownloader.gui.views.components.packagetable.columns.ChecksumColumn;
 import org.jdownloader.gui.views.components.packagetable.columns.CommentColumn;
+import org.jdownloader.gui.views.components.packagetable.columns.ExtractToColumn;
 import org.jdownloader.gui.views.components.packagetable.columns.DownloadPasswordColumn;
 import org.jdownloader.gui.views.components.packagetable.columns.FileTypeColumn;
 import org.jdownloader.gui.views.components.packagetable.columns.HasCaptchaColumn;
@@ -83,6 +84,7 @@ public class DownloadsTableModel extends PackageControllerTableModel<FilePackage
         this.addColumn(priorityColumn = new PriorityColumn());
         this.addColumn(available = new AvailabilityColumn());
         this.addColumn(new DownloadFolderColumn());
+        this.addColumn(new ExtractToColumn());
         this.addColumn(new CommentColumn());
         if (!Application.isJared(null)) {
             this.addColumn(new LinkIDColumn());

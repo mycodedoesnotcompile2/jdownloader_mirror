@@ -9,8 +9,7 @@ import org.jdownloader.actions.AppAction;
 public class ExtMenuButton extends JMenu {
 
     /*
-     * JMenuBar uses Boxlayout. BoxLayout always tries to strech the components to their Maximum Width. Fixes
-     * http://svn.jdownloader.org/issues/8509
+     * JMenuBar uses Boxlayout. BoxLayout always tries to strech the components to their Maximum Width.
      */
     public ExtMenuButton(AppAction action) {
         super(action);

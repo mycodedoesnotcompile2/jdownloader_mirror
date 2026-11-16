@@ -3,6 +3,7 @@ package org.jdownloader.extensions.extraction;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicLong;
 
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.plugins.DownloadLink;
@@ -109,7 +110,7 @@ public class ArchiveController {
                     final BooleanStatus defaultAuto = BooleanStatus.get(archiveFactory.getDefaultAutoExtract());
                     if (BooleanStatus.UNSET.equals(ret.getAutoExtract()) && !ret.getAutoExtract().equals(defaultAuto)) {
                         /* only set AutoExtract value when it is UNSET */
-                        ret.setAutoExtract(defaultAuto);
+                        ret._setInitialAutoExtract(defaultAuto);
                     }
                 }
                 if (archive != null) {
@@ -167,5 +168,16 @@ public class ArchiveController {
 
     public void update(ArchiveSettings archiveSettings) {
         // we could start some kind of asynch saver delayer here.
+    }
+
+    /* Increased on every change of an ArchiveSettings value that influences the extraction destination. Lets GUI caches detect it. */
+    private static final AtomicLong SETTINGS_CHANGE_COUNTER = new AtomicLong(0);
+
+    public static long getSettingsChangeCounter() {
+        return SETTINGS_CHANGE_COUNTER.get();
+    }
+
+    protected static void onDestinationSettingsChanged() {
+        SETTINGS_CHANGE_COUNTER.incrementAndGet();
     }
 }

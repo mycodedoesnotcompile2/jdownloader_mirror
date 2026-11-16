@@ -59,6 +59,7 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.staticreferences.CFG_MYJD;
+import org.jdownloader.utils.HelpLinks;
 
 public class MyJDownloaderSettingsPanel extends AbstractConfigPanel implements GenericConfigEventListener<Enum>, MyJDownloaderListener {
     private static final long    serialVersionUID = 1L;
@@ -96,7 +97,7 @@ public class MyJDownloaderSettingsPanel extends AbstractConfigPanel implements G
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                CrossSystem.openURL("https://support.jdownloader.org/knowledgebase/article/what-is-myjdownloader");
+                CrossSystem.openURL(HelpLinks.MYJD_WHAT_IS_MYJDOWNLOADER);
             }
         });
         openMyJDownloader = new SettingsButton(new AppAction() {
