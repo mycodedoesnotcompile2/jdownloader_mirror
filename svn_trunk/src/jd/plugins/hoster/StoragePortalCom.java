@@ -20,7 +20,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
+import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -48,7 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 52906 $", interfaceVersion = 3, names = { "storage-portal.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 54025 $", interfaceVersion = 3, names = { "storage-portal.com" }, urls = { "" })
 public class StoragePortalCom extends PluginForHost {
     /* API docs: https://www.storage-portal.com/docs/download-client-api */
     private static final String          API_BASE           = "https://www.storage-portal.com/api/external/v1";
@@ -140,7 +142,9 @@ public class StoragePortalCom extends PluginForHost {
             link.setProperty(PROPERTY_LINKID, linkId);
             dllink = pollUntilReady(account, link, linkId, data);
             if (StringUtils.isEmpty(dllink)) {
-                mhm.handleErrorGeneric(account, link, "Failed to find final downloadurl", 50, 5 * 60 * 1000l);
+                mhm.handleErrorGeneric(account, link, "Failed to find final downloadurl", 50, TimeUnit.MINUTES.toMillis(5));
+                /* Unreachable code */
+                throw new WTFException();
             }
             link.setProperty(PROPERTY_DIRECTURL, dllink);
         }
@@ -151,7 +155,9 @@ public class StoragePortalCom extends PluginForHost {
                 if (dl.getConnection().getContentType().contains("json")) {
                     handleAPIErrors(account, link);
                 }
-                mhm.handleErrorGeneric(account, link, "Unknown download error", 50, 5 * 60 * 1000l);
+                mhm.handleErrorGeneric(account, link, "Unknown download error", 50, TimeUnit.MINUTES.toMillis(5));
+                /* Unreachable code */
+                throw new WTFException();
             }
         } catch (final Exception e) {
             if (storedDirecturl != null) {
@@ -185,19 +191,19 @@ public class StoragePortalCom extends PluginForHost {
             }
             final String remoteStatus = (String) data.get("remote_status");
             if ("error".equalsIgnoreCase(remoteStatus)) {
-                mhm.handleErrorGeneric(account, link, "Remote download failed on storage-portal servers (remote_status=error)", 50, 5 * 60 * 1000l);
-                /* Unreachable */
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                mhm.handleErrorGeneric(account, link, "Remote download failed on storage-portal servers (remote_status=error)", 50, TimeUnit.MINUTES.toMillis(5));
+                /* Unreachable code */
+                throw new WTFException();
             }
             final int pollAfterSeconds = Math.min(Math.max(((Number) data.get("poll_after_seconds")).intValue(), 1), 60);
             logger.info("storage-portal.com: Polling link " + linkId + " after " + pollAfterSeconds + "s (remote_status=" + remoteStatus + ")");
-            this.sleep(pollAfterSeconds * 1000l, link);
+            this.sleep(TimeUnit.SECONDS.toMillis(pollAfterSeconds), link);
             br.getPage(API_BASE + "/link/" + Encoding.urlEncode(linkId));
             data = handleAPIErrors(account, link);
         }
-        mhm.handleErrorGeneric(account, link, "Polling timeout: file never became ready on storage-portal servers", 50, 5 * 60 * 1000l);
-        /* Unreachable */
-        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        mhm.handleErrorGeneric(account, link, "Polling timeout: file never became ready on storage-portal servers", 50, TimeUnit.MINUTES.toMillis(5));
+        /* Unreachable code */
+        throw new WTFException();
     }
 
     @SuppressWarnings("unchecked")
@@ -209,7 +215,7 @@ public class StoragePortalCom extends PluginForHost {
         if (login_check_interval_millis != null) {
             account.setRefreshTimeout(login_check_interval_millis.longValue());
         }
-        final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
+        final SIZEUNIT maxSizeUnit = CFG_GUI.MAX_SIZE_UNIT.getValue();
         if ("premium".equalsIgnoreCase((String) data.get("accountType"))) {
             account.setType(AccountType.PREMIUM);
             final long account_trafficmax = ((Number) data.get("trafficmax")).longValue();
@@ -278,7 +284,7 @@ public class StoragePortalCom extends PluginForHost {
             entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         } catch (final JSonMapperException ignore) {
             final String msg = "Invalid API response";
-            final long wait = 1 * 60 * 1000l;
+            final long wait = TimeUnit.MINUTES.toMillis(1);
             if (link != null) {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, wait);
             } else {
@@ -293,7 +299,7 @@ public class StoragePortalCom extends PluginForHost {
         final int statusCode = ((Number) entries.get("status")).intValue();
         final String msg = (String) entries.get("msg");
         final Object retryInO = entries.get("retry_in_seconds");
-        final long retryWait = retryInO instanceof Number ? ((Number) retryInO).longValue() * 1000l : 5 * 60 * 1000l;
+        final long retryWait = retryInO instanceof Number ? TimeUnit.SECONDS.toMillis(((Number) retryInO).longValue()) : TimeUnit.MINUTES.toMillis(5);
         switch (statusCode) {
         case 1:
             /* Missing or invalid API key */
@@ -308,10 +314,11 @@ public class StoragePortalCom extends PluginForHost {
             /* Per-host 24h limit exceeded */
             if (link != null) {
                 mhm.putError(account, link, retryWait, msg);
+                /* Unreachable code */
+                throw new WTFException();
             } else {
                 throw new AccountUnavailableException(msg, retryWait);
             }
-            break;
         case 55:
         case 56:
             /* Too many concurrent downloads */
@@ -319,16 +326,16 @@ public class StoragePortalCom extends PluginForHost {
         case 101:
             /* Unsupported URL/host */
             mhm.handleErrorGeneric(account, link, msg, 50, retryWait);
-            break;
+            /* Unreachable code */
+            throw new WTFException();
         case 102:
             /* File banned */
-            throw new PluginException(LinkStatus.ERROR_FATAL, msg);
         case 103:
             /* Private file */
             throw new PluginException(LinkStatus.ERROR_FATAL, msg);
         case 104:
             /* File offline */
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "File offline, unavailable, or upstream could not provide file/download information", 1 * 60 * 60 * 1000);
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "File offline, unavailable, or upstream could not provide file/download information", TimeUnit.HOURS.toMillis(1));
         case 109:
             /* File password required; retry /unrestrict with the password field */
             link.setDownloadPassword(null);
@@ -344,10 +351,10 @@ public class StoragePortalCom extends PluginForHost {
                 throw new AccountUnavailableException(msg, retryWait);
             } else {
                 mhm.handleErrorGeneric(account, link, msg, 50, retryWait);
+                /* Unreachable code */
+                throw new WTFException();
             }
         }
-        /* Unreachable after mhm.handleErrorGeneric / mhm.putError, but compiler needs it */
-        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
 
     @Override

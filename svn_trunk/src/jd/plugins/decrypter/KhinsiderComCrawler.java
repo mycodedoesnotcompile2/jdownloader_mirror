@@ -21,6 +21,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -42,10 +45,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.KhinsiderCom;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-
-@DecrypterPlugin(revision = "$Revision: 51820 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54010 $", interfaceVersion = 3, names = {}, urls = {})
 public class KhinsiderComCrawler extends PluginForDecrypt {
     public KhinsiderComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -86,6 +86,7 @@ public class KhinsiderComCrawler extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final KhinsiderCom hosterplugin = (KhinsiderCom) this.getNewPluginForHostInstance(this.getHost());
+        br = hosterplugin.createNewBrowserInstance();
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
         final String thishost = this.getHost();
         final String contenturl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");

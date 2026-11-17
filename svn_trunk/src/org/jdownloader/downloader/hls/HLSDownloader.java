@@ -94,6 +94,7 @@ import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.DownloadPluginProgress;
 import org.jdownloader.plugins.SkipReason;
 import org.jdownloader.plugins.SkipReasonException;
+import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.translate._JDT;
 
@@ -1223,7 +1224,15 @@ public class HLSDownloader extends DownloadInterface {
         l.add("-analyzeduration");// required for low bandwidth streams!
         l.add("15000000");// 15 secs
         final long processID = getProcessID();
+        boolean hasSubtitle = false;
         for (int index = 0; index < content.size(); index++) {
+            final MEDIA media = content.getMediaFor(content.get(index));
+            if (media != null && MEDIA.TYPE.SUBTITLES.equals(media._getType())) {
+                hasSubtitle = true;
+                /* required to support/allow vtt extension */
+                l.add("-extension_picky");
+                l.add("0");
+            }
             l.add("-i");
             l.add("http://" + server.getServerAddress() + "/m3u8.m3u8?id=" + processID + "&" + QUERY_M3U8_ID + "=" + content.getId() + "&" + QUERY_M3U8_INDEX + "=" + index);
         }
@@ -1245,6 +1254,16 @@ public class HLSDownloader extends DownloadInterface {
         l.add("copy");
         l.add("-c:a");
         l.add("copy");
+        if (hasSubtitle) {
+            l.add("-c:s");
+            if ("mkv".equals(format)) {
+                /* mkv native supports vtt */
+                l.add("copy");
+            } else {
+                /* mp4, we must convert mov_text */
+                l.add("mov_text");
+            }
+        }
         l.add("-f");
         l.add(format);
         // TODO: try to add support for http output and request handler writing bytes to file
@@ -1362,14 +1381,22 @@ public class HLSDownloader extends DownloadInterface {
                 break format;
             }
         }
+        final String validSegmentFileType = getValidSegmentFileType(segment);
+        if (validSegmentFileType != null) {
+            return validSegmentFileType;
+        }
+        return "ts";
+    }
+
+    protected String getValidSegmentFileType(final M3U8Segment segment) throws IOException {
         final String extension = Files.getExtension(new URL(segment.getUrl()).getPath(), true);
         final CompiledFiletypeExtension fileType = CompiledFiletypeFilter.getExtensionsFilterInterface(extension);
-        if (CompiledFiletypeFilter.AudioExtensions.AAC.isSameExtensionGroup(fileType) || CompiledFiletypeFilter.VideoExtensions.MP4.isSameExtensionGroup(fileType)) {
+        if (CompiledFiletypeFilter.AudioExtensions.AAC.isSameExtensionGroup(fileType) || CompiledFiletypeFilter.VideoExtensions.MP4.isSameExtensionGroup(fileType) || CompiledFiletypeFilter.SubtitleExtensions.VTT.isSameExtensionGroup(fileType)) {
             // for example: detected format aac extension aac mismatches allowed extensions
             // original m3u8 has file.aac, so the dummy one must have same extension
             return extension;
         }
-        return "ts";
+        return null;
     }
 
     protected boolean isSegmentDownload(AbstractGetRequest request) throws IOException {
@@ -1384,12 +1411,9 @@ public class HLSDownloader extends DownloadInterface {
         if (segment == null) {
             return false;
         }
-        final String extension = Files.getExtension(new URL(segment.getUrl()).getPath(), true);
-        final CompiledFiletypeExtension fileType = CompiledFiletypeFilter.getExtensionsFilterInterface(extension);
-        if (CompiledFiletypeFilter.AudioExtensions.AAC.isSameExtensionGroup(fileType) || CompiledFiletypeFilter.VideoExtensions.MP4.isSameExtensionGroup(fileType)) {
-            if (requestedPath.matches("^/download\\." + Pattern.quote(extension) + "$")) {
-                return true;
-            }
+        final String validSegmentFileType = getValidSegmentFileType(segment);
+        if (validSegmentFileType != null && requestedPath.matches("^/download\\." + Pattern.quote(validSegmentFileType) + "$")) {
+            return true;
         }
         return false;
     }
@@ -1685,6 +1709,8 @@ public class HLSDownloader extends DownloadInterface {
                                             return false;
                                         };
                                     };
+                                    /* try to avoid (e.g. gz) content-encoding */
+                                    getRequest.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING, "identity");
                                     final long byteRange[] = segment.getByteRange();
                                     if (fileBytesMap.getFinalSize() > 0) {
                                         requestLogger.info("Resume(" + retry + "): " + fileBytesMap.toString());
@@ -1773,12 +1799,17 @@ public class HLSDownloader extends DownloadInterface {
                                     try {
                                         if (fileBytesMap.getFinalSize() > 0) {
                                             length = fileBytesMap.getFinalSize();
+                                        } else if (connection.isContentDecoded()) {
+                                            /* we don't have/know a final complete content length */
+                                            length = -1;
                                         } else if (byteRange != null) {
                                             length = connection.getContentLength();
                                         } else {
                                             length = connection.getCompleteContentLength();
                                         }
-                                        length = length - skippedBytes;
+                                        if (length != -1) {
+                                            length = length - skippedBytes;
+                                        }
                                         if (requestOutputStream == null) {
                                             // final String acceptRanges =
                                             // connection.getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCEPT_RANGES);

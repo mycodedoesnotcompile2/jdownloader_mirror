@@ -20,11 +20,30 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.uio.ConfirmDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.Application;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.parser.UrlQuery;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.config.PixeldrainConfig;
+import org.jdownloader.plugins.components.config.PixeldrainConfig.ActionOnCaptchaRequired;
+import org.jdownloader.plugins.components.config.PixeldrainConfig.ActionOnSpeedLimitReached;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -45,25 +64,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.uio.ConfirmDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.Application;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.os.CrossSystem;
-import org.appwork.utils.parser.UrlQuery;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.config.PixeldrainConfig;
-import org.jdownloader.plugins.components.config.PixeldrainConfig.ActionOnCaptchaRequired;
-import org.jdownloader.plugins.components.config.PixeldrainConfig.ActionOnSpeedLimitReached;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
-@HostPlugin(revision = "$Revision: 53504 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54008 $", interfaceVersion = 3, names = {}, urls = {})
 public class PixeldrainCom extends PluginForHost {
     public PixeldrainCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -195,7 +196,8 @@ public class PixeldrainCom extends PluginForHost {
     public int getMaxChunks(final DownloadLink link, final Account account) {
         if (this.isLinktypeFilesystem(link)) {
             /**
-             * Premium link -> No limit </br> Links which can basically be downloaded like a premium user but for free -> No limit
+             * Premium link -> No limit </br>
+             * Links which can basically be downloaded like a premium user but for free -> No limit
              */
             return 0;
         } else if (account != null && AccountType.PREMIUM.equals(account.getType())) {
@@ -241,7 +243,8 @@ public class PixeldrainCom extends PluginForHost {
     }
 
     /**
-     * Returns true for direct downloadable 'filesystem' single file URL. </br> User docs: https://pixeldrain.com/filesystem
+     * Returns true for direct downloadable 'filesystem' single file URL. </br>
+     * User docs: https://pixeldrain.com/filesystem
      */
     private boolean isLinktypeFilesystem(final DownloadLink link) {
         if (getFilesystemFileID(link) != null) {
@@ -275,96 +278,98 @@ public class PixeldrainCom extends PluginForHost {
             return false;
         }
         try {
-            if (account != null) {
-                this.login(account, false);
-            }
-            final ArrayList<DownloadLink> links = new ArrayList<DownloadLink>();
-            int index = 0;
-            while (true) {
-                final StringBuilder sb = new StringBuilder();
-                links.clear();
-                while (true) {
-                    /* We test up to 100 links at once (more is possible). */
-                    if (index == allLinks.length || links.size() == 100) {
-                        break;
-                    } else {
-                        links.add(allLinks[index]);
-                        index++;
-                    }
-                }
-                sb.delete(0, sb.capacity());
-                for (final DownloadLink link : links) {
-                    if (this.isLinktypeFilesystem(link)) {
-                        /* Such items do not [yet] have mass-linkcheck support! */
-                        continue;
-                    }
-                    if (sb.length() > 0) {
-                        /* Append comma */
-                        sb.append("%2C");
-                    }
-                    sb.append(this.getFID(link));
-                }
-                try {
-                    List<Map<String, Object>> items = null;
-                    /**
-                     * If the StringBuilder item is empty this means that currently we got only items which cannot be mass-linkchecked.
-                     * </br> In this case, no http request is needed.
-                     */
-                    if (sb.length() > 0) {
-                        br.getPage(getAPIBase(this, br) + "/file/" + sb.toString() + "/info");
-                        final Object response = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
-                        if (response instanceof List) {
-                            items = (List<Map<String, Object>>) response;
-                        } else {
-                            /* E.g. when only one fileID was checked API will return a map instead of a list of maps. */
-                            final Map<String, Object> responseMap = (Map<String, Object>) response;
-                            if ((Boolean) responseMap.get("success") == Boolean.FALSE) {
-                                /* All files checked in this run are offline. */
-                                for (final DownloadLink link : links) {
-                                    link.setAvailable(false);
-                                }
-                                continue;
-                            } else {
-                                items = new ArrayList<Map<String, Object>>();
-                                items.add((Map<String, Object>) response);
-                            }
-                        }
-                    }
-                    /* Offline/invalid fileIDs won't be returned via API so we'll have to look for the data of our targetID. */
-                    for (final DownloadLink link : links) {
-                        if (items == null || this.isLinktypeFilesystem(link)) {
-                            /* Such items do not [yet] have mass-linkcheck support! */
-                            link.setAvailableStatus(AvailableStatus.UNCHECKED);
-                        } else {
-                            final String id = this.getFID(link);
-                            Map<String, Object> data = null;
-                            for (final Map<String, Object> item : items) {
-                                final String thisID = (String) item.get("id");
-                                if (StringUtils.equals(thisID, id)) {
-                                    data = item;
-                                    break;
-                                }
-                            }
-                            if (data == null) {
-                                /* FileID not in response, so it's offline */
-                                link.setAvailable(false);
-                            } else {
-                                setDownloadLinkInfo(this, br, link, account, data);
-                            }
-                        }
-                    }
-                } finally {
-                    if (index == allLinks.length) {
-                        /* We've reached the end */
-                        break;
-                    }
-                }
-            }
-        } catch (final Exception ignore) {
-            logger.log(ignore);
+            this.checkLinksInternal(allLinks, account);
+            return true;
+        } catch (final Exception e) {
+            logger.log(e);
             return false;
         }
-        return true;
+    }
+
+    /** Does the actual linkcheck and lets all exceptions through so that callers can react to them. */
+    private void checkLinksInternal(final DownloadLink[] allLinks, final Account account) throws Exception {
+        if (account != null) {
+            this.login(account, false);
+        }
+        int index = 0;
+        while (index < allLinks.length) {
+            final List<DownloadLink> links = new ArrayList<DownloadLink>();
+            /* We test up to 100 links at once (more is possible). */
+            while (index < allLinks.length && links.size() < 100) {
+                links.add(allLinks[index]);
+                index++;
+            }
+            final StringBuilder sb = new StringBuilder();
+            /* Evaluate isLinktypeFilesystem only once per link. */
+            final List<DownloadLink> filesystemLinks = new ArrayList<DownloadLink>();
+            final List<DownloadLink> apiLinks = new ArrayList<DownloadLink>();
+            for (final DownloadLink link : links) {
+                if (this.isLinktypeFilesystem(link)) {
+                    /* Such items do not [yet] have mass-linkcheck support! */
+                    filesystemLinks.add(link);
+                    continue;
+                }
+                apiLinks.add(link);
+                if (sb.length() > 0) {
+                    /* Append comma */
+                    sb.append("%2C");
+                }
+                sb.append(this.getFID(link));
+            }
+            if (sb.length() == 0) {
+                /* Only items which cannot be mass-linkchecked (filesystem links) -> No http request needed. */
+                logger.info("Nothing was checked: all " + links.size() + " link(s) in this run are filesystem links without mass-linkcheck support");
+                for (final DownloadLink link : filesystemLinks) {
+                    link.setAvailableStatus(AvailableStatus.UNCHECKED);
+                }
+                continue;
+            }
+            final List<Map<String, Object>> items;
+            br.getPage(getAPIBase(this, br) + "/file/" + sb.toString() + "/info");
+            final Object response = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
+            if (response instanceof List) {
+                items = (List<Map<String, Object>>) response;
+            } else {
+                /* E.g. when only one fileID was checked API will return a map instead of a list of maps. */
+                final Map<String, Object> responseMap = (Map<String, Object>) response;
+                if (Boolean.FALSE.equals(responseMap.get("success"))) {
+                    if ("not_found".equalsIgnoreCase((String) responseMap.get("value"))) {
+                        /* All files checked in this run are offline. Filesystem links were not checked and stay untouched. */
+                        for (final DownloadLink link : apiLinks) {
+                            link.setAvailable(false);
+                        }
+                    } else {
+                        /* Other error: Leave links unchecked. Callers can evaluate the error via checkErrors(). */
+                        logger.info("Linkcheck failed with API error: " + responseMap.get("value"));
+                    }
+                    continue;
+                }
+                items = new ArrayList<Map<String, Object>>();
+                items.add(responseMap);
+            }
+            /* Such items do not [yet] have mass-linkcheck support! */
+            for (final DownloadLink link : filesystemLinks) {
+                link.setAvailableStatus(AvailableStatus.UNCHECKED);
+            }
+            /* Offline/invalid fileIDs won't be returned via API so we'll have to look for the data of our targetID. */
+            for (final DownloadLink link : apiLinks) {
+                final String id = this.getFID(link);
+                Map<String, Object> data = null;
+                for (final Map<String, Object> item : items) {
+                    final String thisID = (String) item.get("id");
+                    if (StringUtils.equals(thisID, id)) {
+                        data = item;
+                        break;
+                    }
+                }
+                if (data == null) {
+                    /* FileID not in response, so it's offline */
+                    link.setAvailable(false);
+                } else {
+                    setDownloadLinkInfo(this, br, link, account, data);
+                }
+            }
+        }
     }
 
     @Override
@@ -400,7 +405,7 @@ public class PixeldrainCom extends PluginForHost {
             }
             return AvailableStatus.UNCHECKABLE;
         } else {
-            this.checkLinks(new DownloadLink[] { link }, account);
+            this.checkLinksInternal(new DownloadLink[] { link }, account);
             checkErrors(br, link, account);
             if (!link.isAvailable()) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -414,32 +419,17 @@ public class PixeldrainCom extends PluginForHost {
     public boolean isTransferLimitReached(final Browser br, final DownloadLink link, final Account account) {
         synchronized (LIMIT_MAP) {
             final Map<Account, Set<DownloadLink>> accountMap = LIMIT_MAP.get(br.getProxy());
-            final Set<DownloadLink> linkList;
-            if (accountMap == null || (linkList = accountMap.get(account)) == null) {
-                return false;
-            }
-            if (true) {
-                // IP and account has known limit
-                return linkList != null;
-            }
-            return linkList.contains(link);
+            /* IP and account has known limit if an entry exists. */
+            return accountMap != null && accountMap.get(account) != null;
         }
     }
 
     private static boolean setTransferLimitReached(final Plugin plugin, final Browser br, final DownloadLink link, final Account account, Object speedLimit) {
         synchronized (LIMIT_MAP) {
-            if (speedLimit == null || ((speedLimit instanceof Number) && ((Number) speedLimit).intValue() == 0)) {
+            if (speedLimit == null || ((speedLimit instanceof Number) && ((Number) speedLimit).longValue() == 0)) {
                 final Map<Account, Set<DownloadLink>> accountMap = LIMIT_MAP.get(br.getProxy());
-                if (true) {
-                    // IP and Account no longer has limit
-                    return accountMap != null && accountMap.remove(account) != null;
-                }
-                final Set<DownloadLink> linkList;
-                if (accountMap != null && (linkList = accountMap.get(account)) != null) {
-                    // only remove limit for this link
-                    return linkList.remove(link);
-                }
-                return false;
+                /* IP and Account no longer has limit */
+                return accountMap != null && accountMap.remove(account) != null;
             } else {
                 Map<Account, Set<DownloadLink>> accountMap = LIMIT_MAP.get(br.getProxy());
                 if (accountMap == null) {
@@ -478,8 +468,9 @@ public class PixeldrainCom extends PluginForHost {
         final Object speedLimit = data.get("download_speed_limit");
         setTransferLimitReached(plugin, br, link, account, speedLimit);
         /**
-         * Check if file has been abused. </br> We are checking this just here at the end because file information for such files can still
-         * be available and we want to provide as much information to the user as possible.
+         * Check if file has been abused. </br>
+         * We are checking this just here at the end because file information for such files can still be available and we want to provide
+         * as much information to the user as possible.
          */
         final String abuse_type = (String) data.get("abuse_type");
         if (!StringUtils.isEmpty(abuse_type)) {
@@ -509,8 +500,8 @@ public class PixeldrainCom extends PluginForHost {
         final PixeldrainConfig cfg = get(getConfigInterface());
         if (cfg.getActionOnSpeedLimitReached() == ActionOnSpeedLimitReached.TRIGGER_RECONNECT_TO_CHANGE_IP && isTransferLimitReached(br, link, account)) {
             /**
-             * User prefers to perform reconnect to be able to download without speedlimit again. </br> 2022-07-19: Speedlimit sits only on
-             * IP, not on account but our upper system will of not do reconnects for accounts atm.
+             * User prefers to perform reconnect to be able to download without speedlimit again. </br>
+             * 2022-07-19: Speedlimit sits only on IP, not on account but our upper system will of not do reconnects for accounts atm.
              */
             throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, getErrorMessageSpeedLimited(), getWaittimeErrorSpeedLimited());
         }
@@ -567,8 +558,9 @@ public class PixeldrainCom extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         /**
          * 2021-01-15: (Free) Accounts = No captcha required for downloading (usually not even via anonymous files but captchas can
-         * sometimes be required for files with high traffic). </br> There are also "Donator" Accounts (at this moment we don't try to
-         * differ between them) but the download process is no different when using those!
+         * sometimes be required for files with high traffic). </br>
+         * There are also "Donator" Accounts (at this moment we don't try to differ between them) but the download process is no different
+         * when using those!
          */
         final Map<String, Object> user = login(account, true);
         /* User will always only have one running subscription. */
@@ -580,7 +572,7 @@ public class PixeldrainCom extends PluginForHost {
         String accountStatusText = subscription.get("name").toString();
         final double euroBalance = ((Number) user.get("balance_micro_eur")).doubleValue();
         if (euroBalance > 0.0d) {
-            accountStatusText += String.format(" | %2.2f€", euroBalance / 1000000);
+            accountStatusText += String.format(Locale.ENGLISH, " | %2.2f€", euroBalance / 1000000);
         }
         if ("free".equalsIgnoreCase(accountType) || StringUtils.isEmpty(accountType)) {
             /* Assume it's a free account */
@@ -588,9 +580,9 @@ public class PixeldrainCom extends PluginForHost {
             account.setMaxSimultanDownloads(this.getMaxSimultanFreeDownloadNum());
             account.setAllowReconnectToResetLimits(true);
             /**
-             * Global limits and limits for (anonymous) users can be checked here: https://pixeldrain.com/api/misc/rate_limits </br> Once
-             * one of these limits is hit, a captcha will be required for downloading.</br> These captchas can be avoided by using free/paid
-             * accounts.
+             * Global limits and limits for (anonymous) users can be checked here: https://pixeldrain.com/api/misc/rate_limits </br>
+             * Once one of these limits is hit, a captcha will be required for downloading.</br>
+             * These captchas can be avoided by using free/paid accounts.
              */
             br.getPage(getAPIBase(this, br) + "/misc/rate_limits");
             /* E.g. {"download_limit":10000,"download_limit_used":0,"transfer_limit":6000000000,"transfer_limit_used":0} */
@@ -687,8 +679,9 @@ public class PixeldrainCom extends PluginForHost {
             throw new AccountInvalidException(message);
         } else if (value.equalsIgnoreCase("out_of_transfer")) {
             /**
-             * Typically for 'filesystem' links: </br> This happens if the user who has provided that link has run out of traffic. </br> The
-             * link can be downloaded once the uploader has more traffic available or if the user who wants to download it has premium
+             * Typically for 'filesystem' links: </br>
+             * This happens if the user who has provided that link has run out of traffic. </br>
+             * The link can be downloaded once the uploader has more traffic available or if the user who wants to download it has premium
              * traffic.
              */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, message, TimeUnit.HOURS.toMillis(2));

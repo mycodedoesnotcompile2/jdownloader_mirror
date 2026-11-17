@@ -166,8 +166,14 @@ public class ArchiveController {
         }
     }
 
+    /**
+     * Called on every change of an {@link ArchiveSettings}. Intentionally does nothing: the settings are not written immediately but only
+     * once by {@link #save()} on shutdown (see the ShutdownEvent in the constructor), and only if {@link ArchiveSettings#_needsSaving()}.
+     * Consequence: if JDownloader is killed or crashes, all changes of the archive settings since the start (e.g. extract path overrides,
+     * auto extract, passwords, extraction info) are lost.<br>
+     * We could start some kind of asynch saver delayer here to avoid that.
+     */
     public void update(ArchiveSettings archiveSettings) {
-        // we could start some kind of asynch saver delayer here.
     }
 
     /* Increased on every change of an ArchiveSettings value that influences the extraction destination. Lets GUI caches detect it. */

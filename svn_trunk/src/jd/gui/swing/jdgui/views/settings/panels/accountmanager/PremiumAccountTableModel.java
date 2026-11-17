@@ -14,12 +14,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JTable;
-import javax.swing.SwingConstants;
 import javax.swing.table.JTableHeader;
 
 import org.appwork.scheduler.DelayedRunnable;
@@ -42,6 +42,7 @@ import org.appwork.swing.exttable.columns.ExtPasswordEditorColumn;
 import org.appwork.swing.exttable.columns.ExtProgressColumn;
 import org.appwork.swing.exttable.columns.ExtTextColumn;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.swing.EDTRunner;
 import org.appwork.utils.swing.renderer.RenderLabel;
@@ -50,7 +51,6 @@ import org.jdownloader.DomainInfo;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.components.ColumnButton;
 import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.translate._JDT;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSolverService;
@@ -59,6 +59,7 @@ import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
+import org.jdownloader.translate._JDT;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
 import jd.SecondLevelLaunch;
@@ -70,9 +71,9 @@ import jd.controlling.accountchecker.AccountCheckerEventListener;
 import jd.gui.swing.jdgui.interfaces.SwitchPanelEvent;
 import jd.gui.swing.jdgui.interfaces.SwitchPanelListener;
 import jd.plugins.Account;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountTrafficView;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 import jd.plugins.PluginForHost;
 
 public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implements AccountCheckerEventListener {
@@ -309,6 +310,8 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
     private static final long serialVersionUID       = 3120481189794897020L;
     private AccountListPanel  accountManagerSettings = null;
     private DelayedRunnable   delayedFill;
+    private volatile Account  pendingSelectAccount   = null;
+    private volatile long     pendingSelectTimestamp = 0;
     private volatile boolean  checkRunning           = false;
     private DelayedRunnable   delayedUpdate;
 
@@ -694,8 +697,8 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
                 if (account.isValid() && !account.isTempDisabled() && account.isLowBalance()) {
                     /*
                      * Captcha solver account with low balance: show its status text (which contains the low balance warning) in the theme's
-                     * error color. Not for invalid/temp disabled accounts: Their whole row is already highlighted by the row highlighters of
-                     * the table (see PremiumAccountTable), so an error colored text would be red on red.
+                     * error color. Not for invalid/temp disabled accounts: Their whole row is already highlighted by the row highlighters
+                     * of the table (see PremiumAccountTable), so an error colored text would be red on red.
                      */
                     rendererLabel.setForeground(LAFOptions.getInstance().getColorForErrorForeground());
                 } else {
@@ -1151,6 +1154,48 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
             }
         }
         _fireTableStructureChanged(newtableData, true);
+        if (pendingSelectAccount != null) {
+            /* The rebuilt rows are new AccountEntry objects: select the requested account once they are in the model. */
+            new EDTRunner() {
+                @Override
+                protected void runInEDT() {
+                    applyPendingSelection();
+                    pendingSelectAccount = null;
+                }
+            };
+        }
+    }
+
+    /**
+     * Selects the row of the given account. If the row does not exist yet (e.g. an account that was just added and the table has not been
+     * rebuilt yet), the selection is applied as soon as the next rebuild contains it.
+     */
+    public void selectAccount(final Account account) {
+        pendingSelectAccount = account;
+        pendingSelectTimestamp = Time.systemIndependentCurrentJVMTimeMillis();
+        new EDTRunner() {
+            @Override
+            protected void runInEDT() {
+                applyPendingSelection();
+            }
+        };
+    }
+
+    private void applyPendingSelection() {
+        final Account account = pendingSelectAccount;
+        if (account == null) {
+            return;
+        }
+        if (Time.systemIndependentCurrentJVMTimeMillis() - pendingSelectTimestamp > TimeUnit.SECONDS.toMillis(5)) {
+            pendingSelectAccount = null;
+            return;
+        }
+        for (final AccountEntry ae : getTableData()) {
+            if (account.equals(ae.getAccount())) {
+                setSelectedObject(ae);
+                return;
+            }
+        }
     }
 
     public static String accountToStatusString(Account value) {

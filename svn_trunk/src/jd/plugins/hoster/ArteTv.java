@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.downloader.hls.HLSContent;
 import org.jdownloader.downloader.hls.HLSDownloader;
@@ -39,7 +40,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53194 $", interfaceVersion = 3, names = { "arte.tv" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 54016 $", interfaceVersion = 3, names = { "arte.tv" }, urls = { "" })
 public class ArteTv extends PluginForHost {
     @SuppressWarnings("deprecation")
     public ArteTv(PluginWrapper wrapper) {
@@ -157,12 +158,22 @@ public class ArteTv extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             final HLSContent hlsContent = new HLSContent(m3u8.get(0));
-            final MEDIA media = found.findMEDIA(linkContainer.getMedia().get(0));
-            final List<M3U8Playlist> audioM3U8 = media.loadM3U8(br.cloneBrowser());
-            if (audioM3U8 == null || audioM3U8.size() != 1) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            {
+                final MEDIA media = found.findMEDIA(linkContainer.getMedia().get(0));
+                final List<M3U8Playlist> audioM3U8 = media.loadM3U8(br.cloneBrowser());
+                if (audioM3U8 == null || audioM3U8.size() != 1) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                hlsContent.add(media, audioM3U8.get(0));
             }
-            hlsContent.addAudioTrack(audioM3U8.get(0));
+            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && found.getMedia().size() > 1) {
+                final MEDIA media = found.findMEDIA(linkContainer.getMedia().get(1));
+                final List<M3U8Playlist> subM3U8 = media.loadM3U8(br.cloneBrowser());
+                if (subM3U8 == null || subM3U8.size() != 1) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                hlsContent.add(media, subM3U8.get(0));
+            }
             final List<HLSContent> hlsContents = new ArrayList<HLSContent>();
             hlsContents.add(hlsContent);
             dl = new HLSDownloader(link, br, hlsContents);

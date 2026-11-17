@@ -14,6 +14,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.ConnectException;
 import java.net.MalformedURLException;
 import java.net.SocketTimeoutException;
@@ -42,15 +43,6 @@ import javax.imageio.ImageIO;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 
-import jd.captcha.utils.GifDecoder;
-import jd.http.Browser;
-import jd.http.Browser.BlockedByException;
-import jd.http.Browser.BrowserException;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.plugins.PluginForHost;
-
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.resources.MultiResolutionImageHelper;
 import org.appwork.shutdown.ShutdownController;
@@ -67,6 +59,7 @@ import org.appwork.utils.ModifyLock;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.ImageProvider.ImageProvider;
+import org.appwork.utils.encoding.HTMLEncoding;
 import org.appwork.utils.images.IconIO;
 import org.appwork.utils.images.svg.SVGFactory;
 import org.appwork.utils.logging2.LogInterface;
@@ -86,8 +79,19 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
+import jd.captcha.utils.GifDecoder;
+import jd.http.Browser;
+import jd.http.Browser.BlockedByException;
+import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.plugins.PluginForHost;
+
 public class FavIcons {
     private static final int                                 BASE_SIZE       = 16;
+    /* max size in bytes of a downloaded favicon (ico files with several resolutions and apple-touch-icons are well below that) */
+    private static final int                                 MAX_FAVICON_SIZE = 1024 * 1024;
     private static final ThreadPoolExecutor                  THREAD_POOL;
     private static final Object                              LOCK            = new Object();
     private static final Map<String, List<FavIconRequestor>> QUEUE           = new LinkedHashMap<String, List<FavIconRequestor>>();
@@ -95,8 +99,8 @@ public class FavIcons {
     private static final Set<String>                         REFRESHED_ICONS = new HashSet<String>();
     private static final Map<String, ImageIcon>              DEFAULT_ICONS   = new HashMap<String, ImageIcon>();
     private static final FavIconsConfig                      CONFIG          = JsonConfig.create(FavIconsConfig.class);
-    private static final long                                REFRESH_TIMEOUT = 1000l * 60 * 60 * 24 * 7;
-    private static final long                                RETRY_TIMEOUT   = 1000l * 60 * 60 * 24 * 7;
+    private static final long                                REFRESH_TIMEOUT = TimeUnit.DAYS.toMillis(7);
+    private static final long                                RETRY_TIMEOUT   = TimeUnit.DAYS.toMillis(7);
     static {
         int maxThreads = Math.max(CONFIG.getMaxThreads(), 1);
         int keepAlive = Math.max(CONFIG.getThreadKeepAlive(), 100);
@@ -323,8 +327,13 @@ public class FavIcons {
         if (existingHostPlugin != null) {
             return existingHostPlugin;
         }
-        final String domain = PublicSuffixList.getInstance().getDomain(host);
-        if (host.equalsIgnoreCase(domain)) {
+        /* getInstance() is null if the public suffix list could not be loaded */
+        final PublicSuffixList publicSuffixList = PublicSuffixList.getInstance();
+        if (publicSuffixList == null) {
+            return null;
+        }
+        final String domain = publicSuffixList.getDomain(host);
+        if (domain == null || host.equalsIgnoreCase(domain)) {
             return null;
         }
         return new PluginFinder()._assignHost(domain);
@@ -384,23 +393,50 @@ public class FavIcons {
              * create the default icon before the loader is started: a failing loader removes it from DEFAULT_ICONS again
              * (getDefaultIcon(..., true)), so creating it afterwards could leave a stale DEFAULT_ICONS entry
              */
-            final ImageIcon icon = getDefaultIcon(logger, host, false);
-            if (!startLoader) {
-                /* already enqueued, requestor gets notified by the running loader */
-                return icon;
-            }
-            /* the runnable takes over the logger and closes it */
-            loggerReference.getAndSet(null);
-            THREAD_POOL.execute(new FavIconsRunnable(host) {
-                public void run() {
-                    try {
-                        loadFavIcon(host, logger);
-                    } finally {
-                        logger.close();
+            boolean loaderStarted = false;
+            try {
+                final ImageIcon icon = getDefaultIcon(logger, host, false);
+                if (!startLoader) {
+                    /* already enqueued, requestor gets notified by the running loader */
+                    return icon;
+                }
+                /* the runnable takes over the logger and closes it */
+                loggerReference.getAndSet(null);
+                try {
+                    THREAD_POOL.execute(new FavIconsRunnable(host) {
+                        public void run() {
+                            try {
+                                loadFavIcon(host, logger);
+                            } catch (final Throwable e) {
+                                /*
+                                 * e.g. an Error thrown by a plugin. Without this the host would stay in QUEUE and never be loaded again.
+                                 */
+                                logger.log(e);
+                                onLoadFailed(logger, host);
+                            } finally {
+                                logger.close();
+                            }
+                        }
+                    });
+                    loaderStarted = true;
+                } finally {
+                    if (!loaderStarted) {
+                        /* the runnable will never run (e.g. RejectedExecutionException), so it cannot close the logger */
+                        loggerReference.set(logger);
                     }
                 }
-            });
-            return icon;
+                return icon;
+            } finally {
+                if (startLoader && !loaderStarted) {
+                    /*
+                     * Rendering the default icon or starting the loader failed, so no loader will ever remove the host from QUEUE. Without
+                     * this the host would never be loaded again and its requestor list would keep growing.
+                     */
+                    synchronized (LOCK) {
+                        QUEUE.remove(host);
+                    }
+                }
+            }
         } finally {
             if (loggerReference.getAndSet(null) == logger) {
                 logger.close();
@@ -466,6 +502,14 @@ public class FavIcons {
         }
         /* file system calls and png encoding outside LOCK */
         final boolean written = writeFavIcon(logger, host, favicon);
+        if (!written) {
+            /*
+             * The favicon could not be buffered to disk (e.g. write protected directory or a host that is not a valid file name). Remember
+             * the host as failed, otherwise every getFavIcon call would find no file and start another download.
+             */
+            onLoadFailed(logger, host);
+            return;
+        }
         final List<FavIconRequestor> requestors;
         synchronized (LOCK) {
             /*
@@ -473,8 +517,10 @@ public class FavIcons {
              * and must see the host as already enqueued, so they only add their requestor instead of starting a second loader
              */
             requestors = QUEUE.remove(host);
+            /* the favicon is on disk now, the default icon created in add() is not needed anymore */
+            DEFAULT_ICONS.remove(host);
         }
-        if (!written || requestors == null || requestors.size() == 0) {
+        if (requestors == null || requestors.size() == 0) {
             return;
         }
         /* callbacks outside LOCK: setFavIcon loads and scales the icon from disk and calls foreign code */
@@ -486,14 +532,18 @@ public class FavIcons {
      * holding LOCK.
      */
     private static void onLoadFailed(final LogSource logger, final String host) {
-        /* rendering is expensive -> outside LOCK, even if the icon is not needed in the end (refreshed or already failed host) */
-        final ImageIcon defaultIcon = getDefaultIcon(logger, host, true);
-        synchronized (LOCK) {
-            QUEUE.remove(host);
-            if (REFRESHED_ICONS.contains(host) || FAILED_ICONS.get(host) != null) {
-                return;
+        ImageIcon defaultIcon = null;
+        try {
+            /* rendering is expensive -> outside LOCK, even if the icon is not needed in the end (refreshed or already failed host) */
+            defaultIcon = getDefaultIcon(logger, host, true);
+        } finally {
+            /* the host must leave QUEUE even if rendering the default icon failed */
+            synchronized (LOCK) {
+                QUEUE.remove(host);
+                if (defaultIcon != null && !REFRESHED_ICONS.contains(host) && FAILED_ICONS.get(host) == null) {
+                    FAILED_ICONS.put(host, defaultIcon);
+                }
             }
-            FAILED_ICONS.put(host, defaultIcon);
         }
     }
 
@@ -521,7 +571,9 @@ public class FavIcons {
         if (host.matches("\\d+\\.\\d+\\.\\d+\\.\\d+")) {
             return;
         }
-        final String domain = PublicSuffixList.getInstance() != null ? PublicSuffixList.getInstance().getDomain(host) : null;
+        /* getInstance() is null if the public suffix list could not be loaded */
+        final PublicSuffixList publicSuffixList = PublicSuffixList.getInstance();
+        final String domain = publicSuffixList != null ? publicSuffixList.getDomain(host) : null;
         String tryHost = host;
         while (true) {
             /*
@@ -643,6 +695,11 @@ public class FavIcons {
     /**
      * Creates a dummy hoster icon: a rounded rectangle with a two letter abbreviation of the host (see getDefaultIconAbbreviation) and the
      * tld in the lower right corner.
+     *
+     * Note: only the font sizes (w - 7 for the abbreviation, w - 10 for the tld) depend on w. Corner radius (5), the one pixel shift of the
+     * abbreviation and the offsets of the tld (2) are fixed pixel values. The bigger variant created for HiDPI screens (see
+     * createDefaultFavIcon(logger, host)) is therefore not a proportional scaling of the 16x16 base icon (at w = 32 the tld is nearly as
+     * big as the abbreviation). This is known and left as is on purpose.
      */
     private static Image createDefaultFavIcon(final LogSource logger, final String host, final int w, final int h) {
         final int size = w - 7;
@@ -860,6 +917,17 @@ public class FavIcons {
         return false;
     }
 
+    /**
+     * Returns true if domain is equal to host or a subdomain of it (ignoring case). A plain contains check would also accept e.g.
+     * banana.com for a.com or x.com.evil.org for x.com.
+     */
+    private static boolean isSameOrSubdomain(final String domain, final String host) {
+        if (domain == null || host == null) {
+            return false;
+        }
+        return StringUtils.equalsIgnoreCase(domain, host) || StringUtils.endsWithCaseInsensitive(domain, "." + host);
+    }
+
     private static boolean isSameDomain(final Browser br, String host, String[] siteSupportedNames) throws IOException {
         if (host.matches("(?i)^https?://.+")) {
             host = new URL(host).getHost();
@@ -868,18 +936,24 @@ public class FavIcons {
         if (url == null) {
             return false;
         }
-        if (StringUtils.containsIgnoreCase(url.getHost(), host)) {
+        if (isSameOrSubdomain(url.getHost(), host)) {
             return true;
         }
         final String domain = br.getHost();
-        if (!StringUtils.containsIgnoreCase(domain, host)) {
+        if (!isSameOrSubdomain(domain, host)) {
             // different domain, check for different ld
-            final String domainTld = PublicSuffixList.getInstance().getTopLevelDomain(domain);
-            final String hostTld = PublicSuffixList.getInstance().getTopLevelDomain(host);
-            final String compareDomain = domain.replaceAll("\\." + domainTld + "$", "");
-            final String compareHost = host.replaceAll("\\." + hostTld + "$", "");
-            if (StringUtils.equalsIgnoreCase(compareDomain, compareHost)) {
-                return true;
+            /* getInstance() is null if the public suffix list could not be loaded */
+            final PublicSuffixList publicSuffixList = PublicSuffixList.getInstance();
+            if (publicSuffixList != null) {
+                final String domainTld = publicSuffixList.getTopLevelDomain(domain);
+                final String hostTld = publicSuffixList.getTopLevelDomain(host);
+                if (domainTld != null && hostTld != null) {
+                    final String compareDomain = domain.replaceAll("\\." + Pattern.quote(domainTld) + "$", "");
+                    final String compareHost = host.replaceAll("\\." + Pattern.quote(hostTld) + "$", "");
+                    if (StringUtils.equalsIgnoreCase(compareDomain, compareHost)) {
+                        return true;
+                    }
+                }
             }
         }
         if (siteSupportedNames == null) {
@@ -888,6 +962,11 @@ public class FavIcons {
         if (isSameDomain(siteSupportedNames, domain, url)) {
             return true;
         }
+        /*
+         * Note: this accepts the redirect target if ANY crawler plugin supports its domain, independent of the host the favicon is loaded
+         * for. E.g. a parked host that redirects to a site supported by some crawler passes this check and gets the favicon of that site.
+         * Known and left as is on purpose (the host related check is the siteSupportedNames comparison above).
+         */
         final List<LazyCrawlerPlugin> crawlerPlugins = CrawlerPluginController.getInstance().list(true);
         for (LazyCrawlerPlugin crawlerPlugin : crawlerPlugins) {
             final String[] siteSupported = crawlerPlugin.getSitesSupported();
@@ -974,6 +1053,10 @@ public class FavIcons {
             }
         }
         for (final String website : websites) {
+            if (Thread.currentThread().isInterrupted()) {
+                /* interrupted by a sleep above, stop instead of trying the next website */
+                break;
+            }
             favBr.setRequest(null);
             boolean retryFlag = true;
             int retryCount = 0;
@@ -987,16 +1070,22 @@ public class FavIcons {
                             throw e;
                         }
                         final String unknownHost = Browser.getHost(website, true);
-                        if (!StringUtils.startsWithCaseInsensitive(host, "www.")) {
-                            final String wwwSubdomain = website.replaceFirst("//" + Pattern.quote(unknownHost), "//www." + unknownHost);
-                            favBr.getPage(wwwSubdomain);
+                        if (StringUtils.startsWithCaseInsensitive(unknownHost, "www.")) {
+                            /*
+                             * Already a www subdomain, there is nothing left to retry. Rethrow, otherwise the code below would continue
+                             * without a loaded page.
+                             */
+                            throw e;
                         }
+                        final String wwwSubdomain = website.replaceFirst("//" + Pattern.quote(unknownHost), "//www." + unknownHost);
+                        favBr.getPage(wwwSubdomain);
                     }
                     final String redirectOrRefresh = StringUtils.firstNotEmpty(favBr.getRedirectLocation(), favBr.getRequest().getHTMLRefresh());
                     if (redirectOrRefresh != null) {
                         try {
                             Thread.sleep(500);// helps to prevent cloudflare protection
                         } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
                             throw new IOException(e);
                         }
                         favBr.getPage(redirectOrRefresh);
@@ -1036,7 +1125,9 @@ public class FavIcons {
                             Thread.sleep(timeout);
                             retryFlag = true;
                             retryCount = 1;
-                        } catch (InterruptedException ignore) {
+                        } catch (InterruptedException ie) {
+                            /* no retry, keep the interrupt so the callers can stop */
+                            Thread.currentThread().interrupt();
                         }
                     }
                 } catch (final IOException e) {
@@ -1049,6 +1140,25 @@ public class FavIcons {
         }
         // host is absolute URL
         return download_FavIconTag(favBr, host);
+    }
+
+    /**
+     * Reads the complete stream into memory, but never more than maxSize bytes.
+     *
+     * @throws IOException
+     *             if the stream is bigger than maxSize
+     */
+    private static byte[] readLimited(final InputStream is, final int maxSize) throws IOException {
+        final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        final byte[] buffer = new byte[8192];
+        int read;
+        while ((read = is.read(buffer)) != -1) {
+            if (bos.size() + read > maxSize) {
+                throw new IOException("Favicon is bigger than " + maxSize + " bytes");
+            }
+            bos.write(buffer, 0, read);
+        }
+        return bos.toByteArray();
     }
 
     private static BufferedImage load_DataURL(DataURLInputStream is) throws IOException {
@@ -1076,9 +1186,11 @@ public class FavIcons {
             }
             return IconIO.toBufferedImage(img);
         }
-        final byte[] dataURL_data = IO.readStream(-1, is);
+        final byte[] dataURL_data = readLimited(is, MAX_FAVICON_SIZE);
         final ByteArrayInputStream bis = new ByteArrayInputStream(dataURL_data);
         if (CompiledFiletypeFilter.ImageExtensions.ICO.matchesMagic(bis)) {
+            /* matchesMagic consumes bytes, so start from the beginning again */
+            bis.reset();
             final Image img = IconIO.loadIcon(bis);
             if (img == null) {
                 return null;
@@ -1100,7 +1212,6 @@ public class FavIcons {
             return ret;
         }
         return null;
-
     }
 
     public static BufferedImage download_FavIconTag(Browser favBr, String host) throws IOException {
@@ -1108,6 +1219,10 @@ public class FavIcons {
         final LogInterface logger = favBr.getLogger();
         final List<BufferedImage> images = new ArrayList<BufferedImage>();
         for (final String favIconURL : favIconURLs) {
+            if (Thread.currentThread().isInterrupted()) {
+                /* interrupted by a sleep below, stop and use what has been loaded so far */
+                break;
+            }
             boolean retryFlag = true;
             int retryCount = 0;
             while (retryFlag) {
@@ -1129,6 +1244,7 @@ public class FavIcons {
                     try {
                         Thread.sleep(250);// helps to prevent cloudflare protection
                     } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
                         throw new IOException(e);
                     }
                     final BufferedImage ret = download_FavIconTag(brc, favIconURL, host);
@@ -1148,7 +1264,9 @@ public class FavIcons {
                             Thread.sleep(timeout);
                             retryFlag = true;
                             retryCount++;
-                        } catch (InterruptedException ignore) {
+                        } catch (InterruptedException ie) {
+                            /* no retry, keep the interrupt so the callers can stop */
+                            Thread.currentThread().interrupt();
                         }
                     }
                 } catch (IOException e) {
@@ -1160,6 +1278,17 @@ public class FavIcons {
         return best;
     }
 
+    /* values of the rel attribute of a link tag that point to a favicon */
+    private static final String FAVICON_REL_PATTERN = "(?:icon|shortcut icon|alternate icon|apple-touch-icon|apple-touch-icon-precomposed)";
+
+    /**
+     * Removes the quotes (" or ') around a html attribute value and decodes all html entities (named and numeric, e.g. &amp;amp; or
+     * &amp;#38;).
+     */
+    private static String unquoteAttribute(final String quoted) {
+        return HTMLEncoding.unescape(quoted.substring(1, quoted.length() - 1));
+    }
+
     public static Set<String> getFavIconURLs(final Browser favBr, final String host) throws IOException {
         final Set<String> ret = new LinkedHashSet<String>();
         String favIconURL = getFavIconURL(null, host);
@@ -1168,10 +1297,10 @@ public class FavIcons {
             return ret;
         }
         final String requestHtml = favBr.toString().replaceAll("(?s)<!--.*?-->", "");
-        String urls[] = new Regex(requestHtml, "(?i) rel\\s*=\\s*(['\"])" + "(?:icon|shortcut icon|apple-touch-icon)" + "\\1[^<>]*? href\\s*=\\s*((?:\"[^\"]*\")|(?:'[^']*'))").getColumn(1);
+        String urls[] = new Regex(requestHtml, "(?i)\\srel\\s*=\\s*(['\"])" + FAVICON_REL_PATTERN + "\\1[^<>]*?\\shref\\s*=\\s*((?:\"[^\"]*\")|(?:'[^']*'))").getColumn(1);
         if (urls != null) {
             for (String url : urls) {
-                url = url.substring(1, url.length() - 1);// remove " and '
+                url = unquoteAttribute(url);
                 favIconURL = getFavIconURL(favBr, url);
                 if (favIconURL == null) {
                     continue;
@@ -1179,10 +1308,10 @@ public class FavIcons {
                 ret.add(favIconURL);
             }
         }
-        urls = new Regex(requestHtml, "(?i) href\\s*=\\s*((?:\"[^\"]*\")|(?:'[^']*'))[^<>]*? rel\\s*=\\s*(['\"])" + "(?:icon|shortcut icon|apple-touch-icon)" + "\\2").getColumn(0);
+        urls = new Regex(requestHtml, "(?i)\\shref\\s*=\\s*((?:\"[^\"]*\")|(?:'[^']*'))[^<>]*?\\srel\\s*=\\s*(['\"])" + FAVICON_REL_PATTERN + "\\2").getColumn(0);
         if (urls != null) {
             for (String url : urls) {
-                url = url.substring(1, url.length() - 1);// remove " and '
+                url = unquoteAttribute(url);
                 favIconURL = getFavIconURL(favBr, url);
                 if (favIconURL == null) {
                     continue;
@@ -1194,6 +1323,16 @@ public class FavIcons {
         return ret;
     }
 
+    /**
+     * Loads the image behind the given url (ico, png, svg, jpg, gif) and returns it.
+     *
+     * The result is checked with getValidImage (bigger than 1x1) for every format. There is no further validation: the image is not
+     * cropped and it is not compared with other candidates, see download_FavIconTag(Browser, String) which uses returnBestImage.
+     *
+     * The response is limited to MAX_FAVICON_SIZE bytes, bigger responses throw an IOException.
+     *
+     * @return the image or null if the response is not an image or is not a valid favicon (see getValidImage)
+     */
     public static BufferedImage download_FavIconTag(final Browser favBr, final String url, final String host) throws IOException {
         URLConnectionAdapter con = null;
         byte[] bytes = null;
@@ -1206,17 +1345,22 @@ public class FavIcons {
             favBr.setFollowRedirects(true);
             GetRequest request = favBr.createGetRequest(url);
             con = favBr.openRequestConnection(request);
-            /* we use bufferedinputstream to reuse it later if needed */
-            bytes = IO.readStream(-1, con.getInputStream());
-            if (!con.isOK() || StringUtils.containsIgnoreCase(con.getContentType(), "text") || bytes == null || bytes.length == 0) {
-                favBr.getLogger().info("could not load:" + con.getURL() + "|responseCode=" + con.getResponseCode() + "|contentType=" + con.getContentType() + "|bytes=" + (bytes == null ? -1 : bytes.length));
+            /* check status and content type first, the body of an error page or a html page is not read at all */
+            if (!con.isOK() || StringUtils.containsIgnoreCase(con.getContentType(), "text")) {
+                favBr.getLogger().info("could not load:" + con.getURL() + "|responseCode=" + con.getResponseCode() + "|contentType=" + con.getContentType());
+                return null;
+            }
+            /* we use bufferedinputstream to reuse it later if needed, throws an IOException if the response is bigger than the limit */
+            bytes = readLimited(con.getInputStream(), MAX_FAVICON_SIZE);
+            if (bytes.length == 0) {
+                favBr.getLogger().info("could not load:" + con.getURL() + "|responseCode=" + con.getResponseCode() + "|contentType=" + con.getContentType() + "|bytes=0");
                 return null;
             }
             final ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
             try {
                 if (CompiledFiletypeFilter.ImageExtensions.PNG.matchesMagic(bis)) {
                     // PNG magic
-                    return downloadImage(con, logger, bis);
+                    return downloadImage(con, logger, bis, false);
                 }
                 bis.reset();
                 if (CompiledFiletypeFilter.ImageExtensions.ICO.matchesMagic(bis)) {
@@ -1226,17 +1370,17 @@ public class FavIcons {
                     if (img == null) {
                         return null;
                     }
-                    return IconIO.toBufferedImage(img);
+                    return getValidImage(IconIO.toBufferedImage(img));
                 }
                 bis.reset();
                 if (CompiledFiletypeFilter.ImageExtensions.SVG.matchesMagic(bis) || CompiledFiletypeFilter.ImageExtensions.SVG.matchesMimeType(con.getContentType()) > 0) {
-                    // SVG magic
-                    return downloadImage(con, logger, bis);
+                    // SVG magic or mime type, the url does not need to end with .svg
+                    return downloadImage(con, logger, bis, true);
                 }
                 bis.reset();
                 if (CompiledFiletypeFilter.ImageExtensions.JPG.matchesMagic(bis)) {
                     // JPG magic
-                    return downloadImage(con, logger, bis);
+                    return downloadImage(con, logger, bis, false);
                 }
                 bis.reset();
                 if (CompiledFiletypeFilter.ImageExtensions.GIF.matchesMagic(bis)) {
@@ -1251,7 +1395,7 @@ public class FavIcons {
                 /* try first with iconloader */
                 if (bytes.length < 70) {
                     // smallest single pixel icon has 70 bytes
-                    return downloadImage(con, logger, bis);
+                    return downloadImage(con, logger, bis, false);
                 }
                 List<BufferedImage> ret = null;
                 try {
@@ -1275,7 +1419,7 @@ public class FavIcons {
                 return img;
             } catch (Throwable e) {
                 /* maybe redirect to different icon format? */
-                final BufferedImage img = downloadImage(con, logger, bis);
+                final BufferedImage img = downloadImage(con, logger, bis, false);
                 if (img != null) {
                     return img;
                 }
@@ -1296,10 +1440,13 @@ public class FavIcons {
      * Returns the image if it is bigger than 1x1, else null. Some hosts have fake favicons with 1x1 size.
      */
     private static BufferedImage getValidImage(final BufferedImage img) {
-        if (img == null || img.getHeight() <= 1 || img.getWidth() <= 1) {
+        if (img == null) {
             return null;
         }
-        return img;
+        if ((img.getHeight() >= 2 && img.getWidth() >= 1) || (img.getHeight() >= 1 && img.getWidth() >= 2)) {
+            return img;
+        }
+        return null;
     }
 
     public static BufferedImage downloadFavIcon(LogSource logger, List<String> hosts, String[] siteSupportedNames) {
@@ -1349,11 +1496,13 @@ public class FavIcons {
     /**
      * Decodes the image (svg, any ImageIO format or gif) from the given stream.
      *
+     * @param isSvg
+     *            true if the content was already detected as svg (magic or mime type), even if the url does not end with .svg
      * @return the image, or null if it cannot be decoded or is not a valid favicon (see getValidImage)
      */
-    private static BufferedImage downloadImage(URLConnectionAdapter con, LogInterface logger, ByteArrayInputStream is) {
+    private static BufferedImage downloadImage(URLConnectionAdapter con, LogInterface logger, ByteArrayInputStream is, final boolean isSvg) {
         try {
-            if (StringUtils.endsWithCaseInsensitive(con.getURL().getPath(), ".svg")) {
+            if (isSvg || StringUtils.endsWithCaseInsensitive(con.getURL().getPath(), ".svg")) {
                 try {
                     final SVGFactory svgFactory = IconIO.getSvgFactory();
                     if (svgFactory == null) {

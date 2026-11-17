@@ -25,23 +25,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import jd.PluginWrapper;
-import jd.controlling.ProgressController;
-import jd.http.Browser;
-import jd.plugins.Account;
-import jd.plugins.CryptedLink;
-import jd.plugins.DecrypterPlugin;
-import jd.plugins.DecrypterRetryException;
-import jd.plugins.DecrypterRetryException.RetryReason;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForDecrypt;
-import jd.plugins.hoster.ArteTv;
-import jd.plugins.hoster.DirectHTTP;
-
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
@@ -63,7 +46,24 @@ import org.jdownloader.plugins.components.hls.HlsContainerStorable;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 53996 $", interfaceVersion = 4, names = {}, urls = {})
+import jd.PluginWrapper;
+import jd.controlling.ProgressController;
+import jd.http.Browser;
+import jd.plugins.Account;
+import jd.plugins.CryptedLink;
+import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.ArteTv;
+import jd.plugins.hoster.DirectHTTP;
+
+@DecrypterPlugin(revision = "$Revision: 54016 $", interfaceVersion = 4, names = {}, urls = {})
 public class ArteMediathekV3 extends PluginForDecrypt {
     public ArteMediathekV3(PluginWrapper wrapper) {
         super(wrapper);
@@ -522,7 +522,8 @@ public class ArteMediathekV3 extends PluginForDecrypt {
                 final HlsContainer hlsRef = (HlsContainer) videoStream.get("hlsRef");
                 if (hlsRef != null) {
                     final HlsContainer.MEDIA mediaRef = (HlsContainer.MEDIA) videoStream.get("mediaRef");
-                    hlsRef.setPropertiesOnDownloadLink(link, mediaRef);
+                    final HlsContainer.MEDIA mediaRefSub = (HlsContainer.MEDIA) videoStream.get("mediaRefSub");
+                    hlsRef.setPropertiesOnDownloadLink(link, mediaRef, mediaRefSub);
                 }
                 link.setProperty(PROPERTY_TYPE, "video");
                 /* Set properties which we later need for custom filenames. */
@@ -933,7 +934,6 @@ public class ArteMediathekV3 extends PluginForDecrypt {
                 // Original european version, with subtitles
                 return ORIGINAL_EUROPEAN;
             }
-
             if (StringUtils.equalsIgnoreCase(apiosCode, "VOF")) {
                 // Original version in French, without subtitles.
                 return ORIGINAL_FRANCAIS;
@@ -948,7 +948,6 @@ public class ArteMediathekV3 extends PluginForDecrypt {
                 // Original version in German, with subtitles
                 return ORIGINAL_GERMAN;
             }
-
             if (StringUtils.equalsIgnoreCase(apiosCode, "VF")) {
                 // Non-original French version (Post-Synchro and/or Voice Over), without subtitles
                 return NON_ORIGINAL_FRANCAIS;
@@ -956,7 +955,6 @@ public class ArteMediathekV3 extends PluginForDecrypt {
                 // Non-original French version (Post-Synchro and/or Voice Over), with subtitles
                 return NON_ORIGINAL_FRANCAIS;
             }
-
             if (StringUtils.equalsIgnoreCase(apiosCode, "VFAUD")) {
                 // French version, with audio description
                 return NON_ORIGINAL_FRANCAIS;
@@ -964,7 +962,6 @@ public class ArteMediathekV3 extends PluginForDecrypt {
                 // French version, with audio description, with subtitles
                 return NON_ORIGINAL_FRANCAIS;
             }
-
             if (StringUtils.equalsIgnoreCase(apiosCode, "VA")) {
                 // Non-original German version (Post-Synchro and/or Voice Over),without subtitles
                 return NON_ORIGINAL_GERMAN;
@@ -972,22 +969,19 @@ public class ArteMediathekV3 extends PluginForDecrypt {
                 // Non-original German version (Post-Synchro and/or Voice Over),with subtitles
                 return NON_ORIGINAL_GERMAN;
             }
-
             if (StringUtils.equalsIgnoreCase(apiosCode, "VAAUD")) {
                 // German version, with audio description
                 return NON_ORIGINAL_GERMAN;
             } else if (StringUtils.startsWithCaseInsensitive(apiosCode, "VAAUD-")) {
                 // German version, with audio description, with subtitles
                 return NON_ORIGINAL_GERMAN;
-            } else
-
-                if (StringUtils.equalsIgnoreCase(apiosCode, "VE")) {
-                    // Foreign version, dubbed in a third language, neither in French nor German, without subtitles
-                    return FOREIGN;
-                } else if (StringUtils.startsWithCaseInsensitive(apiosCode, "VE-")) {
-                    // Foreign version, dubbed in a third language, neither in French nor German, with subtitles
-                    return FOREIGN;
-                }
+            } else if (StringUtils.equalsIgnoreCase(apiosCode, "VE")) {
+                // Foreign version, dubbed in a third language, neither in French nor German, without subtitles
+                return FOREIGN;
+            } else if (StringUtils.startsWithCaseInsensitive(apiosCode, "VE-")) {
+                // Foreign version, dubbed in a third language, neither in French nor German, with subtitles
+                return FOREIGN;
+            }
             return UNKNOWN;
         }
     }

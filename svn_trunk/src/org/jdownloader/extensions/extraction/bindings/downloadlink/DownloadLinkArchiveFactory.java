@@ -24,12 +24,12 @@ import org.jdownloader.extensions.extraction.Archive;
 import org.jdownloader.extensions.extraction.ArchiveFactory;
 import org.jdownloader.extensions.extraction.ArchiveFile;
 import org.jdownloader.extensions.extraction.BooleanStatus;
+import org.jdownloader.extensions.extraction.ExtractionExtension;
 import org.jdownloader.extensions.extraction.UnitType;
 import org.jdownloader.extensions.extraction.bindings.file.FileArchiveFactory;
 import org.jdownloader.extensions.extraction.bindings.file.FileArchiveFile;
 import org.jdownloader.extensions.extraction.multi.ArchiveType;
 import org.jdownloader.extensions.extraction.split.SplitType;
-import org.jdownloader.settings.GeneralSettings;
 
 public class DownloadLinkArchiveFactory extends DownloadLinkArchiveFile implements ArchiveFactory {
     public static final String DOWNLOADLINK_KEY_EXTRACTEDPATH = "EXTRACTEDPATH";
@@ -83,12 +83,8 @@ public class DownloadLinkArchiveFactory extends DownloadLinkArchiveFile implemen
                 }
             }
             if (path.contains(SUBFOLDER)) {
-                final String dif = link == null ? null : new File(org.appwork.storage.config.JsonConfig.create(GeneralSettings.class).getDefaultDownloadFolder()).getAbsolutePath().replace(new File(link.getFileOutput(false, true)).getParent(), "");
-                if (StringUtils.isEmpty(dif) || new File(dif).isAbsolute()) {
-                    path = path.replace(SUBFOLDER, "");
-                } else {
-                    path = path.replace(SUBFOLDER, CrossSystem.alleviatePathParts(dif));
-                }
+                final String linkFolder = link == null ? null : new File(link.getFileOutput(false, true)).getParent();
+                path = path.replace(SUBFOLDER, StringUtils.isEmpty(linkFolder) ? "" : ExtractionExtension.createDownloadPathSubfolder(new File(linkFolder)));
             }
             return CrossSystem.fixPathSeparators(path);
         } catch (Exception e) {

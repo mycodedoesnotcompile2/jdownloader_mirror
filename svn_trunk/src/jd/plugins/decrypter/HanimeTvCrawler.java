@@ -15,27 +15,33 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
+import java.nio.charset.Charset;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
+import java.util.regex.Pattern;
 
+import javax.crypto.Cipher;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+
+import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.jdownloader.plugins.components.config.HanimeTvConfig;
+import org.jdownloader.plugins.components.config.HanimeTvConfig.QUALITY;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
-import jd.controlling.AccountFilter;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
 import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -44,40 +50,36 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.HanimeTv;
 
 /**
- * <b>STATUS (2026-11): DEFECT - website was completely rebuilt, this crawler is outdated and needs a rewrite.</b> <br>
- * Findings so far:
- * <ul>
- * <li>The website is now an Astro page with a Vue island (HTVPlayer). <code>window.__NUXT__</code> no longer exists. The HTML only contains
- * title/slug (ld+json VideoObject, <code>data-video-id</code>, astro-island props "slug"). No streams/manifest/description in the HTML.</li>
- * <li>The old flow (/downloads/&lt;base64 slug&gt; + reCAPTCHA v2 + h.freeanimehentai.net/rapi/v7/downloads) is no longer referenced by the
- * player JS. The page now uses a Turnstile site key (0x4AAAAAABsjKGKilqEiCHWo).</li>
- * <li>New flow according to the player JS (/_astro/BLboX1K_.js):
+ * Crawler for hanime.tv (Astro page + Vue player, reworked 2026-11). <br>
+ * Flow (reverse engineered from the player JS and the WASM module in hanime-cdn.com/js/vendor.&lt;hash&gt;.min.js):
  * <ol>
- * <li>GET https://ct.hanime.tv/csrf-token -> {"csrf_token": "...", "csrf_token_expires_at": ...} and sets cookie "htv_csrf_proof".</li>
- * <li>POST https://auth.hanime.tv/api/v11/handshake with JSON body {"token": &lt;encrypted blob&gt;} and headers content-type/accept
- * application/json, x-signature-version: web2, x-signature, x-time, x-csrf-token.</li>
- * <li>Plaintext of the token: {"timestamp_unix": &lt;unix seconds&gt;, "directive": "htv_player_handshake", "slug": "...", "playlist_slug":
- * optional}.</li>
- * <li>Encryption ("htv-insecure" scheme, /_astro/CwylGxhk2.js): AES-256-GCM, key = SHA-256("htv-insecure-handshake-v1"), random 12 byte IV,
- * AAD = "htv-insecure-v1", 128 bit tag. Output = base64url(JSON {"v":1,"alg":"AES-256-GCM","iv":b64url,"tag":b64url,"data":b64url}), data
- * = ciphertext without tag.</li>
- * <li>The response header "x-token" is encrypted the same way. Decrypted it is JSON containing "sources" (+ preroll ad info).</li>
+ * <li>GET https://ct.hanime.tv/csrf-token -> {"csrf_token": "..."} (also sets cookie "htv_csrf_proof").</li>
+ * <li>POST https://auth.hanime.tv/api/v11/handshake with JSON {"token": &lt;encrypted blob&gt;} and the headers x-signature-version: web2,
+ * x-signature, x-time, x-csrf-token.</li>
+ * <li>Plaintext of the token: {"timestamp_unix": &lt;unix seconds&gt;, "directive": "htv_player_handshake", "slug": "..."}.</li>
+ * <li>Encryption ("htv-insecure" scheme): AES-256-GCM, key = SHA-256("htv-insecure-handshake-v1"), random 12 byte IV, AAD =
+ * "htv-insecure-v1", 128 bit tag. Output = base64url(JSON {"v":1,"alg":"AES-256-GCM","iv":b64url,"tag":b64url,"data":b64url}), "data" is
+ * the ciphertext without the tag.</li>
+ * <li>The response header "x-token" is encrypted the same way. Decrypted it is JSON containing "sources": a list of HLS media playlists
+ * with relative URLs (resolved against https://hanime.tv). Items with an empty "src" are premium-only promotions. The playlists are AES-128
+ * encrypted HLS streams and are short-lived, so they must be handed over to the HLS plugin right away.</li>
  * </ol>
- * </li>
- * <li><b>Blocker:</b> x-signature and x-time come from an Emscripten WASM module (embedded as base64 in
- * hanime-cdn.com/js/vendor.&lt;hash&gt;.min.js, exports window.ssignature / window.stime, recalculated on every "e" window event). The server
- * validates the signature: a random 32 char hex value results in HTTP 401 {"error_id":"UA1","message":"Unauthorized"}. The WASM contains
- * SHA-256 constants and the strings ",Xkdi29," and ",mn2,", so the signature is most likely a SHA-256 over a string built with these
- * salts, the unix time and probably location/origin. The exact formula is not reversed yet.</li>
- * <li>Unknown: whether "sources" contains direct download URLs or only HLS streams, and whether Cloudflare/Turnstile is required.</li>
- * </ul>
+ * x-signature / x-time (computed by the WASM module): x-time = current unix time in seconds (t), x-signature = hex(SHA-256(t + ",Xkdi29," +
+ * window.top.location.origin + ",mn2," + t)). Verified against the original WASM implementation (executed via wasmtime) and against the
+ * live server.
  */
-@DecrypterPlugin(revision = "$Revision: 53999 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54023 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { HanimeTv.class })
 public class HanimeTvCrawler extends PluginForDecrypt {
+    private static final String HANDSHAKE_KEY_SEED  = "htv-insecure-handshake-v1";
+    private static final String HANDSHAKE_AAD       = "htv-insecure-v1";
+    private static final String HANDSHAKE_DIRECTIVE = "htv_player_handshake";
+    private static final String URL_HANDSHAKE       = "https://auth.hanime.tv/api/v11/handshake";
+
     public HanimeTvCrawler(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -106,136 +108,211 @@ public class HanimeTvCrawler extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
+    private static final Pattern PATTERN_DEFAULT = Pattern.compile("/videos/hentai/([a-z0-9\\-_]+)", Pattern.CASE_INSENSITIVE);
+
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            // See: https://svn.jdownloader.org/issues/89919
-            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/videos/hentai/([a-z0-9\\-]+)");
-            } else {
-                ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/videos/hentai_TODO_UNFINISHED_PLUGIN/([a-z0-9\\-]+)");
-            }
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_DEFAULT.pattern());
         }
         return ret.toArray(new String[0]);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        br.getPage(param.getCryptedUrl());
+        final String contenturl = param.getCryptedUrl();
+        final String slug = new Regex(contenturl, PATTERN_DEFAULT).getMatch(0);
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        /* TODO: OUTDATED - window.__NUXT__ no longer exists, see class comment for the new website structure. */
-        final String json = br.getRegex("window\\.__NUXT__=(.*?);</script>").getMatch(0);
-        final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
-        final Map<String, Object> video = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "state/data/video");
-        final Map<String, Object> hentai_video = (Map<String, Object>) video.get("hentai_video");
-        final String title = hentai_video.get("name").toString();
-        final String slug = hentai_video.get("slug").toString();
-        final String slug_base64_encoded = Encoding.Base64Encode(slug);
-        final String description = hentai_video.get("description").toString();
+        String title = br.getRegex("\"@type\":\"VideoObject\",\"name\":\"([^\"]+)\"").getMatch(0);
+        if (title == null) {
+            title = slug.replace("-", " ");
+        }
+        title = Encoding.htmlDecode(title).trim();
+        final String origin = HanimeTv.ORIGIN;
+        final String videoID = br.getRegex("data-video-id=\"(\\d+)\"\\s+data-video-slug=\"" + Pattern.quote(slug) + "\"").getMatch(0);
+        if (videoID == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find video ID");
+        }
+        if (this.isAbort()) {
+            throw new InterruptedException();
+        }
+        /* Optional login: Logged in users also get direct downloadlinks. */
+        final Account account = AccountController.getInstance().getValidAccount(this.getHost());
+        if (account != null) {
+            final HanimeTv hosterplugin = (HanimeTv) this.getNewPluginForHostInstance(this.getHost());
+            hosterplugin.login(br, account, false);
+        }
+        final Browser brc = br.cloneBrowser();
+        final String csrfToken = HanimeTv.fetchCsrfToken(brc);
+        if (this.isAbort()) {
+            throw new InterruptedException();
+        }
         final FilePackage fp = FilePackage.getInstance();
-        fp.setName(Encoding.htmlDecode(title).trim());
-        fp.setComment(description);
-        final String downloadlink = "/downloads/" + slug_base64_encoded;
-        br.getPage(downloadlink);
-        final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br, "6Lcs0SUUAAAAALB-B0yj9Bw0DQFSn0te4l72YrtV").getToken();
-        /* TODO: Implement signature verification */
-        final UrlQuery query = new UrlQuery();
-        query.appendEncoded("id", slug_base64_encoded);
-        query.appendEncoded("kind", "requestlinks");
-        query.appendEncoded("captcha_kind", "recaptcha");
-        query.appendEncoded("captcha_token", recaptchaV2Response);
-        query.appendEncoded("captcha_expires", "");
-        query.appendEncoded("loc", "https://" + getHost());
-        br.getHeaders().put("Accept", "application/json, text/plain, */*");
-        br.getHeaders().put("Origin", "https://" + br.getHost());
-        /* Session token only exists for logged in users */
-        br.getHeaders().put("x-session-token", "");
-        br.getHeaders().put("x-signature", generateXSignature()); // TODO: Fix this
-        br.getHeaders().put("x-signature-version", "web2");
-        br.getHeaders().put("x-time", Long.toString(System.currentTimeMillis() / 1000));
-        br.getHeaders().put("x-token", "null");
-        br.getPage("https://h.freeanimehentai.net/rapi/v7/downloads?" + query.toString());
-        final Map<String, Object> entries2 = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        if (entries2.get("is_downloads_enabled") != Boolean.TRUE) {
-            throw new AccountRequiredException();
-        }
-        boolean hasFreeAccount = false;
-        /*
-         * TODO: Add proper handling for case that user owns premium account -> Captcha should be skippable and 1080p downloads should be
-         * possible.
-         */
-        boolean hasPremiumAccount = false;
-        Account premiumAccount = null;
-        final ArrayList<Account> accounts = AccountController.getInstance().listAccounts(new AccountFilter("hanime.tv"));
-        for (final Account account : accounts) {
-            if (!hasFreeAccount && account.getType() == AccountType.FREE) {
-                hasFreeAccount = true;
-            } else if (!hasPremiumAccount && account.getType() == AccountType.PREMIUM) {
-                hasPremiumAccount = true;
-                premiumAccount = account;
-            }
-            if (hasFreeAccount && hasPremiumAccount) {
-                break;
-            }
-        }
+        fp.setName(title);
+        fp.setPackageKey("hanimetv://video/" + videoID);
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        int numberofDownloadableItemsGuest = 0;
-        // int numberofDownloadableItemsMember = 0;
-        final Map<String, Object> videos_manifest = (Map<String, Object>) entries2.get("videos_manifest");
-        final List<Map<String, Object>> servers = (List<Map<String, Object>>) videos_manifest.get("servers");
-        for (final Map<String, Object> server : servers) {
-            final List<Map<String, Object>> streams = (List<Map<String, Object>>) server.get("streams");
-            for (final Map<String, Object> stream : streams) {
-                if (stream.get("is_downloadable") != Boolean.TRUE) {
-                    logger.info("Skipping undownloadable item: " + stream.get("id"));
-                    continue;
-                } else if (stream.get("is_guest_allowed") != Boolean.TRUE) {
-                    logger.info("Skipping undownloadable item: " + stream.get("id"));
-                    continue;
-                }
-                numberofDownloadableItemsGuest++;
-                final String url = stream.get("url").toString();
-                final String filename = stream.get("filename").toString();
-                final long filesize_mbs = ((Number) stream.get("filesize_mbs")).longValue();
-                final DownloadLink link = this.createDownloadlink(url);
-                link.setName(filename);
-                link.setDownloadSize(filesize_mbs * 1024 * 1024 * 1024);
-                if (StringUtils.containsIgnoreCase(url, "highwinds-cdn.com")) {
-                    /* Direct downloadable URL */
-                    link.setAvailable(true);
-                }
+        /*
+         * Step 1: Direct downloadlinks (external filehoster, e.g. pixeldrain). The response body contains an encrypted "token":
+         * {"is_premium_user":false,"download_links":[{"label":"720p","height":720,"width":1280,"url":"https://pixeldrain.com/d/..."}]} This
+         * also works for guests. Logged in premium users probably get more qualities.
+         */
+        final Map<String, Object> downloadsPlain = new LinkedHashMap<String, Object>();
+        downloadsPlain.put("directive", "get_download_links");
+        downloadsPlain.put("slug", slug);
+        downloadsPlain.put("hentai_video_id", Long.parseLong(videoID));
+        final Map<String, Object> downloadsResponse = postHandshake(brc, csrfToken, downloadsPlain);
+        final HanimeTvConfig cfg = get(getConfigInterface());
+        final String downloadsToken = (String) downloadsResponse.get("token");
+        if (downloadsToken != null) {
+            final Map<String, Object> downloads = restoreFromString(decryptToken(downloadsToken), TypeRef.MAP);
+            final List<Map<String, Object>> downloadMaps = (List<Map<String, Object>>) downloads.get("download_links");
+            final Map<String, Object> downloadMap = selectQuality(downloadMaps, cfg.getPreferredDownloadQuality());
+            if (downloadMap != null) {
+                final DownloadLink link = this.createDownloadlink(downloadMap.get("url").toString());
+                link.setReferrerUrl(contenturl);
+                link.setName(title + "_" + downloadMap.get("label") + ".mp4");
                 link._setFilePackage(fp);
                 ret.add(link);
             }
+            logger.info("Found " + downloadMaps.size() + " direct downloadlinks | Selected: " + ret.size() + " | is_premium_user: " + downloads.get("is_premium_user"));
+            if (!ret.isEmpty()) {
+                /* Direct downloadlinks are preferred over the (encrypted) HLS streams. */
+                return ret;
+            }
         }
-        if (numberofDownloadableItemsGuest == 0) {
-            throw new AccountRequiredException();
+        /* Step 2: No direct downloadlinks available -> Fallback to HLS streams (player handshake) */
+        final Map<String, Object> playerPlain = new LinkedHashMap<String, Object>();
+        playerPlain.put("directive", HANDSHAKE_DIRECTIVE);
+        playerPlain.put("slug", slug);
+        postHandshake(brc, csrfToken, playerPlain);
+        if (this.isAbort()) {
+            throw new InterruptedException();
+        }
+        final String xToken = brc.getRequest().getResponseHeader("x-token");
+        final Map<String, Object> handshakeResult = restoreFromString(decryptToken(xToken), TypeRef.MAP);
+        final List<Map<String, Object>> sources = (List<Map<String, Object>>) handshakeResult.get("sources");
+        final List<Map<String, Object>> availableSources = new ArrayList<Map<String, Object>>();
+        for (final Map<String, Object> source : sources) {
+            if (StringUtils.isEmpty(source.get("src").toString())) {
+                /* Premium only quality without URL */
+                logger.info("Skipping source without URL: " + source.get("label"));
+                continue;
+            }
+            availableSources.add(source);
+        }
+        /* Find user preferred quality source */
+        final Map<String, Object> source = selectQuality(availableSources, cfg.getPreferredStreamQuality());
+        if (source != null) {
+            final String src = source.get("src").toString();
+            final String url = src.startsWith("/") ? origin + src : src;
+            final DownloadLink link = this.createDownloadlink(GenericM3u8.createURLForThisPlugin(url));
+            link.setAvailable(true);
+            link.setReferrerUrl(contenturl);
+            link.setProperty(GenericM3u8.PROPERTY_HEIGHT, ((Number) source.get("height")).intValue());
+            link.setProperty(GenericM3u8.PROPERTY_WIDTH, ((Number) source.get("width")).intValue());
+            link.setFinalFileName(title + "_" + source.get("label") + ".mp4");
+            link._setFilePackage(fp);
+            ret.add(link);
+        }
+        if (ret.isEmpty()) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "No playable sources");
         }
         return ret;
     }
 
     /**
-     * Generates a random 32-character hexadecimal string for x-signature <br>
-     * This might have worked for their apiv6 but not for v7(?) <br>
-     * Verified 2026-11: A random signature is rejected by the new API (auth.hanime.tv/api/v11/handshake) with HTTP 401 "UA1". The real
-     * signature is calculated by a WASM module, see class comment.
+     * Returns the item matching the preferred quality. If the preferred quality is BEST or not available, the best available item is
+     * returned (fallback). Returns null if the list is empty.
      */
-    public static String generateXSignature() {
-        Random random = new Random();
-        StringBuilder signature = new StringBuilder(32);
-        for (int i = 0; i < 32; i++) {
-            int randomHex = random.nextInt(16); // 0-15
-            signature.append(Integer.toHexString(randomHex));
+    private static Map<String, Object> selectQuality(final List<Map<String, Object>> items, final QUALITY preferred) {
+        Map<String, Object> best = null;
+        int bestHeight = -1;
+        for (final Map<String, Object> item : items) {
+            final int height = ((Number) item.get("height")).intValue();
+            if (preferred.getHeight() == height) {
+                return item;
+            } else if (best == null || height > bestHeight) {
+                best = item;
+                bestHeight = height;
+            }
         }
-        return signature.toString();
+        return best;
     }
 
     @Override
-    public boolean hasCaptcha(CryptedLink link, Account acc) {
-        return true;
+    public Class<? extends HanimeTvConfig> getConfigInterface() {
+        return HanimeTvConfig.class;
+    }
+
+    /**
+     * Sends a signed handshake request. "timestamp_unix" is added to the given plaintext. Returns the parsed response body. The response
+     * header "x-token" can be read from the browser afterwards.
+     */
+    private Map<String, Object> postHandshake(final Browser brc, final String csrfToken, final Map<String, Object> plaintext) throws Exception {
+        final long timestampUnix = HanimeTv.setSignedApiHeaders(brc, csrfToken);
+        final Map<String, Object> handshakePlain = new LinkedHashMap<String, Object>();
+        handshakePlain.put("timestamp_unix", timestampUnix);
+        handshakePlain.putAll(plaintext);
+        final Map<String, Object> handshakeBody = new LinkedHashMap<String, Object>();
+        handshakeBody.put("token", encryptToken(JSonStorage.serializeToJson(handshakePlain)));
+        brc.postPageRaw(URL_HANDSHAKE, JSonStorage.serializeToJson(handshakeBody));
+        if (brc.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (brc.getHttpConnection().getResponseCode() != 200) {
+            /* E.g. 401 {"error_id":"UA1"} = invalid x-signature / x-time */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Handshake failed: HTTP " + brc.getHttpConnection().getResponseCode());
+        }
+        return restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+    }
+
+    private static SecretKeySpec getHandshakeKey() throws Exception {
+        final MessageDigest md = MessageDigest.getInstance("SHA-256");
+        return new SecretKeySpec(md.digest(HANDSHAKE_KEY_SEED.getBytes("UTF-8")), "AES");
+    }
+
+    /** Encrypts the plaintext with the "htv-insecure" scheme, see class comment. */
+    private static String encryptToken(final String plaintext) throws Exception {
+        final byte[] iv = new byte[12];
+        new SecureRandom().nextBytes(iv);
+        final Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(Cipher.ENCRYPT_MODE, getHandshakeKey(), new GCMParameterSpec(128, iv));
+        cipher.updateAAD(HANDSHAKE_AAD.getBytes("UTF-8"));
+        final byte[] encrypted = cipher.doFinal(plaintext.getBytes("UTF-8"));
+        /* Java appends the 16 byte tag to the ciphertext */
+        final byte[] data = new byte[encrypted.length - 16];
+        final byte[] tag = new byte[16];
+        System.arraycopy(encrypted, 0, data, 0, data.length);
+        System.arraycopy(encrypted, data.length, tag, 0, 16);
+        final Base64.Encoder enc = Base64.getUrlEncoder().withoutPadding();
+        final Map<String, Object> envelope = new LinkedHashMap<String, Object>();
+        envelope.put("v", 1);
+        envelope.put("alg", "AES-256-GCM");
+        envelope.put("iv", enc.encodeToString(iv));
+        envelope.put("tag", enc.encodeToString(tag));
+        envelope.put("data", enc.encodeToString(data));
+        return enc.encodeToString(JSonStorage.serializeToJson(envelope).getBytes("UTF-8"));
+    }
+
+    /** Decrypts a token (e.g. the x-token response header) with the "htv-insecure" scheme, see class comment. */
+    private String decryptToken(final String token) throws Exception {
+        final Base64.Decoder dec = Base64.getUrlDecoder();
+        final Map<String, Object> envelope = restoreFromString(new String(dec.decode(token), "UTF-8"), TypeRef.MAP);
+        final byte[] iv = dec.decode(envelope.get("iv").toString());
+        final byte[] tag = dec.decode(envelope.get("tag").toString());
+        final byte[] data = dec.decode(envelope.get("data").toString());
+        final byte[] encrypted = new byte[data.length + tag.length];
+        System.arraycopy(data, 0, encrypted, 0, data.length);
+        System.arraycopy(tag, 0, encrypted, data.length, tag.length);
+        final Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(Cipher.DECRYPT_MODE, getHandshakeKey(), new GCMParameterSpec(128, iv));
+        cipher.updateAAD(HANDSHAKE_AAD.getBytes("UTF-8"));
+        return new String(cipher.doFinal(encrypted), Charset.forName("UTF-8"));
+    }
+
+    @Override
+    public boolean hasCaptcha(CryptedLink link, jd.plugins.Account acc) {
+        return false;
     }
 }

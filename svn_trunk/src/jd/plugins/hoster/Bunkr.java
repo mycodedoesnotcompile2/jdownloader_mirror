@@ -13,6 +13,16 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.encoding.URLEncode.Decoder;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.BunkrConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
@@ -31,17 +41,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BunkrAlbum;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.encoding.URLEncode.Decoder;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.BunkrConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
-@HostPlugin(revision = "$Revision: 53668 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54010 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -62,12 +62,12 @@ public class Bunkr extends PluginForHost {
             return fid;
         }
         fid = getFID(link);
-        if (fid == null) {
-            return super.getMirrorID(link);
+        if (fid != null) {
+            fid = "bunkr://" + fid;
+            link.setProperty(PROPERTY_LAST_KNOWN_FID, fid);
+            return fid;
         }
-        fid = "bunkr://" + fid;
-        link.setProperty(PROPERTY_LAST_KNOWN_FID, fid);
-        return fid;
+        return super.getMirrorID(link);
     }
 
     @Override
@@ -77,12 +77,12 @@ public class Bunkr extends PluginForHost {
             return fid;
         }
         fid = getFID(link);
-        if (fid == null) {
-            return super.getLinkID(link);
+        if (fid != null) {
+            fid = "bunkr://" + fid;
+            link.setProperty(PROPERTY_LAST_KNOWN_FID, fid);
+            return fid;
         }
-        fid = "bunkr://" + fid;
-        link.setProperty(PROPERTY_LAST_KNOWN_FID, fid);
-        return fid;
+        return super.getLinkID(link);
     }
 
     @Override
@@ -137,7 +137,7 @@ public class Bunkr extends PluginForHost {
     private final static Pattern PATTERN_FID                                         = Pattern.compile("(-([A-Za-z0-9]{8}))(\\.[^\\.]+)?$");
     /* Plugin properties */
     private static final String  PROPERTY_LAST_GRABBED_DIRECTURL                     = "last_grabbed_directurl";
-    private static final String  PROPERTY_LAST_KNOWN_FID                             = "last_known_fid";
+    private static final String  PROPERTY_LAST_KNOWN_FID                             = "last_known_fid_v2";
     private static final String  PROPERTY_LAST_GRABBED_VIDEO_STREAM_DIRECTURL        = "last_grabbed_video_stream_directurl";
     private static final String  PROPERTY_LAST_GRABBED_IMAGE_FULLSIZE_VIEW_DIRECTURL = "last_grabbed_image_fullsize_view_directurl";
     private static final String  PROPERTY_LAST_USED_SINGLE_FILE_URL                  = "last_used_single_file_url";
@@ -164,6 +164,11 @@ public class Bunkr extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
+        /* prefer /f/slug ID as it's more stable from old/new system migration */
+        final String slug = new Regex(link.getPluginPatternMatcher(), "/f/([A-Za-z0-9]{13,})(?:$|[?#])").getMatch(0);
+        if (slug != null) {
+            return slug;
+        }
         final String lastStoredDirecturl = link.getStringProperty(PROPERTY_LAST_GRABBED_DIRECTURL);
         String fid = null;
         if (lastStoredDirecturl != null) {

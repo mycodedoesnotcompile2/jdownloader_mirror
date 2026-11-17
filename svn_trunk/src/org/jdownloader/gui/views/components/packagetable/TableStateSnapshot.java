@@ -37,30 +37,31 @@ import jd.controlling.packagecontroller.AbstractPackageNode;
  * new links are usually added at the end of the list, the user expects to see them again (and not the row which was the last one before
  * they were added).
  */
-public abstract class TableStateSnapshot<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> {
-    private TableStateSnapshot() {
-    }
+public class TableStateSnapshot<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> {
+    private final AbstractNode                             lead;
+    private final SelectionInfo<PackageType, ChildrenType> selectionInfo;
+    private final AbstractNode                             anchor;
+    private final Edge                                     edge;
+    private final AbstractNode                             firstVisible;
+    private final Integer                                  leadViewportOffset;
+    private final int                                      firstVisibleOffset;
 
-    public static enum EDGE {
+    private enum Edge {
         /* Somewhere in between, or the whole table fits into the viewport (no scrolling) */
         NONE,
         TOP,
         BOTTOM
     }
 
-    public abstract SelectionInfo<PackageType, ChildrenType> getSelectionInfo();
-
-    public abstract AbstractNode getLead();
-
-    public abstract AbstractNode getAnchor();
-
-    public abstract EDGE getEdge();
-
-    public abstract AbstractNode getFirstVisible();
-
-    public abstract Integer getLeadViewportOffset();
-
-    public abstract int getFirstVisibleOffset();
+    private TableStateSnapshot(SelectionInfo<PackageType, ChildrenType> selectionInfo, AbstractNode lead, AbstractNode anchor, Edge edge, AbstractNode firstVisible, Integer leadViewportOffset, int firstVisibleOffset) {
+        this.selectionInfo = selectionInfo;
+        this.lead = lead;
+        this.anchor = anchor;
+        this.edge = edge;
+        this.firstVisible = firstVisible;
+        this.leadViewportOffset = leadViewportOffset;
+        this.firstVisibleOffset = firstVisibleOffset;
+    }
 
     protected static AbstractNode getObjectByRow(final PackageControllerTableModel<?, ?> model, final int row) {
         return row >= 0 && row < model.getRowCount() ? model.getObjectbyRow(row) : null;
@@ -80,14 +81,15 @@ public abstract class TableStateSnapshot<PackageType extends AbstractPackageNode
             protected TableStateSnapshot<PackageType, ChildrenType> runInEDT() throws RuntimeException {
                 SelectionInfo<PackageType, ChildrenType> selectionInfo = table.getSelectionInfo(true, true);
                 if (selectionInfo == null) {
-                    selectionInfo = new EmptySelectionInfo<>(table.getController());
+                    /* getSelectionInfo returns null if it got interrupted */
+                    selectionInfo = new EmptySelectionInfo<PackageType, ChildrenType>(table.getController());
                 }
                 final PackageControllerTableModel<PackageType, ChildrenType> tableModel = table.getModel();
                 final ListSelectionModel selectionModel = table.getSelectionModel();
                 final AbstractNode lead = getObjectByRow(tableModel, selectionModel.getLeadSelectionIndex());
                 final AbstractNode anchor = getObjectByRow(tableModel, selectionModel.getAnchorSelectionIndex());
                 AbstractNode firstVisible = null;
-                EDGE edge = EDGE.NONE;
+                Edge edge = Edge.NONE;
                 int firstVisibleOffset = 0;
                 Integer leadViewportOffset = null;
                 if (table.getParent() instanceof JViewport) {
@@ -96,9 +98,9 @@ public abstract class TableStateSnapshot<PackageType extends AbstractPackageNode
                     final int maxY = table.getPreferredSize().height - viewport.getExtentSize().height;
                     if (maxY > 0) {
                         if (position.y <= 0) {
-                            edge = EDGE.TOP;
+                            edge = Edge.TOP;
                         } else if (position.y >= maxY) {
-                            edge = EDGE.BOTTOM;
+                            edge = Edge.BOTTOM;
                         }
                     }
                     /* Row at the top edge of the viewport, may be only partly visible */
@@ -116,47 +118,7 @@ public abstract class TableStateSnapshot<PackageType extends AbstractPackageNode
                         }
                     }
                 }
-                final int finalFirstVisibleOffset = firstVisibleOffset;
-                final EDGE finalEdge = edge;
-                final AbstractNode finalFirstVisible = firstVisible;
-                final Integer finalLeadViewportOffset = leadViewportOffset;
-                final SelectionInfo<PackageType, ChildrenType> finalSelectionInfo = selectionInfo;
-                return new TableStateSnapshot<PackageType, ChildrenType>() {
-                    @Override
-                    public SelectionInfo<PackageType, ChildrenType> getSelectionInfo() {
-                        return finalSelectionInfo;
-                    }
-
-                    @Override
-                    public AbstractNode getLead() {
-                        return lead;
-                    }
-
-                    @Override
-                    public AbstractNode getAnchor() {
-                        return anchor;
-                    }
-
-                    @Override
-                    public EDGE getEdge() {
-                        return finalEdge;
-                    }
-
-                    @Override
-                    public AbstractNode getFirstVisible() {
-                        return finalFirstVisible;
-                    }
-
-                    @Override
-                    public int getFirstVisibleOffset() {
-                        return finalFirstVisibleOffset;
-                    }
-
-                    @Override
-                    public Integer getLeadViewportOffset() {
-                        return finalLeadViewportOffset;
-                    }
-                };
+                return new TableStateSnapshot<PackageType, ChildrenType>(selectionInfo, lead, anchor, edge, firstVisible, leadViewportOffset, firstVisibleOffset);
             }
         }.waitForAndSwallowInterrupt();
     }
@@ -172,14 +134,14 @@ public abstract class TableStateSnapshot<PackageType extends AbstractPackageNode
      */
     public boolean carryOverSelection(final PackageControllerTable<?, ?> table) {
         final RowLookup lookup = new RowLookup(table.getModel());
-        final List<AbstractNode> selection = getSelectionInfo().getRawSelection();
+        final List<AbstractNode> selection = selectionInfo.getRawSelection();
         final List<AbstractNode> nodes = lookup.resolveAll(selection);
         if (nodes.size() == 0) {
             return false;
         }
         applySelection(table, lookup, nodes);
-        final int leadRow = lookup.getRow(getLead());
-        if (leadRow >= 0 && getLeadViewportOffset() != null && table.getParent() instanceof JViewport) {
+        final int leadRow = lookup.getRow(lead);
+        if (leadRow >= 0 && leadViewportOffset != null && table.getParent() instanceof JViewport) {
             /*
              * Lead node has its own row (not hidden in a collapsed package): same height on screen as before. Only the vertical position is
              * changed, clamped to the table.
@@ -187,11 +149,11 @@ public abstract class TableStateSnapshot<PackageType extends AbstractPackageNode
             final JViewport viewport = (JViewport) table.getParent();
             final Point position = viewport.getViewPosition();
             final int maxY = Math.max(0, table.getPreferredSize().height - viewport.getExtentSize().height);
-            position.y = Math.min(maxY, Math.max(0, table.getCellRect(leadRow, 0, true).y - getLeadViewportOffset().intValue()));
+            position.y = Math.min(maxY, Math.max(0, table.getCellRect(leadRow, 0, true).y - leadViewportOffset.intValue()));
             viewport.setViewPosition(position);
             return true;
         }
-        int row = lookup.getRow(lookup.resolve(getLead()));
+        int row = lookup.getRow(lookup.resolve(lead));
         if (row < 0) {
             /* Lead node is not present: Topmost selected row */
             for (final AbstractNode node : nodes) {
@@ -230,7 +192,7 @@ public abstract class TableStateSnapshot<PackageType extends AbstractPackageNode
     public void restore(final PackageControllerTable<?, ?> table) {
         final RowLookup lookup = new RowLookup(table.getModel());
         /* Also clears the selection if nothing was selected */
-        final List<AbstractNode> selection = getSelectionInfo().getRawSelection();
+        final List<AbstractNode> selection = selectionInfo.getRawSelection();
         applySelection(table, lookup, lookup.resolveAll(selection));
         if (!(table.getParent() instanceof JViewport)) {
             return;
@@ -238,7 +200,7 @@ public abstract class TableStateSnapshot<PackageType extends AbstractPackageNode
         if (selection.size() == 0 && restoreEdge(table, (JViewport) table.getParent())) {
             return;
         }
-        final AbstractNode node = getFirstVisible();
+        final AbstractNode node = firstVisible;
         final AbstractNode resolved = lookup.resolve(node);
         final int row = lookup.getRow(resolved);
         if (row < 0) {
@@ -246,7 +208,7 @@ public abstract class TableStateSnapshot<PackageType extends AbstractPackageNode
             return;
         }
         /* The offset belongs to the row of the node itself, not to the row of its collapsed package */
-        final int offset = resolved == node ? getFirstVisibleOffset() : 0;
+        final int offset = resolved == node ? firstVisibleOffset : 0;
         final JViewport viewport = (JViewport) table.getParent();
         final Point position = viewport.getViewPosition();
         /* Do not scroll beyond the end if the table has become shorter */
@@ -263,7 +225,7 @@ public abstract class TableStateSnapshot<PackageType extends AbstractPackageNode
      */
     private boolean restoreEdge(final PackageControllerTable<?, ?> table, final JViewport viewport) {
         final Point position = viewport.getViewPosition();
-        switch (getEdge()) {
+        switch (edge) {
         case TOP:
             position.y = 0;
             break;
@@ -283,8 +245,8 @@ public abstract class TableStateSnapshot<PackageType extends AbstractPackageNode
         if (nodes.size() == 0) {
             return;
         }
-        final int anchorRow = lookup.getRow(lookup.resolve(getAnchor()));
-        final int leadRow = lookup.getRow(lookup.resolve(getLead()));
+        final int anchorRow = lookup.getRow(lookup.resolve(anchor));
+        final int leadRow = lookup.getRow(lookup.resolve(lead));
         final ListSelectionModel selectionModel = table.getSelectionModel();
         /* Both setAnchorSelectionIndex and moveLeadSelectionIndex do not change the selection itself */
         if (anchorRow >= 0) {

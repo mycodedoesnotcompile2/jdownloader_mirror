@@ -3,6 +3,8 @@ package jd.gui.swing.jdgui.views.settings.panels.accountmanager;
 import java.awt.event.ActionEvent;
 
 import jd.gui.swing.dialog.AddAccountDialog;
+import jd.gui.swing.jdgui.views.settings.ConfigurationView;
+import jd.plugins.Account;
 import jd.plugins.PluginForHost;
 
 import org.jdownloader.gui.translate._GUI;
@@ -23,10 +25,15 @@ public class NewAction extends AbstractAddAction {
          * no need for IOEQ or Thread, as we want to show Dialog and that blocks
          * EDT anyway
          */
+        final Account addedAccount;
         if (e.getSource() instanceof PluginForHost) {
-            AddAccountDialog.showDialog((PluginForHost) e.getSource(), null);
+            addedAccount = AddAccountDialog.showDialog((PluginForHost) e.getSource(), null);
         } else {
-            AddAccountDialog.showDialog(null, null);
+            addedAccount = AddAccountDialog.showDialog(null, null);
+        }
+        if (addedAccount != null) {
+            /* Highlight the new account in the account manager table (selected as soon as it appears there). */
+            ConfigurationView.getInstance().getSubPanel(AccountManagerSettings.class).getAccountManager().selectAccount(addedAccount);
         }
     }
 

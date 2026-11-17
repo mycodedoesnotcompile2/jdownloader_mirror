@@ -17,20 +17,28 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
+import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
+import org.appwork.utils.Hash;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
+import jd.http.Cookies;
 import jd.parser.Regex;
 import jd.plugins.Account;
-import jd.plugins.AccountRequiredException;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -38,11 +46,24 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51437 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54009 $", interfaceVersion = 3, names = {}, urls = {})
 public class HanimeTv extends PluginForHost {
+    /** Origin the website uses for the signature (window.top.location.origin). */
+    public static final String  ORIGIN            = "https://hanime.tv";
+    private static final String API_BASE          = "https://auth.hanime.tv";
+    private static final String URL_CSRF          = "https://ct.hanime.tv/csrf-token";
+    private static final String SIGNATURE_SALT_1  = ",Xkdi29,";
+    private static final String SIGNATURE_SALT_2  = ",mn2,";
+    private static final String SIGNATURE_VERSION = "web2";
+
     public HanimeTv(PluginWrapper wrapper) {
         super(wrapper);
-        // this.enablePremium("https://" + getHost() + "/premium");
+        this.enablePremium(ORIGIN + "/premium");
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.USERNAME_IS_EMAIL };
     }
 
     @Override
@@ -125,63 +146,177 @@ public class HanimeTv extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        handleDownload(link, null);
-    }
-
-    private void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
-        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            /* 2025-08-04: While the plugin is unfinished either way, their HLS streams are encrypted. */
-            throw new PluginException(LinkStatus.ERROR_FATAL, "Encrypted HLS is not supported");
-        }
-        if (account == null) {
-            throw new AccountRequiredException("Premium account required to download items higher than 720p quality");
-        }
-        if (true) {
-            /* 2021-09-30: Unfinished plugin */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        final String fid = this.getFID(link);
-        final String fidB64Encoded = Encoding.Base64Encode(fid);
-        /* This step is probably skippable. */
-        br.getPage("/downloads/" + fidB64Encoded);
-        /* TODO: Requires signed API request */
-        final Browser brc = br.cloneBrowser();
-        brc.getHeaders().put("x-session-token", "");
-        brc.getHeaders().put("x-signature", "TODO");
-        brc.getHeaders().put("x-signature-version", "web2");
-        brc.getHeaders().put("x-time", Long.toString(System.currentTimeMillis()));
-        brc.getHeaders().put("x-token", "null");
-        final UrlQuery query = new UrlQuery();
-        query.appendEncoded("id", Encoding.urlEncode(fidB64Encoded));
-        query.appendEncoded("kind", "requestlinks");
-        query.appendEncoded("captcha_token", "TODO");
-        query.appendEncoded("captcha_expires", "");
-        query.appendEncoded("loc", Encoding.urlEncode("https://hanime.tv"));
-        brc.getPage("https://members.hanime.tv/rapi/v7/downloads?" + query.toString());
-        /* TODO */
-        final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-        String dllink = (String) entries.get("TODO");
-        if (StringUtils.isEmpty(dllink)) {
-            logger.warning("Failed to find final downloadurl");
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
-        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-            br.followConnection(true);
-            if (dl.getConnection().getResponseCode() == 403) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 5 * 60 * 1000l);
-            } else if (dl.getConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 5 * 60 * 1000l);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error");
-            }
-        }
-        dl.startDownload();
+        /*
+         * Since the 2026-11 website rebuild, video URLs are handled by HanimeTvCrawler (signed handshake -> encrypted HLS playlists which
+         * are handed over to GenericM3u8). This hoster only validates the item and has no download logic of its own.
+         */
+        throw new PluginException(LinkStatus.ERROR_FATAL, "Direct downloads are not supported, use the crawler (HLS streams)");
     }
 
     @Override
-    public boolean hasCaptcha(final DownloadLink link, final jd.plugins.Account acc) {
-        return true;
+    public void handlePremium(final DownloadLink link, final Account account) throws Exception {
+        handleFree(link);
+    }
+
+    /**
+     * Calculates the x-signature header: hex(SHA-256(t + ",Xkdi29," + origin + ",mn2," + t)) with t = unix time in seconds (= x-time
+     * header). Reverse engineered from the WASM module of the website.
+     */
+    public static String generateXSignature(final long timestampUnix, final String origin) {
+        return Hash.getSHA256(timestampUnix + SIGNATURE_SALT_1 + origin + SIGNATURE_SALT_2 + timestampUnix);
+    }
+
+    /** Fetches a CSRF token. Also sets the cookie "htv_csrf_proof" in the given browser. */
+    public static String fetchCsrfToken(final Browser br) throws Exception {
+        final Browser brc = br.cloneBrowser();
+        brc.getHeaders().put("Origin", ORIGIN);
+        brc.getHeaders().put("Referer", ORIGIN + "/");
+        brc.getHeaders().put("Accept", "application/json");
+        brc.getPage(URL_CSRF);
+        final Map<String, Object> entries = JSonStorage.restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+        return entries.get("csrf_token").toString();
+    }
+
+    /**
+     * Sets all headers needed for a request to the authed API (auth.hanime.tv). <br>
+     * Returns the unix timestamp (seconds) used for x-time.
+     */
+    public static long setSignedApiHeaders(final Browser br, final String csrfToken) {
+        final long timestampUnix = System.currentTimeMillis() / 1000;
+        br.getHeaders().put("Origin", ORIGIN);
+        br.getHeaders().put("Referer", ORIGIN + "/");
+        br.getHeaders().put("Accept", "application/json");
+        br.getHeaders().put("Content-Type", "application/json");
+        br.getHeaders().put("x-signature-version", SIGNATURE_VERSION);
+        br.getHeaders().put("x-signature", generateXSignature(timestampUnix, ORIGIN));
+        br.getHeaders().put("x-time", Long.toString(timestampUnix));
+        br.getHeaders().put("x-csrf-token", csrfToken);
+        return timestampUnix;
+    }
+
+    /**
+     * Logs in and makes sure the given browser contains the session cookies afterwards. <br>
+     * The username of the account is the email address. <br>
+     * Returns the session info (contains "user" and "session_expire_at_unix") or null if the stored cookies were used without validating
+     * them (force == false).
+     */
+    public Map<String, Object> login(final Browser br, final Account account, final boolean force) throws Exception {
+        synchronized (account) {
+            br.setFollowRedirects(true);
+            br.setCookiesExclusive(true);
+            final Cookies cookies = account.loadCookies("");
+            if (cookies != null) {
+                br.setCookies(cookies);
+                if (!force) {
+                    /* Do not validate cookies. */
+                    return null;
+                }
+                logger.info("Attempting cookie login");
+                final Map<String, Object> session = fetchSession(br);
+                if (session != null) {
+                    logger.info("Cookie login successful");
+                    account.saveCookies(collectCookies(br), "");
+                    return session;
+                }
+                logger.info("Cookie login failed");
+                br.clearCookies(null);
+            }
+            logger.info("Performing full login");
+            br.getPage(ORIGIN + "/login");
+            final String turnstileSiteKey = br.getRegex("\"turnstile_public_site_key\":\"([^\"]+)\"").getMatch(0);
+            if (turnstileSiteKey == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find Cloudflare Turnstile sitekey");
+            }
+            final String turnstileToken = new CaptchaHelperHostPluginCloudflareTurnstile(this, br, turnstileSiteKey).getToken();
+            final Browser brc = br.cloneBrowser();
+            final int maxLoginAttempts = 3;
+            Map<String, Object> session = null;
+            for (int attempt = 1; attempt <= maxLoginAttempts; attempt++) {
+                final String csrfToken = fetchCsrfToken(brc);
+                setSignedApiHeaders(brc, csrfToken);
+                final Map<String, Object> postdata = new LinkedHashMap<String, Object>();
+                postdata.put("email", account.getUser());
+                postdata.put("password", account.getPass());
+                postdata.put("csrf_token", csrfToken);
+                postdata.put("turnstile_token", turnstileToken);
+                brc.postPageRaw(API_BASE + "/api/v11/login", JSonStorage.serializeToJson(postdata));
+                if (brc.getHttpConnection().getResponseCode() == 200) {
+                    /* The login response contains the same session info as the keep-alive response. */
+                    session = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+                    break;
+                }
+                String errorId = null;
+                String message = null;
+                if (StringUtils.containsIgnoreCase(brc.getHttpConnection().getContentType(), "json")) {
+                    final Map<String, Object> error = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+                    errorId = (String) error.get("error_id");
+                    message = (String) error.get("message");
+                }
+                if (errorId != null && errorId.startsWith("CSRF_ERROR_") && attempt < maxLoginAttempts) {
+                    logger.info("CSRF token rejected, retrying: " + errorId + " | Attempt " + attempt + "/" + maxLoginAttempts);
+                    continue;
+                }
+                if (brc.getHttpConnection().getResponseCode() == 429) {
+                    throw new AccountUnavailableException("Too many login attempts", 10 * 60 * 1000l);
+                }
+                logger.info("Login failed: HTTP " + brc.getHttpConnection().getResponseCode() + " | " + errorId + " | " + message);
+                throw new AccountInvalidException(message);
+            }
+            if (session == null) {
+                /* Should never happen: The last attempt always ends with an exception or success. */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Login failed: Max attempts reached");
+            }
+            logger.info("Login successful");
+            final Cookies sessionCookies = collectCookies(brc);
+            br.setCookies(sessionCookies);
+            account.saveCookies(sessionCookies, "");
+            return session;
+        }
+    }
+
+    private static Cookies collectCookies(final Browser br) {
+        final Cookies ret = new Cookies();
+        ret.add(br.getCookies("hanime.tv"));
+        ret.add(br.getCookies("auth.hanime.tv"));
+        ret.add(br.getCookies("ct.hanime.tv"));
+        return ret;
+    }
+
+    /** Returns the session info (contains "user") or null if the session is invalid / the user is not logged in. */
+    private Map<String, Object> fetchSession(final Browser br) throws Exception {
+        final Browser brc = br.cloneBrowser();
+        setSignedApiHeaders(brc, fetchCsrfToken(brc));
+        brc.getPage(API_BASE + "/api/v11/keep-alive");
+        if (brc.getHttpConnection().getResponseCode() != 200) {
+            return null;
+        }
+        final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+        return entries.get("user") != null ? entries : null;
+    }
+
+    @Override
+    public AccountInfo fetchAccountInfo(final Account account) throws Exception {
+        final AccountInfo ai = new AccountInfo();
+        /* force == true: Never returns null */
+        final Map<String, Object> session = login(br, account, true);
+        final Map<String, Object> user = (Map<String, Object>) session.get("user");
+        if (Boolean.TRUE.equals(user.get("is_able_to_access_premium"))) {
+            account.setType(AccountType.PREMIUM);
+        } else {
+            account.setType(AccountType.FREE);
+        }
+        /* Example: 2025-08-05T09:34:32.290Z */
+        ai.setCreateTime(TimeFormatter.getMilliSeconds(user.get("created_at").toString(), "yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.ENGLISH));
+        final long sessionExpireTimestampMillis = ((Number) session.get("session_expire_at_unix")).longValue() * 1000;
+        logger.info("Remaining session duration: " + TimeFormatter.formatMilliSeconds(sessionExpireTimestampMillis - System.currentTimeMillis(), 0));
+        ai.setUnlimitedTraffic();
+        return ai;
+    }
+
+    @Override
+    public boolean hasCaptcha(final DownloadLink link, final Account acc) {
+        /* No captchas at all (except for the login-captcha) */
+        return false;
     }
 
     @Override
@@ -190,10 +325,7 @@ public class HanimeTv extends PluginForHost {
     }
 
     @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
+    public int getMaxSimultanPremiumDownloadNum() {
+        return Integer.MAX_VALUE;
     }
 }

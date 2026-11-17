@@ -29,7 +29,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 53966 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54012 $", interfaceVersion = 3, names = {}, urls = {})
 public class FiledotXyz extends XFileSharingProBasic {
     public FiledotXyz(final PluginWrapper wrapper) {
         super(wrapper);
@@ -46,7 +46,7 @@ public class FiledotXyz extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "filedot.to", "filedot.top", "filedot.xyz" });
+        ret.add(new String[] { "filedot.sc", "filedot.st", "filedot.to", "filedot.top", "filedot.xyz" });
         return ret;
     }
 

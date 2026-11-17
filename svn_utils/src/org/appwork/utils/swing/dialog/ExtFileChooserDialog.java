@@ -53,7 +53,6 @@ import java.awt.event.MouseEvent;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -101,7 +100,6 @@ import javax.swing.table.TableColumnModel;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.resources.AWUTheme;
 import org.appwork.storage.config.JsonConfig;
-import org.appwork.sunwrapper.sun.awt.shell.ShellFolderWrapper;
 import org.appwork.swing.components.searchcombo.SearchComboBox;
 import org.appwork.utils.Application;
 import org.appwork.utils.Files;
@@ -146,15 +144,7 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
             if (file == null) {
                 return null;
             } else {
-                return getShellFolder(file);
-            }
-        }
-
-        private File getShellFolder(File file) {
-            try {
-                return file != null ? ShellFolderWrapper.getShellFolder(file) : null;
-            } catch (FileNotFoundException e) {
-                return file;
+                return fileSystemView.mapSpecialFolders(ExtFileSystemView.getShellFolder(file));
             }
         }
 
@@ -193,7 +183,7 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
                     okButton.setEnabled(true);
                 }
                 setSelectedFile(null);
-                super.setCurrentDirectory(getShellFolder(dir));
+                super.setCurrentDirectory(ExtFileSystemView.getShellFolder(dir));
             } finally {
                 selecting = oldSelecting;
             }
@@ -227,7 +217,7 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
             final boolean oldSelecting = selecting;
             selecting = true;
             try {
-                super.setSelectedFile(getShellFolder(file));
+                super.setSelectedFile(ExtFileSystemView.getShellFolder(file));
             } finally {
                 selecting = oldSelecting;
             }
@@ -239,6 +229,7 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
             // _AWU.T.DIALOG_FILECHOOSER_lookInLabelText());
             // UIManager.put("FileChooser.saveInLabelText",
             // _AWU.T.DIALOG_FILECHOOSER_saveInLabelText());
+            /* required for our ExtFileSystemView.getRoots is getting used, else it is */
             putClientProperty("FileChooser.useShellFolder", Boolean.FALSE);
             super.updateUI();
             final FileChooserUI myUi = getUI();
@@ -303,7 +294,8 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
      */
     public static final String       FILECHOOSER            = "FILECHOOSER";
     // TODO: The default is NOT a class name. createFileSystemView() does Class.forName(FILE_SYSTEM_VIEW_CLASS) for every dialog, which
-    // always fails with this value. The exception is swallowed and the fallback "new ExtFileSystemView()" is used. It works by accident, but
+    // always fails with this value. The exception is swallowed and the fallback "new ExtFileSystemView()" is used. It works by accident,
+    // but
     // hides misconfiguration. Probably this should be null/empty (= default) or a real class name.
     public static String             FILE_SYSTEM_VIEW_CLASS = "FILECHOOSER_FILE_SYSTEM_VIEW_CLASS";
     private FileChooserSelectionMode fileSelectionMode      = FileChooserSelectionMode.FILES_AND_DIRECTORIES;
@@ -449,11 +441,11 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
                 if (f == null) {
                     final String path = getText();
                     if (path != null && isAllowedPath(path)) {
-                        f = new File(path);
+                        f = ExtFileSystemView.getShellFolder(new File(path));
                     } else {
                         final FileChooserSelectionMode mode = getFileSelectionMode();
                         if (mode == FileChooserSelectionMode.DIRECTORIES_ONLY || mode == FileChooserSelectionMode.FILES_AND_DIRECTORIES) {
-                            f = fc.getCurrentDirectory();
+                            f = ExtFileSystemView.getShellFolder(fc.getCurrentDirectory());
                             if (f != null) {
                                 return new File[] { f };
                             }
@@ -853,7 +845,7 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
         if (presel == null) {
             presel = new File(System.getProperty("user.home"), "documents");
         }
-        final File orgPresel = presel;
+        final File orgPresel = ExtFileSystemView.getShellFolder(presel);
         while (presel != null) {
             if (!presel.exists()) {
                 /* file does not exist, try ParentFile */
@@ -880,7 +872,7 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
         }
         if (orgPresel != null && !orgPresel.isDirectory()) {
             if (fc.getSelectedFile() == null || !fc.getSelectedFile().equals(orgPresel)) {
-                fc.setSelectedFile(new File(fc.getCurrentDirectory(), orgPresel.getName()));
+                fc.setSelectedFile(ExtFileSystemView.getShellFolder(new File(ExtFileSystemView.getShellFolder(fc.getCurrentDirectory()), orgPresel.getName())));
             }
         }
         updateView();
@@ -1006,9 +998,9 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
                                     }
                                     File ret = null;
                                     if (fileSystemView.getNetworkFolder() != null) {
-                                        ret = fileSystemView.getNetworkFolder().get(new File(txt).getAbsolutePath());
+                                        ret = fileSystemView.getNetworkFolder().get(ExtFileSystemView.getShellFolder(new File(txt)).getAbsolutePath());
                                     }
-                                    return ret != null ? ret : new File(txt);
+                                    return ret != null ? ret : ExtFileSystemView.getShellFolder(new File(txt));
                                 }
 
                                 @Override
@@ -1151,7 +1143,8 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
                                 if (index < 0) {
                                     final File dir = fc.getSelectedFile();
                                     if (dir != null) {
-                                        // TODO: dir.getParent() is null if dir is a root (e.g. "C:\"). This results in the text "null\". Needs a
+                                        // TODO: dir.getParent() is null if dir is a root (e.g. "C:\"). This results in the text "null\".
+                                        // Needs a
                                         // decision: omit the parent for roots, or use the path of dir itself.
                                         destination.setText(dir.getParent() + File.separator);
                                         final ListSelectionModel listSelectionModel = list.getSelectionModel();
@@ -1441,8 +1434,8 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
     }
 
     /**
-     * Hooks the table (details view) and the list (list view). The FilePane creates them when they are shown the first time, so this is also
-     * called whenever the view type changes. Every hook is installed only once per component.
+     * Hooks the table (details view) and the list (list view). The FilePane creates them when they are shown the first time, so this is
+     * also called whenever the view type changes. Every hook is installed only once per component.
      */
     private void hookViews() {
         if (fc != null) {
@@ -1558,7 +1551,8 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
 
     /**
      * Adds "Delete file/folder" to the right click menu of the file list (like in the Explorer). The popup menu of the FilePane is created
-     * once and used by the list view and the details view. We update the entry every time the menu opens, based on the item under the mouse.
+     * once and used by the list view and the details view. We update the entry every time the menu opens, based on the item under the
+     * mouse.
      */
     protected void installDeleteContextMenu(final JComponent fcContainer) {
         final JComponent filePane = findFilePane(fcContainer);
@@ -1689,8 +1683,8 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
     }
 
     /**
-     * Deletes a file or folder (context menu and DEL hotkey). Files and folders with content have to be confirmed. Empty folders are deleted
-     * right away.
+     * Deletes a file or folder (context menu and DEL hotkey). Files and folders with content have to be confirmed. Empty folders are
+     * deleted right away.
      */
     private void deleteFromContextMenu(final File file, final Component view) {
         if (!isDeletable(file)) {
@@ -1739,8 +1733,8 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
                             // selection to the list/table after the rescan, so keyboard navigation continues from there.
                             fc.setSelectedFile(neighbor);
                             /*
-                             * The reload of the list clears the selection of the table/list including lead and anchor (keyboard navigation then
-                             * starts at the top). So select the neighbor again after the reload.
+                             * The reload of the list clears the selection of the table/list including lead and anchor (keyboard navigation
+                             * then starts at the top). So select the neighbor again after the reload.
                              */
                             if (neighbor != null && view != null) {
                                 pendingSelectionAfterRename.set(neighbor);
@@ -1797,8 +1791,9 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
         }
     }
 
-    private boolean isSymbolicLink(final File file) {
+    private boolean isSymbolicLink(File file) {
         try {
+            file = ExtFileSystemView.getShellFolder(file);
             final File parent = file.getAbsoluteFile().getParentFile();
             final File canonical = parent == null ? file.getCanonicalFile() : new File(parent.getCanonicalFile(), file.getName());
             return !canonical.getCanonicalFile().equals(canonical.getAbsoluteFile());
@@ -1809,7 +1804,7 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
     }
 
     private static final String COLUMN_RESTORE_LISTENER_INSTALLED = ExtFileChooserDialog.class.getName() + ".columnRestoreListener";
-    private static final String EDITOR_FOCUS_HANDLER_INSTALLED = ExtFileChooserDialog.class.getName() + ".editorFocusHandler";
+    private static final String EDITOR_FOCUS_HANDLER_INSTALLED    = ExtFileChooserDialog.class.getName() + ".editorFocusHandler";
 
     /**
      * JTable#editCellAt does not request the focus for the editor component. After "New Folder", the FilePane starts the inline rename via
@@ -1828,8 +1823,8 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
             public void propertyChange(final PropertyChangeEvent evt) {
                 if (evt.getNewValue() == null) {
                     /*
-                     * The editor was removed. If the file was renamed (JTable#editingStopped calls setValueAt, which renames, before it removes
-                     * the editor), the renamed file has to be selected afterwards.
+                     * The editor was removed. If the file was renamed (JTable#editingStopped calls setValueAt, which renames, before it
+                     * removes the editor), the renamed file has to be selected afterwards.
                      */
                     onRenameEditorClosed(jtable, editedFile.getAndSet(null), editedField.getAndSet(null));
                     return;
@@ -1849,9 +1844,10 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
                         editedFile.set(row < 0 ? null : getTableFile(jtable, row));
                         editedField.set(editor instanceof JTextField ? (JTextField) editor : null);
                         /*
-                         * The edited entry (e.g. a new folder) has to be the only selected entry. Else the old selection stays visible until
-                         * the name is confirmed. Changing the selection may make the FileChooser apply and close the editor (it does so if the
-                         * selected file changes). So start the editor again in this case. The new editor starts this handler again.
+                         * The edited entry (e.g. a new folder) has to be the only selected entry. Else the old selection stays visible
+                         * until the name is confirmed. Changing the selection may make the FileChooser apply and close the editor (it does
+                         * so if the selected file changes). So start the editor again in this case. The new editor starts this handler
+                         * again.
                          */
                         if (row >= 0 && (jtable.getSelectedRowCount() != 1 || !jtable.isRowSelected(row))) {
                             final int column = jtable.getEditingColumn();
@@ -1879,8 +1875,8 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
     private volatile long               pendingSelectionDeadline    = 0;
 
     /**
-     * @return the file of the given row (view index). The file is always in the first column of the table MODEL, but the user may have moved
-     *         the columns, so the first column of the view is not reliable.
+     * @return the file of the given row (view index). The file is always in the first column of the table MODEL, but the user may have
+     *         moved the columns, so the first column of the view is not reliable.
      */
     private File getTableFile(final JTable table, final int viewRow) {
         final Object value = table.getModel().getValueAt(table.convertRowIndexToModel(viewRow), 0);
@@ -1974,8 +1970,8 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
     }
 
     /**
-     * Called when the inline rename editor (table or list) was closed. If the file was renamed, the renamed file has to be selected as soon as
-     * it is in the list.
+     * Called when the inline rename editor (table or list) was closed. If the file was renamed, the renamed file has to be selected as soon
+     * as it is in the list.
      */
     private void onRenameEditorClosed(final Component view, final File oldFile, final JTextField field) {
         if (oldFile == null || field == null || oldFile.getParentFile() == null) {
@@ -1985,7 +1981,7 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
         if (name.length() == 0) {
             return;
         }
-        final File renamed = new File(oldFile.getParentFile(), name);
+        final File renamed = ExtFileSystemView.getShellFolder(new File(oldFile.getParentFile(), name));
         /* the rename is already done at this point. If not (cancelled, error), there is nothing to select */
         if (!oldFile.exists() && renamed.exists()) {
             pendingSelectionAfterRename.set(renamed);
@@ -2016,7 +2012,9 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
         if (target == null) {
             return;
         }
-        /* after a delete: wait until the list was reloaded, which means the deleted file is gone. Else the selection would be lost again. */
+        /*
+         * after a delete: wait until the list was reloaded, which means the deleted file is gone. Else the selection would be lost again.
+         */
         final File deleted = pendingDeletedFile.get();
         final int index = deleted != null && getIndexInView(view, deleted) >= 0 ? -1 : getIndexInView(view, target);
         if (index >= 0) {
@@ -2118,7 +2116,8 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
                 }
             }
         }
-        // moveColumn shifts the indices of the other columns. So we cannot move while iterating over the current indices. Sort the columns by
+        // moveColumn shifts the indices of the other columns. So we cannot move while iterating over the current indices. Sort the columns
+        // by
         // their stored position and move them one after another, beginning with the lowest position.
         final java.util.List<TableColumn> ordered = new ArrayList<TableColumn>();
         final Map<TableColumn, Integer> positions = new HashMap<TableColumn, Integer>();

@@ -19,9 +19,15 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.utils.net.httpconnection.HTTPConnection;
+import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
+import org.appwork.utils.net.httpconnection.SSLSocketStreamOptionsModifier;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
+import jd.http.Request;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -40,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.KhinsiderComCrawler;
 
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54010 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { KhinsiderComCrawler.class })
 public class KhinsiderCom extends PluginForHost {
     public KhinsiderCom(PluginWrapper wrapper) {
@@ -86,6 +92,22 @@ public class KhinsiderCom extends PluginForHost {
         }
     }
 
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser ret = super.createNewBrowserInstance();
+        // UA (default 76 is being blocked) and TLS matching/probing
+        ret.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, Request.getSuggestedUserAgent("153.0"));
+        ret.setSSLSocketStreamOptions(new SSLSocketStreamOptionsModifier() {
+            @Override
+            public SSLSocketStreamOptions modify(SSLSocketStreamOptions ret, HTTPConnection httpConnection) {
+                ret.getCustomFactorySettings().add("JSSE_TLS1.3_ENABLED");
+                ret.getCustomFactorySettings().add("BC_TLS1.3_ENABLED");
+                return ret;
+            }
+        });
+        return ret;
+    }
+
     private String getFID(final DownloadLink link) {
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
     }
@@ -123,7 +145,6 @@ public class KhinsiderCom extends PluginForHost {
     protected void handleConnectionErrors(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
         if (!this.looksLikeDownloadableContent(con)) {
             br.followConnection(true);
-
             if (br.containsHTML(">\\s*Unfortunately, due to large server expenses we are no longer able to|To be able to use the mass download feature you are now required to")) {
                 /* No account or given account does not have the rights to download. */
                 throw new AccountRequiredException();

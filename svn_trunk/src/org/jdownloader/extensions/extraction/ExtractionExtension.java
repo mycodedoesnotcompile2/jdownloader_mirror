@@ -1010,26 +1010,26 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
     }
 
     /**
+     * @param raw
+     *            true: the dynamic tags (&lt;jd:...&gt;) of the path are not replaced. The archive specific tags (%PACKAGENAME%,
+     *            %ARCHIVENAME%, %HOSTER%, %SUBFOLDER%, $DATE:...$) are always replaced, because they cannot be shown without an archive.
      * @param appendSubFolder
      *            false: do not append the configured subfolder. Its existence depends on the archive content (thresholds), which is not
      *            always known (e.g. before the archive was validated).
      */
     public File getFinalExtractToFolder(Archive archive, boolean raw, final boolean appendSubFolder) {
-        String path = null;
-        if (StringUtils.isEmpty(path)) {
-            path = archive.getSettings().getExtractPath();
-            if (!StringUtils.isEmpty(path)) {
-                /* use customized extracttofolder */
-                if (!raw) {
-                    path = PackagizerController.replaceDynamicTags(path, ArchiveFactory.PACKAGENAME, null);
-                }
-                path = archive.getFactory().createExtractSubPath(path, archive);
-                File ret = new File(path);
-                if (appendSubFolder) {
-                    ret = appendSubFolder(archive, ret);
-                }
-                return ret;
+        String path = archive.getSettings().getExtractPath();
+        if (!StringUtils.isEmpty(path)) {
+            /* use customized extracttofolder */
+            if (!raw) {
+                path = PackagizerController.replaceDynamicTags(path, ArchiveFactory.PACKAGENAME, null);
             }
+            path = archive.getFactory().createExtractSubPath(path, archive);
+            File ret = new File(path);
+            if (appendSubFolder) {
+                ret = appendSubFolder(archive, ret);
+            }
+            return ret;
         }
         if (getSettings().isCustomExtractionPathEnabled()) {
             /* customized extractpath is enabled */
@@ -1083,6 +1083,45 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
             }
         }
         return ret;
+    }
+
+    /**
+     * Value of the %SUBFOLDER% tag ("Downloadpath Subfolder"): the path of the archive folder below the default download folder, e.g.
+     * <code>Movies/Action</code> for the archive folder <code>C:\dl\Movies\Action</code> and the default download folder <code>C:\dl</code>.
+     * Every folder name is made safe to be used in a path.
+     *
+     * @return the subfolder or an empty String if the archive folder is not located below the default download folder
+     */
+    public static String createDownloadPathSubfolder(final File archiveFolder) {
+        if (archiveFolder == null) {
+            return "";
+        }
+        final String defaultFolder = PackagizerController.replaceDynamicTags(org.appwork.storage.config.JsonConfig.create(org.jdownloader.settings.GeneralSettings.class).getDefaultDownloadFolder(), null, null);
+        if (StringUtils.isEmpty(defaultFolder)) {
+            return "";
+        }
+        final String parent = new File(defaultFolder).getAbsolutePath();
+        final String child = archiveFolder.getAbsolutePath();
+        if (child.length() <= parent.length() || !child.regionMatches(org.appwork.utils.os.CrossSystem.isWindows(), 0, parent, 0, parent.length())) {
+            return "";
+        }
+        String relative = child.substring(parent.length());
+        if (!parent.endsWith(File.separator) && !relative.startsWith(File.separator)) {
+            /* No path boundary, e.g. C:\dl2 is not located below C:\dl */
+            return "";
+        }
+        final StringBuilder sb = new StringBuilder();
+        for (final String part : relative.split("[\\\\/]+")) {
+            final String safePart = org.appwork.utils.os.CrossSystem.alleviatePathParts(part);
+            if (StringUtils.isEmpty(safePart)) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append(File.separator);
+            }
+            sb.append(safePart);
+        }
+        return sb.toString();
     }
 
     public Set<IExtraction> getExtractors() {

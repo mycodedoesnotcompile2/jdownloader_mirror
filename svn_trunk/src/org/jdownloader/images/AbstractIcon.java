@@ -23,14 +23,12 @@ public class AbstractIcon implements Icon, IDIcon {
         return size;
     }
 
-    private final int     size;
-    private volatile long dimension = LongUtils.pack(-1, -1);// high=height, low=width
-    private boolean       autoDisabledIconEnabled;
-    private Composite     composite;
-
-    public static void main(String[] args) {
-        System.out.println(LongUtils.pack(-1, -1));
-    }
+    private final int           size;
+    /* high=height, low=width */
+    protected static final long UNKNOWN   = LongUtils.pack(-1, -1);
+    private volatile long       dimension = UNKNOWN;
+    private boolean             autoDisabledIconEnabled;
+    private Composite           composite;
 
     public Composite getComposite() {
         return composite;
@@ -45,20 +43,9 @@ public class AbstractIcon implements Icon, IDIcon {
         this.size = size;
     }
 
-    public AbstractIcon getIcon(final int size) {
-        final AbstractIcon ret = new AbstractIcon(getKey(), size);
-        ret.setComposite(getComposite());
-        ret.setAutoDisabledIconEnabled(isAutoDisabledIconEnabled());
-        return ret;
-    }
-
-    /**
-     *
-     */
     protected long lazyUpdate() {
         final long ret = dimension;
-        if (ret != -1) {
-            // -1,-1
+        if (ret != UNKNOWN) {
             return ret;
         }
         final Icon icon = NewTheme.I().getIcon(getKey(), getSize());
@@ -75,7 +62,7 @@ public class AbstractIcon implements Icon, IDIcon {
 
     @Override
     public int hashCode() {
-        return key.hashCode() + size;
+        return getKey().hashCode() + getSize();
     }
 
     @Override

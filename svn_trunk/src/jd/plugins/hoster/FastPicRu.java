@@ -20,6 +20,8 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -34,9 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54010 $", interfaceVersion = 2, names = {}, urls = {})
 public class FastPicRu extends PluginForHost {
     public FastPicRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -141,7 +141,12 @@ public class FastPicRu extends PluginForHost {
         }
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (dllink == null) {
+        }
+        final String continuetoImage = br.getRegex("href\\s*=\\s*\"([^\"]+)\"[^>]*>\\s*Continue to image\\s*<").getMatch(0);
+        if (continuetoImage != null) {
+            br.getPage(continuetoImage);
+        }
+        if (dllink == null) {
             dllink = br.getRegex("<span class=\"text-muted d-lg-none\">нажмите для увеличения</span>\\s*<img src=\"(https://[^\"]+)\"").getMatch(0);
             if (dllink == null) {
                 dllink = br.getRegex("\"(https?://[a-z0-9]+\\.[^/]+/big/[^/]+/[^/]+/[^/]+/_?[a-f0-9]{32}\\.[A-Za-z]+[^\"]*)\"").getMatch(0);

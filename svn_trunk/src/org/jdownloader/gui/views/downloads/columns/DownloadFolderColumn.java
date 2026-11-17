@@ -5,16 +5,13 @@ import java.awt.event.MouseEvent;
 import java.io.File;
 
 import javax.swing.JPopupMenu;
-import javax.swing.JTextField;
 
 import jd.controlling.packagecontroller.AbstractNode;
 import jd.controlling.packagecontroller.AbstractPackageNode;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
-import net.miginfocom.swing.MigLayout;
 
 import org.appwork.swing.exttable.columns.ExtTextColumn;
-import org.appwork.utils.os.CrossSystem;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.components.packagetable.LinkTreeUtils;
@@ -35,13 +32,11 @@ public class DownloadFolderColumn extends ExtTextColumn<AbstractNode> {
     public DownloadFolderColumn() {
         super(_GUI.T.LinkGrabberTableModel_initColumns_folder());
         setClickcount(0);
+    }
 
-        editorField.setBorder(new JTextField().getBorder());
-        // bt.setRolloverEffectEnabled(true);
-        editor.setLayout(new MigLayout("ins 1 4 1 0", "[grow,fill][][]", "[fill,grow]"));
-        editor.removeAll();
-        editor.add(this.editorField, "height 20!");
-
+    @Override
+    protected String getTooltipText(final AbstractNode obj) {
+        return LinkTreeUtils.createDownloadDirectoryTooltip(obj, super.getTooltipText(obj));
     }
 
     @Override
@@ -63,15 +58,8 @@ public class DownloadFolderColumn extends ExtTextColumn<AbstractNode> {
 
     @Override
     public boolean onDoubleClick(MouseEvent e, AbstractNode value) {
-
-        final File ret = LinkTreeUtils.getDownloadDirectory(value);
-        if (ret != null && ret.exists() && ret.isDirectory()) {
-
-            CrossSystem.openFile(ret);
-
-        }
-        return true;
-
+        /* The file system access happens in a background thread, not in the EDT */
+        return LinkTreeUtils.openDownloadDirectoryAsync(value);
     }
 
     @Override
@@ -91,11 +79,6 @@ public class DownloadFolderColumn extends ExtTextColumn<AbstractNode> {
             return ((AbstractPackageNode) obj).getView().isEnabled();
         }
         return obj.isEnabled();
-    }
-
-    protected boolean isEditable(final AbstractNode obj, final boolean enabled) {
-        /* needed so we can edit even is row is disabled */
-        return isEditable(obj);
     }
 
     @Override

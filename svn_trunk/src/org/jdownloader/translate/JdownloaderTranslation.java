@@ -159,6 +159,9 @@ public interface JdownloaderTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Wait %s1" })
     String gui_download_waittime_status2(Object s1);
 
+    @Default(lngs = { "en" }, values = { "Account problem: %s1" })
+    String gui_download_account_problem(Object s1);
+
     @Default(lngs = { "en" }, values = { "Not enough traffic available (%s1 required)" })
     String gui_download_waittime_notenoughtraffic(String trafficRequired);
 

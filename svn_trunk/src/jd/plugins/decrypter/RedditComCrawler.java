@@ -32,6 +32,24 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.storage.simplejson.MinimalMemoryMap;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Hash;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.RedditConfig;
+import org.jdownloader.plugins.components.config.RedditConfig.CommentsPackagenameScheme;
+import org.jdownloader.plugins.components.config.RedditConfig.FilenameScheme;
+import org.jdownloader.plugins.components.config.RedditConfig.PreviewCrawlerMode;
+import org.jdownloader.plugins.components.config.RedditConfig.TextCrawlerMode;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
+import org.jdownloader.plugins.controller.host.LazyHostPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -58,25 +76,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.RedditCom;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.simplejson.MinimalMemoryMap;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Hash;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.RedditConfig;
-import org.jdownloader.plugins.components.config.RedditConfig.CommentsPackagenameScheme;
-import org.jdownloader.plugins.components.config.RedditConfig.FilenameScheme;
-import org.jdownloader.plugins.components.config.RedditConfig.PreviewCrawlerMode;
-import org.jdownloader.plugins.components.config.RedditConfig.TextCrawlerMode;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
-import org.jdownloader.plugins.controller.host.LazyHostPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 53821 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54017 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { RedditCom.class })
 public class RedditComCrawler extends PluginForDecrypt {
     public RedditComCrawler(PluginWrapper wrapper) {
@@ -99,8 +99,8 @@ public class RedditComCrawler extends PluginForDecrypt {
     public int getMaxConcurrentProcessingInstances() {
         /**
          * 2023-08-07: Try not to run into API rate-limits RE:
-         * https://support.reddithelp.com/hc/en-us/articles/16160319875092-Reddit-Data-API-Wiki </br> IMPORTANT: Dev: If you want to set
-         * this to a value higher than 1, first check API rate-limit handling and implement locks!!
+         * https://support.reddithelp.com/hc/en-us/articles/16160319875092-Reddit-Data-API-Wiki </br>
+         * IMPORTANT: Dev: If you want to set this to a value higher than 1, first check API rate-limit handling and implement locks!!
          */
         return 1;
     }
@@ -243,12 +243,12 @@ public class RedditComCrawler extends PluginForDecrypt {
         }
         /* Crawl until we've reached the end. */
         final FilePackage fp = FilePackage.getInstance();
-        String url = "https://www." + this.getHost() + "/r/" + subredditSlug + "/" + sorting + ".json";
+        String url = "https://www." + this.getHost() + "/r/" + subredditSlug + ".json";
         if (timeRange != null) {
             url = URLHelper.parseLocation(new URL(url), "&t=" + timeRange);
         }
         fp.setName("/r/" + subredditSlug);
-        return this.crawlPagination(url, fp, maxPagesToCrawl);
+        return this.crawlPagination(url, fp, maxPagesToCrawl, sorting);
     }
 
     private ArrayList<DownloadLink> crawlUser(final CryptedLink param, final String username) throws Exception {
@@ -270,13 +270,10 @@ public class RedditComCrawler extends PluginForDecrypt {
         final FilePackage fp = FilePackage.getInstance();
         fp.setName("/u/" + username);
         String url = "https://www." + this.getHost() + "/user/" + username + "/submitted.json";
-        if (sorting != null) {
-            url = URLHelper.parseLocation(new URL(url), "&sort=" + sorting);
-        }
         if (timeRange != null) {
             url = URLHelper.parseLocation(new URL(url), "&t=" + timeRange);
         }
-        return this.crawlPagination(url, fp, maxPagesToCrawl);
+        return this.crawlPagination(url, fp, maxPagesToCrawl, sorting);
     }
 
     @Override
@@ -296,7 +293,7 @@ public class RedditComCrawler extends PluginForDecrypt {
      * @param maxPage
      *            Max. page to crawl. -1 = crawl all pages.
      */
-    private ArrayList<DownloadLink> crawlPagination(final String url, final FilePackage fp, final int maxPage) throws Exception {
+    private ArrayList<DownloadLink> crawlPagination(final String url, final FilePackage fp, final int maxPage, final String sorting) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final Set<String> nextPageTokenDupes = new HashSet<String>();
         final int maxItemsPerCall = 100;
@@ -305,6 +302,9 @@ public class RedditComCrawler extends PluginForDecrypt {
         query.add("limit", Integer.toString(maxItemsPerCall));
         query.add("raw_json", "1");
         query.add("sr_detail", "1");
+        if (sorting != null) {
+            query.add("sort", sorting);
+        }
         int page = 1;
         int numberofItemsWalkedThrough = 0;
         fp.setAllowMerge(true);
@@ -467,8 +467,8 @@ public class RedditComCrawler extends PluginForDecrypt {
             if (crosspost_parent_list != null && crosspost_parent_list.size() == 1) {
                 /**
                  * post is a crosspost -> Crawl original post content <br>
-                 * See: https://www.reddit.com/r/redditdev/comments/18c67v8/how_to_detect_crossposts_in_praw/ </br> If we fail to do this,
-                 * some video elements may be downloaded in max 720p while 1080p is available via "fallback_url".
+                 * See: https://www.reddit.com/r/redditdev/comments/18c67v8/how_to_detect_crossposts_in_praw/ </br>
+                 * If we fail to do this, some video elements may be downloaded in max 720p while 1080p is available via "fallback_url".
                  */
                 data = crosspost_parent_list.get(0);
             }
@@ -693,7 +693,8 @@ public class RedditComCrawler extends PluginForDecrypt {
                     }
                     /**
                      * Return "preview video" because e.g. in some cases original video is hosted on imgur.com but it is offline while
-                     * content on reddit is still online e.g.: </br> /r/Bellissima/comments/151ruli/brit_manuela/
+                     * content on reddit is still online e.g.: </br>
+                     * /r/Bellissima/comments/151ruli/brit_manuela/
                      */
                     if (reddit_video_preview != null && !addedRedditSelfhostedVideo) {
                         final String hls_url = reddit_video_preview.get("hls_url").toString();
@@ -766,8 +767,8 @@ public class RedditComCrawler extends PluginForDecrypt {
                     }
                 } else {
                     /**
-                     * No image gallery or offline image gallery. </br> --> Look for embedded content from external sources - the object is
-                     * always given but can be empty
+                     * No image gallery or offline image gallery. </br>
+                     * --> Look for embedded content from external sources - the object is always given but can be empty
                      */
                     final Map<String, Object> embeddedMediaInfo = (Map<String, Object>) data.get("media_embed");
                     if (embeddedMediaInfo != null && !embeddedMediaInfo.isEmpty()) {

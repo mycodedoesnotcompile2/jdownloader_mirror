@@ -4,14 +4,6 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
-import jd.controlling.packagecontroller.AbstractPackageNode;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.StringUtils;
@@ -21,8 +13,15 @@ import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.UrlDisplayType;
 
-public class LinkTreeUtils {
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
+import jd.controlling.packagecontroller.AbstractPackageNode;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
 
+public class LinkTreeUtils {
     public static File getDownloadDirectory(AbstractNode node) {
         if (node instanceof DownloadLink) {
             final FilePackage parent = ((DownloadLink) node).getFilePackage();
@@ -88,6 +87,54 @@ public class LinkTreeUtils {
             return new File(path);
         }
         return new File(PackagizerController.replaceDynamicTags(org.jdownloader.settings.staticreferences.CFG_GENERAL.DEFAULT_DOWNLOAD_FOLDER.getValue(), packagename, node), path);
+    }
+
+    /**
+     * Opens the download directory of the node in the file manager. Checking and opening the directory happens in a background thread,
+     * because the file system access must not block the EDT (e.g. for network drives).
+     *
+     * @return true if opening was started, false if it is not supported or there is no node
+     */
+    public static boolean openDownloadDirectoryAsync(final AbstractNode node) {
+        if (node == null || !CrossSystem.isOpenFileSupported()) {
+            return false;
+        }
+        final Thread thread = new Thread("Open download directory:idle") {
+            @Override
+            public void run() {
+                final File directory = getDownloadDirectory(node);
+                if (directory == null || !directory.isDirectory()) {
+                    return;
+                }
+                setName("Open download directory:" + directory);
+                CrossSystem.openFile(directory);
+            }
+        };
+        thread.setDaemon(true);
+        thread.start();
+        return true;
+    }
+
+    /**
+     * Tooltip for a download directory column: the directory. If the unresolved path contains dynamic tags, it is shown as well.
+     *
+     * @param directory
+     *            the resolved download directory of the node
+     */
+    public static String createDownloadDirectoryTooltip(final AbstractNode node, final String directory) {
+        if (StringUtils.isEmpty(directory)) {
+            return null;
+        }
+        final File raw = getRawDownloadDirectory(node);
+        final String rawPath = raw == null ? null : raw.getPath();
+        if (rawPath != null && rawPath.contains("<jd:")) {
+            return "<html><pre>" + escapeHtml(directory) + "\r\n(" + escapeHtml(rawPath) + ")</pre></html>";
+        }
+        return directory;
+    }
+
+    private static String escapeHtml(final String text) {
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
     public static String getUrlByType(final UrlDisplayType dt, final AbstractNode node) {

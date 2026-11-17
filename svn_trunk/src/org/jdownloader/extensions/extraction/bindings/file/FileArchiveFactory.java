@@ -26,7 +26,6 @@ import org.jdownloader.extensions.extraction.UnitType;
 import org.jdownloader.extensions.extraction.bindings.downloadlink.DownloadLinkArchiveFactory;
 import org.jdownloader.extensions.extraction.multi.ArchiveType;
 import org.jdownloader.extensions.extraction.split.SplitType;
-import org.jdownloader.settings.GeneralSettings;
 
 public class FileArchiveFactory extends FileArchiveFile implements ArchiveFactory {
     private final Archive origin;
@@ -192,11 +191,7 @@ public class FileArchiveFactory extends FileArchiveFile implements ArchiveFactor
                     org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().severe("Could not set extraction date. Maybe pattern is wrong. For " + firstArchiveFile.getFilePath());
                 }
             }
-            String dif = new File(org.appwork.storage.config.JsonConfig.create(GeneralSettings.class).getDefaultDownloadFolder()).getAbsolutePath().replace(getFile().getParent(), "");
-            if (new File(dif).isAbsolute()) {
-                dif = "";
-            }
-            path = path.replace(SUBFOLDER, dif);
+            path = path.replace(SUBFOLDER, ExtractionExtension.createDownloadPathSubfolder(getFile().getParentFile()));
             return CrossSystem.fixPathSeparators(path);
         } catch (Exception e) {
             org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);

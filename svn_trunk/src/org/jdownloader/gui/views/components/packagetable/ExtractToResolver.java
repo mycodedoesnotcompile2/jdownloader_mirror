@@ -183,6 +183,37 @@ public class ExtractToResolver {
         return entry.result;
     }
 
+    /**
+     * INFO: When is a value (re)calculated? Only while the column is visible and the row is painted. There is no periodic refresh.<br>
+     * <b>Calculated:</b>
+     * <ul>
+     * <li>There is no entry for the node yet: the first time it is painted. A package that is moved from the LinkGrabber to the download
+     * list consists of new nodes, so it is calculated once more there. Entries are held weakly and disappear with their node.</li>
+     * <li>The extension became available or unavailable ({@link ArchiveValidator#EXTENSION}).</li>
+     * <li>A setting changed (CONFIG_COUNTER): default download folder, default auto extract of the LinkGrabber, custom extraction path (and
+     * its switch), subfolder switch, subpath.</li>
+     * <li>An archive setting changed ({@link ArchiveController#getSettingsChangeCounter()}): extract path override, auto extract or the
+     * extraction info (extraction finished). Not counted: restoring the settings from disk and applying the default auto extract value to
+     * new settings.</li>
+     * <li>The node itself changed (input key): raw download folder or name of the package, name of the link.</li>
+     * </ul>
+     * <b>Not calculated:</b>
+     * <ul>
+     * <li>Because of time.</li>
+     * <li>When children are added to / removed from / moved between packages, as long as the package has an entry. The value of a package
+     * is the aggregate of its archives. See TODO below.</li>
+     * <li>When the subfolder thresholds change: the column does not show them.</li>
+     * <li>When the archive is validated or completed.</li>
+     * <li>While the column is hidden or the row is not painted. The outdated value stays in the cache until it is painted again.</li>
+     * </ul>
+     * <b>Good to know:</b> The counters are global. If one setting or one archive changes, all cached values are outdated and are
+     * calculated again when painted, e.g. all visible rows after the extraction of a single archive.<br>
+     * TODO: Package values are not refreshed if their children change (e.g. a second archive with a different destination arrives in the
+     * LinkGrabber, or a link is moved to another package). Adding the number of children to the input key would fix it, but then the
+     * package would be calculated over and over while the crawler adds links. Reconsider, maybe with a delay.<br>
+     * TODO: Invalidate only the nodes that are affected by an archive change instead of all (global counter).<br>
+     * TODO: {@link ArchiveValidator#EXTENSION} is never reset when the extension is stopped, so disabling it at runtime is not detected.
+     */
     private boolean isOutdated(final Entry entry, final AbstractNode node) {
         final boolean extensionAvailable = ArchiveValidator.EXTENSION != null;
         if (entry.extensionAvailable != extensionAvailable) {
@@ -268,12 +299,10 @@ public class ExtractToResolver {
         if (archives.isEmpty()) {
             return Result.EMPTY;
         }
-        /* Linkgrabber nodes show the raw path (with tags), download list nodes the resolved path */
-        final boolean raw = node instanceof CrawledLink || node instanceof CrawledPackage;
         final Map<String, Destination> destinations = new LinkedHashMap<String, Destination>();
         for (final Archive archive : archives) {
             try {
-                final Destination destination = describe(extension, archive, raw);
+                final Destination destination = describe(extension, archive);
                 if (destination.text.length() > 0 && !destinations.containsKey(destination.text)) {
                     destinations.put(destination.text, destination);
                 }
@@ -305,8 +334,12 @@ public class ExtractToResolver {
         return new Result(text, toHtml(tooltip.toString()));
     }
 
-    @SuppressWarnings({ "rawtypes", "unchecked" })
-    private static List<Archive> getArchives(final ExtractionExtension extension, final AbstractNode node) {
+    /**
+     * Builds the archives of a node: the archive of a link or all archives of the children of a package. This may access the file system,
+     * so it must not be called in the EDT.
+     */
+    @SuppressWarnings({ "rawtypes" })
+    public static List<Archive> getArchives(final ExtractionExtension extension, final AbstractNode node) {
         if (node instanceof AbstractPackageNode) {
             final AbstractPackageNode pkg = (AbstractPackageNode) node;
             final List<Object> children;
@@ -336,55 +369,42 @@ public class ExtractToResolver {
         return Collections.singletonList(archive);
     }
 
-    private static Destination describe(final ExtractionExtension extension, final Archive archive, final boolean raw) {
+    /**
+     * Always describes the final path: dynamic tags and archive tags (e.g. %PACKAGENAME%) are replaced, in the LinkGrabber as well.
+     */
+    private static Destination describe(final ExtractionExtension extension, final Archive archive) {
+        /*
+         * The archive was extracted (also manually): show the directory it was really extracted to. It is not checked if it still exists.
+         */
+        final ExtractionInfo extractionInfo = archive.getSettings().getExtractionInfo();
+        if (extractionInfo != null && !StringUtils.isEmpty(extractionInfo.getExtractToFolder())) {
+            final String extractedTo = extractionInfo.getExtractToFolder();
+            return new Destination(extractedTo, extractedTo, false);
+        }
         if (!extension.isAutoExtractEnabled(archive)) {
-            /* Extracted manually: Auto extract is still disabled, but we know where the archive was extracted to. */
-            final ExtractionInfo extractionInfo = archive.getSettings().getExtractionInfo();
-            if (extractionInfo != null && !StringUtils.isEmpty(extractionInfo.getExtractToFolder())) {
-                final String extractedTo = extractionInfo.getExtractToFolder();
-                return new Destination(extractedTo, extractedTo, false);
-            }
             /* Auto extract disabled && manual extraction hasn't happened either. */
             final String text = _GUI.T.ExtractToColumn_auto_extract_disabled();
             return new Destination(text, text, false);
         }
-        /* The subfolder is not part of the folder, because it depends on the archive content, which is often not known yet */
-        final String subRaw = getSubfolder(extension, archive, true);
-        final String subResolved = getSubfolder(extension, archive, false);
-        final String suffixShown = createSuffix(raw ? subRaw : subResolved);
-        final String suffixResolved = createSuffix(subResolved);
-        File resolved = extension.getFinalExtractToFolder(archive, false, false);
-        if (resolved == null) {
+        File folder = extension.getFinalExtractToFolder(archive, false, false);
+        if (folder == null) {
             /* No path configured: the archive is extracted into its own folder. Always show the path, never a placeholder text. */
             final String downloadFolder = archive.getFactory().createDefaultExtractToPath(archive);
             if (StringUtils.isEmpty(downloadFolder)) {
                 return new Destination("", "", false);
             }
-            resolved = new File(downloadFolder);
+            folder = new File(downloadFolder);
         }
-        File shown = resolved;
-        if (raw) {
-            final File rawFolder = extension.getFinalExtractToFolder(archive, true, false);
-            if (rawFolder != null) {
-                shown = rawFolder;
-            }
-        }
-        final String text = shown.getPath() + suffixShown;
-        final String resolvedText = resolved.getPath() + suffixResolved;
-        final String tooltip;
-        if (StringUtils.equals(text, resolvedText)) {
-            tooltip = text;
-        } else {
-            /* Show the resolved path, too, if the shown one contains tags */
-            tooltip = text + "\n" + resolvedText;
-        }
-        return new Destination(text, tooltip, suffixShown.length() > 0);
+        /* The subfolder is only a suffix, because its existence depends on the archive content, which is often not known yet */
+        final String suffix = createSuffix(getSubfolder(extension, archive));
+        final String text = folder.getPath() + suffix;
+        return new Destination(text, text, suffix.length() > 0);
     }
 
     /**
-     * @return the configured subfolder or null if no subfolder is used
+     * @return the configured subfolder (tags replaced) or null if no subfolder is used
      */
-    private static String getSubfolder(final ExtractionExtension extension, final Archive archive, final boolean raw) {
+    private static String getSubfolder(final ExtractionExtension extension, final Archive archive) {
         final ExtractionConfig config = extension.getSettings();
         if (!config.isSubpathEnabled()) {
             return null;
@@ -393,11 +413,9 @@ public class ExtractToResolver {
         if (StringUtils.isEmpty(sub)) {
             return null;
         }
-        if (!raw) {
-            final String resolved = archive.getFactory().createExtractSubPath(sub, archive);
-            if (!StringUtils.isEmpty(resolved)) {
-                sub = resolved;
-            }
+        final String resolved = archive.getFactory().createExtractSubPath(sub, archive);
+        if (!StringUtils.isEmpty(resolved)) {
+            sub = resolved;
         }
         sub = sub.trim();
         while (sub.startsWith("/") || sub.startsWith("\\")) {

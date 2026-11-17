@@ -43,10 +43,6 @@ public class AccountListPanel extends SwitchPanel {
     }
 
     public void selectAccount(Account account) {
-        for (AccountEntry ae : table.getModel().getTableData()) {
-            if (account.equals(ae.getAccount())) {
-                table.getModel().setSelectedObject(ae);
-            }
-        }
+        ((PremiumAccountTableModel) table.getModel()).selectAccount(account);
     }
 }

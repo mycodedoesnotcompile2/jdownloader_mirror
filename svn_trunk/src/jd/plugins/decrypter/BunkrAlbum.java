@@ -50,7 +50,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.Bunkr;
 
-@DecrypterPlugin(revision = "$Revision: 53578 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54010 $", interfaceVersion = 3, names = {}, urls = {})
 public class BunkrAlbum extends PluginForDecrypt {
     public BunkrAlbum(PluginWrapper wrapper) {
         super(wrapper);
@@ -142,7 +142,7 @@ public class BunkrAlbum extends PluginForDecrypt {
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            final boolean enforceAdvancedView = false;// also works for smaller albums
+            final boolean enforceAdvancedView = true;// also works for smaller albums
             boolean advancedView = false;
             if (br.containsHTML("<a\\s*href\\s*=\\s*\"\\?advanced=1\"") || enforceAdvancedView) {
                 // all images on one page
@@ -344,7 +344,7 @@ public class BunkrAlbum extends PluginForDecrypt {
             parsedFilesize = Long.parseLong(filesizeBytesStr);
             dl.setVerifiedFileSize(parsedFilesize);
         } else if (filesizeStr != null) {
-            parsedFilesize = SizeFormatter.getSize(filesizeStr);
+            parsedFilesize = SizeFormatter.getSize(null, filesizeStr, true, false);
             dl.setDownloadSize(parsedFilesize);
         }
         if (parsedFilesize != -1) {

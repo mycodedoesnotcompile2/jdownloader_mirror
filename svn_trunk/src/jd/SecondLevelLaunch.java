@@ -41,20 +41,6 @@ import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JWindow;
 
-import jd.controlling.AccountController;
-import jd.controlling.ClipboardMonitoring;
-import jd.controlling.DelayWriteController;
-import jd.controlling.downloadcontroller.DownloadController;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.packagecontroller.AbstractPackageChildrenNodeFilter;
-import jd.controlling.proxy.ProxyController;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.laf.LookAndFeelController;
-import jd.http.Browser;
-import jd.nutils.zip.SharedMemoryState;
-import jd.plugins.DownloadLink;
-
 import org.appwork.console.ConsoleDialog;
 import org.appwork.controlling.SingleReachableState;
 import org.appwork.shutdown.ShutdownController;
@@ -104,7 +90,6 @@ import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogNoAnswerException;
 import org.appwork.utils.swing.dialog.ExceptionDialog;
-import org.appwork.utils.swing.dialog.ExtFileSystemView;
 import org.appwork.utils.swing.windowmanager.WindowManager;
 import org.jdownloader.api.RemoteAPIController;
 import org.jdownloader.api.cnl2.ExternInterface;
@@ -132,10 +117,10 @@ import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.CLIPBOARD_SKIP_MODE;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.RlyWarnLevel;
-import org.jdownloader.settings.staticreferences.CFG_GENERAL;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.settings.SilentModeController;
 import org.jdownloader.settings.SilentModeSettings.SilentModeSetting;
+import org.jdownloader.settings.staticreferences.CFG_GENERAL;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.settings.staticreferences.CFG_SILENTMODE;
 import org.jdownloader.translate._JDT;
 import org.jdownloader.updatev2.InternetConnectionSettings;
@@ -147,6 +132,20 @@ import com.btr.proxy.selector.pac.PacScriptParser;
 import com.btr.proxy.selector.pac.PacScriptSource;
 import com.btr.proxy.selector.pac.ProxyEvaluationException;
 import com.btr.proxy.selector.pac.RhinoPacScriptParser;
+
+import jd.controlling.AccountController;
+import jd.controlling.ClipboardMonitoring;
+import jd.controlling.DelayWriteController;
+import jd.controlling.downloadcontroller.DownloadController;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNodeFilter;
+import jd.controlling.proxy.ProxyController;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.laf.LookAndFeelController;
+import jd.http.Browser;
+import jd.nutils.zip.SharedMemoryState;
+import jd.plugins.DownloadLink;
 
 public class SecondLevelLaunch {
     static {
@@ -967,9 +966,6 @@ public class SecondLevelLaunch {
                                 OperatingSystemEventSender.getInstance().setIgnoreSignal("HUP", true);
                             }
                         }
-                        if (CrossSystem.isWindows() && !Application.isHeadless() && CFG_GENERAL.CFG.isSambaPrefetchEnabled()) {
-                            ExtFileSystemView.runSambaScanner();
-                        }
                     }
                 }.start();
             }
@@ -1020,7 +1016,6 @@ public class SecondLevelLaunch {
         if (!Application.isHeadless()) {
             while (true) {
                 final Thread initThread = new EDTHelper<Thread>() {
-
                     @Override
                     public Thread edtRun() {
                         final JDGui ret = JDGui.init();

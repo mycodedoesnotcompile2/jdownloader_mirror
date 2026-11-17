@@ -40,8 +40,10 @@ import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import javax.swing.Icon;
 import javax.swing.filechooser.FileSystemView;
@@ -49,6 +51,7 @@ import javax.swing.filechooser.FileSystemView;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.sunwrapper.sun.awt.shell.ShellFolderWrapper;
+import org.appwork.utils.Time;
 import org.appwork.utils.locale._AWU;
 import org.appwork.utils.os.CrossSystem;
 
@@ -62,52 +65,32 @@ import org.appwork.utils.os.CrossSystem;
  *
  */
 public class ExtFileSystemView extends FileSystemView {
-    public static boolean SAMBA_SCANNED = false;
 
-    public static void runSambaScanner() {
-        if (ExtFileSystemView.SAMBA_SCANNED) {
-            return;
+    public static File getShellFolder(File file) {
+        try {
+            return file != null ? ShellFolderWrapper.getShellFolderIfAvailable(file) : file;
+        } catch (FileNotFoundException e) {
+            return file;
         }
-        ExtFileSystemView.SAMBA_SCANNED = true;
-        // final long tt = System.currentTimeMillis();
-        // new Thread("Networkfolder Loader") {
-        // @Override
-        // public void run() {
-        // final ExtFileSystemView view = new ExtFileSystemView();
-        // view.getRoots();
-        // try {
-        // if (view.networkFolder != null) {
-        // view.networkFolder.listFiles();
-        // LogV3.I().getDefaultLogger().info("List Networkfolder done " +
-        // (System.currentTimeMillis() -
-        // tt));
-        // }
-        // } catch (final Exception e) {
-        // e.printStackTrace();
-        // }
-        // }
-        // }.start();
     }
 
-    private final FileSystemView org;
-    private File[]               roots;
-    private NetWorkFolder        networkFolder;
-    private HashMap<File, File>  specialsMap;
-    private final boolean        useFileIcons;
+    private final FileSystemView  org;
+    private File[]                roots;
+    private NetWorkFolder         networkFolder;
+    private HashMap<Object, File> specialsMap;
+    private final boolean         useFileIcons;
     /**
      *
      */
-    public static final String   VIRTUAL_NETWORKFOLDER    = "::{F02C1A0D-BE21-4350-88B0-7367FC96EF3C}";
-    public static final String   VIRTUAL_NETWORKFOLDER_XP = "::{208D2C60-3AEA-1069-A2D7-08002B30309D}";
+    public static final String    VIRTUAL_NETWORKFOLDER    = "::{F02C1A0D-BE21-4350-88B0-7367FC96EF3C}";
+    public static final String    VIRTUAL_NETWORKFOLDER_XP = "::{208D2C60-3AEA-1069-A2D7-08002B30309D}";
+    public static final String    VIRTUAL_GALLERY          = "::{E88865EA-0E1C-4E20-9AA6-EDCD0212C87C}";
+    public static final String    VIRTUAL_LIBRARY          = "::{031E4825-7B94-4DC3-B131-E946B44C8DD5}";
 
     /**
      */
     public ExtFileSystemView() {
         this.org = FileSystemView.getFileSystemView();
-        if (!ExtFileSystemView.SAMBA_SCANNED) {
-            new Exception("run ExtFileSystemView.runSambaScanner() as early as possible in your app!");
-            ExtFileSystemView.runSambaScanner();
-        }
         this.useFileIcons = JsonConfig.create(ExtFileSystemViewSettings.class).isUseSystemIcons();
     }
 
@@ -143,7 +126,7 @@ public class ExtFileSystemView extends FileSystemView {
 
     @Override
     public File[] getFiles(final File dir, final boolean useFileHiding) {
-        final long t = System.currentTimeMillis();
+        final long t = Time.systemIndependentCurrentJVMTimeMillis();
         try {
             final File[] ret;
             if (dir == this.networkFolder) {
@@ -153,7 +136,7 @@ public class ExtFileSystemView extends FileSystemView {
                 LogV3.I().getDefaultLogger().info("org.getFiles(dir, useFileHiding);");
                 ret = this.org.getFiles(dir, useFileHiding);
             }
-            LogV3.I().getDefaultLogger().info("getFiles: ms:" + (System.currentTimeMillis() - t) + " " + dir + "|" + ret.length);
+            LogV3.I().getDefaultLogger().info("getFiles: ms:" + (Time.systemIndependentCurrentJVMTimeMillis() - t) + " " + dir + "(" + dir.getName() + ")" + "|" + ret.length);
             final java.util.List<File> filtered = new ArrayList<File>();
             for (final File f : ret) {
                 if (f.getName().equals(ExtFileSystemView.VIRTUAL_NETWORKFOLDER)) {
@@ -170,7 +153,7 @@ public class ExtFileSystemView extends FileSystemView {
             LogV3.I().getDefaultLogger().info("Return Files for " + dir + "(" + useFileHiding + "): " + filtered.size());
             return filtered.toArray(new File[] {});
         } finally {
-            LogV3.I().getDefaultLogger().info("getFiles(end): ms:" + (System.currentTimeMillis() - t) + " " + dir);
+            LogV3.I().getDefaultLogger().info("getFiles(end): ms:" + (Time.systemIndependentCurrentJVMTimeMillis() - t) + " " + dir + "(" + dir.getName() + ")");
         }
     }
 
@@ -223,12 +206,17 @@ public class ExtFileSystemView extends FileSystemView {
 
     @Override
     public File getParentDirectory(final File dir) {
-        return this.org.getParentDirectory(dir);
+        final File ret = this.org.getParentDirectory(dir);
+        return mapSpecialFolders(ret);
+    }
+
+    protected File toShellFolder(File file) {
+        return ExtFileSystemView.getShellFolder(file);
     }
 
     @Override
     public File[] getRoots() {
-        final long t = System.currentTimeMillis();
+        final long t = Time.systemIndependentCurrentJVMTimeMillis();
         LogV3.I().getDefaultLogger().info("Get Roots");
         if (this.roots != null) {
             return this.roots;
@@ -236,83 +224,104 @@ public class ExtFileSystemView extends FileSystemView {
         try {
             // this may take a long time on some systems.
             final File[] baseFolders = getBaseFolders();
-            LogV3.I().getDefaultLogger().info("Listed Base folders " + (System.currentTimeMillis() - t) + "|" + (baseFolders != null ? baseFolders.length : -1));
-            final LinkedHashSet<File> unique = new LinkedHashSet<File>() {
-                /*
-                 * (non-Javadoc)
-                 *
-                 * @see java.util.HashSet#add(java.lang.Object)
-                 */
-                @Override
-                public boolean add(final File e) {
-                    if (this.contains(e)) {
-                        return false;
-                    }
-                    return super.add(e);
-                }
-            };
-            final File desktopPath = new File(System.getProperty("user.home") + "/Desktop");
-            if (desktopPath.exists() && desktopPath.isDirectory()) {
+            LogV3.I().getDefaultLogger().info("Listed Base folders " + (Time.systemIndependentCurrentJVMTimeMillis() - t) + "|" + (baseFolders != null ? baseFolders.length : -1));
+            final Set<File> unique = new LinkedHashSet<File>();
+            File desktopPath = new File(System.getProperty("user.home") + "/Desktop");
+            final HashMap<Object, File> nspecialsMap = new HashMap<Object, File>();
+            if (desktopPath.isDirectory()) {
+                /* we prefer/want this Desktop folder over special Win32ShellFolder2 ones */
+                desktopPath = toShellFolder(desktopPath);
+                nspecialsMap.put(desktopPath, desktopPath);
+                nspecialsMap.put(desktopPath.getPath(), desktopPath);
                 unique.add(desktopPath);
             }
             this.mount(new File("/Volumes"), unique);
             this.mount(new File("/media"), unique);
-            String userName = System.getProperty("user.name");
+            final String userName = System.getProperty("user.name");
             if (userName != null) {
                 this.mount(new File("/run/media/" + userName), unique);
             }
             final HomeFolder[] homeFolders = new HomeFolder[] { new HomeFolder(HomeFolder.HOME_ROOT, ExtFileChooserDialogIcon.FILECHOOSER_HOME.path()), new HomeFolder(HomeFolder.DOCUMENTS, ExtFileChooserDialogIcon.FILECHOOSER_DOCUMENTS.path()), new HomeFolder(HomeFolder.DROPBOX, ExtFileChooserDialogIcon.FILECHOOSER_BOX.path()), new HomeFolder(HomeFolder.PICTURES, ExtFileChooserDialogIcon.FILECHOOSER_IMAGES.path()), new HomeFolder(HomeFolder.VIDEOS, ExtFileChooserDialogIcon.FILECHOOSER_VIDEO.path()), new HomeFolder(HomeFolder.DOWNLOADS, ExtFileChooserDialogIcon.FILECHOOSER_DOWNLOADS.path()), new HomeFolder(HomeFolder.MUSIC, ExtFileChooserDialogIcon.FILECHOOSER_MUSIC.path()) };
-            for (final HomeFolder hf : homeFolders) {
-                if (hf.exists()) {
-                    unique.add(hf);
+            for (final HomeFolder homeFolder : homeFolders) {
+                if (homeFolder.isDirectory()) {
+                    unique.add(homeFolder);
+                }
+            }
+            if (baseFolders != null && this.networkFolder == null) {
+                for (final File baseFolder : baseFolders) {
+                    final String baseFolderName = baseFolder.getName();
+                    if (baseFolderName.equals("Recent")) {
+                        continue;
+                    }
+                    if (baseFolderName.equals(ExtFileSystemView.VIRTUAL_NETWORKFOLDER)) {
+                        unique.add(this.networkFolder = new NetWorkFolder(baseFolder));
+                        break;
+                    } else if (baseFolderName.equals(ExtFileSystemView.VIRTUAL_NETWORKFOLDER_XP)) {
+                        unique.add(this.networkFolder = new NetWorkFolder(baseFolder));
+                        break;
+                    }
                 }
             }
             if (baseFolders != null) {
-                for (final File f : baseFolders) {
-                    // Win32ShellFolder2.class
-                    if (f.getName().equals("Recent")) {
+                final Set<String> skip = new HashSet<String>();
+                if (CrossSystem.isWindows()) {
+                    /* skip special Win32ShellFolder2 folder */
+                    skip.add(VIRTUAL_LIBRARY);
+                    skip.add(VIRTUAL_GALLERY);
+                    skip.add("Recent");
+                    skip.add("Desktop");
+                }
+                for (final File baseFolder : baseFolders) {
+                    if (skip.contains(baseFolder.getName())) {
                         continue;
                     }
-                    if (f.getName().equals(ExtFileSystemView.VIRTUAL_NETWORKFOLDER)) {
-                        this.networkFolder = new NetWorkFolder(f);
-                        break;
-                    } else if (f.getName().equals(ExtFileSystemView.VIRTUAL_NETWORKFOLDER_XP)) {
-                        this.networkFolder = new NetWorkFolder(f);
-                        break;
-                    }
-                }
-            }
-            if (this.networkFolder != null) {
-                unique.add(this.networkFolder);
-            }
-            final File home = this.getHomeDirectory();
-            if (baseFolders != null) {
-                for (final File f : baseFolders) {
-                    // Win32ShellFolder2.class
-                    if (f.getName().equals("Recent")) {
+                    if (unique.contains(baseFolder)) {
+                        /* skip already added HomeFolder or NetWorkFolder */
                         continue;
                     }
-                    if (f.getParentFile() == null || !f.getParentFile().equals(home)) {
-                        unique.add(f);
+                    final File parentFile = baseFolder.getParentFile();
+                    if (parentFile == null) {
+                        if (desktopPath != null && desktopPath.getPath().equals(baseFolder.getPath())) {
+                            /* skip special (Win32ShellFolder2)Desktop folder, has no parent */
+                            continue;
+                        }
+                        unique.add(baseFolder);
+                    } else {
+                        if (baseFolder.getPath().equals(parentFile.getPath())) {
+                            /* skip special (Win32ShellFolder2)Desktop folder, path and parent are the same */
+                            continue;
+                        }
+                        if (desktopPath != null) {
+                            if (baseFolder.getPath().equals(desktopPath.getPath())) {
+                                continue;
+                            }
+                            if (baseFolder.getPath().startsWith(desktopPath.getPath())) {
+                                /* skip all folders on (Win32ShellFolder2)Desktop folder */
+                                continue;
+                            }
+                        }
+                        unique.add(baseFolder);
                     }
-                    LogV3.I().getDefaultLogger().info("Basefolder: " + f.getName() + " - " + f + " - " + CrossSystem.getOSString());
+                    LogV3.I().getDefaultLogger().info("Basefolder: " + baseFolder.getName() + " - " + baseFolder + " - " + CrossSystem.getOSString());
                 }
             }
-            final File[] nroots = unique.toArray(new File[] {});
-            final HashMap<File, File> nspecialsMap = new HashMap<File, File>();
-            for (final File f : nroots) {
-                nspecialsMap.put(f, f);
+            final File[] roots = unique.toArray(new File[] {});
+            for (final File nroot : roots) {
+                if (nspecialsMap.containsKey(nroot) || nspecialsMap.containsKey(nroot.getPath())) {
+                    continue;
+                }
+                nspecialsMap.put(nroot, nroot);
+                nspecialsMap.put(nroot.getPath(), nroot);
             }
             this.specialsMap = nspecialsMap;
-            this.roots = nroots;
-            return this.roots;
+            return this.roots = roots;
         } finally {
-            LogV3.I().getDefaultLogger().info("Roots: " + (System.currentTimeMillis() - t));
+            LogV3.I().getDefaultLogger().info("Roots: " + (Time.systemIndependentCurrentJVMTimeMillis() - t));
         }
     }
 
     private File[] getBaseFolders() {
-        return AccessController.doPrivileged(new PrivilegedAction<File[]>() {
+        final File[] fileChooserComboBoxFolders = AccessController.doPrivileged(new PrivilegedAction<File[]>() {
             public File[] run() {
                 try {
                     return (File[]) ShellFolderWrapper.get("fileChooserComboBoxFolders");
@@ -322,6 +331,7 @@ public class ExtFileSystemView extends FileSystemView {
                 }
             }
         });
+        return fileChooserComboBoxFolders;
     }
 
     @Override
@@ -427,12 +437,18 @@ public class ExtFileSystemView extends FileSystemView {
             // if extended, this may not be initialized yet
             return f;
         }
-        final File ret = this.specialsMap.get(f);
+        /* mapping via File.equals */
+        File ret = this.specialsMap.get(f);
+        if (ret == null) {
+            /* mapping via File.getPath */
+            ret = this.specialsMap.get(f.getPath());
+        }
         return ret != null ? ret : f;
     }
 
-    private void mount(final File path, final LinkedHashSet<File> files) {
+    private void mount(File path, final Set<File> files) {
         if (path.exists() && path.isDirectory()) {
+            path = ExtFileSystemView.getShellFolder(path);
             final File[] content = path.listFiles();
             if (content != null) {
                 for (final File f : content) {

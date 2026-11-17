@@ -7,19 +7,9 @@ import java.util.ArrayList;
 
 import javax.swing.JPopupMenu;
 
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcollector.LinknameCleaner;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.linkcrawler.CrawledPackage.TYPE;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.packagecontroller.AbstractPackageNode;
-
-import org.appwork.swing.components.ExtButton;
 import org.appwork.swing.exttable.columns.ExtTextColumn;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.event.queue.QueueAction;
-import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogCanceledException;
 import org.appwork.utils.swing.dialog.DialogClosedException;
@@ -31,13 +21,19 @@ import org.jdownloader.gui.views.linkgrabber.contextmenu.SetDownloadFolderInLink
 import org.jdownloader.settings.staticreferences.CFG_LINKCOLLECTOR;
 import org.jdownloader.translate._JDT;
 
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcollector.LinknameCleaner;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.linkcrawler.CrawledPackage.TYPE;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.packagecontroller.AbstractPackageNode;
+
 public class DownloadFolderColumn extends ExtTextColumn<AbstractNode> {
     /**
      *
      */
     private static final long serialVersionUID = 1L;
-    private AbstractNode      editing;
-    private ExtButton         open;
 
     public DownloadFolderColumn() {
         super(_GUI.T.LinkGrabberTableModel_initColumns_folder());
@@ -54,15 +50,7 @@ public class DownloadFolderColumn extends ExtTextColumn<AbstractNode> {
 
     @Override
     protected String getTooltipText(AbstractNode obj) {
-        final String ret = super.getTooltipText(obj);
-        if (StringUtils.isNotEmpty(ret)) {
-            final File raw = LinkTreeUtils.getRawDownloadDirectory(obj);
-            String rawString = null;
-            if (raw != null && (rawString = raw.getPath()).contains("<jd:")) {
-                return "<html><pre>" + ret + "\r\n(" + rawString.replaceAll("<", "&lt;").replaceAll(">", "&gt;") + ")</html>";
-            }
-        }
-        return ret;
+        return LinkTreeUtils.createDownloadDirectoryTooltip(obj, super.getTooltipText(obj));
     }
 
     @Override
@@ -80,14 +68,8 @@ public class DownloadFolderColumn extends ExtTextColumn<AbstractNode> {
 
     @Override
     public boolean onDoubleClick(MouseEvent e, AbstractNode value) {
-        if (CrossSystem.isOpenFileSupported() && value != null) {
-            final File ret = LinkTreeUtils.getDownloadDirectory(value);
-            if (ret != null && ret.exists() && ret.isDirectory()) {
-                CrossSystem.openFile(ret);
-            }
-            return true;
-        }
-        return false;
+        /* The file system access happens in a background thread, not in the EDT */
+        return LinkTreeUtils.openDownloadDirectoryAsync(value);
     }
 
     @Override
@@ -125,6 +107,10 @@ public class DownloadFolderColumn extends ExtTextColumn<AbstractNode> {
             return;
         } else if (object instanceof CrawledLink) {
             final CrawledPackage p = ((CrawledLink) object).getParentNode();
+            if (p == null) {
+                /* link was removed in the meantime */
+                return;
+            }
             try {
                 Dialog.getInstance().showConfirmDialog(Dialog.LOGIC_DONOTSHOW_BASED_ON_TITLE_ONLY | Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, _JDT.T.SetDownloadFolderAction_actionPerformed_(p.getName()), _JDT.T.SetDownloadFolderAction_msg(p.getName(), 1), null, _JDT.T.SetDownloadFolderAction_yes(), _JDT.T.SetDownloadFolderAction_no());
                 LinkCollector.getInstance().getQueue().add(new QueueAction<Object, RuntimeException>(org.appwork.utils.event.queue.Queue.QueuePriority.HIGH) {
@@ -142,18 +128,12 @@ public class DownloadFolderColumn extends ExtTextColumn<AbstractNode> {
             }
             final CrawledPackage pkg = new CrawledPackage();
             pkg.setExpanded(CFG_LINKCOLLECTOR.CFG.isPackageAutoExpanded());
-            if (TYPE.NORMAL != p.getType()) {
-                final String packagename;
-                if (object instanceof AbstractPackageNode) {
-                    /* Package */
-                    packagename = object.getName();
-                } else {
-                    /* File */
-                    packagename = LinknameCleaner.derivePackagenameFromFilename(object.getName());
-                }
+            if (TYPE.NORMAL == p.getType()) {
+                final String packagename = p.getName();
                 pkg.setName(packagename);
             } else {
-                pkg.setName(p.getName());
+                String packagename = LinknameCleaner.derivePackagenameFromFilename(object.getName());
+                pkg.setName(packagename);
             }
             pkg.setComment(p.getComment());
             pkg.setDownloadFolder(value);

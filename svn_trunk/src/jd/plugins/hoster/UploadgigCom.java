@@ -50,7 +50,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 53969 $", interfaceVersion = 3, names = { "uploadgig.com" }, urls = { "https?://(?:www\\.)?uploadgig\\.com/file/download/([A-Za-z0-9]+)(/[A-Za-z0-9%\\.\\-_]+)?" })
+@HostPlugin(revision = "$Revision: 54011 $", interfaceVersion = 3, names = { "uploadgig.com" }, urls = { "https?://(?:www\\.)?uploadgig\\.com/file/download/([A-Za-z0-9]+)(/[A-Za-z0-9%\\.\\-_]+)?" })
 public class UploadgigCom extends antiDDoSForHost {
     @Override
     protected long getStartInterval(DownloadLink downloadLink, Account account) {
@@ -422,12 +422,12 @@ public class UploadgigCom extends antiDDoSForHost {
                         return;
                     }
                     logger.info("Checking login cookies");
-                    getPage("http://" + this.getHost());
+                    getPage("https://" + this.getHost() + "/user/my_account");
                     /**
                      * 2021-01-01: It is also possible to check via: https://uploadgig.com/login/form --> Returns raw text "You are
                      * currently logged in." on success!
                      */
-                    if (this.isLoggedIN()) {
+                    if (this.isLoggedIN() && StringUtils.endsWithCaseInsensitive(br.getURL(), "/user/my_account")) {
                         logger.info("Cookie login successful");
                         /* Save new cookie timestamp */
                         account.saveCookies(br.getCookies(this.getHost()), "");

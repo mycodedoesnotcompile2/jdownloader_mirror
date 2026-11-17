@@ -219,17 +219,8 @@ public class CrawledLinkFactory extends CrawledLinkArchiveFile implements Archiv
                 }
             }
             if (path.contains(SUBFOLDER)) {
-                String defaultDest = createDefaultExtractToPath(archive);
-                if (!StringUtils.isEmpty(defaultDest)) {
-                    String dif = new File(org.appwork.storage.config.JsonConfig.create(GeneralSettings.class).getDefaultDownloadFolder()).getAbsolutePath().replace(defaultDest, "");
-                    if (StringUtils.isEmpty(dif) || new File(dif).isAbsolute()) {
-                        path = path.replace(SUBFOLDER, "");
-                    } else {
-                        path = path.replace(SUBFOLDER, CrossSystem.alleviatePathParts(dif));
-                    }
-                } else {
-                    path = path.replace(SUBFOLDER, "");
-                }
+                final String defaultDest = createDefaultExtractToPath(archive);
+                path = path.replace(SUBFOLDER, StringUtils.isEmpty(defaultDest) ? "" : ExtractionExtension.createDownloadPathSubfolder(new File(defaultDest)));
             }
             return CrossSystem.fixPathSeparators(path);
         } catch (Exception e) {
