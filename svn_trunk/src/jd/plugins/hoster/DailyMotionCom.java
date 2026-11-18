@@ -62,7 +62,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA;
 import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA.TYPE;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 53581 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://dailymotion\\.com/video/\\w+" })
+@HostPlugin(revision = "$Revision: 54028 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://dailymotion\\.com/video/\\w+" })
 public class DailyMotionCom extends PluginForHost {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -365,7 +365,7 @@ public class DailyMotionCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             logger.info("Add media:" + audioMedia);
-            hlsContent.addAudioTrack(audioM3U8.get(0));
+            hlsContent.add(audioMedia, audioM3U8.get(0));
         }
         final List<HLSContent> hlsContents = new ArrayList<HLSContent>();
         hlsContents.add(hlsContent);

@@ -19,24 +19,28 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperCrawlerPluginHCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 import org.jdownloader.plugins.components.config.AvxHmeWConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
+import jd.http.Cookies;
 import jd.http.Request;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
+import jd.parser.html.Form.MethodType;
 import jd.parser.html.HTMLParser;
 import jd.plugins.Account;
 import jd.plugins.CryptedLink;
@@ -51,7 +55,7 @@ import jd.plugins.PluginForHost;
 /**
  * @author typek_pb
  */
-@DecrypterPlugin(revision = "$Revision: 52605 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54027 $", interfaceVersion = 2, names = {}, urls = {})
 public class AvxHmeWCrawler extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public AvxHmeWCrawler(PluginWrapper wrapper) {
@@ -112,13 +116,19 @@ public class AvxHmeWCrawler extends PluginForDecrypt {
         return ret.toArray(new String[0]);
     }
 
-    private static final String  PATTERN_REDIRECT_STR         = "go/([a-f0-9]{32}/\\d+/?|[A-Za-z0-9\\-_:%]+/?|\\d+/[^\"]+)";
-    private static final Pattern PATTERN_REDIRECT             = Pattern.compile("(?i)https?://[^/]+/" + PATTERN_REDIRECT_STR);
-    private static final String  PATTERN_RELEASE_STR          = "(ebooks|music|software|video|magazines|newspapers|games|graphics|misc|hraphile|comics|audiobooks|girls|tvseries|anime|sheet_music|musik|fernsehserie|zeitschriften|zeitungen|grafik|madchen|horbucher)/(?!facet/).+";
-    private static final Pattern PATTERN_RELEASE              = Pattern.compile("(?i)https?://[^/]+/" + PATTERN_RELEASE_STR);
-    private static final String  PATTERN_RELEASE_OVERVIEW_STR = "m/(\\d+)/.*";
-    private static final Pattern PATTERN_RELEASE_OVERVIEW     = Pattern.compile("(?i)https?://[^/]+/" + PATTERN_RELEASE_OVERVIEW_STR);
-    private static AtomicLong    LAST_DIRECT                  = new AtomicLong(-1);
+    private static final String            PATTERN_REDIRECT_STR         = "go/([a-f0-9]{32}/\\d+/?|[A-Za-z0-9\\-_:%]+/?|\\d+/[^\"]+)";
+    private static final Pattern           PATTERN_REDIRECT             = Pattern.compile("(?i)https?://[^/]+/" + PATTERN_REDIRECT_STR);
+    private static final String            PATTERN_RELEASE_STR          = "(ebooks|music|software|video|magazines|newspapers|games|graphics|misc|hraphile|comics|audiobooks|girls|tvseries|anime|sheet_music|musik|fernsehserie|zeitschriften|zeitungen|grafik|madchen|horbucher)/(?!facet/).+";
+    private static final Pattern           PATTERN_RELEASE              = Pattern.compile("(?i)https?://[^/]+/" + PATTERN_RELEASE_STR);
+    private static final String            PATTERN_RELEASE_OVERVIEW_STR = "m/(\\d+)/.*";
+    private static final Pattern           PATTERN_RELEASE_OVERVIEW     = Pattern.compile("(?i)https?://[^/]+/" + PATTERN_RELEASE_OVERVIEW_STR);
+    private static AtomicLong              LAST_DIRECT                  = new AtomicLong(-1);
+    /*
+     * "dltoken" returned by /api/download/ after a successfully solved captcha. The website stores it in the localStorage and sends it
+     * instead of a captcha for the next links. It is refreshed with every response.
+     */
+    private static final String            PROPERTY_CSRFTOKEN           = "csrftoken";
+    private static AtomicReference<String> CACHED_DLTOKEN               = new AtomicReference<String>();
 
     @Override
     public int getMaxConcurrentProcessingInstances() {
@@ -172,39 +182,102 @@ public class AvxHmeWCrawler extends PluginForDecrypt {
                 int counter = 0;
                 do {
                     counter++;
-                    logger.info("Captcha attempt " + counter);
-                    final Form captchaForm = br.getForm(0);
-                    if (AbstractRecaptchaV2.containsRecaptchaV2Class(br)) {
-                        final String siteURL = br.getURL("/").toString();
-                        final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br) {
-                            protected String getSiteUrl() {
-                                // special handling
-                                // being logged in can result in auto redirect/no captcha
-                                return siteURL;
-                            };
-                        }.getToken();
-                        captchaForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                    } else if (AbstractHCaptcha.containsHCaptcha(br)) {
-                        final String siteURL = br.getURL("/").toString();
-                        final String recaptchaV2Response = new CaptchaHelperCrawlerPluginHCaptcha(this, br) {
-                            protected String getSiteUrl() {
-                                // special handling
-                                // being logged in can result in auto redirect/no captcha
-                                return siteURL;
-                            };
-                        }.getToken();
-                        captchaForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                    }
-                    br.submitForm(captchaForm);
-                    LAST_DIRECT.set(Time.systemIndependentCurrentJVMTimeMillis());
-                    followInternalRedirects();
+                    logger.info("Attempt " + counter);
                     /*
-                     * 2021-03-11: Sometimes they may first ask for an invisible reCaptchaV2 and then for a normal reCaptchaV2 afterwards...
+                     * 2026-11-17: The captcha page contains no <form>. The hCaptcha is rendered via JavaScript and its token is sent via
+                     * fetch() to /api/download/ together with "link_data". The response is JSON: {"redirect":true,"url":"..."} or
+                     * {"captcha":true} if the token was not accepted.
                      */
-                    captchaError = br.containsHTML(">\\s*Captcha error");
-                    link = br.getRedirectLocation();
+                    final String linkData = br.getRegex("append\\(\\s*'link_data'\\s*,\\s*\"([^\"]+)\"").getMatch(0);
+                    if (linkData == null) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find link_data");
+                    }
+                    final String siteURL = br.getURL("/").toString();
+                    final String captchaPageURL = br.getURL();
+                    /*
+                     * The captcha page itself does not set the "csrftoken" cookie but the API request needs it (Django CSRF: cookie and
+                     * X-CSRFToken header must match, else HTTP 403). Do this before the captcha is solved so the captcha token does not
+                     * expire meanwhile.
+                     */
+                    String csrf = br.getCookie(br.getHost(), "csrftoken", Cookies.NOTDELETEDPATTERN);
+                    if (StringUtils.isEmpty(csrf)) {
+                        /* Token which was stored on the link by the crawler of the release page -> Use it as cookie and header. */
+                        final DownloadLink sourceLink = param.getDownloadLink();
+                        final String storedCsrf = sourceLink != null ? sourceLink.getStringProperty(PROPERTY_CSRFTOKEN) : null;
+                        if (!StringUtils.isEmpty(storedCsrf)) {
+                            logger.info("Using stored csrftoken");
+                            csrf = storedCsrf;
+                            setCsrfCookie(csrf);
+                        }
+                    }
+                    if (StringUtils.isEmpty(csrf)) {
+                        /* A real browser already has the cookie from other pages -> Get it from the mainpage. */
+                        logger.info("csrftoken missing -> Trying to obtain it from the mainpage");
+                        final Browser csrfBrowser = br.cloneBrowser();
+                        csrfBrowser.setFollowRedirects(true);
+                        csrfBrowser.getPage(siteURL);
+                        csrf = csrfBrowser.getCookie(csrfBrowser.getHost(), "csrftoken", Cookies.NOTDELETEDPATTERN);
+                        if (StringUtils.isEmpty(csrf)) {
+                            csrf = csrfBrowser.getRegex("name='csrfmiddlewaretoken' value='([^']+)'").getMatch(0);
+                        }
+                        if (StringUtils.isEmpty(csrf)) {
+                            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find csrftoken");
+                        }
+                        setCsrfCookie(csrf);
+                    }
+                    /* Build the form which would normally be sent by the JavaScript code. */
+                    final Form apiForm = new Form();
+                    apiForm.setMethod(MethodType.POST);
+                    apiForm.setAction("/api/download/");
+                    apiForm.setEncoding("multipart/form-data");
+                    apiForm.put("link_data", linkData);
+                    final String cachedDltoken = CACHED_DLTOKEN.get();
+                    if (cachedDltoken != null) {
+                        /* Token from a previously solved captcha -> No captcha needed */
+                        logger.info("Trying cached dltoken");
+                        apiForm.put("dltoken", cachedDltoken);
+                    } else {
+                        final String siteKey = br.getRegex("sitekey\\s*:\\s*['\"]([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})['\"]").getMatch(0);
+                        final String hCaptchaResponse = new CaptchaHelperCrawlerPluginHCaptcha(this, br, siteKey) {
+                            protected String getSiteUrl() {
+                                /* Being logged in can result in auto redirect/no captcha */
+                                return siteURL;
+                            };
+                        }.getToken();
+                        apiForm.put("hcaptcha_token", hCaptchaResponse);
+                    }
+                    /* Django also checks Referer/Origin on HTTPS -> Use the captcha page as Referer like the browser does. */
+                    br.getHeaders().put("X-CSRFToken", csrf);
+                    br.getHeaders().put("Referer", captchaPageURL);
+                    br.getHeaders().put("Origin", siteURL.replaceFirst("/$", ""));
+                    try {
+                        br.submitForm(apiForm);
+                    } finally {
+                        br.getHeaders().remove("X-CSRFToken");
+                        br.getHeaders().remove("Referer");
+                        br.getHeaders().remove("Origin");
+                    }
+                    final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                    final String newDltoken = (String) entries.get("dltoken");
+                    if (newDltoken != null) {
+                        /* Same as the website: Store token so next time we should be able to proceed without captcha. */
+                        CACHED_DLTOKEN.set(newDltoken);
+                    }
+                    if (Boolean.TRUE.equals(entries.get("redirect"))) {
+                        LAST_DIRECT.set(Time.systemIndependentCurrentJVMTimeMillis());
+                        link = entries.get("url").toString();
+                        captchaError = false;
+                    } else {
+                        /* Captcha/dltoken was not accepted -> Remove token, reload page and try again (with captcha). */
+                        logger.info("Captcha or dltoken failed");
+                        captchaError = true;
+                        CACHED_DLTOKEN.set(null);
+                        br.getPage(param.getCryptedUrl());
+                        followInternalRedirects();
+                        link = br.getRedirectLocation();
+                    }
                 } while (link == null && captchaError && counter <= 3);
-                if (captchaError) {
+                if (link == null && captchaError) {
                     /* This should never happen */
                     throw new PluginException(LinkStatus.ERROR_CAPTCHA);
                 }
@@ -238,9 +311,18 @@ public class AvxHmeWCrawler extends PluginForDecrypt {
             /* Now find single redirect-URLs */
             int numberofRedirectURLs = 0;
             final String[] allURLs = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
+            /* Store the csrftoken on the redirect-links so the redirect-crawler can reuse it. */
+            String csrf = br.getCookie(br.getHost(), "csrftoken", Cookies.NOTDELETEDPATTERN);
+            if (StringUtils.isEmpty(csrf)) {
+                csrf = br.getRegex("name='csrfmiddlewaretoken' value='([^']+)'").getMatch(0);
+            }
             for (final String url : allURLs) {
                 if (new Regex(url, PATTERN_REDIRECT).patternFind()) {
-                    ret.add(createDownloadlink(url));
+                    final DownloadLink redirectLink = createDownloadlink(url);
+                    if (!StringUtils.isEmpty(csrf)) {
+                        redirectLink.setProperty(PROPERTY_CSRFTOKEN, csrf);
+                    }
+                    ret.add(redirectLink);
                     numberofRedirectURLs++;
                 }
             }
@@ -309,6 +391,13 @@ public class AvxHmeWCrawler extends PluginForDecrypt {
             }
         }
         return ret;
+    }
+
+    /** Sets the csrftoken cookie for all known plugin domains. */
+    private void setCsrfCookie(final String csrftoken) {
+        for (final String domain : getPluginDomains().get(0)) {
+            br.setCookie(domain, "csrftoken", csrftoken);
+        }
     }
 
     private void followInternalRedirects() throws IOException {

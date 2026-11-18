@@ -14,6 +14,7 @@ import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -110,6 +111,7 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
     private JCheckBox           enableAccountsCheckBox;
     private JCheckBox           disableSilentCheckBox;
     private JCheckBox           resetModeCheckBox;
+    private JCheckBox           fixOrderCheckBox;
     /* Step 1: timeout actions and notifications (applied on Finish, like the login captcha setting). */
     private JComboBox<CAPTCHA_TIMEOUT_ACTION> hosterTimeoutCombo;
     private JComboBox<CAPTCHA_TIMEOUT_ACTION> crawlerTimeoutCombo;
@@ -195,6 +197,11 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
      * Sorts the solver order according to the preferences: 1. The local JAC solver (if enabled) comes first, 2. the other usable solvers
      * follow, the preferred kind first (automatic: external solvers, manual: solvers which need a human, both: the order stays), 3. all
      * solvers which are not usable. The order within each group is kept.
+     * <p>
+     * <b>Fixed rules, no matter which preference the user has:</b> Among the usable solvers JAntiCaptcha is always at the top, and the
+     * manual solvers always come in this order: 1. dialog (window) in JDownloader, 2. dialog in the browser, 3. MyJDownloader. The
+     * preference only decides where the manual solvers as a block are placed relative to the external solvers, never their order among
+     * each other. Keep these rules when changing the sorting.
      */
     private void applySortOrder() {
         final List<SolverService> ordered = new ArrayList<SolverService>(ChallengeResponseController.getInstance().getOrderedServices());
@@ -214,12 +221,97 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
                 otherUsable.add(service);
             }
         }
+        /* The usable solvers: JAC first, then the preferred kind. */
+        final List<SolverService> usable = new ArrayList<SolverService>(ordered.size());
+        usable.addAll(jac);
+        usable.addAll(preferred);
+        usable.addAll(otherUsable);
         final List<SolverService> result = new ArrayList<SolverService>(ordered.size());
-        result.addAll(jac);
-        result.addAll(preferred);
-        result.addAll(otherUsable);
+        result.addAll(usable);
         result.addAll(unusable);
+        /* The fixed rules always win over the preference. */
+        enforceOrderRules(result);
         ChallengeResponseController.getInstance().setServiceOrder(result);
+    }
+
+    /** The solvers the fixed order rules are about: the usable ones, and JAntiCaptcha if it is enabled. */
+    private static boolean isOrderRelevant(final SolverService service) {
+        return isJacEnabled(service) || service.isUsable();
+    }
+
+    private static boolean isJacEnabled(final SolverService service) {
+        return JacSolverService.ID.equals(service.getID()) && service.getConfigV3().isEnabled();
+    }
+
+    /**
+     * Applies the fixed order rules to the given list (in place): Among the relevant solvers JAntiCaptcha comes first, and the manual
+     * solvers are in the order dialog in JDownloader, dialog in the browser, MyJDownloader. All other solvers keep their position, the
+     * solvers which are not relevant (not usable) are not moved at all.
+     */
+    private static void enforceOrderRules(final List<SolverService> services) {
+        final List<Integer> positions = new ArrayList<Integer>();
+        final List<SolverService> relevant = new ArrayList<SolverService>();
+        for (int i = 0; i < services.size(); i++) {
+            if (isOrderRelevant(services.get(i))) {
+                positions.add(i);
+                relevant.add(services.get(i));
+            }
+        }
+        /* JAntiCaptcha first, the order of the others stays. */
+        final List<SolverService> jac = new ArrayList<SolverService>();
+        final List<SolverService> others = new ArrayList<SolverService>();
+        for (final SolverService service : relevant) {
+            if (isJacEnabled(service)) {
+                jac.add(service);
+            } else {
+                others.add(service);
+            }
+        }
+        final List<SolverService> sorted = new ArrayList<SolverService>(jac);
+        sorted.addAll(others);
+        /* The positions of the manual solvers stay, but they are filled in the fixed order. */
+        final List<Integer> manualPositions = new ArrayList<Integer>();
+        final List<SolverService> manualSolvers = new ArrayList<SolverService>();
+        for (int i = 0; i < sorted.size(); i++) {
+            if (getManualRank(sorted.get(i)) >= 0) {
+                manualPositions.add(i);
+                manualSolvers.add(sorted.get(i));
+            }
+        }
+        Collections.sort(manualSolvers, new Comparator<SolverService>() {
+            @Override
+            public int compare(final SolverService a, final SolverService b) {
+                return getManualRank(a) - getManualRank(b);
+            }
+        });
+        for (int i = 0; i < manualPositions.size(); i++) {
+            sorted.set(manualPositions.get(i), manualSolvers.get(i));
+        }
+        for (int i = 0; i < positions.size(); i++) {
+            services.set(positions.get(i), sorted.get(i));
+        }
+    }
+
+    /** True if the current solver order breaks the fixed order rules, see {@link #enforceOrderRules(List)}. */
+    private static boolean isSolverOrderWrong() {
+        final List<SolverService> current = new ArrayList<SolverService>(ChallengeResponseController.getInstance().getOrderedServices());
+        final List<SolverService> fixed = new ArrayList<SolverService>(current);
+        enforceOrderRules(fixed);
+        return !current.equals(fixed);
+    }
+
+    /** Fixed order of the manual solvers: dialog in JDownloader, dialog in the browser, MyJDownloader. -1 for all other solvers. */
+    private static int getManualRank(final SolverService service) {
+        switch (service.getType()) {
+        case JD_LOCAL_DIALOG:
+            return 0;
+        case JD_LOCAL_BROWSER:
+            return 1;
+        case JD_REMOTE_MYJD:
+            return 2;
+        default:
+            return -1;
+        }
     }
 
     /** True if the usable solver belongs to the kind the user prefers. With both methods every solver counts as preferred (no sorting). */
@@ -431,6 +523,14 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
         } else {
             warnings.add(createFinding(false, _GUI.T.CaptchaWizard_precheck_modeSkipAll(), null));
         }
+        /* The fixed order rules, see applySortOrder(): JAntiCaptcha first, then dialog, browser dialog, MyJDownloader. */
+        final boolean orderOk = !isSolverOrderWrong();
+        if (orderOk) {
+            okFindings.add(createFinding(true, _GUI.T.CaptchaWizard_precheck_orderOk(), null));
+        } else {
+            warnings.add(createFinding(false, _GUI.T.CaptchaWizard_precheck_orderWrong(), null));
+        }
+        fixOrderCheckBox = orderOk ? null : new JCheckBox(_GUI.T.CaptchaWizard_precheck_fixOrder(), true);
         /* wmin 0: the texts wrap when the dialog gets narrower. */
         for (final JLabel label : warnings) {
             precheckPanel.add(label, "wmin 0");
@@ -473,6 +573,9 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
             if (enableAccountsCheckBox != null) {
                 precheckPanel.add(enableAccountsCheckBox);
             }
+            if (fixOrderCheckBox != null) {
+                precheckPanel.add(fixOrderCheckBox);
+            }
             /* Shown as soon as the user unticks one of the suggested fixes. */
             final JLabel warning = new JLabel("<html>" + _GUI.T.CaptchaWizard_precheck_fixDisabledWarning() + "</html>", NewTheme.I().getIcon(IconKey.ICON_WARNING, 18), JLabel.LEADING);
             precheckPanel.add(warning, "wmin 0, hidemode 3");
@@ -502,7 +605,7 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
 
     /** All fix checkboxes of the pre-check, a checkbox is null if there is nothing to fix. */
     private JCheckBox[] getFixCheckBoxes() {
-        return new JCheckBox[] { resetModeCheckBox, disableSilentCheckBox, enablePremiumCheckBox, enableGlobalCheckBox, enableExternalCheckBox, enableManualCheckBox, enableJacCheckBox, enableAccountsCheckBox };
+        return new JCheckBox[] { resetModeCheckBox, disableSilentCheckBox, enablePremiumCheckBox, enableGlobalCheckBox, enableExternalCheckBox, enableManualCheckBox, enableJacCheckBox, enableAccountsCheckBox, fixOrderCheckBox };
     }
 
     private boolean hasAnyFix() {
@@ -572,6 +675,13 @@ public class CaptchaWizardDialog extends AbstractDialog<Integer> {
             for (final Account account : disabledAccounts) {
                 account.setEnabled(true);
             }
+            precheckChanged = true;
+        }
+        /* Last: Enabling solvers above can change which solvers are usable, and the order rules are about the usable ones. */
+        if (fixOrderCheckBox != null && fixOrderCheckBox.isSelected()) {
+            final List<SolverService> fixed = new ArrayList<SolverService>(ChallengeResponseController.getInstance().getOrderedServices());
+            enforceOrderRules(fixed);
+            ChallengeResponseController.getInstance().setServiceOrder(fixed);
             precheckChanged = true;
         }
         /* The page now shows the new state, also when the user comes back to it. */

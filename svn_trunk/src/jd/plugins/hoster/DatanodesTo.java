@@ -19,7 +19,18 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+
+import org.appwork.exceptions.WTFException;
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -29,21 +40,14 @@ import jd.parser.html.Form;
 import jd.parser.html.InputField;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.UserAgents;
 
-import org.appwork.exceptions.WTFException;
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 53887 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54037 $", interfaceVersion = 3, names = {}, urls = {})
 public class DatanodesTo extends XFileSharingProBasic {
     public DatanodesTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -147,9 +151,14 @@ public class DatanodesTo extends XFileSharingProBasic {
             final InputField ifield = ret.getInputFieldByName(method_free_key);
             if (ifield == null || ifield.getValue() == null || ifield.isDisabled()) {
                 ret.removeInputField(ifield);
-                String method_free_value = ret.getRegex("\"" + method_free_key + "\" value=\"([^<>\"]+)\"").getMatch(0);
+                String method_free_value = ret.getRegex("name=\"" + method_free_key + "\"[^>]*?value=\"([^<>\"]+)\"").getMatch(0);
+                if (method_free_value == null) {
+                    method_free_value = ret.getRegex("value=\"([^<>\"]+)\"[^>]*?name=\"" + method_free_key + "\"").getMatch(0);
+                }
                 if (method_free_value == null || method_free_value.equals("")) {
                     method_free_value = "Free Download";
+                } else {
+                    method_free_value = Encoding.htmlDecode(method_free_value);
                 }
                 ret.put(method_free_key, Encoding.urlEncode(method_free_value));
             }
@@ -171,6 +180,11 @@ public class DatanodesTo extends XFileSharingProBasic {
             final String fuid = this.getFUIDFromURL(this.getDownloadLink());
             final String randStr = br.getRegex("rand=\"([^\"]+)\"").getMatch(0);
             final String dl_token = br.getRegex("dl-token=\"([^\"]+)\"").getMatch(0);
+            /* Both values are attributes of the <download-countdown> component and the free method text is localized. */
+            final String refererAttr = br.getRegex("<download-countdown[^>]*?\\sreferer=\"([^\"]*)\"").getMatch(0);
+            final String freeMethodAttr = br.getRegex("<download-countdown[^>]*?\\sfree-method=\"([^\"]+)\"").getMatch(0);
+            final String referer = StringUtils.isEmpty(refererAttr) ? br.getURL() : Encoding.htmlDecode(refererAttr);
+            final String freeMethod = StringUtils.isEmpty(freeMethodAttr) ? "Free Download >>" : Encoding.htmlDecode(freeMethodAttr);
             final StringBuilder formString = new StringBuilder();
             try {
                 formString.append("<form method=\"POST\">").append("\r\n");
@@ -181,8 +195,8 @@ public class DatanodesTo extends XFileSharingProBasic {
                 if (dl_token != null) {
                     formString.append("<input type=\"text\" id=\"dl_token\" name=\"dl_token\" value=\"" + URLEncoder.encode(dl_token, "UTF-8") + "\">").append("\r\n");
                 }
-                formString.append("<input type=\"text\" id=\"referer\" name=\"referer\" value=\"" + URLEncoder.encode(br.getURL(), "UTF-8") + "\">").append("\r\n");
-                formString.append("<input type=\"text\" id=\"method_free\" name=\"method_free\" value=\"" + URLEncoder.encode("Free Download >>", "UTF-8") + "\">").append("\r\n");
+                formString.append("<input type=\"text\" id=\"referer\" name=\"referer\" value=\"" + URLEncoder.encode(referer, "UTF-8") + "\">").append("\r\n");
+                formString.append("<input type=\"text\" id=\"method_free\" name=\"method_free\" value=\"" + URLEncoder.encode(freeMethod, "UTF-8") + "\">").append("\r\n");
                 formString.append("<input type=\"text\" id=\"method_premium\" name=\"method_premium\" value=\"" + URLEncoder.encode("", "UTF-8") + "\">").append("\r\n");
                 final String captcha_html = br.getRegex("captcha-html=\"(.*?)\"").getMatch(0);
                 if (captcha_html != null) {
@@ -195,6 +209,40 @@ public class DatanodesTo extends XFileSharingProBasic {
             }
         }
         return form;
+    }
+
+    @Override
+    protected void fetchAccountInfoWebsiteStorage(final Browser br, final Account account, final AccountInfo ai) throws Exception {
+        /*
+         * Example 1: "Used space</p> <p ...>1911.40 <span ...>GB</span></p> <p ...>193 files &middot; unlimited space</p>"<br> Example 2
+         * (with storage limit): "Used space</p> <p ...>0.00 <span ...>/ 1024 GB</span></p>"
+         */
+        final String[] space = br.getRegex(">\\s*Used space\\s*</p>.*?<p[^>]*>\\s*([0-9\\.]+)\\s*<span[^>]*>\\s*(?:/\\s*[0-9\\.]+\\s*)?(KB|MB|GB|TB)\\s*</span>").getRow(0);
+        if (space == null) {
+            super.fetchAccountInfoWebsiteStorage(br, account, ai);
+            return;
+        }
+        ai.setUsedSpace(SizeFormatter.getSize(space[0] + " " + space[1]));
+        final String filesNumStr = br.getRegex(">\\s*(\\d+)\\s*files\\s*&middot;").getMatch(0);
+        if (filesNumStr != null) {
+            ai.setFilesNum(Long.parseLong(filesNumStr));
+        }
+    }
+
+    @Override
+    protected Long fetchAccountInfoWebsiteExpireDate(final Browser br, final Account account, final AccountInfo ai) throws Exception {
+        if (!StringUtils.endsWithCaseInsensitive(br.getURL(), "/?op=my_account")) {
+            getPage("/?op=my_account");
+        }
+        /* Example: "Valid until <span class="font-medium text-gray-700">Feb 10, 2027</span>" */
+        final String expireDateStr = br.getRegex("Valid until\\s*<span[^>]*>\\s*([A-Za-z]+ \\d{1,2}, \\d{4})\\s*</span>").getMatch(0);
+        if (expireDateStr != null) {
+            final long timestamp = TimeFormatter.getMilliSeconds(expireDateStr, "MMM dd, yyyy", Locale.ENGLISH);
+            if (timestamp > 0) {
+                return timestamp;
+            }
+        }
+        return super.fetchAccountInfoWebsiteExpireDate(br, account, ai);
     }
 
     @Override

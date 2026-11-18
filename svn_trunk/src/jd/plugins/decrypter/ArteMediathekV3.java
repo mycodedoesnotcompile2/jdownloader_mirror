@@ -63,7 +63,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.ArteTv;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 54016 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54051 $", interfaceVersion = 4, names = {}, urls = {})
 public class ArteMediathekV3 extends PluginForDecrypt {
     public ArteMediathekV3(PluginWrapper wrapper) {
         super(wrapper);
@@ -100,12 +100,16 @@ public class ArteMediathekV3 extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_VIDEO.pattern());
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(?:" + PATTERN_VIDEO.pattern() + "|" + PATTERN_COLLECTION.pattern() + ")");
         }
         return ret.toArray(new String[0]);
     }
 
     private static final Pattern PATTERN_VIDEO                    = Pattern.compile("/([a-z]{2}/videos/\\d+-\\d+-[A-Z]+(/([a-z0-9\\-]+)/?)?|embeds/[a-z]{2}/\\d+-\\d+-[A-Z]+)");
+    /* Collection/series e.g. /fr/videos/RC-028300/blood/ */
+    private static final Pattern PATTERN_COLLECTION               = Pattern.compile("/[a-z]{2}/videos/RC-\\d+(?:/[a-z0-9\\-]+/?)?");
+    private static final String  API_PLAYER_BASE                  = "https://api.arte.tv/api/player/v2";
+    private static final String  API_EMAC_BASE                    = "https://api.arte.tv/api/emac/v3";
     private static final String  API_BASE                         = "https://api.arte.tv/api/opa/v3";
     private final String         PROPERTY_VIDEO_ID                = "video_id";
     private final String         PROPERTY_TITLE                   = "title";
@@ -149,16 +153,105 @@ public class ArteMediathekV3 extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
+        if (new Regex(param.getCryptedUrl(), PATTERN_COLLECTION).patternFind()) {
+            final Regex urlinfo = new Regex(param.getCryptedUrl(), "/([a-z]{2})/videos/(RC-\\d+)");
+            return crawlCollection(urlinfo.getMatch(0), urlinfo.getMatch(1));
+        }
         return crawlPrograms(param);
+    }
+
+    /**
+     * Crawls all episodes/videos of a collection ("series"). Each season is a sub-collection which has its own playlist. The episode URLs
+     * are returned as new links which will be processed by this plugin again (single video handling).
+     *
+     * @param urlLanguageParam
+     *            Language code from the URL, e.g. "fr". Can be null: Fallback is French if the OS default language is French, otherwise
+     *            German.
+     * @param collectionID
+     *            Collection ID, e.g. "RC-028300". Must not be null.
+     * @throws IllegalArgumentException
+     *             if collectionID is null
+     */
+    private ArrayList<DownloadLink> crawlCollection(final String urlLanguageParam, final String collectionID) throws Exception {
+        if (collectionID == null) {
+            throw new IllegalArgumentException("collectionID must not be null");
+        }
+        final String urlLanguage;
+        if (urlLanguageParam != null) {
+            urlLanguage = urlLanguageParam;
+        } else if (Locale.FRENCH.getLanguage().equals(Locale.getDefault().getLanguage())) {
+            urlLanguage = "fr";
+        } else {
+            urlLanguage = "de";
+        }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        /* The public player API does not need the bearer token. */
+        final Browser brc = createNewBrowserInstance();
+        brc.getHeaders().remove(HTTPConstants.HEADER_REQUEST_AUTHORIZATION);
+        brc.getPage(API_EMAC_BASE + "/" + urlLanguage + "/web/collections/" + collectionID + "/");
+        if (brc.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final Map<String, Object> collection = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+        /* Each season is a sub-collection zone with ID "<collectionID>_<seasonID>". */
+        final List<String> playlistIDs = new ArrayList<String>();
+        final List<Map<String, Object>> zones = (List<Map<String, Object>>) collection.get("zones");
+        for (final Map<String, Object> zone : zones) {
+            if (!"collection_subcollection".equals(zone.get("name"))) {
+                continue;
+            }
+            final String seasonID = new Regex(zone.get("id").toString(), "_(RC-\\d+)$").getMatch(0);
+            if (seasonID != null && !playlistIDs.contains(seasonID)) {
+                playlistIDs.add(seasonID);
+            }
+        }
+        if (playlistIDs.isEmpty()) {
+            /* No seasons -> The collection itself is the playlist. */
+            playlistIDs.add(collectionID);
+        }
+        final String collectionTitle = (String) collection.get("title");
+        /* Playlists may contain the same episode multiple times. */
+        final HashSet<String> dupes = new HashSet<String>();
+        for (final String playlistID : playlistIDs) {
+            brc.getPage(API_PLAYER_BASE + "/playlist/" + urlLanguage + "/" + playlistID);
+            final Map<String, Object> playlist = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+            final Map<String, Object> attributes = (Map<String, Object>) JavaScriptEngineFactory.walkJson(playlist, "data/attributes");
+            final List<Map<String, Object>> items = (List<Map<String, Object>>) attributes.get("items");
+            final String seasonTitle = (String) JavaScriptEngineFactory.walkJson(attributes, "metadata/title");
+            final FilePackage fp = FilePackage.getInstance();
+            fp.setName(seasonTitle != null ? seasonTitle : collectionTitle);
+            for (final Map<String, Object> item : items) {
+                final String providerId = item.get("providerId").toString();
+                if (!dupes.add(providerId)) {
+                    continue;
+                }
+                final String episodeURL = (String) JavaScriptEngineFactory.walkJson(item, "link/url");
+                final DownloadLink episode = createDownloadlink(episodeURL);
+                episode._setFilePackage(fp);
+                ret.add(episode);
+                distribute(episode);
+            }
+        }
+        if (ret.isEmpty()) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        return ret;
     }
 
     private ArrayList<DownloadLink> crawlPrograms(final CryptedLink param) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final ArteMediathekConfig cfg = get(this.getConfigInterface());
         final List<Integer> selectedQualitiesHeight = getSelectedHTTPQualities();
-        if (selectedQualitiesHeight.isEmpty() && cfg.getQualitySelectionFallbackMode() == QualitySelectionFallbackMode.NONE) {
-            logger.info("User has deselected all qualities and set QualitySelectionFallbackMode to QualitySelectionFallbackMode.NONE --> Doing nothing");
-            return ret;
+        /* Mode BEST does not depend on the selected qualities so an empty selection is irrelevant there. */
+        switch (cfg.getQualitySelectionMode()) {
+        case BEST:
+            break;
+        default:
+            if (selectedQualitiesHeight.isEmpty() && cfg.getQualitySelectionFallbackMode() == QualitySelectionFallbackMode.NONE) {
+                logger.info("User has deselected all qualities and set QualitySelectionFallbackMode to QualitySelectionFallbackMode.NONE --> Doing nothing");
+                return ret;
+            }
+            break;
         }
         final String contenturl = param.getCryptedUrl();
         final String urlLanguage = getUrlLanguage(contenturl);
@@ -339,7 +432,9 @@ public class ArteMediathekV3 extends PluginForDecrypt {
                         continue;
                     }
                     if (media.getCharacteristics() == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                        /* Skip this audio track instead of failing the whole video. */
+                        logger.info("Skipping audio track without characteristics: " + media.getName());
+                        continue;
                     }
                     final Map<String, Object> videoStream = new HashMap<String, Object>();
                     videoStream.put("programID", programId);
@@ -347,6 +442,7 @@ public class ArteMediathekV3 extends PluginForDecrypt {
                     switch (streamCodec.getCodec()) {
                     case AVC:
                         videoStream.put(PROPERTY_VIDEO_CODEC, "H264");
+                        break;
                     case HEVC:
                         videoStream.put(PROPERTY_VIDEO_CODEC, "H265");
                         break;
@@ -638,7 +734,7 @@ public class ArteMediathekV3 extends PluginForDecrypt {
             final ArrayList<DownloadLink> finalSelection = new ArrayList<DownloadLink>();
             if (mode == QualitySelectionMode.BEST) {
                 if (bestAllowed != null) {
-                    finalSelection.add(best);
+                    finalSelection.add(bestAllowed);
                 } else {
                     logger.info("Failed to find bestAllowed -> User might have bad plugin settings");
                 }
@@ -749,7 +845,7 @@ public class ArteMediathekV3 extends PluginForDecrypt {
         filename = filename.replace("*video_id*", link.getStringProperty(PROPERTY_VIDEO_ID));
         filename = filename.replace("*platform*", link.getStringProperty(PROPERTY_PLATFORM));
         filename = filename.replace("*date*", link.getStringProperty(PROPERTY_DATE));
-        final String shortLanguage = link.getStringProperty(PROPERTY_ORIGINAL_AUDIO_LANGUAGE, link.getStringProperty(PROPERTY_AUDIO_SHORT_LABEL));
+        final String shortLanguage = link.getStringProperty(PROPERTY_ORIGINAL_AUDIO_LANGUAGE, link.getStringProperty(PROPERTY_AUDIO_SHORT_LABEL, ""));
         filename = filename.replace("*shortlanguage*", shortLanguage);
         filename = filename.replace("*language*", link.getStringProperty(PROPERTY_AUDIO_LABEL));
         filename = filename.replace("*width*", width);

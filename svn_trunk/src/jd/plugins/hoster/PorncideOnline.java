@@ -31,7 +31,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 54023 $", interfaceVersion = 3, names = { "porncide.online" }, urls = { "https?://(?:www\\.)?porncide\\.online/video/([^/]+)/video/([^/?#]+)" })
+@HostPlugin(revision = "$Revision: 54031 $", interfaceVersion = 3, names = { "porncide.online" }, urls = { "https?://(?:www\\.)?porncide\\.online/video/([a-z0-9]+)/video/([^/?#]+)" })
 public class PorncideOnline extends PluginForHost {
     public PorncideOnline(PluginWrapper wrapper) {
         super(wrapper);
@@ -55,15 +55,24 @@ public class PorncideOnline extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        final String titleFromURL = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(1);
-        if (link.getFinalFileName() == null && titleFromURL != null) {
-            link.setName(titleFromURL.replaceAll("(-|\\+)+", " ").trim() + ".mp4");
+        if (link.getFinalFileName() == null) {
+            /* Try to set weak filename */
+            String titleFromURL = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(1);
+            if (titleFromURL != null) {
+                titleFromURL = Encoding.htmlDecode(titleFromURL).trim();
+                titleFromURL = titleFromURL.replaceAll("(-|\\+)+", " ").trim();
+                link.setName(titleFromURL + ".mp4");
+            }
         }
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
         String title = br.getRegex("class\\s*=\\s*\"title\"[^>]*>\\s*(.*?)\\s*<").getMatch(0);
-        if (link.getFinalFileName() == null && title != null) {
+        if (title != null) {
+            /*
+             * Always set final filename here if title is found, allow for (theoretical) change of video title from one linkcheck to
+             * another.
+             */
             title = Encoding.htmlDecode(title).trim();
             link.setFinalFileName(title + ".mp4");
         }

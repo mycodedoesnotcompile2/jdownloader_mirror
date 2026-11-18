@@ -37,7 +37,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47268 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54027 $", interfaceVersion = 3, names = {}, urls = {})
 public class AvxHmeW extends PluginForHost {
     public AvxHmeW(PluginWrapper wrapper) {
         super(wrapper);
@@ -140,7 +140,7 @@ public class AvxHmeW extends PluginForHost {
                 loginform.put("password", Encoding.urlEncode(account.getPass()));
                 br.submitForm(loginform);
                 if (!isLoggedin()) {
-                    if (this.br.containsHTML("(?i)>\\s*Your accound is blocked")) {
+                    if (this.br.containsHTML(">\\s*Your accound is blocked")) {
                         throw new AccountInvalidException("Your account is blocked");
                     } else {
                         throw new AccountInvalidException();

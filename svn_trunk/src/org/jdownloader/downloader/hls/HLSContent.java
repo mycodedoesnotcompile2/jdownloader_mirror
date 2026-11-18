@@ -66,11 +66,6 @@ public class HLSContent {
         }
     }
 
-    @Deprecated
-    public void addAudioTrack(M3U8Playlist audioTrack) {
-        this.mediaPlayLists.put(audioTrack, null);
-    }
-
     public List<M3U8Playlist> list() {
         final List<M3U8Playlist> ret = new ArrayList<M3U8Playlist>();
         ret.add(getMain());
@@ -101,6 +96,6 @@ public class HLSContent {
     }
 
     public int size() {
-        return 1/* main */ + getMediaPlayLists().size()/* audioTracks/subTitles */;
+        return 1/* main */+ getMediaPlayLists().size()/* audioTracks/subTitles */;
     }
 }

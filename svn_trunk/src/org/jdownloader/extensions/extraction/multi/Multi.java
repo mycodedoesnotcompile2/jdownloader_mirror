@@ -32,21 +32,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 
-import jd.controlling.downloadcontroller.IfFileExistsDialogInterface;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import net.sf.sevenzipjbinding.ArchiveFormat;
-import net.sf.sevenzipjbinding.ExtractOperationResult;
-import net.sf.sevenzipjbinding.IArchiveExtractCallback;
-import net.sf.sevenzipjbinding.IArchiveOpenCallback;
-import net.sf.sevenzipjbinding.IInStream;
-import net.sf.sevenzipjbinding.PropID;
-import net.sf.sevenzipjbinding.SevenZip;
-import net.sf.sevenzipjbinding.SevenZipException;
-import net.sf.sevenzipjbinding.impl.RandomAccessFileInStream;
-import net.sf.sevenzipjbinding.simple.ISimpleInArchive;
-import net.sf.sevenzipjbinding.simple.ISimpleInArchiveItem;
-
 import org.appwork.utils.Application;
 import org.appwork.utils.BinaryLogic;
 import org.appwork.utils.DebugMode;
@@ -84,6 +69,21 @@ import org.jdownloader.extensions.extraction.content.PackedFile;
 import org.jdownloader.extensions.extraction.gui.iffileexistsdialog.IfFileExistsDialog;
 import org.jdownloader.settings.IfFileExistsAction;
 import org.jdownloader.updatev2.UpdateController;
+
+import jd.controlling.downloadcontroller.IfFileExistsDialogInterface;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import net.sf.sevenzipjbinding.ArchiveFormat;
+import net.sf.sevenzipjbinding.ExtractOperationResult;
+import net.sf.sevenzipjbinding.IArchiveExtractCallback;
+import net.sf.sevenzipjbinding.IArchiveOpenCallback;
+import net.sf.sevenzipjbinding.IInStream;
+import net.sf.sevenzipjbinding.PropID;
+import net.sf.sevenzipjbinding.SevenZip;
+import net.sf.sevenzipjbinding.SevenZipException;
+import net.sf.sevenzipjbinding.impl.RandomAccessFileInStream;
+import net.sf.sevenzipjbinding.simple.ISimpleInArchive;
+import net.sf.sevenzipjbinding.simple.ISimpleInArchiveItem;
 
 public class Multi extends IExtraction {
     private volatile int               crack = 0;
@@ -457,11 +457,22 @@ public class Multi extends IExtraction {
     }
 
     public static final String getSevenZipJBindingVersion() {
+        String version = "4.65";
         try {
-            return ReflectionUtils.invoke(SevenZip.class.getName(), "getSevenZipJBindingVersion", null, String.class, new Object[0]);
-        } catch (Throwable e) {
-            return "4.65";
+            version = ReflectionUtils.invoke("net.sf.sevenzipjbinding.SevenZip", "getSevenZipJBindingVersion", null, String.class, new Object[0]);
+            final boolean initializedSuccessfully = ReflectionUtils.invoke("net.sf.sevenzipjbinding.SevenZip", "isInitializedSuccessfully", null, boolean.class, new Object[0]);
+            if (initializedSuccessfully) {
+                final String usedPlatform = ReflectionUtils.invoke("net.sf.sevenzipjbinding.SevenZip", "getUsedPlatform", null, String.class, new Object[0]);
+                final Class<?> sevenZipVersionClass = Class.forName("net.sf.sevenzipjbinding.SevenZip$Version");
+                final Object nativeVersion = ReflectionUtils.invoke("net.sf.sevenzipjbinding.SevenZip", "getSevenZipVersion", null, sevenZipVersionClass, new Object[0]);
+                version = version + "(" + usedPlatform + "/" + ReflectionUtils.getFieldValue(sevenZipVersionClass, "version", nativeVersion, String.class) + ")";
+            } else {
+                version = version + "(not yet initialized)";
+            }
+        } catch (final Throwable ignore1) {
+            ignore1.printStackTrace();
         }
+        return version;
     }
 
     public static boolean isRAR5Supported() {
@@ -859,7 +870,6 @@ public class Multi extends IExtraction {
                 setLastModifiedDate(item, parent);
                 parent = parent.getParentFile();
             }
-
         }
         while (true) {
             try {

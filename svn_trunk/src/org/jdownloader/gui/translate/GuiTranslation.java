@@ -7802,6 +7802,15 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Finish" })
     String CaptchaWizard_finish();
 
+    @Default(lngs = { "en" }, values = { "The order of your usable built-in solvers is wrong: JAntiCaptcha should come first, then dialog in JDownloader, dialog in browser and MyJDownloader." })
+    String CaptchaWizard_precheck_orderWrong();
+
+    @Default(lngs = { "en" }, values = { "The order of your usable built-in solvers is correct." })
+    String CaptchaWizard_precheck_orderOk();
+
+    @Default(lngs = { "en" }, values = { "Fix the order of the built-in solvers" })
+    String CaptchaWizard_precheck_fixOrder();
+
     @Default(lngs = { "en" }, values = { "Update captcha sort order" })
     String CaptchaWizard_finish_sortOrder();
 

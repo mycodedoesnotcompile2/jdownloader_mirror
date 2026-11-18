@@ -146,7 +146,6 @@ public class Browser implements HTTPConnectionFactoryInterface {
         STRICT_ORIGIN,
         STRICT_ORIGIN_WHEN_CROSS_ORIGIN,
         UNSAFE_URL;
-
         public static boolean isSameProtocol(final Request current, final Request next) {
             return StringUtils.equalsIgnoreCase(current.getURL().getProtocol(), next.getURL().getProtocol());
         }
@@ -357,8 +356,6 @@ public class Browser implements HTTPConnectionFactoryInterface {
     public static String getSubdomain(final String url, final boolean removeTrailingDelimiter) throws MalformedURLException {
         return Browser.getSubdomain(new URL(url), removeTrailingDelimiter);
     }
-
-   
 
     public static String getHost(final URL uri, final boolean includeSubDomains) {
         if (uri == null) {
@@ -748,7 +745,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
     private String                              acceptLanguage        = "de, en-gb;q=0.9, en;q=0.8";
     /*
      * -1 means use default Timeouts
-     *
+     * 
      * 0 means infinite (DO NOT USE if not needed)
      */
     private int                                 connectTimeout        = -1;
@@ -1081,7 +1078,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
     /**
      * Creates a new postrequest based an an requestVariable ArrayList
      *
-     * @deprecated use {@link #createPostRequest(String, UrlQuery, String)
+     * @deprecated use {@link #createPostRequest(String, UrlQuery, String)
      *
      *
      *
@@ -1089,7 +1086,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
      *
      *
      *
-     * 
+     *
      */
     @Deprecated
     public PostRequest createPostRequest(String url, final List<KeyValueStringEntry> post, final String encoding) throws IOException {
@@ -1357,10 +1354,9 @@ public class Browser implements HTTPConnectionFactoryInterface {
 
     public String getCookie(final String url, final String key, String pattern) {
         try {
-            return getCookie(new URL(url), key, pattern);
+            return getCookie(expandToURL(url), key, pattern);
         } catch (MalformedURLException e) {
-            final Cookie cookie = getCookies(url).get(null, key, pattern);
-            return cookie != null ? cookie.getValue() : null;
+            throw new WTFException(e);
         }
     }
 
@@ -1370,12 +1366,16 @@ public class Browser implements HTTPConnectionFactoryInterface {
         return cookie != null ? cookie.getValue() : null;
     }
 
-    public String getHostCookie(final String key) {
-        return this.getCookie(_getURL(), key, null);
+    public String getHostCookie(final String key) throws IOException {
+        return getHostCookie(key, null);
     }
 
-    public String getHostCookie(final String key, final String pattern) {
-        return this.getCookie(_getURL(), key, pattern);
+    public String getHostCookie(final String key, final String pattern) throws IOException {
+        final URL url = _getURL();
+        if (url == null) {
+            throw new IOException("No request available");
+        }
+        return this.getCookie(url, key, pattern);
     }
 
     public HashMap<String, Cookies> getCookies() {
@@ -1400,15 +1400,20 @@ public class Browser implements HTTPConnectionFactoryInterface {
     @Deprecated
     public Cookies getCookies(final String url) {
         try {
-            if (url == null) {
-                return getCookies((URL) null);
-            } else if (url.matches("(?i)^(https?|ftps?|wss?)://.+")) {
-                return getCookies(new URL(url));
-            } else {
-                return getCookies(new URL("https://" + url));
-            }
+            return getCookies(expandToURL(url));
         } catch (MalformedURLException e) {
             throw new WTFException(e);
+        }
+    }
+
+    private URL expandToURL(final String url) throws MalformedURLException {
+        if (url == null) {
+            DebugMode.debugger();
+            return null;
+        } else if (url.matches("(?i)^(https?|ftps?|wss?)://.+")) {
+            return new URL(url);
+        } else {
+            return new URL("https://" + url);
         }
     }
 
@@ -1950,8 +1955,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
     }
 
     /**
-     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site </br>
-     * auto completes Sec-Fetch-Site, some websites(eg facebook) check it
+     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site </br> auto completes Sec-Fetch-Site, some websites(eg
+     * facebook) check it
      */
     protected void autoCompleteHeaders(final Request request) {
         if (request == null) {
@@ -2567,11 +2572,9 @@ public class Browser implements HTTPConnectionFactoryInterface {
             if (url == null) {
                 DebugMode.debugger();
             }
-            setCookie(new URL(url), key, value);
+            setCookie(expandToURL(url), key, value);
         } catch (MalformedURLException e) {
-            final Cookies cookies = this.getCookies(url);
-            final ManualCookie newCookie = new ManualCookie(Browser.getHost(url), key, value);
-            cookies.add(newCookie);
+            throw new WTFException(e);
         }
     }
 
@@ -2581,7 +2584,11 @@ public class Browser implements HTTPConnectionFactoryInterface {
         cookies.add(newCookie);
     }
 
+    @Deprecated
     public void setCookie(final Cookie cookie) {
+        if (cookie.getHost() == null) {
+            DebugMode.debugger();
+        }
         final Cookies cookies = this.getCookies(cookie.getHost());
         cookies.add(cookie);
     }
@@ -2615,37 +2622,48 @@ public class Browser implements HTTPConnectionFactoryInterface {
      * @param iCookies
      * @param replace
      */
-    public void setCookies(final String url, final Cookies setCookies, final boolean replace) {
-        if (url == null) {
-            /* Set all cookies on their (hopefully given) host. */
-            final Set<String> clearedCookies = new HashSet<String>();
-            for (final Cookie setCookie : setCookies.getCookies()) {
-                if (replace && clearedCookies.add(setCookie.getHost())) {
-                    clearCookies(setCookie.getHost());
-                }
-                this.setCookie(setCookie);
-            }
-        } else {
-            /* Get cookies for pre-defined host and set them */
-            final Cookies cookies = this.getCookies(url);
-            if (replace) {
-                cookies.clear();
-            }
-            final String host = getHost(url);
-            final Cookies newSetCookies = new Cookies();
-            for (final Cookie setCookie : setCookies.getCookies()) {
-                final Cookie copy = Cookie.copyOf(setCookie);
-                if (copy.updateHost(host)) {
-                    newSetCookies.add(copy);
-                } else {
-                    final LogInterface logger = getLogger();
-                    if (logger != null) {
-                        logger.info("Cookie.update(" + host + ") failed for " + copy);
+    public void setCookies(final String urlString, final Cookies setCookies, final boolean replace) {
+        try {
+            if (urlString == null) {
+                /* Set all cookies on their (hopefully given) host. */
+                final Set<String> clearedCookies = new HashSet<String>();
+                for (final Cookie setCookie : setCookies.getCookies()) {
+                    final String cookieHost = setCookie.getHost();
+                    if (cookieHost == null) {
+                        DebugMode.debugger();
+                        continue;
                     }
-                    DebugMode.debugger();
+                    final Cookies existingCookies = getCookies(expandToURL(cookieHost));
+                    if (replace && clearedCookies.add(cookieHost)) {
+                        existingCookies.clear();
+                    }
+                    existingCookies.add(setCookie);
                 }
+            } else {
+                /* Get cookies for pre-defined host and set them */
+                final URL url = expandToURL(urlString);
+                final Cookies existingCookies = this.getCookies(url);
+                if (replace) {
+                    existingCookies.clear();
+                }
+                final String host = getHost(url);
+                final Cookies newSetCookies = new Cookies();
+                for (final Cookie setCookie : setCookies.getCookies()) {
+                    final Cookie copy = Cookie.copyOf(setCookie);
+                    if (copy.updateHost(host)) {
+                        newSetCookies.add(copy);
+                    } else {
+                        final LogInterface logger = getLogger();
+                        if (logger != null) {
+                            logger.info("Cookie.update(" + host + ") failed for " + copy);
+                        }
+                        DebugMode.debugger();
+                    }
+                }
+                existingCookies.add(newSetCookies);
             }
-            cookies.add(newSetCookies);
+        } catch (MalformedURLException e) {
+            throw new WTFException(e);
         }
     }
 
@@ -2761,8 +2779,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
     }
 
     /**
-     * Sets Browser upper page load limit Byte value. </br>
-     * Use Integer.MAX_VALUE for "unlimited" (do not use "-1"!).
+     * Sets Browser upper page load limit Byte value. </br> Use Integer.MAX_VALUE for "unlimited" (do not use "-1"!).
      *
      * @since JD2
      * @param i
@@ -2913,8 +2930,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
     }
 
     /**
-     * Checks for block by firewalls and similar. </br>
-     * To be called after a sent request.
+     * Checks for block by firewalls and similar. </br> To be called after a sent request.
      */
     public void checkForBlockedByAfterLoadConnection(Request request) throws IOException {
         if (!this.getThrowExceptionOnBlockedBy(request)) {
@@ -2946,8 +2962,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
         /* 520: Web server is returning an unknown error | 526: Invalid SSL certificate */
         /**
          * TODO: 2023-12-21: Maybe remove reliance on http status-code as it looks like literally any status code can be returned when a
-         * Cloudflare block happens. </br>
-         * I've just added code 502 to the list of "Cloudflare response-codes".
+         * Cloudflare block happens. </br> I've just added code 502 to the list of "Cloudflare response-codes".
          */
         /*
          * It is really important to also check for Cloudflare html else stuff will fail/break e.g. icerbox.com wrong login -> Cloudflare
@@ -3397,8 +3412,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
                         return this;
                     }
                     /**
-                     * <title>Sito Illegale - AGCOM</title>
-                     * <h1>ATTENZIONE SITO ILLEGALE</h1>
+                     * <title>Sito Illegale - AGCOM</title> <h1>ATTENZIONE SITO ILLEGALE</h1>
                      *
                      * <p class="warning-text">
                      * L'accesso al presente sito è stato disabilitato in esecuzione di un provvedimento Agcom per violazione del diritto
@@ -3417,9 +3431,9 @@ public class Browser implements HTTPConnectionFactoryInterface {
                      * </p>
                      *
                      * <p>
-                     * Per maggiori informazioni visita la
-                     * <a href="https://www.agcom.it/competenze/piattaforme-online/antipirateria-e-piracy-shield">pagina dedicata</a> sul
-                     * sito Agcom.it
+                     * Per maggiori informazioni visita la <a
+                     * href="https://www.agcom.it/competenze/piattaforme-online/antipirateria-e-piracy-shield">pagina dedicata</a> sul sito
+                     * Agcom.it
                      * </p>
                      */
                     if (request.containsHTML("<h1>\\s*ATTENZIONE SITO ILLEGALE\\s*</h1>") && request.containsHTML("per violazione del diritto") && request.containsHTML("www\\.agcom\\.it")) {
@@ -3885,8 +3899,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
                     return null;
                 }
                 if (true) { /*
-                             * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
-                             */
+                 * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
+                 */
                     /* See new ESET NOD32 html code 2023: https://board.jdownloader.org/showthread.php?t=91433 */
                     return null;
                 }
@@ -4110,8 +4124,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
     }
 
     /**
-     * Returns true if any antiddos provider/other sort of blocking is blocking at this moment. </br>
-     * See also: https://svn.jdownloader.org/issues/89834
+     * Returns true if any antiddos provider/other sort of blocking is blocking at this moment. </br> See also:
+     * https://svn.jdownloader.org/issues/89834
      */
     public boolean isBlocked() {
         final Request request = this.getRequest();

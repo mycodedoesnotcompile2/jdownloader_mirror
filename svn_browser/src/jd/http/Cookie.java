@@ -25,7 +25,6 @@ import java.util.regex.Pattern;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.logging2.extmanager.LoggerFactory;
 
@@ -60,7 +59,7 @@ public abstract class Cookie {
         }
 
         @Override
-        public boolean equals(Object obj) {
+        public boolean matchesScope(Cookie obj) {
             if (obj == this) {
                 return true;
             } else if (obj instanceof Cookie) {
@@ -68,10 +67,10 @@ public abstract class Cookie {
                  * we only want Server and Import cookies to be handled/supported by equals method, Legacy/Manual should never equal
                  * Server/Import cookies
                  */
-                switch (((Cookie) obj).getSource()) {
+                switch (obj.getSource()) {
                 case SERVER:
                 case IMPORT:
-                    return super.equals(obj);
+                    return super.matchesScope(obj);
                 default:
                     return false;
                 }
@@ -116,7 +115,7 @@ public abstract class Cookie {
         }
 
         @Override
-        public boolean equals(Object obj) {
+        public boolean matchesScope(Cookie obj) {
             if (obj == this) {
                 return true;
             } else if (obj instanceof Cookie) {
@@ -124,10 +123,10 @@ public abstract class Cookie {
                  * we only want Server and Import cookies to be handled/supported by equals method, Legacy/Manual should never equal
                  * Server/Import cookies
                  */
-                switch (((Cookie) obj).getSource()) {
+                switch (obj.getSource()) {
                 case SERVER:
                 case IMPORT:
-                    return super.equals(obj);
+                    return super.matchesScope(obj);
                 default:
                     return false;
                 }
@@ -155,11 +154,19 @@ public abstract class Cookie {
         public SOURCE getSource() {
             return SOURCE.MANUAL;
         }
-        
+
+        boolean expiredFlag = false;
+
         public void setExpired() {
-            final long now=System.currentTimeMillis();
-            setExpireDate(now+1);
-            setHostTime(now);
+            expiredFlag = true;
+        }
+
+        @Override
+        public boolean isExpired() {
+            if (expiredFlag) {
+                return true;
+            }
+            return super.isExpired();
         }
 
         @Override
@@ -218,7 +225,6 @@ public abstract class Cookie {
                 return new LegacyCookie();
             }
         };
-
         public abstract Cookie newCookieInstance();
 
         public boolean isSameSource(Cookie cookie) {
@@ -240,7 +246,20 @@ public abstract class Cookie {
     public abstract Cookie newCookieInstance();
 
     public boolean isValid() {
-        return getKey() != null;
+        if (StringUtils.isEmpty(getKey())) {
+            /* key must not be empty, value may be null */
+            return false;
+        }
+        final boolean ret;
+        final String host = getHost();
+        if (isIPAddress(getHost())) {
+            final String domain = getDomain();
+            ret = domain == null || host.equalsIgnoreCase(domain);
+        } else {
+            final String domain = getDomain();
+            ret = domain == null || !isIPAddress(domain);
+        }
+        return ret;
     }
 
     public boolean isSecureProtocol() {
@@ -287,8 +306,6 @@ public abstract class Cookie {
     public String getSetSameSite() {
         return sameSite;
     }
-    
-    
 
     public String getSameSite() {
         final String ret = getSetSameSite();
@@ -312,7 +329,22 @@ public abstract class Cookie {
         return !StringUtils.equals(oldSameSite, this.sameSite);
     }
 
+    protected static final Pattern IPV4_PATTERN = Pattern.compile("^(?:(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)$");
+
+    protected static boolean isIPAddress(String host) {
+        if (host == null || host.isEmpty()) {
+            return false;
+        } else if (host.indexOf(':') != -1) {
+            return true;
+        } else {
+            return IPV4_PATTERN.matcher(host).matches();
+        }
+    }
+
     public Boolean isHostOnly() {
+        if (isIPAddress(getHost())) {
+            return Boolean.TRUE;
+        }
         return hostOnly;
     }
 
@@ -347,14 +379,16 @@ public abstract class Cookie {
     public abstract boolean isCustomCookie();
 
     @Override
-    public boolean equals(final Object obj) {
-        if (this == obj) {
+    public final boolean equals(final Object obj) {
+        return super.equals(obj);
+    }
+
+    public boolean matchesScope(final Cookie other) {
+        if (other == null) {
+            return false;
+        } else if (this == other) {
             return true;
         }
-        if (!(obj instanceof Cookie)) {
-            return false;
-        }
-        final Cookie other = (Cookie) obj;
         host: {
             final String thisHost = getHost();
             final String otherHost = other.getHost();
@@ -422,12 +456,17 @@ public abstract class Cookie {
         }
         String urlHost = url.getHost();
         try {
-            urlHost = IDN.toASCII(urlHost);
+            urlHost = normalizeHost(urlHost);
         } catch (IllegalArgumentException ignore) {
             LogV3.log(ignore);
         }
+        final String host = getHost();
         final String domain = getDomain();
-        if (Boolean.TRUE.equals(isHostOnly()) && !StringUtils.equalsIgnoreCase(urlHost, domain)) {
+        if (isIPAddress(urlHost) && (host != null && !urlHost.equalsIgnoreCase(host) || domain != null && !urlHost.equalsIgnoreCase(domain))) {
+            return false;
+        }        
+        final String scope = domain != null ? domain : getOriginHost();
+        if (Boolean.TRUE.equals(isHostOnly()) && scope != null && !StringUtils.equalsIgnoreCase(urlHost, scope)) {
             return false;
         }
         if (domain != null && !StringUtils.endsWithCaseInsensitive("." + urlHost, "." + domain)) {
@@ -437,6 +476,39 @@ public abstract class Cookie {
             return false;
         }
         return true;
+    }
+
+    /* RFC 6265 (Sektion 5.1.4) */
+    protected boolean setPath(URL url) {
+        if (url == null) {
+            return setPath("/");
+        }
+        final String uriPath = url.getPath();
+        if (uriPath == null || uriPath.isEmpty() || uriPath.charAt(0) != '/') {
+            return setPath("/");
+        }
+        final int lastSlashIndex = uriPath.lastIndexOf('/');
+        if (lastSlashIndex <= 0) {
+            return setPath("/");
+        }
+        return setPath(uriPath.substring(0, lastSlashIndex));
+    }
+
+    protected String normalizeHost(String host) throws IllegalArgumentException {
+        if (host == null || host.isEmpty()) {
+            return host;
+        }
+        boolean hasUpper = false;
+        for (int i = 0, len = host.length(); i < len; i++) {
+            final char c = host.charAt(i);
+            if (c >= 128) {
+                return IDN.toASCII(host).toLowerCase(Locale.ROOT);
+            }
+            if (hasUpper || c >= 'A' && c <= 'Z') {
+                hasUpper = true;
+            }
+        }
+        return hasUpper ? host.toLowerCase(Locale.ROOT) : host;
     }
 
     public boolean isCookiePathMatch(URL url) {
@@ -547,7 +619,7 @@ public abstract class Cookie {
             domain = removeLeadingDot(domain);
             /** normalize domain */
             try {
-                domain = IDN.toASCII(domain).toLowerCase(Locale.ROOT);
+                domain = normalizeHost(domain);
             } catch (IllegalArgumentException e) {
                 LoggerFactory.getDefaultLogger().log(e);
                 DebugMode.debugger();
@@ -558,6 +630,19 @@ public abstract class Cookie {
             domain = null;
         }
         return !StringUtils.equalsIgnoreCase(oldDomain, this.domain = domain);
+    }
+
+    protected String normalizeSetHost(String host) {
+        if (host == null || host.isEmpty()) {
+            return host;
+        }
+        host = removeLeadingDot(host);
+        try {
+            return normalizeHost(host);
+        } catch (IllegalArgumentException e) {
+            LoggerFactory.getDefaultLogger().log(e);
+            return host.toLowerCase(Locale.ROOT);
+        }
     }
 
     public boolean setExpireDate(final long time) {
@@ -591,7 +676,7 @@ public abstract class Cookie {
 
     public boolean setHost(final String host) {
         final String oldHost = this.host;
-        return !StringUtils.equalsIgnoreCase(oldHost, this.host = Browser.getHost(this.originHost = removeLeadingDot(Browser.getHost(host, true)), false));
+        return !StringUtils.equalsIgnoreCase(oldHost, this.host = Browser.getHost(this.originHost = normalizeSetHost(Browser.getHost(host, true)), false));
     }
 
     public boolean updateHost(String newHost) {
@@ -654,26 +739,31 @@ public abstract class Cookie {
         return !StringUtils.equals(oldKey, this.key = key);
     }
 
-    public boolean setPath(String path) {
-        final String oldPath = this.path;
+    protected static boolean testPath(String path) {
         path = cleanAttributeValue(path);
         if (StringUtils.isEmpty(path) || !path.startsWith("/")) {
-            this.path = null;
-        } else {
-            this.path = path;
+            return false;
         }
-        return !StringUtils.equals(oldPath, this.path);
+        return true;
     }
 
-    protected String cleanAttributeValue(String val) {
+    public boolean setPath(String path) {
+        if (!testPath(path)) {
+            return false;
+        }
+        final String oldPath = this.path;
+        return !StringUtils.equals(oldPath, this.path = cleanAttributeValue(path));
+    }
+
+    protected static String cleanAttributeValue(String val) {
         if (val == null) {
             return null;
         }
         val = val.trim();
         /** remove leading and trailing ' and " **/
         if (val.length() >= 2) {
-            char first = val.charAt(0);
-            char last = val.charAt(val.length() - 1);
+            final char first = val.charAt(0);
+            final char last = val.charAt(val.length() - 1);
             if (first == '"' && last == '"' || first == '\'' && last == '\'') {
                 val = val.substring(1, val.length() - 1).trim();
             }

@@ -21,6 +21,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -36,14 +43,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 52513 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54046 $", interfaceVersion = 3, names = {}, urls = {})
 public class RlGalleriesNt extends PluginForDecrypt {
     public RlGalleriesNt(PluginWrapper wrapper) {
         super(wrapper);
@@ -78,7 +78,7 @@ public class RlGalleriesNt extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
-    public static final Pattern PATTERN_GALLERY_AND_SINGLE_IMAGE = Pattern.compile("/([\\w\\-]+)/(\\d+)/([\\w\\-]+)(/([^/]+))?");
+    public static final Pattern PATTERN_GALLERY_AND_SINGLE_IMAGE = Pattern.compile("(?:/[a-z]{2})?/([\\w\\-]+)/(\\d+)/([\\w\\-]+)(/([^/]+))?");
     public static final Pattern PATTERN_SINGLE_REDIRECT          = Pattern.compile("/dl?/([0-9]+)/?");
     public static final Pattern PATTERN_SPECIAL_FAPPIC           = Pattern.compile("/ft/img\\d+/\\d+/([a-z0-9]{12}).*");
     public static Object        LOCK                             = new Object();
@@ -200,6 +200,19 @@ public class RlGalleriesNt extends PluginForDecrypt {
         }
         final Regex gallery_regex = new Regex(contenturl, PATTERN_GALLERY_AND_SINGLE_IMAGE);
         String galleryID = gallery_regex.getMatch(1);
+        if ("hqthumbs".equals(gallery_regex.getMatch(0)) && galleryID != null) {
+            /* first collapse all hqthumbs into dummy gallery link */
+            ret.add(this.createDownloadlink("https://urlgalleries.net/en/" + galleryID + "/dummyGallery"));
+            return ret;
+        } else if ("dummyGallery".equals(gallery_regex.getMatch(2))) {
+            /* then follow redirect to actual real gallery link */
+            br.getPage(contenturl);
+            if (canHandle(br.getURL())) {
+                ret.add(this.createDownloadlink(br.getURL()));
+                return ret;
+            }
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         final String gallery_title_from_url = gallery_regex.getMatch(2);
         if (galleryID == null) {
             /* For old links */

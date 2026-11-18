@@ -46,13 +46,19 @@ import java.awt.Transparency;
 import java.awt.font.FontRenderContext;
 import java.awt.font.GlyphVector;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLConnection;
+import java.net.URLStreamHandler;
 import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -440,6 +446,9 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             if (url == null && IconIO.isExeSupported()) {
                 url = this.getURL("images/", relativePath, ".exe", useStandardPath);
             }
+            if (url == null) {
+                url = getImageFromSessionCache(relativePath);
+            }
             if (url != null) {
                 if (context != null) {
                     context.putURL(relativePath, url);
@@ -448,6 +457,94 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             }
         }
         return null;
+    }
+
+    protected final Map<String, byte[]> sessionImageCache         = new HashMap<String, byte[]>();
+    protected final URLStreamHandler    sessionCacheStreamHandler = new URLStreamHandler() {
+                                                                      @Override
+                                                                      protected URLConnection openConnection(URL u) throws IOException {
+                                                                          return new URLConnection(u) {
+                                                                              byte[]               byteArray = null;
+                                                                              ByteArrayInputStream bis       = null;
+
+                                                                              @Override
+                                                                              public void connect() throws IOException {
+                                                                                  final URL url = getURL();
+                                                                                  final String relative = url.getPath().substring(1);
+                                                                                  final byte[] imageBytes;
+                                                                                  synchronized (sessionImageCache) {
+                                                                                      imageBytes = sessionImageCache.get(relative);
+                                                                                      if (imageBytes == null) {
+                                                                                          throw new FileNotFoundException(url.toExternalForm());
+                                                                                      }
+                                                                                  }
+                                                                                  byteArray = imageBytes;
+                                                                                  bis = new ByteArrayInputStream(byteArray);
+                                                                                  this.connected = true;
+                                                                              }
+
+                                                                              public String getContentType() {
+                                                                                  final URL url = getURL();
+                                                                                  final String query = url.getQuery();
+                                                                                  if (StringUtils.containsIgnoreCase(query, "content-type=.png")) {
+                                                                                      return "image/png";
+                                                                                  }
+                                                                                  return null;
+                                                                              };
+
+                                                                              @Override
+                                                                              public int getContentLength() {
+                                                                                  final byte[] byteArray = this.byteArray;
+                                                                                  if (byteArray == null) {
+                                                                                      return -1;
+                                                                                  }
+                                                                                  return byteArray.length;
+                                                                              };
+
+                                                                              @Override
+                                                                              public long getContentLengthLong() {
+                                                                                  return getContentLength();
+                                                                              };
+
+                                                                              @Override
+                                                                              public InputStream getInputStream() throws IOException {
+                                                                                  if (!connected) {
+                                                                                      connect();
+                                                                                  }
+                                                                                  return bis;
+                                                                              }
+                                                                          };
+                                                                      }
+                                                                  };
+
+    public URL getImageFromSessionCache(final String relative) {
+        synchronized (sessionImageCache) {
+            if (sessionImageCache.get(relative) == null) {
+                return null;
+            }
+            try {
+                return new URL(null, "sessionCache://local/" + relative + "?content-type=.png", sessionCacheStreamHandler);
+            } catch (MalformedURLException e) {
+                return null;
+            }
+        }
+    }
+
+    public byte[] removeImageFromSessionCache(final String relativePath) throws IOException {
+        synchronized (sessionImageCache) {
+            return sessionImageCache.remove(relativePath);
+        }
+    }
+
+    public byte[] addImageToSessionCache(Image image, final String relativePath) throws IOException {
+        synchronized (sessionImageCache) {
+            if (image == null) {
+                return removeImageFromSessionCache(relativePath);
+            }
+            final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            ImageIO.write(IconIO.toBufferedImage(image), "png", bos);
+            return sessionImageCache.put(relativePath, bos.toByteArray());
+        }
     }
 
     /**

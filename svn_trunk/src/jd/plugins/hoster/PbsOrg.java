@@ -42,7 +42,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA;
 import org.jdownloader.plugins.components.hls.HlsContainer.MEDIA.TYPE;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 52878 $", interfaceVersion = 2, names = { "pbs.org" }, urls = { "https?://video\\.pbs\\.org/video/\\d+|https?://(?:www\\.)?pbs\\.org/.+|https?://player\\.pbs\\.org/[a-z]+/\\d+" })
+@HostPlugin(revision = "$Revision: 54028 $", interfaceVersion = 2, names = { "pbs.org" }, urls = { "https?://video\\.pbs\\.org/video/\\d+|https?://(?:www\\.)?pbs\\.org/.+|https?://player\\.pbs\\.org/[a-z]+/\\d+" })
 public class PbsOrg extends PluginForHost {
     @SuppressWarnings("deprecation")
     public PbsOrg(PluginWrapper wrapper) {
@@ -303,7 +303,7 @@ public class PbsOrg extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 logger.info("Add media:" + audioMedia);
-                hlsContent.addAudioTrack(audioM3U8.get(0));
+                hlsContent.add(audioMedia, audioM3U8.get(0));
             }
             final List<HLSContent> hlsContents = new ArrayList<HLSContent>();
             hlsContents.add(hlsContent);

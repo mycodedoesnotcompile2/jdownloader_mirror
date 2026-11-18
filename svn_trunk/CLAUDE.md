@@ -175,6 +175,12 @@ if (account == null) {
 ```
 where `errorAccountNeeded()` always throws (e.g. `AccountRequiredException`).
 
+## Plugin Methods Without @Override
+
+Some plugin methods are looked up by the framework via reflection and do **not** exist in `PluginForHost` / `PluginForDecrypt`. Never add `@Override` to them, it would not compile. Do not "fix" the missing annotation either.
+
+- `getMaxChunks(DownloadLink link, Account account)` — no `@Override`. (`isResumeable(DownloadLink, Account)` on the other hand does have one.)
+
 ## Tables
 
 Applies to every table created in the JDownloader project.
@@ -287,5 +293,6 @@ Applies to the Captcha Wizard (`CaptchaWizardDialog` and its tables) and everyth
 
 - The JAntiCaptcha solver (`JacSolverService`, `SolverType.JD_LOCAL`) is of minor importance: it only solves a few simple image captchas. **Every other solver is more important than JAntiCaptcha.**
 - It must still be shown and mentioned (pre-check warning, solver tables, notes). Do not remove it.
-- Wherever solvers are ordered, preferred or suggested to the user (sort order, "solves most types" ranking, combinations), JAntiCaptcha comes after all other solvers, never before an equal alternative.
+- Wherever solvers are preferred or suggested to the user ("solves most types" ranking, combinations), JAntiCaptcha comes after all other solvers, never before an equal alternative.
+- **Exception, the automatic sort order of the solver order table** (`CaptchaWizardDialog#applySortOrder`): among the usable solvers JAntiCaptcha is always at the very top, and the manual solvers always come in the order dialog in JDownloader (`JD_LOCAL_DIALOG`), dialog in the browser (`JD_LOCAL_BROWSER`), MyJDownloader (`JD_REMOTE_MYJD`), whatever preference the user chose. The preference only decides where the manual solvers as a block are placed relative to the external solvers.
 - **Exception, the order in which the solvers are started while solving a captcha** (default order, order for login captchas, see `ChallengeResponseController#getDefaultOrderRank` and `#getLoginCaptchaOrderRank`): JAntiCaptcha stays **first**. It usually needs far less than a second and may solve some very old simple captchas completely automatically, so it is worth trying first. This does not make it more important than the other solvers, it is only cheap to try.

@@ -18,10 +18,12 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.controller.LazyPlugin;
@@ -45,7 +47,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51137 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54038 $", interfaceVersion = 3, names = {}, urls = {})
 public class ManyvidsCom extends PluginForHost {
     public ManyvidsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -274,17 +276,32 @@ public class ManyvidsCom extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
         login(account, true);
-        final String internalUserID = getLoginCookie(br);
         final Browser brc = br.cloneBrowser();
-        brc.getPage("https://api.journey-bff.kiwi.manyvids.com/api/v1/user/" + internalUserID);
+        /* The profile API needs the numeric legacy user-ID, not the GUID from the KGID cookie. */
+        brc.getPage("https://www." + getHost() + "/bff/user/viewer");
+        final Map<String, Object> viewer = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+        final String internalUserID = (String) ((Map<String, Object>) viewer.get("user")).get("userId");
+        /* Old endpoint api.journey-bff.kiwi.manyvids.com/api/v1/user/<id> is dead (HTTP 503) -> use api.manyvids.com instead. */
+        brc.getHeaders().put("Accept", "application/json");
+        brc.getHeaders().put("Origin", "https://www." + getHost());
+        brc.getHeaders().put("Referer", "https://www." + getHost() + "/");
+        brc.getPage("https://api." + getHost() + "/profile/profile/" + internalUserID);
         final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-        if (Boolean.TRUE.equals(entries.get("premiumMember"))) {
+        /* Integer flag: 0 = no premium membership, otherwise premium. */
+        if (((Number) entries.get("hasPremiumMembership")).intValue() != 0) {
             account.setType(AccountType.PREMIUM);
         } else {
             /* Free accounts can still contain single bought video elements which the user will be allowed to watch- and download. */
             account.setType(AccountType.FREE);
         }
         ai.setUnlimitedTraffic();
+        try {
+            /* E.g. "2024-01-25T10:36:41.000Z" */
+            ai.setCreateTime(TimeFormatter.getMilliSeconds(entries.get("createdAt").toString(), "yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.ENGLISH));
+        } catch (final Exception e) {
+            logger.log(e);
+            logger.warning("Failed to parse createdAt date");
+        }
         if (account.loadUserCookies() != null) {
             /* Set unique username because when cookie login is used, user can enter anything into username field. */
             final String username = (String) entries.get("urlHandle");

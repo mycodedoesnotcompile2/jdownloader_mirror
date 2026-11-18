@@ -25,9 +25,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.controller.LazyPlugin;
@@ -43,7 +45,6 @@ import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterException;
 import jd.plugins.DecrypterPlugin;
@@ -55,10 +56,9 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
-import jd.plugins.components.UserAgents;
 import jd.plugins.hoster.FlickrCom;
 
-@DecrypterPlugin(revision = "$Revision: 54018 $", interfaceVersion = 3, names = { "flickr.com" }, urls = { "https?://(?:secure\\.|www\\.)?flickr\\.com/(?:photos|groups|gp)/.+" })
+@DecrypterPlugin(revision = "$Revision: 54034 $", interfaceVersion = 3, names = { "flickr.com" }, urls = { "https?://(?:secure\\.|www\\.)?flickr\\.com/(?:photos|groups|gp)/.+" })
 public class FlickrComCrawler extends PluginForDecrypt {
     public FlickrComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -80,11 +80,13 @@ public class FlickrComCrawler extends PluginForDecrypt {
     public static final String                   API_BASE                 = "https://api.flickr.com/";
     private static final int                     api_max_entries_per_page = 500;
     private static LinkedHashMap<String, String> INTERNAL_USERNAME_CACHE  = new LinkedHashMap<String, String>() {
+                                                                              @Override
                                                                               protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
                                                                                   return size() > 200;
                                                                               };
                                                                           };
     private static LinkedHashMap<String, String> INTERNAL_GROUPNAME_CACHE = new LinkedHashMap<String, String>() {
+                                                                              @Override
                                                                               protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
                                                                                   return size() > 200;
                                                                               };
@@ -117,8 +119,9 @@ public class FlickrComCrawler extends PluginForDecrypt {
             } catch (final Throwable e) {
                 logger.log(e);
                 logger.info("Can't use existing account because login failed");
-                account = null;
+                /* Must be called with the account BEFORE it is set to null, otherwise the account can't be flagged as faulty. */
                 this.handleAccountException(account, e);
+                account = null;
             }
         }
         if (flickrHostPlugin.canHandle(contenturl)) {
@@ -129,17 +132,25 @@ public class FlickrComCrawler extends PluginForDecrypt {
         } else {
             if (contenturl.matches("^https?://[^/]+/gp/.+")) {
                 br.getPage(contenturl);
-                final String apikey = br.getRegex("root\\.YUI_config\\.flickr\\.api\\.site_key\\s*=\\s*\"([^\"]+)\"").getMatch(0);
-                if (apikey != null) {
-                    synchronized (api) {
-                        api.put("apikey", apikey);
-                        api.put("timestamp", System.currentTimeMillis());
-                    }
-                }
-                if (canHandle(br.getURL())) {
+                final String redirectedurl = br.getURL();
+                if (flickrHostPlugin.canHandle(redirectedurl)) {
+                    /* Single photo -> Pass to hostplugin */
                     final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-                    ret.add(createDownloadlink(br.getURL()));
+                    ret.add(createDownloadlink(redirectedurl));
                     return ret;
+                } else if (canHandle(redirectedurl)) {
+                    /*
+                     * Guest pass link ("/gp/<nsid>/<passkey>"): Gives anonymous access to non-public albums. Flickr redirects to the normal
+                     * album URL and sets a cookie that grants access. Without that cookie the API answers with {"stat":"fail","code":1,
+                     * "message":"Photoset not found"}. Because of this we must continue crawling in this instance instead of returning
+                     * the redirected URL as a new link (a new crawler instance would have a fresh Browser without the guest pass cookie).
+                     * The cookie stays in our Browser instance and is sent along with the API requests. Tested/confirmed working.
+                     */
+                    if (redirectedurl.matches(TYPE_SETS_OF_USER_ALL)) {
+                        return apiCrawlSetsOfUser(param, redirectedurl, account);
+                    } else {
+                        return crawlStreamsAPI(param, redirectedurl, account);
+                    }
                 }
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -214,9 +225,8 @@ public class FlickrComCrawler extends PluginForDecrypt {
             album.setSetID(new Regex(contenturl, TYPE_SET_SINGLE).getMatch(1));
             /* This request is only needed to get the title and owner of the photoset */
             query.add("photoset_id", album.getSetID());
-            final UrlQuery paramsSetInfo = query;
-            paramsSetInfo.add("method", "flickr.photosets.getInfo");
-            apiGetPage(API_BASE + "services/rest?" + paramsSetInfo.toString());
+            /* Append the info-only method to a copy of the query string so that "query" itself stays unchanged. */
+            apiGetPage(API_BASE + "services/rest?" + query.toString() + "&method=flickr.photosets.getInfo");
             final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
             final Map<String, Object> setInfo = (Map<String, Object>) entries.get("photoset");
             usernameInternal = (String) setInfo.get("owner");
@@ -235,9 +245,8 @@ public class FlickrComCrawler extends PluginForDecrypt {
             album.setGalleryID(new Regex(contenturl, TYPE_GALLERY).getMatch(1));
             query.add("method", "flickr.galleries.getPhotos");
             query.add("gallery_id", album.getGalleryID());
-            final UrlQuery specialQueryForFirstRequest = query;
-            specialQueryForFirstRequest.add("get_gallery_info", "1");
-            apiGetPage(API_BASE + "services/rest?" + specialQueryForFirstRequest.toString());
+            /* Only request gallery info on first request: Do not add it to "query" itself. */
+            apiGetPage(API_BASE + "services/rest?" + query.toString() + "&get_gallery_info=1");
             final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
             final Map<String, Object> galleryInfo = (Map<String, Object>) entries.get("gallery");
             username = (String) galleryInfo.get("username");
@@ -265,9 +274,7 @@ public class FlickrComCrawler extends PluginForDecrypt {
             query.add("group_id", Encoding.urlEncode(usernameInternal));
             query.add("method", "flickr.groups.pools.getPhotos");
             /* Only request group info on first request. */
-            final UrlQuery specialQueryForFirstRequest = query;
-            specialQueryForFirstRequest.add("get_group_info", "1");
-            apiGetPage(API_BASE + "services/rest?" + specialQueryForFirstRequest.toString());
+            apiGetPage(API_BASE + "services/rest?" + query.toString() + "&get_group_info=1");
             final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
             final Map<String, Object> groupInfo = (Map<String, Object>) entries.get("group");
             username = (String) groupInfo.get("pathalias");
@@ -319,8 +326,9 @@ public class FlickrComCrawler extends PluginForDecrypt {
             totalpages = ((Number) photoInfo.get("pages")).intValue();
             totalNumberofItems = ((Number) photoInfo.get("total")).intValue();
             if (totalNumberofItems == 0) {
+                /* The album/user/group itself exists (otherwise the API would have returned an error) but it is empty. */
                 logger.info("ZERO items available");
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                return ret;
             }
             if (df == null || fp == null) {
                 /* Set this on first run. */
@@ -405,11 +413,6 @@ public class FlickrComCrawler extends PluginForDecrypt {
         return ret;
     }
 
-    /** Wrapper */
-    private String getFormattedFilename(final DownloadLink dl) throws ParseException {
-        return FlickrCom.getFormattedFilename(this, dl);
-    }
-
     private String getFormattedPackagename(final FlickrAlbum album) throws ParseException {
         String ret;
         final SubConfiguration cfg = getPluginConfig();
@@ -483,8 +486,9 @@ public class FlickrComCrawler extends PluginForDecrypt {
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
                 return ret;
-            } else if (sets.size() < api_max_entries_per_page) {
-                logger.info("Stopping because: Current page contains less than max. item number");
+            } else if (sets.isEmpty()) {
+                /* Do not stop on "less than max items per page" as the API may return fewer items per page than requested. */
+                logger.info("Stopping because: Current page is empty");
                 break;
             } else if (page >= maxPage) {
                 logger.info("Stopping because: Reached last page: " + maxPage);
@@ -673,7 +677,7 @@ public class FlickrComCrawler extends PluginForDecrypt {
 
     public static String getPublicAPIKey(final Plugin plugin, final Browser br) throws IOException {
         synchronized (api) {
-            if (!api.containsKey("apikey") || !api.containsKey("timestamp") || System.currentTimeMillis() - ((Number) api.get("timestamp")).longValue() > 1 * 60 * 60 * 1000) {
+            if (!api.containsKey("apikey") || !api.containsKey("timestamp") || Time.systemIndependentCurrentJVMTimeMillis() - ((Number) api.get("timestamp")).longValue() > TimeUnit.HOURS.toMillis(1)) {
                 if (!api.containsKey("apikey")) {
                     plugin.getLogger().info("apikey needs to be crawled for the first time");
                 } else {
@@ -683,204 +687,26 @@ public class FlickrComCrawler extends PluginForDecrypt {
                 brc.setFollowRedirects(true);
                 brc.setVerbose(false);
                 /* 2025-01-02: apikey is now not available anymore in html of main page. */
-                brc.getPage("https://www.flickr.com/photos/" + new Random().nextInt(10000) + "/");
-                String apikey = brc.getRegex("root\\.YUI_config\\.flickr\\.api\\.site_key\\s*=\\s*\"([^\"]+)\"").getMatch(0);
-                if (apikey == null) {
-                    apikey = PluginJSonUtils.getJsonValue(brc, "api_key");
+                String apikey = null;
+                try {
+                    brc.getPage("https://www.flickr.com/photos/" + new Random().nextInt(10000) + "/");
+                    apikey = brc.getRegex("root\\.YUI_config\\.flickr\\.api\\.site_key\\s*=\\s*\"([^\"]+)\"").getMatch(0);
+                    if (apikey == null) {
+                        apikey = PluginJSonUtils.getJsonValue(brc, "api_key");
+                    }
+                } catch (final IOException e) {
+                    /* E.g. random user does not exist (404) -> Use fallback key below. */
+                    plugin.getLogger().log(e);
                 }
                 if (StringUtils.isEmpty(apikey)) {
                     /* Try static attempt as final fallback. Do not store this one in api map! */
                     return "d4164f487cc0c73caae134d4644b3410";
                 }
                 api.put("apikey", apikey);
-                api.put("timestamp", System.currentTimeMillis());
+                api.put("timestamp", Time.systemIndependentCurrentJVMTimeMillis());
             }
             return api.get("apikey").toString();
         }
-    }
-
-    private Browser prepBrowserWebsite(final Browser br) {
-        br.getHeaders().put("User-Agent", UserAgents.stringUserAgent());
-        br.setFollowRedirects(true);
-        br.setCookie(this.getHost(), "localization", "en-us%3Bus%3Bde");
-        br.setCookie(this.getHost(), "fldetectedlang", "en-us");
-        return br;
-    }
-
-    /**
-     * Handles decryption via website.
-     *
-     * @throws Exception
-     */
-    @SuppressWarnings({ "unchecked" })
-    @Deprecated
-    /** Deprecated! Uses website without ajax requests! */
-    private ArrayList<DownloadLink> crawlStreamsWebsite(final CryptedLink param, final String contenturl, final Account account) throws Exception {
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        prepBrowserWebsite(this.br);
-        // if not logged in this is 25... need to confirm for logged in -raztoki20160717
-        int maxEntriesPerPage = 25;
-        String fpName;
-        br.getPage(contenturl);
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if ((br.containsHTML("class=\"ThinCase Interst\"") || br.getURL().contains("/login.yahoo.com/"))) {
-            throw new AccountRequiredException();
-        } else if (contenturl.matches(TYPE_FAVORITES) && br.containsHTML("id=\"no\\-faves\"")) {
-            /* Favourite link but user has no favourites */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        // Some stuff which is different from link to link
-        String picCount = br.getRegex("\"total\":(\")?(\\d+)").getMatch(1);
-        fpName = br.getRegex("<title>(.*?) \\| Flickr</title>").getMatch(0);
-        String username = null;
-        if (contenturl.matches(TYPE_FAVORITES)) {
-            username = new Regex(contenturl, TYPE_FAVORITES).getMatch(0);
-            fpName = "favourites of user " + username;
-        } else {
-            /* Unsupported URL type/developer mistake */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        final FilePackage fp = FilePackage.getInstance();
-        // lets allow merge, so if the user imports multiple pages manually they will go into the same favourites package.
-        fp.setAllowMerge(true);
-        fp.setName(Encoding.htmlDecode(fpName.trim()));
-        final int totalEntries;
-        if (picCount != null) {
-            picCount = picCount.replaceAll("(,|\\.)", "");
-            totalEntries = Integer.parseInt(picCount);
-        } else {
-            totalEntries = -1;
-        }
-        /**
-         * Handling for albums/sets: Only decrypt all pages if user did NOT add a direct page link
-         */
-        int currentPage = -1;
-        if (contenturl.contains("/page")) {
-            currentPage = Integer.parseInt(new Regex(contenturl, "page(\\d+)").getMatch(0));
-        }
-        String getPage = contenturl.replaceFirst("/page\\d+", "") + "/page%s";
-        if (contenturl.matches(TYPE_GROUPS) && contenturl.endsWith("/")) {
-            // Try other way of loading more pictures for groups links
-            br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-            getPage = contenturl + "page%s/?fragment=1";
-        }
-        int i = (currentPage != -1 ? currentPage : 1);
-        /* We don't know the total count before so let's always use 4 digits. */
-        final DecimalFormat df = new DecimalFormat("0000");
-        int imagePosition = 0;
-        do {
-            if (i != 1 && currentPage == -1) {
-                br.getPage(String.format(getPage, i));
-                // when we are out of pages, it will redirect back to non page count
-                if (br.getURL().equals(getPage.replace("/page%s", "/"))) {
-                    logger.info("No more pages!");
-                    break;
-                }
-            }
-            final String json = this.br.getRegex("modelExport\\s*:\\s*(\\{.+\\}),").getMatch(0);
-            if (json == null) {
-                /* This should never happen but if we found links before, lets return them. */
-                if (ret.isEmpty()) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                } else {
-                    break;
-                }
-            }
-            Map<String, Object> entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(json);
-            List<Object> resourcelist = (List<Object>) JavaScriptEngineFactory.walkJson(entries, "favorite-models/{0}/photoPageList/_data");
-            if (resourcelist == null) {
-                resourcelist = (List<Object>) JavaScriptEngineFactory.walkJson(entries, "main/favorite-models/{0}/photoPageList/_data");
-            }
-            Map<String, Object> lastOwner = null;
-            final ArrayList<Map<String, Object>> knownOwner = new ArrayList<Map<String, Object>>();
-            for (final Object pico : resourcelist) {
-                imagePosition += 1;
-                Map<String, Object> entry = (Map<String, Object>) pico;
-                if (entry == null) {
-                    continue;
-                }
-                String title = (String) entry.get("title");
-                String media = (String) entry.get("media");
-                final String picID = (String) entry.get("id");
-                // not all images have a title.
-                if (title == null) {
-                    title = "";
-                }
-                final Map<String, Object> owner;
-                if (entry.get("owner") instanceof Map) {
-                    owner = (Map<String, Object>) entry.get("owner");
-                } else if (entry.get("owner").toString().startsWith("~")) {
-                    final int index = Integer.parseInt(entry.get("owner").toString().substring(1));
-                    if (knownOwner.size() > index) {
-                        owner = knownOwner.get(index);
-                    } else {
-                        owner = lastOwner;
-                        knownOwner.add(owner);
-                    }
-                } else {
-                    owner = null;
-                }
-                lastOwner = owner;
-                String pathAlias = (String) owner.get("pathAlias"); // standard
-                if (pathAlias == null) {
-                    // flickr 'Model' will be under the following (not username)
-                    pathAlias = (String) owner.get("id");
-                    if (pathAlias == null) {
-                        // stupid i know but they reference other entries values. (standard users)
-                        final String pa = (String) owner.get("$ref");
-                        if (pa != null) {
-                            final String r = new Regex(pa, "\\$\\[\"favorite-models\"\\]\\[0\\]\\[\"photoPageList\"\\]\\[\"_data\"\\]\\[(\\d+)\\]\\[\"owner\"\\]").getMatch(0);
-                            pathAlias = (String) JavaScriptEngineFactory.walkJson(resourcelist, "{" + r + "}/owner/pathAlias");
-                        }
-                        if (pathAlias == null) {
-                            // 'r' above can fail.. referenced a another record resourcelist value which doens't have result!
-                            pathAlias = (String) JavaScriptEngineFactory.walkJson(entry, "engagement/ownerNsid");
-                        }
-                    }
-                }
-                if (picID == null || pathAlias == null) {
-                    /* Skip invalid items */
-                    logger.warning("Found invalid json object");
-                    continue;
-                }
-                final DownloadLink fina = createDownloadlink(buildContentURL(pathAlias, picID));
-                final String extension;
-                if ("video".equalsIgnoreCase(media)) {
-                    extension = ".mp4";
-                } else {
-                    extension = ".jpg";
-                }
-                fina.setProperty(FlickrCom.PROPERTY_MEDIA_TYPE, media);
-                fina.setProperty(FlickrCom.PROPERTY_EXT, extension);
-                fina.setProperty(FlickrCom.PROPERTY_USERNAME, pathAlias);
-                fina.setProperty(FlickrCom.PROPERTY_CONTENT_ID, picID);
-                fina.setProperty(FlickrCom.PROPERTY_TITLE, title);
-                fina.setProperty(FlickrCom.PROPERTY_ORDER_ID, df.format(imagePosition));
-                final String formattedFilename = getFormattedFilename(fina);
-                fina.setName(formattedFilename);
-                fina.setAvailable(true);
-                fp.add(fina);
-                distribute(fina);
-                ret.add(fina);
-            }
-            final int dsize = ret.size();
-            logger.info("Found " + dsize + " links from " + i + " pages of searching.");
-            if (this.isAbort()) {
-                logger.info("Stopping because: Aborted by user");
-                return ret;
-            } else if (dsize == 0 || (dsize * i) == totalEntries || dsize != (maxEntriesPerPage * i)) {
-                logger.info("Stopping because: Stopping at page " + i + " because it seems like we got everything decrypted.");
-                break;
-            } else if (currentPage != -1) {
-                // we only want to decrypt the page user selected.
-                logger.info("Stopping because: Stopped at page " + i + " because user selected a single page to decrypt!");
-                break;
-            } else {
-                i++;
-            }
-        } while (true);
-        return ret;
     }
 
     private String buildContentURL(final String pathAlias, final String contentID) {

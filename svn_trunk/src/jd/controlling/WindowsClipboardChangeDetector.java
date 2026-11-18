@@ -5,6 +5,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
+import jd.controlling.ClipboardMonitoring.ClipboardHash;
+
 import org.appwork.jna.windows.JNAOptions;
 import org.appwork.utils.logging2.LogSource;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
@@ -14,8 +16,6 @@ import com.sun.jna.Pointer;
 import com.sun.jna.platform.win32.WinDef.HWND;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.win32.StdCallLibrary;
-
-import jd.controlling.ClipboardMonitoring.ClipboardHash;
 
 public class WindowsClipboardChangeDetector extends ClipboardMonitoring.ClipboardChangeDetector {
     private interface User32 extends StdCallLibrary {
@@ -149,11 +149,6 @@ public class WindowsClipboardChangeDetector extends ClipboardMonitoring.Clipboar
     @Override
     protected int getCurrentWaitTimeout() {
         return 100;
-    }
-
-    @Override
-    protected void restart() {
-        super.restart();
     }
 
     @Override

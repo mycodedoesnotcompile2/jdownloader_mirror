@@ -48,15 +48,6 @@ import javax.swing.LookAndFeel;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
-import jd.SecondLevelLaunch;
-import jd.controlling.ClipboardMonitoring;
-import jd.controlling.reconnect.ReconnectPluginController;
-import jd.gui.swing.Factory;
-import jd.gui.swing.components.linkbutton.JLink;
-import jd.gui.swing.jdgui.JDGui;
-import jd.nutils.io.JDIO;
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.swing.MigPanel;
@@ -102,6 +93,15 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.updatev2.UpdateController;
 import org.jdownloader.utils.HelpLinks;
+
+import jd.SecondLevelLaunch;
+import jd.controlling.ClipboardMonitoring;
+import jd.controlling.reconnect.ReconnectPluginController;
+import jd.gui.swing.Factory;
+import jd.gui.swing.components.linkbutton.JLink;
+import jd.gui.swing.jdgui.JDGui;
+import jd.nutils.io.JDIO;
+import net.miginfocom.swing.MigLayout;
 
 public class AboutDialog extends AbstractDialog<Integer> {
     private int labelHeight = 0;
@@ -279,7 +279,6 @@ public class AboutDialog extends AbstractDialog<Integer> {
                     } catch (Exception e) {
                         org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);
                     }
-
                     if (url != null) {
                         final String text = "<html>" + CrossSystem.getOSFamily() + "(" + CrossSystem.getOS() + ")" + (CrossSystem.is64BitOperatingSystem() ? "(64bit)" : "(32bit)") + systemOnChip + "<u><font color=red>(Rosetta emulation detected!)</font></u></html>";
                         stats.add(createLink(text, url));
@@ -585,11 +584,17 @@ public class AboutDialog extends AbstractDialog<Integer> {
         String version = "4.65";
         try {
             version = ReflectionUtils.invoke("net.sf.sevenzipjbinding.SevenZip", "getSevenZipJBindingVersion", null, String.class, new Object[0]);
-            final String usedPlatform = ReflectionUtils.invoke("net.sf.sevenzipjbinding.SevenZip", "getUsedPlatform", null, String.class, new Object[0]);
-            if (usedPlatform != null) {
-                return version + "/" + usedPlatform;
+            final boolean initializedSuccessfully = ReflectionUtils.invoke("net.sf.sevenzipjbinding.SevenZip", "isInitializedSuccessfully", null, boolean.class, new Object[0]);
+            if (initializedSuccessfully) {
+                final String usedPlatform = ReflectionUtils.invoke("net.sf.sevenzipjbinding.SevenZip", "getUsedPlatform", null, String.class, new Object[0]);
+                final Class<?> sevenZipVersionClass = Class.forName("net.sf.sevenzipjbinding.SevenZip$Version");
+                final Object nativeVersion = ReflectionUtils.invoke("net.sf.sevenzipjbinding.SevenZip", "getSevenZipVersion", null, sevenZipVersionClass, new Object[0]);
+                version = version + "(" + usedPlatform + "/" + ReflectionUtils.getFieldValue(sevenZipVersionClass, "version", nativeVersion, String.class) + ")";
+            } else {
+                version = version + "(not yet initialized)";
             }
         } catch (final Throwable ignore1) {
+            ignore1.printStackTrace();
         }
         return version;
     }

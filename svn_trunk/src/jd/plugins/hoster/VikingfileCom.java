@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.TypeRef;
@@ -39,7 +40,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 51437 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54031 $", interfaceVersion = 3, names = {}, urls = {})
 public class VikingfileCom extends PluginForHost {
     public VikingfileCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -57,10 +58,10 @@ public class VikingfileCom extends PluginForHost {
         return "https://" + getHost() + "/terms";
     }
 
-    private static List<String[]> getPluginDomains() {
+    public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "vikingfile.com", "vikingf1le.us.to" });
+        ret.add(new String[] { "vikingfile.com", "vikingf1le.us.to", "vik1ngfile.site" });
         return ret;
     }
 
@@ -74,9 +75,15 @@ public class VikingfileCom extends PluginForHost {
     }
 
     public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    private static final Pattern PATTERN_FILE = Pattern.compile("/f/([A-Za-z0-9]{10})(?![A-Za-z0-9])", Pattern.CASE_INSENSITIVE);
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
-        for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/f/([A-Za-z0-9]{10})");
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_FILE.pattern());
         }
         return ret.toArray(new String[0]);
     }
@@ -92,7 +99,12 @@ public class VikingfileCom extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        return new Regex(link.getPluginPatternMatcher(), PATTERN_FILE).getMatch(0);
+    }
+
+    @Override
+    protected String getDefaultFileName(final DownloadLink link) {
+        return this.getFID(link);
     }
 
     @Override
@@ -115,70 +127,70 @@ public class VikingfileCom extends PluginForHost {
             return false;
         }
         try {
-            final StringBuilder sb = new StringBuilder();
-            final List<DownloadLink> links = new ArrayList<DownloadLink>();
-            int index = 0;
-            while (true) {
-                links.clear();
-                while (true) {
-                    /* We check up to 100 links at once */
-                    if (index == urls.length || links.size() == 100) {
-                        break;
-                    } else {
-                        links.add(urls[index]);
-                        index++;
-                    }
-                }
-                sb.delete(0, sb.capacity());
-                for (final DownloadLink link : links) {
-                    sb.append("hash[]=" + this.getFID(link));
-                    sb.append("&");
-                }
-                // remove last "&"
-                sb.deleteCharAt(sb.length() - 1);
-                br.postPageRaw(getApiBase() + "/check-file", sb.toString());
-                final List<Map<String, Object>> items = (List<Map<String, Object>>) restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
-                if (items == null || items.size() != links.size()) {
-                    /* This should never happen */
-                    throw new WTFException();
-                }
-                for (int i = 0; i < links.size(); i++) {
-                    final DownloadLink link = links.get(i);
-                    final String fid = this.getFID(link);
-                    if (!link.isNameSet()) {
-                        /* Set weak filename */
-                        link.setName(fid);
-                    }
-                    final Map<String, Object> data = items.get(i);
-                    if (Boolean.TRUE.equals(data.get("exist"))) {
-                        link.setAvailable(true);
-                        link.setFinalFileName(data.get("name").toString());
-                        link.setVerifiedFileSize(((Number) data.get("size")).longValue());
-                    } else {
-                        /* Deleted file or invalid fileID. */
-                        link.setAvailable(false);
-                    }
-                }
-                if (index == urls.length) {
-                    break;
-                }
-            }
+            checkLinksAPI(urls);
         } catch (final Exception e) {
+            logger.log(e);
             return false;
         }
         return true;
     }
 
+    /** Checks the given links via API. Exceptions are passed through to the caller. */
+    @SuppressWarnings("unchecked")
+    private void checkLinksAPI(final DownloadLink[] urls) throws Exception {
+        final StringBuilder sb = new StringBuilder();
+        final List<DownloadLink> links = new ArrayList<DownloadLink>();
+        int index = 0;
+        while (true) {
+            links.clear();
+            while (true) {
+                /* We check up to 100 links at once */
+                if (index == urls.length || links.size() == 100) {
+                    break;
+                } else {
+                    links.add(urls[index]);
+                    index++;
+                }
+            }
+            sb.setLength(0);
+            for (final DownloadLink link : links) {
+                if (sb.length() > 0) {
+                    sb.append("&");
+                }
+                sb.append("hash[]=" + this.getFID(link));
+            }
+            br.postPageRaw(getApiBase() + "/check-file", sb.toString());
+            final List<Map<String, Object>> items = (List<Map<String, Object>>) restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
+            if (items == null || items.size() != links.size()) {
+                /* This should never happen */
+                throw new WTFException();
+            }
+            for (int i = 0; i < links.size(); i++) {
+                final DownloadLink link = links.get(i);
+                final Map<String, Object> data = items.get(i);
+                if (Boolean.TRUE.equals(data.get("exist"))) {
+                    link.setAvailable(true);
+                    link.setFinalFileName(data.get("name").toString());
+                    link.setVerifiedFileSize(((Number) data.get("size")).longValue());
+                } else {
+                    /* Deleted file or invalid fileID. */
+                    link.setAvailable(false);
+                }
+            }
+            if (index == urls.length) {
+                break;
+            }
+        }
+    }
+
     @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         return requestFileInformationAPI(link);
     }
 
-    public AvailableStatus requestFileInformationAPI(final DownloadLink link) throws IOException, PluginException {
-        checkLinks(new DownloadLink[] { link });
-        if (!link.isAvailabilityStatusChecked()) {
-            return AvailableStatus.UNCHECKED;
-        } else if (link.isAvailabilityStatusChecked() && !link.isAvailable()) {
+    public AvailableStatus requestFileInformationAPI(final DownloadLink link) throws Exception {
+        checkLinksAPI(new DownloadLink[] { link });
+        if (!link.isAvailable()) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else {
             return AvailableStatus.TRUE;
@@ -187,10 +199,6 @@ public class VikingfileCom extends PluginForHost {
 
     public AvailableStatus requestFileInformationWebsite(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
-        final String fid = this.getFID(link);
-        if (!link.isNameSet()) {
-            link.setName(fid);
-        }
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -202,7 +210,7 @@ public class VikingfileCom extends PluginForHost {
         } else {
             logger.warning("Failed to find filename");
         }
-        String filesize = br.getRegex("id=\"size\"[^>]*>([^<]+)<").getMatch(0);
+        final String filesize = br.getRegex("id=\"size\"[^>]*>([^<]+)<").getMatch(0);
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
         } else {
@@ -217,14 +225,14 @@ public class VikingfileCom extends PluginForHost {
     }
 
     public void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
-        final String directlinkproperty = "directurl_" + (account != null ? account.getType().getLabel() : null);
+        final String directlinkproperty = "directurl_" + (account != null ? account.getType().getLabel() : "free");
         final String storedDirecturl = link.getStringProperty(directlinkproperty);
-        String dllink;
+        final String dllink;
         if (storedDirecturl != null) {
             logger.info("Re-using stored directurl: " + storedDirecturl);
             dllink = storedDirecturl;
         } else {
-            requestFileInformationAPI(link);
+            /* Availability was already checked via API by the core before. Only the website is needed for the captcha sitekey. */
             requestFileInformationWebsite(link);
             final String cfkey = br.getRegex("sitekey\\s*:\\s*'([^']+)'").getMatch(0);
             if (cfkey == null) {
@@ -236,10 +244,12 @@ public class VikingfileCom extends PluginForHost {
             query.appendEncoded("cf-turnstile-response", cfTurnstileResponse);
             br.postPage(br.getURL(), query);
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            dllink = entries.get("link").toString();
-            if (StringUtils.isEmpty(dllink)) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            /* "link" is missing in error responses (e.g. captcha rejected) */
+            final Object linkO = entries.get("link");
+            if (linkO == null || StringUtils.isEmpty(linkO.toString())) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find directurl: " + entries);
             }
+            dllink = linkO.toString();
         }
         try {
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
@@ -256,6 +266,8 @@ public class VikingfileCom extends PluginForHost {
                 }
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+        } catch (final InterruptedException e) {
+            throw e;
         } catch (final Exception e) {
             if (storedDirecturl != null) {
                 link.removeProperty(directlinkproperty);
@@ -271,11 +283,6 @@ public class VikingfileCom extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(final DownloadLink downloadLink, final Account account) throws Exception {
-        return true;
-    }
-
-    @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
     }
@@ -283,13 +290,5 @@ public class VikingfileCom extends PluginForHost {
     @Override
     public boolean hasCaptcha(final DownloadLink link, final Account acc) {
         return true;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }
