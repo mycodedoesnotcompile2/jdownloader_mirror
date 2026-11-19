@@ -225,6 +225,7 @@ public abstract class Cookie {
                 return new LegacyCookie();
             }
         };
+
         public abstract Cookie newCookieInstance();
 
         public boolean isSameSource(Cookie cookie) {
@@ -464,7 +465,7 @@ public abstract class Cookie {
         final String domain = getDomain();
         if (isIPAddress(urlHost) && (host != null && !urlHost.equalsIgnoreCase(host) || domain != null && !urlHost.equalsIgnoreCase(domain))) {
             return false;
-        }        
+        }
         final String scope = domain != null ? domain : getOriginHost();
         if (Boolean.TRUE.equals(isHostOnly()) && scope != null && !StringUtils.equalsIgnoreCase(urlHost, scope)) {
             return false;

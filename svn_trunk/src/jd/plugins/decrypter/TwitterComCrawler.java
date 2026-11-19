@@ -78,7 +78,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.TwitterCom;
 
-@DecrypterPlugin(revision = "$Revision: 53415 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54059 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterComCrawler extends PluginForDecrypt {
     private String  resumeURL                                     = null;
     private Number  maxTweetsToCrawl                              = null;
@@ -128,7 +128,9 @@ public class TwitterComCrawler extends PluginForDecrypt {
 
     private static final Pattern           PATTERN_I_CARD                                                   = Pattern.compile("/(?:i/)?cards/tfw/v1/(\\d+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern           PATTERN_I_OWN_LIKES                                              = Pattern.compile("/(?:i/)?history/likes", Pattern.CASE_INSENSITIVE);
-    private static final Pattern           PATTERN_I_USER_VIA_USER_ID                                       = Pattern.compile("/(?:i/)?user/(\\d+)", Pattern.CASE_INSENSITIVE);
+    /* Own bookmarks (saved Tweets): https://x.com/i/history */
+    private static final Pattern           PATTERN_I_OWN_BOOKMARKS                                          = Pattern.compile("/i/history/?(\\?.*)?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern           PATTERN_I_USER_VIA_USER_ID                                       =Pattern.compile("/(?:i/)?user/(\\d+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern           PATTERN_I_VIDEOS_BY_SINGLE_TWEET                                 = Pattern.compile("/(?:i/)?videos/tweet/(\\d+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern           PATTERN_SINGLE_TWEET                                             = Pattern.compile("/(?:i/)?([A-Za-z0-9_-]+)/status/(\\d+).*?", Pattern.CASE_INSENSITIVE);
     private static final Pattern           TYPE_USER_ALL                                                    = Pattern.compile("/(?:i/)?([A-Za-z0-9_-]+)(?:/(?:media|likes))?(\\?.*)?", Pattern.CASE_INSENSITIVE);
@@ -196,6 +198,8 @@ public class TwitterComCrawler extends PluginForDecrypt {
             regex += "|";
             regex += PATTERN_I_OWN_LIKES.pattern();
             regex += "|";
+            regex += PATTERN_I_OWN_BOOKMARKS.pattern();
+            regex += "|";
             regex += PATTERN_I_USER_VIA_USER_ID.pattern();
             regex += "|";
             regex += PATTERN_I_VIDEOS_BY_SINGLE_TWEET.pattern();
@@ -216,6 +220,8 @@ public class TwitterComCrawler extends PluginForDecrypt {
     public static enum ProfileCrawlMode {
         ALL_ITEMS,
         LIKES,
+        /* Own bookmarks of the logged in account */
+        BOOKMARKS,
         MEDIA
     }
 
@@ -357,38 +363,136 @@ public class TwitterComCrawler extends PluginForDecrypt {
         return PluginJSonUtils.getJson(brc, "guest_token");
     }
 
+    /** Base URL of all static web client files (main.js and lazy loaded chunks). */
+    private static final String GRAPHQL_CLIENT_WEB_BASE_URL = "https://abs.twimg.com/responsive-web/client-web/";
+
     private String getGraphqlQueryID(final String operationName) throws IOException, PluginException {
         synchronized (graphqlQueryids) {
             if (graphqlQueryids.isEmpty() || !graphqlQueryids.containsKey(operationName)) {
-                final Browser br = this.createNewBrowserInstance();
-                /* URL last updated: 2025-03-11 */
-                br.getPage("https://abs.twimg.com/responsive-web/client-web/main.bb7184fa.js");
-                // 2025-04-28: New: https://abs.twimg.com/responsive-web/client-web/main.ef558a8a.js
                 final HashSet<String> operationNamesToCache = new HashSet<String>();
                 operationNamesToCache.add("UserByScreenName");
                 operationNamesToCache.add("UserMedia");
                 operationNamesToCache.add("UserTweets");
                 operationNamesToCache.add("Likes");
+                operationNamesToCache.add("Bookmarks");
                 operationNamesToCache.add("TweetDetail");
                 operationNamesToCache.add("TweetResultByRestId");
                 /* Just in case this isn't in here already */
                 if (operationNamesToCache.add(operationName)) {
                     logger.info("!Developer! Update list of defaultIDs and add operationName: " + operationName);
                 }
-                for (final String idToCache : operationNamesToCache) {
-                    final String queryID = br.getRegex("queryId\\s*:\\s*\"([^\"]+)\",\\s*operationName\\s*:\\s*\"" + idToCache + "\"").getMatch(0);
-                    if (queryID != null) {
-                        graphqlQueryids.put(idToCache, queryID);
-                    } else {
-                        logger.warning("Failed to find ID for operationName: " + operationName);
-                    }
+                /*
+                 * Step 1: Fixed main.js: Existing operations keep using the IDs they have always used so their requests (variables/features)
+                 * stay compatible.
+                 */
+                final HashSet<String> missingOperationNames = new HashSet<String>(operationNamesToCache);
+                /* URL last updated: 2025-03-11 */
+                this.findGraphqlQueryIDs(GRAPHQL_CLIENT_WEB_BASE_URL + "main.bb7184fa.js", missingOperationNames);
+                if (!missingOperationNames.isEmpty()) {
+                    /*
+                     * Step 2: Operations which are not part of the fixed main.js (e.g. "Bookmarks"): Look them up in the current main.js and
+                     * in the lazy loaded chunks of the current web client.
+                     */
+                    logger.info("Operations missing in fixed main.js: " + missingOperationNames);
+                    this.findGraphqlQueryIDsInCurrentWebClient(missingOperationNames);
+                }
+                for (final String missingOperationName : missingOperationNames) {
+                    logger.warning("Failed to find ID for operationName: " + missingOperationName);
                 }
             }
-            final String ret = graphqlQueryids.get(operationName);
+            String ret = graphqlQueryids.get(operationName);
+            if (ret == null && operationName.equals("Bookmarks")) {
+                /* Last resort: Last known queryID (2026-11-18). */
+                ret = "fjf5b5Lu82lYMSBRhppK2g";
+                graphqlQueryids.put(operationName, ret);
+            }
             if (ret == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             return ret;
+        }
+    }
+
+    /**
+     * Searches the given JavaScript file for the queryIDs of the given operations. Found operations are cached and removed from the given
+     * set.
+     */
+    private void findGraphqlQueryIDs(final String jsURL, final Set<String> missingOperationNames) {
+        try {
+            final Browser brJs = this.createNewBrowserInstance();
+            brJs.getPage(jsURL);
+            if (brJs.getHttpConnection().getResponseCode() != 200) {
+                logger.info("Failed to load JS file: " + jsURL + " | Responsecode: " + brJs.getHttpConnection().getResponseCode());
+                return;
+            }
+            for (final String operationName : new ArrayList<String>(missingOperationNames)) {
+                final String queryID = brJs.getRegex("queryId\\s*:\\s*\"([^\"]+)\",\\s*operationName\\s*:\\s*\"" + Pattern.quote(operationName) + "\"").getMatch(0);
+                if (queryID != null) {
+                    logger.info("Found queryID for operation " + operationName + ": " + queryID + " | Source: " + jsURL);
+                    graphqlQueryids.put(operationName, queryID);
+                    missingOperationNames.remove(operationName);
+                }
+            }
+        } catch (final Exception e) {
+            logger.log(e);
+            logger.info("Failed to search JS file: " + jsURL);
+        }
+    }
+
+    /**
+     * Looks for the given operations in the current main.js and in the lazy loaded chunks, both are determined via the website. Found
+     * operations are cached and removed from the given set. Never throws: Failures are only logged.
+     */
+    private void findGraphqlQueryIDsInCurrentWebClient(final Set<String> missingOperationNames) {
+        try {
+            final Browser brHtml = this.createNewBrowserInstance();
+            brHtml.getPage("https://" + this.getHost() + "/");
+            final String html = brHtml.getRequest().getHtmlCode();
+            final String currentMainJsURL = new Regex(html, "(https?://abs\\.twimg\\.com/responsive-web/client-web/main\\.[a-z0-9]+\\.js)").getMatch(0);
+            if (currentMainJsURL != null) {
+                this.findGraphqlQueryIDs(currentMainJsURL, missingOperationNames);
+            } else {
+                logger.info("Failed to find current main.js URL");
+            }
+            if (missingOperationNames.isEmpty()) {
+                return;
+            }
+            /*
+             * Lazy loaded chunks: URL = base + chunkName + "." + chunkHash + "a.js". Both maps are part of the webpack runtime in the HTML:
+             * x.u=e=>(({id:"name",...})[e]||e)+"."+({id:"hash",...})[e]+"a.js"
+             */
+            final String[] chunkMaps = new Regex(html, Pattern.compile("\\w+\\.u=\\w+=>\\(\\(\\{(.*?)\\}\\)\\[\\w+\\]\\|\\|\\w+\\)\\+\"\\.\"\\+\\(\\{(.*?)\\}\\)\\[\\w+\\]\\+\"a\\.js\"", Pattern.DOTALL)).getRow(0);
+            if (chunkMaps == null) {
+                logger.info("Failed to find chunk maps");
+                return;
+            }
+            final Map<String, String> chunkHashes = new HashMap<String, String>();
+            for (final String[] idAndHash : new Regex(chunkMaps[1], "(\\d+):\"([^\"]*)\"").getMatches()) {
+                chunkHashes.put(idAndHash[0], idAndHash[1]);
+            }
+            final String[][] chunkNames = new Regex(chunkMaps[0], "(\\d+):\"([^\"]*)\"").getMatches();
+            for (final String operationName : new ArrayList<String>(missingOperationNames)) {
+                /* Chunk names usually contain the name of the operation e.g. "bundle.Bookmarks". Limit number of requests. */
+                int chunksChecked = 0;
+                for (final String[] idAndName : chunkNames) {
+                    final String hash = chunkHashes.get(idAndName[0]);
+                    if (hash == null || !idAndName[1].contains(operationName)) {
+                        continue;
+                    } else if (++chunksChecked > 5) {
+                        break;
+                    }
+                    final HashSet<String> thisMissing = new HashSet<String>();
+                    thisMissing.add(operationName);
+                    this.findGraphqlQueryIDs(GRAPHQL_CLIENT_WEB_BASE_URL + idAndName[1] + "." + hash + "a.js", thisMissing);
+                    if (thisMissing.isEmpty()) {
+                        missingOperationNames.remove(operationName);
+                        break;
+                    }
+                }
+            }
+        } catch (final Exception e) {
+            logger.log(e);
+            logger.info("Failed to search current web client for queryIDs");
         }
     }
 
@@ -626,7 +730,14 @@ public class TwitterComCrawler extends PluginForDecrypt {
             throw new IllegalArgumentException();
         }
         final ProfileCrawlMode mode;
-        if (new Regex(path, "/history/likes").patternFind()) {
+        if (new Regex(path, "(?i)^/i/history/?$").patternFind()) {
+            /* User wants to crawl his own bookmarks */
+            if (account == null) {
+                throw new AccountRequiredException("Account required to crawl your own bookmarks");
+            }
+            username = account.getUser();
+            mode = ProfileCrawlMode.BOOKMARKS;
+        } else if (new Regex(path, "/history/likes").patternFind()) {
             /* User wants to crawl his own likes */
             if (account == null) {
                 throw new AccountRequiredException("Account required to crawl your own likes");
@@ -683,7 +794,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
         final int favorite_count = ((Number) user.get("favourites_count")).intValue();
         final String userID = user.get("id_str").toString();
         final String bubbleNotifyTitle = "Twitter profile " + username + " | ID: " + userID;
-        if (statuses_count == 0 && media_count == 0 && favorite_count == 0) {
+        if (crawlmode != ProfileCrawlMode.BOOKMARKS && statuses_count == 0 && media_count == 0 && favorite_count == 0) {
             displayBubbleNotification(bubbleNotifyTitle, "Warning!\nYou are trying to crawl all items of this profile but it has no items.");
             throw new DecrypterRetryException(RetryReason.EMPTY_PROFILE, "PROFILE_HAS_NO_ITEMS_" + username, "You are trying to crawl all items of this profile but it has no items.");
         }
@@ -702,7 +813,8 @@ public class TwitterComCrawler extends PluginForDecrypt {
         if (!StringUtils.isEmpty(profileDescription)) {
             fp.setComment(profileDescription);
         }
-        if (crawlmode == ProfileCrawlMode.LIKES) {
+        switch (crawlmode) {
+        case LIKES: {
             if (favorite_count == 0) {
                 displayBubbleNotification(bubbleNotifyTitle, "Warning!\nYou are trying to crawl all likes of this profile but it has no liked items.");
                 throw new DecrypterRetryException(RetryReason.EMPTY_PROFILE, "PROFILE_HAS_NO_LIKES_" + username, "You are trying to crawl all likes of this profile but it has no liked items.");
@@ -710,7 +822,16 @@ public class TwitterComCrawler extends PluginForDecrypt {
             fp.setName(username + " - likes");
             final ArrayList<DownloadLink> results = crawlTweetsViaGraphqlAPI("Likes", param, user, account, crawlmode, fp);
             ret.addAll(results);
-        } else if (crawlmode == ProfileCrawlMode.MEDIA) {
+            break;
+        }
+        case BOOKMARKS: {
+            /* The number of bookmarks is not available via user info -> Empty bookmarks are detected below. */
+            fp.setName(username + " - bookmarks");
+            final ArrayList<DownloadLink> results = crawlTweetsViaGraphqlAPI("Bookmarks", param, user, account, crawlmode, fp);
+            ret.addAll(results);
+            break;
+        }
+        case MEDIA: {
             if (media_count == 0) {
                 displayBubbleNotification(bubbleNotifyTitle, "Warning!\nYou are trying to crawl all media items of this profile but it has no media items.");
                 throw new DecrypterRetryException(RetryReason.EMPTY_PROFILE, "PROFILE_HAS_NO_MEDIA_ITEMS_" + username, "You are trying to crawl all media items of this profile but it has no media items.");
@@ -718,7 +839,10 @@ public class TwitterComCrawler extends PluginForDecrypt {
             fp.setName(username + " - media");
             final ArrayList<DownloadLink> results = crawlTweetsViaGraphqlAPI("UserMedia", param, user, account, crawlmode, fp);
             ret.addAll(results);
-        } else {
+            break;
+        }
+        case ALL_ITEMS:
+        default: {
             /* Crawl all items of user + all media items */
             fp.setName(username);
             final ArrayList<DownloadLink> results1 = crawlTweetsViaGraphqlAPI("UserTweets", param, user, account, crawlmode, fp);
@@ -743,13 +867,18 @@ public class TwitterComCrawler extends PluginForDecrypt {
                     ret.addAll(results2);
                 }
             }
+            break;
+        }
         }
         final int totalWalkedThroughTweets = globalTweetIDsDupelist.size();
         if (ret.isEmpty()) {
             /* We found nothing -> Check why */
             final String bubbleNotifyTextEnding = "\r\nTotal number of Tweets in this profile: " + statuses_count;
             if (totalWalkedThroughTweets == 0) {
-                if (statuses_count > 0 && account == null) {
+                if (crawlmode == ProfileCrawlMode.BOOKMARKS) {
+                    displayBubbleNotification(bubbleNotifyTitle, "Warning!\nYou are trying to crawl your bookmarks but you have no bookmarked items.");
+                    throw new DecrypterRetryException(RetryReason.EMPTY_PROFILE, "PROFILE_HAS_NO_BOOKMARKS_" + username, "You are trying to crawl your bookmarks but you have no bookmarked items.");
+                } else if (statuses_count > 0 && account == null) {
                     displayBubbleNotification(bubbleNotifyTitle, "Returning no results because:\r\nAccount required to view Tweets of this profile." + bubbleNotifyTextEnding);
                     throw new AccountRequiredException();
                 } else if (br.containsHTML("TimelineTerminateTimeline")) {
@@ -774,7 +903,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
                     displayBubbleNotification(bubbleNotifyTitle, "Returning no results because:\r\nMost likely user has disabled tweet text crawler but this profile only contained text tweets.\r\nMinimum number of skipped possible Tweets: " + totalWalkedThroughTweets + bubbleNotifyTextEnding);
                 }
             }
-        } else if (totalWalkedThroughTweets < statuses_count && globalProfileCrawlerSkippedResultsByRetweetAndReplyTweet.isEmpty() && globalProfileCrawlerSkippedResultsByMaxDate.isEmpty() && globalProfileCrawlerSkippedResultsByMaxitems.isEmpty()) {
+        } else if (crawlmode != ProfileCrawlMode.BOOKMARKS && totalWalkedThroughTweets < statuses_count && globalProfileCrawlerSkippedResultsByRetweetAndReplyTweet.isEmpty() && globalProfileCrawlerSkippedResultsByMaxDate.isEmpty() && globalProfileCrawlerSkippedResultsByMaxitems.isEmpty()) {
             /* No items were skipped but also not all items were found -> Notify user */
             String text = "Some items may be missing!";
             text += "\nTotal number of status items: " + statuses_count + " Crawled: " + totalWalkedThroughTweets;
@@ -799,10 +928,14 @@ public class TwitterComCrawler extends PluginForDecrypt {
             globalProfileCrawlerNextCursor = this.preGivenNextCursor;
         }
         final boolean allowSkipRetweets;
-        if (mode == ProfileCrawlMode.LIKES) {
+        switch (mode) {
+        case LIKES:
+        case BOOKMARKS:
             allowSkipRetweets = false;
-        } else {
+            break;
+        default:
             allowSkipRetweets = true;
+            break;
         }
         final TwitterConfigInterface cfg = PluginJsonConfig.get(TwitterConfigInterface.class);
         final long waitBetweenPaginationRequestsMillis = cfg.getProfileCrawlerWaittimeBetweenPaginationMilliseconds();
@@ -810,16 +943,19 @@ public class TwitterComCrawler extends PluginForDecrypt {
         logger.info("Crawling query " + queryName + " | queryID: " + queryID);
         do {
             final Map<String, Object> variables = new HashMap<String, Object>();
-            variables.put("userId", userID);
             variables.put("count", 20);
             if (globalProfileCrawlerNextCursor != null) {
                 variables.put("cursor", globalProfileCrawlerNextCursor);
             }
             variables.put("includePromotedContent", true);
-            variables.put("withQuickPromoteEligibilityTweetFields", true);
-            variables.put("withSuperFollowsUserFields", true);
-            variables.put("withVoice", true);
-            variables.put("withV2Timeline", true);
+            if (mode != ProfileCrawlMode.BOOKMARKS) {
+                /* Bookmarks always belong to the logged in account -> No userId needed. */
+                variables.put("userId", userID);
+                variables.put("withQuickPromoteEligibilityTweetFields", true);
+                variables.put("withSuperFollowsUserFields", true);
+                variables.put("withVoice", true);
+                variables.put("withV2Timeline", true);
+            }
             /* Not important */
             if (mode == ProfileCrawlMode.LIKES) {
                 variables.put("withBirdwatchNotes", false);
@@ -827,12 +963,18 @@ public class TwitterComCrawler extends PluginForDecrypt {
             final UrlQuery query = new UrlQuery();
             query.addAndReplace("variables", Encoding.urlEncode(JSonStorage.serializeToJson(variables)));
             /* Check this field if this request is wrong. */
-            query.addAndReplace("features",
-                    "%7B%22profile_label_improvements_pcf_label_in_post_enabled%22%3Atrue%2C%22rweb_tipjar_consumption_enabled%22%3Atrue%2C%22responsive_web_graphql_exclude_directive_enabled%22%3Atrue%2C%22verified_phone_label_enabled%22%3Afalse%2C%22creator_subscriptions_tweet_preview_api_enabled%22%3Atrue%2C%22responsive_web_graphql_timeline_navigation_enabled%22%3Atrue%2C%22responsive_web_graphql_skip_user_profile_image_extensions_enabled%22%3Afalse%2C%22premium_content_api_read_enabled%22%3Afalse%2C%22communities_web_enable_tweet_community_results_fetch%22%3Atrue%2C%22c9s_tweet_anatomy_moderator_badge_enabled%22%3Atrue%2C%22responsive_web_grok_analyze_button_fetch_trends_enabled%22%3Afalse%2C%22responsive_web_grok_analyze_post_followups_enabled%22%3Atrue%2C%22responsive_web_jetfuel_frame%22%3Afalse%2C%22responsive_web_grok_share_attachment_enabled%22%3Atrue%2C%22articles_preview_enabled%22%3Atrue%2C%22responsive_web_edit_tweet_api_enabled%22%3Atrue%2C%22graphql_is_translatable_rweb_tweet_is_translatable_enabled%22%3Atrue%2C%22view_counts_everywhere_api_enabled%22%3Atrue%2C%22longform_notetweets_consumption_enabled%22%3Atrue%2C%22responsive_web_twitter_article_tweet_consumption_enabled%22%3Atrue%2C%22tweet_awards_web_tipping_enabled%22%3Afalse%2C%22responsive_web_grok_analysis_button_from_backend%22%3Afalse%2C%22creator_subscriptions_quote_tweet_preview_enabled%22%3Afalse%2C%22freedom_of_speech_not_reach_fetch_enabled%22%3Atrue%2C%22standardized_nudges_misinfo%22%3Atrue%2C%22tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled%22%3Atrue%2C%22rweb_video_timestamps_enabled%22%3Atrue%2C%22longform_notetweets_rich_text_read_enabled%22%3Atrue%2C%22longform_notetweets_inline_media_enabled%22%3Atrue%2C%22responsive_web_grok_image_annotation_enabled%22%3Atrue%2C%22responsive_web_enhance_cards_enabled%22%3Afalse%7D");
+            final String features;
+            if (mode == ProfileCrawlMode.BOOKMARKS) {
+                /* Features as sent by the website in the "Bookmarks" request (2026-11). */
+                features = "%7B%22rweb_video_screen_enabled%22%3Afalse%2C%22rweb_cashtags_enabled%22%3Atrue%2C%22profile_label_improvements_pcf_label_in_post_enabled%22%3Atrue%2C%22responsive_web_profile_redirect_enabled%22%3Atrue%2C%22rweb_tipjar_consumption_enabled%22%3Afalse%2C%22verified_phone_label_enabled%22%3Afalse%2C%22creator_subscriptions_tweet_preview_api_enabled%22%3Atrue%2C%22responsive_web_graphql_timeline_navigation_enabled%22%3Atrue%2C%22premium_content_api_read_enabled%22%3Afalse%2C%22communities_web_enable_tweet_community_results_fetch%22%3Atrue%2C%22c9s_tweet_anatomy_moderator_badge_enabled%22%3Atrue%2C%22responsive_web_grok_analyze_button_fetch_trends_enabled%22%3Afalse%2C%22responsive_web_grok_analyze_post_followups_enabled%22%3Atrue%2C%22rweb_cashtags_composer_attachment_enabled%22%3Atrue%2C%22responsive_web_jetfuel_frame%22%3Atrue%2C%22rweb_sports_post_context_enabled%22%3Atrue%2C%22x_elections_post_context_enabled%22%3Atrue%2C%22responsive_web_grok_share_attachment_enabled%22%3Atrue%2C%22responsive_web_grok_annotations_enabled%22%3Atrue%2C%22articles_preview_enabled%22%3Atrue%2C%22responsive_web_edit_tweet_api_enabled%22%3Atrue%2C%22rweb_conversational_replies_downvote_enabled%22%3Afalse%2C%22graphql_is_translatable_rweb_tweet_is_translatable_enabled%22%3Atrue%2C%22view_counts_everywhere_api_enabled%22%3Atrue%2C%22longform_notetweets_consumption_enabled%22%3Atrue%2C%22responsive_web_twitter_article_tweet_consumption_enabled%22%3Atrue%2C%22content_disclosure_indicator_enabled%22%3Atrue%2C%22content_disclosure_ai_generated_indicator_enabled%22%3Atrue%2C%22responsive_web_grok_show_grok_translated_post%22%3Atrue%2C%22responsive_web_grok_analysis_button_from_backend%22%3Atrue%2C%22post_ctas_fetch_enabled%22%3Afalse%2C%22freedom_of_speech_not_reach_fetch_enabled%22%3Atrue%2C%22standardized_nudges_misinfo%22%3Atrue%2C%22tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled%22%3Atrue%2C%22longform_notetweets_rich_text_read_enabled%22%3Atrue%2C%22longform_notetweets_inline_media_enabled%22%3Afalse%2C%22responsive_web_nested_quote_preview_enabled%22%3Atrue%2C%22responsive_web_grok_image_annotation_enabled%22%3Atrue%2C%22responsive_web_grok_imagine_annotation_enabled%22%3Atrue%2C%22responsive_web_made_on_x_label_enabled%22%3Afalse%2C%22responsive_web_grok_community_note_auto_translation_is_enabled%22%3Atrue%2C%22responsive_web_enhance_cards_enabled%22%3Afalse%7D";
+            } else {
+                features = "%7B%22profile_label_improvements_pcf_label_in_post_enabled%22%3Atrue%2C%22rweb_tipjar_consumption_enabled%22%3Atrue%2C%22responsive_web_graphql_exclude_directive_enabled%22%3Atrue%2C%22verified_phone_label_enabled%22%3Afalse%2C%22creator_subscriptions_tweet_preview_api_enabled%22%3Atrue%2C%22responsive_web_graphql_timeline_navigation_enabled%22%3Atrue%2C%22responsive_web_graphql_skip_user_profile_image_extensions_enabled%22%3Afalse%2C%22premium_content_api_read_enabled%22%3Afalse%2C%22communities_web_enable_tweet_community_results_fetch%22%3Atrue%2C%22c9s_tweet_anatomy_moderator_badge_enabled%22%3Atrue%2C%22responsive_web_grok_analyze_button_fetch_trends_enabled%22%3Afalse%2C%22responsive_web_grok_analyze_post_followups_enabled%22%3Atrue%2C%22responsive_web_jetfuel_frame%22%3Afalse%2C%22responsive_web_grok_share_attachment_enabled%22%3Atrue%2C%22articles_preview_enabled%22%3Atrue%2C%22responsive_web_edit_tweet_api_enabled%22%3Atrue%2C%22graphql_is_translatable_rweb_tweet_is_translatable_enabled%22%3Atrue%2C%22view_counts_everywhere_api_enabled%22%3Atrue%2C%22longform_notetweets_consumption_enabled%22%3Atrue%2C%22responsive_web_twitter_article_tweet_consumption_enabled%22%3Atrue%2C%22tweet_awards_web_tipping_enabled%22%3Afalse%2C%22responsive_web_grok_analysis_button_from_backend%22%3Afalse%2C%22creator_subscriptions_quote_tweet_preview_enabled%22%3Afalse%2C%22freedom_of_speech_not_reach_fetch_enabled%22%3Atrue%2C%22standardized_nudges_misinfo%22%3Atrue%2C%22tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled%22%3Atrue%2C%22rweb_video_timestamps_enabled%22%3Atrue%2C%22longform_notetweets_rich_text_read_enabled%22%3Atrue%2C%22longform_notetweets_inline_media_enabled%22%3Atrue%2C%22responsive_web_grok_image_annotation_enabled%22%3Atrue%2C%22responsive_web_enhance_cards_enabled%22%3Afalse%7D";
+            }
+            query.addAndReplace("features", features);
             final String url = API_BASE_GRAPHQL + "/" + queryID + "/" + queryName + "?" + query.toString();
             getPage(url);
             final Map<String, Object> entries = this.handleErrorsAPI(br);
-            final List<Map<String, Object>> timelineInstructions = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(entries, "data/user/result/timeline_v2/timeline/instructions");
+            final List<Map<String, Object>> timelineInstructions = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(entries, mode == ProfileCrawlMode.BOOKMARKS ? "data/bookmark_timeline_v2/timeline/instructions" : "data/user/result/timeline_v2/timeline/instructions");
             final int numberofTweetsWalkedThroughBefore = globalTweetIDsDupelist.size();
             final List<DownloadLink> resultsThisPage = this.crawlUserProfileGraphqlTimelineInstructions(timelineInstructions, user, null, fp, allowSkipRetweets);
             final int numberofNewTweetsWalkedThroughThisPage = globalTweetIDsDupelist.size() - numberofTweetsWalkedThroughBefore;
@@ -1088,9 +1230,18 @@ public class TwitterComCrawler extends PluginForDecrypt {
     private ArrayList<DownloadLink> crawlTweetMap(String username, final Map<String, Object> thisRoot, FilePackage fp) throws Exception {
         final TwitterConfigInterface cfg = PluginJsonConfig.get(TwitterConfigInterface.class);
         final Map<String, Object> tweet = (Map<String, Object>) thisRoot.get("legacy");
-        final Map<String, Object> user = (Map<String, Object>) JavaScriptEngineFactory.walkJson(thisRoot, "core/user_results/result/legacy");
-        if (user == null) {
-            throw new IllegalArgumentException();
+        final Map<String, Object> userResult = (Map<String, Object>) JavaScriptEngineFactory.walkJson(thisRoot, "core/user_results/result");
+        final Map<String, Object> userLegacy = (Map<String, Object>) userResult.get("legacy");
+        final String userScreenName;
+        final List<String> pinned_tweet_ids_str;
+        if (userLegacy != null) {
+            /* Old format */
+            userScreenName = userLegacy.get("screen_name").toString();
+            pinned_tweet_ids_str = (List<String>) userLegacy.get("pinned_tweet_ids_str");
+        } else {
+            /* New format (e.g. Bookmarks, 2026-11): User info is no longer located in "legacy". */
+            userScreenName = JavaScriptEngineFactory.walkJson(userResult, "core/screen_name").toString();
+            pinned_tweet_ids_str = (List<String>) JavaScriptEngineFactory.walkJson(userResult, "pinned_items/tweet_ids_str");
         }
         final String tweetID = tweet.get("id_str").toString();
         globalTweetIDsDupelist.add(tweetID);
@@ -1099,9 +1250,8 @@ public class TwitterComCrawler extends PluginForDecrypt {
         // logger.info("hit");
         // }
         if (username == null) {
-            username = user.get("screen_name").toString();
+            username = userScreenName;
         }
-        final List<String> pinned_tweet_ids_str = (List<String>) user.get("pinned_tweet_ids_str");
         final String created_at = tweet.get("created_at").toString();
         final long timestamp = getTimestampTwitterDate(created_at);
         final String formattedDate = formatTwitterDateFromTimestamp(timestamp);

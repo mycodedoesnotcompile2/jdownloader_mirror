@@ -15,24 +15,42 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.awt.Color;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.TypeRef;
+import org.appwork.swing.MigPanel;
+import org.appwork.swing.components.ExtPasswordField;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
+import org.jdownloader.gui.InputChangedCallbackInterface;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.accounts.AccountBuilderInterface;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
+import jd.gui.swing.components.linkbutton.JLink;
 import jd.http.Browser;
+import jd.http.Cookies;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.parser.html.Form;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.DefaultEditAccountPanelAPIKeyLogin;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -40,10 +58,28 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 54031 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54057 $", interfaceVersion = 3, names = {}, urls = {})
 public class VikingfileCom extends PluginForHost {
     public VikingfileCom(PluginWrapper wrapper) {
         super(wrapper);
+        /* Premium URL is only exposed in the IDE, see getBuyPremiumUrl(). */
+        this.enablePremium();
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        /* Login via "Login Hash" which is handled like an API key (no username/password). */
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.API_KEY_LOGIN };
+    }
+
+    @Override
+    public String getBuyPremiumUrl() {
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            /* 2026-11-18: TODO: Test with premium logins/"login hash", then remove this IDE-only check. */
+            return "https://" + getHost() + "/premium";
+        } else {
+            return super.getBuyPremiumUrl();
+        }
     }
 
     @Override
@@ -198,7 +234,7 @@ public class VikingfileCom extends PluginForHost {
     }
 
     public AvailableStatus requestFileInformationWebsite(final DownloadLink link) throws IOException, PluginException {
-        this.setBrowserExclusive();
+        /* Do not clear cookies here: They may contain the login session of an account. */
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -222,6 +258,13 @@ public class VikingfileCom extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         handleDownload(link, null);
+    }
+
+    @Override
+    public void handlePremium(final DownloadLink link, final Account account) throws Exception {
+        /* Hash accounts are treated as free accounts for now. */
+        login(account, false);
+        handleDownload(link, account);
     }
 
     public void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
@@ -282,13 +325,179 @@ public class VikingfileCom extends PluginForHost {
         dl.startDownload();
     }
 
+    /**
+     * Logs in via "Login Hash". Reuses stored cookies if possible. A full login requires a Cloudflare Turnstile captcha.
+     *
+     * @return true if a fresh login/cookie validation was performed, false if cookies were only set without validation.
+     */
+    public boolean login(final Account account, final boolean force) throws Exception {
+        synchronized (account) {
+            br.setFollowRedirects(true);
+            br.setCookiesExclusive(true);
+            final Cookies cookies = account.loadCookies("");
+            if (cookies != null) {
+                logger.info("Attempting cookie login");
+                br.setCookies(getHost(), cookies);
+                if (!force) {
+                    /* Do not validate cookies */
+                    return false;
+                }
+                br.getPage("https://" + getHost() + "/account");
+                if (isLoggedin(br)) {
+                    logger.info("Cookie login successful");
+                    /* Refresh cookie timestamp */
+                    account.saveCookies(br.getCookies(getHost()), "");
+                    return true;
+                }
+                logger.info("Cookie login failed");
+                br.clearCookies(getHost());
+            }
+            logger.info("Performing full login");
+            br.getPage("https://" + getHost() + "/login");
+            final Form loginform = br.getFormbyKey("hash");
+            if (loginform == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find loginform");
+            }
+            final String cfkey = br.getRegex("sitekey\\s*:\\s*'([^']+)'").getMatch(0);
+            if (cfkey == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find Turnstile sitekey");
+            }
+            final CaptchaHelperHostPluginCloudflareTurnstile ts = new CaptchaHelperHostPluginCloudflareTurnstile(this, br, cfkey);
+            loginform.put("hash", Encoding.urlEncode(account.getPass()));
+            loginform.put("cf-turnstile-response", Encoding.urlEncode(ts.getToken()));
+            br.submitForm(loginform);
+            if (!isLoggedin(br)) {
+                if (br.containsHTML(">\\s*Wrong hash")) {
+                    throw new AccountInvalidException("Invalid login hash");
+                }
+                throw new AccountInvalidException("Invalid login hash or captcha rejected");
+            }
+            account.saveCookies(br.getCookies(getHost()), "");
+            return true;
+        }
+    }
+
+    private boolean isLoggedin(final Browser br) {
+        /* The "Logout" link is only displayed for logged in users. */
+        return br.containsHTML("href=\"/logout\"");
+    }
+
+    @Override
+    public AccountInfo fetchAccountInfo(final Account account) throws Exception {
+        final AccountInfo ai = new AccountInfo();
+        login(account, true);
+        br.getPage("https://" + getHost() + "/account");
+        /*
+         * Premium account structure is unknown at the moment: All valid login hashes are handled as free accounts.
+         */
+        account.setType(AccountType.FREE);
+        ai.setUnlimitedTraffic();
+        return ai;
+    }
+
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
     }
 
     @Override
+    public int getMaxSimultanPremiumDownloadNum() {
+        return Integer.MAX_VALUE;
+    }
+
+    @Override
     public boolean hasCaptcha(final DownloadLink link, final Account acc) {
         return true;
+    }
+
+    @Override
+    protected String getAPILoginHelpURL() {
+        return "https://" + getHost() + "/login";
+    }
+
+    @Override
+    protected boolean looksLikeValidAPIKey(final String str) {
+        return str != null && str.matches("[a-zA-Z0-9]{5,}");
+    }
+
+    @Override
+    public AccountBuilderInterface getAccountFactory(final InputChangedCallbackInterface callback) {
+        return new VikingfileAccountPanel(callback, this);
+    }
+
+    /** Login mask for the "Login Hash". The hash is stored in username and password. */
+    public static class VikingfileAccountPanel extends MigPanel implements AccountBuilderInterface {
+        private static final long      serialVersionUID = 1L;
+        private final ExtPasswordField pass;
+        private final JLabel           idLabel;
+        private final VikingfileCom    plg;
+
+        public VikingfileAccountPanel(final InputChangedCallbackInterface callback, final VikingfileCom plg) {
+            super("ins 0, wrap 2", "[][grow,fill]", "");
+            this.plg = plg;
+            add(new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_generic_instructions()));
+            add(new JLink(_GUI.T.jd_gui_swing_components_AccountDialog_generic_instructions_click_here_for_instructions(), plg.getAPILoginHelpURL()));
+            add(this.idLabel = new JLink("<HTML><U>Login Hash</U></HTML>", plg.getAPILoginHelpURL()));
+            add(this.pass = new ExtPasswordField() {
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public void onChanged() {
+                    callback.onChangedInput(pass);
+                }
+            }, "");
+            pass.setHelpText("Login Hash");
+        }
+
+        private String getHash() {
+            final String hash = new String(pass.getPassword());
+            return plg.updateAccountPassword(new Account(null, hash), hash);
+        }
+
+        @Override
+        public boolean validateInputs() {
+            if (plg.looksLikeValidAPIKey(getHash())) {
+                idLabel.setForeground(Color.BLACK);
+                return true;
+            } else {
+                idLabel.setForeground(Color.RED);
+                return false;
+            }
+        }
+
+        @Override
+        public Account getAccount() {
+            final String hash = getHash();
+            return new Account(hash, hash);
+        }
+
+        @Override
+        public void setAccount(final Account defaultAccount) {
+            pass.setText(defaultAccount.getPass());
+        }
+
+        @Override
+        public boolean updateAccount(final Account input, final Account output) {
+            boolean changed = false;
+            if (!StringUtils.equals(input.getUser(), output.getUser())) {
+                output.setUser(input.getUser());
+                changed = true;
+            }
+            if (!StringUtils.equals(input.getPass(), output.getPass())) {
+                output.setPass(input.getPass());
+                changed = true;
+            }
+            return changed;
+        }
+
+        @Override
+        public boolean handleClipboardAutoFill() {
+            return DefaultEditAccountPanelAPIKeyLogin.handleClipboardAutoFill(pass, null, plg);
+        }
+
+        @Override
+        public JComponent getComponent() {
+            return this;
+        }
     }
 }

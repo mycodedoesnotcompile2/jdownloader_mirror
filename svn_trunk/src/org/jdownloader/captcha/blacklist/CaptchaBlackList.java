@@ -1,7 +1,9 @@
 package org.jdownloader.captcha.blacklist;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.WeakHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import jd.controlling.downloadcontroller.DownloadLinkCandidate;
 import jd.controlling.downloadcontroller.DownloadLinkCandidateResult;
@@ -23,6 +25,8 @@ import org.jdownloader.captcha.v2.Challenge;
 public class CaptchaBlackList implements DownloadWatchdogListener, LinkCollectorListener {
     private static final CaptchaBlackList   INSTANCE = new CaptchaBlackList();
     private final ArrayList<BlacklistEntry> entries  = new ArrayList<BlacklistEntry>();
+    /* Changes whenever an entry is added or removed, so GUI components can tell cheaply whether they have to read the entries again. */
+    private final AtomicLong                version  = new AtomicLong(0);
 
     private CaptchaBlackList() {
         DownloadWatchDog.getInstance().getEventSender().addListener(this);
@@ -33,11 +37,36 @@ public class CaptchaBlackList implements DownloadWatchdogListener, LinkCollector
         return INSTANCE;
     }
 
+    /** Changes whenever an entry is added or removed. */
+    public long getVersion() {
+        return version.get();
+    }
+
+    /** Returns a copy of the current entries. */
+    public List<BlacklistEntry> listEntries() {
+        synchronized (entries) {
+            return new ArrayList<BlacklistEntry>(entries);
+        }
+    }
+
+    /** Removes the given entry, so the captchas it blocked are not skipped any more. Returns true if the entry was part of the list. */
+    public boolean remove(final BlacklistEntry entry) {
+        final boolean removed;
+        synchronized (entries) {
+            removed = entries.remove(entry);
+        }
+        if (removed) {
+            version.incrementAndGet();
+        }
+        return removed;
+    }
+
     public void add(BlacklistEntry entry) {
         if (entry != null) {
             synchronized (entries) {
                 entries.add(entry);
             }
+            version.incrementAndGet();
         }
         synchronized (whitelist) {
             final ArrayList<DownloadLink> rem = new ArrayList<DownloadLink>();
@@ -81,7 +110,9 @@ public class CaptchaBlackList implements DownloadWatchdogListener, LinkCollector
                         }
                     }
                 } finally {
-                    entries.removeAll(cleanups);
+                    if (entries.removeAll(cleanups)) {
+                        version.incrementAndGet();
+                    }
                 }
             }
         }
@@ -111,6 +142,7 @@ public class CaptchaBlackList implements DownloadWatchdogListener, LinkCollector
                 final BlacklistEntry entry = entries.get(index);
                 if (entry.canCleanUp() || entry instanceof SessionBlackListEntry) {
                     entries.remove(index);
+                    version.incrementAndGet();
                 }
             }
         }
@@ -148,6 +180,7 @@ public class CaptchaBlackList implements DownloadWatchdogListener, LinkCollector
             for (int index = entries.size() - 1; index >= 0; index--) {
                 if (entries.get(index).canCleanUp()) {
                     entries.remove(index);
+                    version.incrementAndGet();
                 }
             }
         }

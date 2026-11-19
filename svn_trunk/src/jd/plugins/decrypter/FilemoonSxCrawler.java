@@ -21,6 +21,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.Regex;
+import org.jdownloader.plugins.components.config.XFSConfigVideoFilemoonSx;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -33,11 +37,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.BysejikuarCom;
 
-import org.appwork.utils.Regex;
-import org.jdownloader.plugins.components.config.XFSConfigVideoFilemoonSx;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 52585 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54064 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilemoonSxCrawler extends PluginForDecrypt {
     public FilemoonSxCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -45,7 +45,7 @@ public class FilemoonSxCrawler extends PluginForDecrypt {
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        ret.add(new String[] { "filemoon.sx", "bysejikuar.com", "bysedikamoum.com", "byse.sx", "byseraguci.com", "bysezejataos.com", "filemoon.to", "filemoon.eu", "filemooon.link", "morgan0928-6v7c14vs.fun", "bf0skv.org", "ghajini-emtftw1o.lol", "f51rm.com", "filemooon.link", "bysezejataos.com", "bysekoze.com", "bysesayeveum.com", "bysesukior.com" });
+        ret.add(new String[] { "filemoon.sx", "bysejikuar.com", "bysedikamoum.com", "byse.sx", "byseraguci.com", "bysezejataos.com", "filemoon.to", "filemoon.eu", "filemooon.link", "morgan0928-6v7c14vs.fun", "bf0skv.org", "ghajini-emtftw1o.lol", "f51rm.com", "filemooon.link", "bysezejataos.com", "bysekoze.com", "bysesayeveum.com", "bysesukior.com", "bysefujedu.com" });
         return ret;
     }
 

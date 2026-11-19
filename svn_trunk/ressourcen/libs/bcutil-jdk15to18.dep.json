@@ -216,15 +216,44 @@
       },
       "version":"1.85.1",
       "vulnerabilities":[]
+    },
+    {
+      "changes":"1.86\t: Bouncy Castle 1.86 is mostly a hardening release: it closes numerous timing/side-channel leaks across classical and post-quantum algorithms (RSA, ECDSA, Diffie-Hellman, MAYO, SNOVA, HQC, and others) and fixes several CVEs affecting OpenPGP, MLS, CMS, PKIX validation, and PKCS#12/BCFKS keystores.\r\n \r\n\r\nNew capabilities include SM9 identity-based cryptography, promoted (non-deprecated) XMSS and LMS/HSS implementations, wider javax.crypto.KEM support (FrodoKEM, Classic McEliece, NTRU+, SMAUG-T), TLS 1.3 OCSP stapling, C509 (CBOR-encoded X.509) certificates, and Destroyable support added across nearly all private key types for proper key zeroization\u2014plus many smaller correctness and compatibility fixes.\r\n \r\n\r\nFor more information on the 1.86 release, see the release notes on GitHub.",
+      "date":"2026-09-18T09:39:15.899+02:00",
+      "dependencies":[{
+        "groupId":"org.bouncycastle",
+        "artifactId":"bcprov-jdk15to18",
+        "version":"1.86",
+        "type":"jar"
+      }],
+      "description":"The Bouncy Castle Java APIs for ASN.1 extension and utility APIs used to support bcpkix and bctls. This jar contains  APIs for Java 1.5 to Java 1.8.",
+      "files":null,
+      "hashes":{
+        "bcutil-jdk15on.jar":"e72ef8a0fcad295207529b268ee02eb72acc7c83ec2e3a9df90cbed9380e3990",
+        "../code-ressourcen/bcutil-jdk15on-sources.jar":"6b7b3297586a8a3b50990a169de21ca857adcf731285b539d04e727c6650bcbf"
+      },
+      "licenses":[{
+        "name":"Bouncy Castle Licence",
+        "url":"https://www.bouncycastle.org/licence.html",
+        "distribution":"repo"
+      }],
+      "minJRE":"JVM_1_5",
+      "name":"Bouncy Castle ASN.1 Extension and Utility APIs",
+      "signatures":{
+        "bcutil-jdk15on.jar":"-----BEGIN PGP SIGNATURE-----\n\niQGzBAABCgAdFiEEexIbdqftbObmCtUXhOkTqOOnSMAFAmqjqY4ACgkQhOkTqOOn\nSMDUwAwAontcjNF1HZtgPYjn/6GUc2uJGDe3O8PjmjvJTJJzDGihuLaczteiZYrH\nuwqo52X7lAIq5p4GY2Led4SMAcAkdHcHquhShigmY5wpIFRh1IvcXqCeELcGQbP2\nb2CsVSca6eZGnCWtMEB74FaVNy3oy++LhXq9kcWg1U21LZY5AM4So4nWu78oIMcP\ny1tQh9GTxSvPpR4EhQN6Qmz4gQVOEBlzg5i6pvv0dKJDlslbKa1F+u9dNjAyzm5l\nTkC7GU0NTnZo+6Gg0HDnEkChlgxTYLbuM3sNVz2Sj2VgJpP0JQBdNegJc14s48OQ\nQ0Pn0wY6MX1D2NRgs6rhrWxACyfMRhF5pR5Qm3OyqKo9wwSqPsPxdHQk8wEZXpSR\nVnhkm9lMd4wYPyzTFnJ98NFENzdilxlZSLVcuR6w1LDMbOMYQM4mJefqGNZyOMsM\nN90iKQBUB9XUGx4h46qGPTlDaoKE/1xWzO0ZcBk9hQSHX0+KBz/QWpnCZXaCTZgY\n3PQmgdbH\n=dsXo\n-----END PGP SIGNATURE-----\n",
+        "../code-ressourcen/bcutil-jdk15on-sources.jar":"-----BEGIN PGP SIGNATURE-----\n\niQGzBAABCgAdFiEEexIbdqftbObmCtUXhOkTqOOnSMAFAmqjqY8ACgkQhOkTqOOn\nSMD5yQv+JqZgI7AJo3K1Tl9sVXsa67Nv18k69ZMNOcm8MeJSbTyiQWRb3UMmAHMt\nx5zB7n/XmOnOhptO3OXbApQyLn2CQk+6emr11tLSaKgL0viSaxTBQPlrlcFqOh15\nnzVZweh92OlHyGbYUCOCRBJwjYdBZiYRRWQg4B9rtg1Puk7GlfbvAoPyGB94TYMK\nM2Y1X7CaQKGrfLvvZ4t7Z2lSLaRHbQFIju93hzEXscREphai8LQof8dr9rY3NKcT\nfTUaXwcA14j+iHNi4xtlqcs8dE6y/qI+lwFlyhXlijiCxNrqvw8bNUgM8xtEuXjM\nlKZnkWxXgWbH5gn9PmBbnwYfsFhttpBv9naiMdbDiQxxKVtaM8ziz0RmsG9ttIZ1\n+Vw76n9UkeXpKwHCp2EoSmvy7qoOStxbcxbkjc4B4enQwYUvn1c3tVwgAxnE63NF\nIxMEVPuJ9+oSZfngkdsQSdzXkst2NybsdkGZaJqEisSWC6MD7Vohq0DYQAvx6uEu\nu35P3xck\n=YhlQ\n-----END PGP SIGNATURE-----\n"
+      },
+      "version":"1.86",
+      "vulnerabilities":[]
     }
   ],
   "installed":{
-    "changes":"1.86\t: Bouncy Castle 1.86 is mostly a hardening release: it closes numerous timing/side-channel leaks across classical and post-quantum algorithms (RSA, ECDSA, Diffie-Hellman, MAYO, SNOVA, HQC, and others) and fixes several CVEs affecting OpenPGP, MLS, CMS, PKIX validation, and PKCS#12/BCFKS keystores.\r\n \r\n\r\nNew capabilities include SM9 identity-based cryptography, promoted (non-deprecated) XMSS and LMS/HSS implementations, wider javax.crypto.KEM support (FrodoKEM, Classic McEliece, NTRU+, SMAUG-T), TLS 1.3 OCSP stapling, C509 (CBOR-encoded X.509) certificates, and Destroyable support added across nearly all private key types for proper key zeroization\u2014plus many smaller correctness and compatibility fixes.\r\n \r\n\r\nFor more information on the 1.86 release, see the release notes on GitHub.",
-    "date":"2026-09-18T09:39:15.899+02:00",
+    "changes":"1.87\t: Bouncy Castle 1.87 is mainly a security and correctness release. It fixes twelve CVEs affecting OpenPGP key merging, RFC 3161 time-stamp validation (which no longer accepts MD5 imprints), X.500 name comparison, CMS and MIME parsing, PKIX revocation checking, and the NTRU+ and SNTRU Prime post-quantum KEMs. It also includes more than 200 other defect fixes across ASN.1/OER decoding, TLS 1.3, certificate path validation, the BCFKS, PKCS#12 and JKS key stores, and the ML-DSA, ML-KEM and SLH-DSA implementations.\r\n \r\n\r\nNew capabilities include OpenPGP post-quantum support per RFC 9980, composite ML-KEM through javax.crypto.KEM, updated HPKE, MLS, Merkle Tree Certificate and C509 drafts, Ascon algorithms in the BC provider, full RFC 4211 CRMF controls, and OpenPGP smart-card signing. There are also large speedups for SM9 (about 120× for pairing), BLS12-381, the NTRU-family KEMs, Blake3 and ChaCha20-Poly1305. Several changes are incompatible with 1.86, including HQC, Merkle Tree Certificates, C509 and ML-KEM key derivation. The old XMSS and LMS implementations under org.bouncycastle.pqc.crypto are removed, and Classic McEliece is deprecated.\r\n \r\n\r\nFor more information on the 1.87 release, see the release notes on GitHub.",
+    "date":"2026-11-18T21:24:02.555+01:00",
     "dependencies":[{
       "groupId":"org.bouncycastle",
       "artifactId":"bcprov-jdk15to18",
-      "version":"1.86",
+      "version":"1.87",
       "type":"jar"
     }],
     "description":"The Bouncy Castle Java APIs for ASN.1 extension and utility APIs used to support bcpkix and bctls. This jar contains  APIs for Java 1.5 to Java 1.8.",
@@ -257,8 +286,8 @@
       "meta.json"
     ],
     "hashes":{
-      "bcutil-jdk15on.jar":"e72ef8a0fcad295207529b268ee02eb72acc7c83ec2e3a9df90cbed9380e3990",
-      "../code-ressourcen/bcutil-jdk15on-sources.jar":"6b7b3297586a8a3b50990a169de21ca857adcf731285b539d04e727c6650bcbf"
+      "bcutil-jdk15on.jar":"103a4bd0665d328ead3e52488f52e21a3ab01f0c0937c3c4ffdf8eefb8c93df3",
+      "../code-ressourcen/bcutil-jdk15on-sources.jar":"f5aba0fc80a99cdb0a44263d83316a3ef45a813e8adf1f0c036aad537456e6de"
     },
     "licenses":[{
       "name":"Bouncy Castle Licence",
@@ -268,10 +297,10 @@
     "minJRE":"JVM_1_5",
     "name":"Bouncy Castle ASN.1 Extension and Utility APIs",
     "signatures":{
-      "bcutil-jdk15on.jar":"-----BEGIN PGP SIGNATURE-----\n\niQGzBAABCgAdFiEEexIbdqftbObmCtUXhOkTqOOnSMAFAmqjqY4ACgkQhOkTqOOn\nSMDUwAwAontcjNF1HZtgPYjn/6GUc2uJGDe3O8PjmjvJTJJzDGihuLaczteiZYrH\nuwqo52X7lAIq5p4GY2Led4SMAcAkdHcHquhShigmY5wpIFRh1IvcXqCeELcGQbP2\nb2CsVSca6eZGnCWtMEB74FaVNy3oy++LhXq9kcWg1U21LZY5AM4So4nWu78oIMcP\ny1tQh9GTxSvPpR4EhQN6Qmz4gQVOEBlzg5i6pvv0dKJDlslbKa1F+u9dNjAyzm5l\nTkC7GU0NTnZo+6Gg0HDnEkChlgxTYLbuM3sNVz2Sj2VgJpP0JQBdNegJc14s48OQ\nQ0Pn0wY6MX1D2NRgs6rhrWxACyfMRhF5pR5Qm3OyqKo9wwSqPsPxdHQk8wEZXpSR\nVnhkm9lMd4wYPyzTFnJ98NFENzdilxlZSLVcuR6w1LDMbOMYQM4mJefqGNZyOMsM\nN90iKQBUB9XUGx4h46qGPTlDaoKE/1xWzO0ZcBk9hQSHX0+KBz/QWpnCZXaCTZgY\n3PQmgdbH\n=dsXo\n-----END PGP SIGNATURE-----\n",
-      "../code-ressourcen/bcutil-jdk15on-sources.jar":"-----BEGIN PGP SIGNATURE-----\n\niQGzBAABCgAdFiEEexIbdqftbObmCtUXhOkTqOOnSMAFAmqjqY8ACgkQhOkTqOOn\nSMD5yQv+JqZgI7AJo3K1Tl9sVXsa67Nv18k69ZMNOcm8MeJSbTyiQWRb3UMmAHMt\nx5zB7n/XmOnOhptO3OXbApQyLn2CQk+6emr11tLSaKgL0viSaxTBQPlrlcFqOh15\nnzVZweh92OlHyGbYUCOCRBJwjYdBZiYRRWQg4B9rtg1Puk7GlfbvAoPyGB94TYMK\nM2Y1X7CaQKGrfLvvZ4t7Z2lSLaRHbQFIju93hzEXscREphai8LQof8dr9rY3NKcT\nfTUaXwcA14j+iHNi4xtlqcs8dE6y/qI+lwFlyhXlijiCxNrqvw8bNUgM8xtEuXjM\nlKZnkWxXgWbH5gn9PmBbnwYfsFhttpBv9naiMdbDiQxxKVtaM8ziz0RmsG9ttIZ1\n+Vw76n9UkeXpKwHCp2EoSmvy7qoOStxbcxbkjc4B4enQwYUvn1c3tVwgAxnE63NF\nIxMEVPuJ9+oSZfngkdsQSdzXkst2NybsdkGZaJqEisSWC6MD7Vohq0DYQAvx6uEu\nu35P3xck\n=YhlQ\n-----END PGP SIGNATURE-----\n"
+      "bcutil-jdk15on.jar":"-----BEGIN PGP SIGNATURE-----\n\niQGzBAABCgAdFiEEexIbdqftbObmCtUXhOkTqOOnSMAFAmr1aosACgkQhOkTqOOn\nSMD4EQv/ZdUV0oviex4zDLKHJ2hVjHhVhZyIsyjiYWycZDx0QUAk+FnL06NmcYDT\nC6ouJi5Uj4pqPypk3Qr41o0OKWBz32NtHFUHt/BJijlArkQjoeYh2+gv7NiuSDDU\n+gBWgVIREgBlYzlXB0TpSkAwza6yT8la3A2Gq4TX+WNamiMOPpo14vACITAwTxgY\npEy6YIcSMTvy1pe+KYWz8O7WJCoT+Uwfn+M2og1inrFSYJYAnZmp+WnHcqobk2by\n2RVaQwsFX29v1jE3EAaqOXLED5MpwPGdM/6jwsPKatrgwIsF8SYg2Bko2DktcmHz\nBak+3e6w0e7yF5ZUGBjd5L0NH/dEQC53qEk9CNIqYCWMvbjtZT9MnC3kipv0inny\nJbyIuHNwhMnKR8AWGKh/z8cTVwuyuT8I5QlhWQD9yMoUYHg2id2OGShUEAeW3kHn\nU4kP3HAM0mWv0jc6AHz33rEG7Vog2bGdqW5VRveNp5zZHbb8pbQPiOt7Oqksng7q\niH1EFSwv\n=Sc2g\n-----END PGP SIGNATURE-----\n",
+      "../code-ressourcen/bcutil-jdk15on-sources.jar":"-----BEGIN PGP SIGNATURE-----\n\niQGzBAABCgAdFiEEexIbdqftbObmCtUXhOkTqOOnSMAFAmr1aowACgkQhOkTqOOn\nSMAN2gv9Fot7PfDmEtqo0x5UoiKhL/EqyHtg6So591h3A0Ku09uxH5HINdI9mT0j\nkwkwWAzZSpj98f+IiImBW1FZGVac3WrAlo43x2bBTu1Az18hT6EfOpgBpd8XcpK6\nJ/Ia6K190CDrHiYEzUrXARw8ECTZjOuaGY6JLF8Z1QmzEHavHhSKHK9te2vRQBHf\nJD1t0O9ikkWAErlYwAlRm2bwiJ26ndDgGyQOe5+3w3PABBrY4917ukeenUbbxzxt\nukytdKYRe2W6xxtZpvXDPFjqVeFwCvetgJpI5tDDESeA1igC2wu/8nshtoir0foO\nZbQGSg0x6XALWF1dLnrPCFppW6loQbHZYTlRNHXB5wJno6Khp1Xse0ozxtutLVC5\nUaiOYuJE6ljbEbBOw/YYqCIH+GoftNkF6H0IaTjpik/VpDPXOrDltRcZxLFsHvUI\nPsSmNgKPUlQy8mKV2C7JP3IieBpXqT3u7tV5owwxtLaHSq8rw94HR3G7hJ0PwQF1\n594S4PQY\n=E+Cl\n-----END PGP SIGNATURE-----\n"
     },
-    "version":"1.86",
+    "version":"1.87",
     "vulnerabilities":[]
   },
   "minJRE":"1.8",

@@ -28,7 +28,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 49457 $", interfaceVersion = 3, names = { "linkcrawlerdeephelper" }, urls = { "" })
+@DecrypterPlugin(revision = "$Revision: 54067 $", interfaceVersion = 3, names = { "linkcrawlerdeephelper" }, urls = { "" })
 @Deprecated
 public class LinkCrawlerDeepHelper extends PluginForDecrypt implements LinkCrawlerDeepHelperInterface {
     public LinkCrawlerDeepHelper(PluginWrapper wrapper) {
@@ -44,7 +44,7 @@ public class LinkCrawlerDeepHelper extends PluginForDecrypt implements LinkCrawl
     @Deprecated
     public URLConnectionAdapter openConnection(final LinkCrawlerRule matchingRule, Browser br, CrawledLink source) throws Exception {
         br.addAllowedResponseCodes(500);
-        final String sourceURL = source.getURL();
+        final URL sourceURL = new URL(source.getURL());
         if (matchingRule != null) {
             matchingRule.applyCookies(br, sourceURL, false);
         }

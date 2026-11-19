@@ -40,7 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.FilemoonSxCrawler;
 
-@HostPlugin(revision = "$Revision: 52918 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54061 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { FilemoonSxCrawler.class })
 public class BysejikuarCom extends PluginForHost {
     public BysejikuarCom(PluginWrapper wrapper) {
@@ -86,7 +86,7 @@ public class BysejikuarCom extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:d|e|download)/([A-Za-z0-9]{12})");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:dl|d|e|download)/([A-Za-z0-9]{12})");
         }
         return ret.toArray(new String[0]);
     }

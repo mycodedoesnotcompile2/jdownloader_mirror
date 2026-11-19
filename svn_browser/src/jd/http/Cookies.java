@@ -102,12 +102,16 @@ public class Cookies {
                     continue;
                 }
                 if (cookie.getKey() == null) {
+                    /* first key/value in setCookie is our key/value */
                     if (StringUtils.isEmpty(key)) {
+                        /* no key -> invalid setCookie */
                         continue setCookie;
                     }
-                    /* key/value first */
                     cookie.setKey(key);
                     cookie.setValue(value);
+                } else if (StringUtils.isEmpty(key)) {
+                    /* no key -> invalid attribute */
+                    continue;
                 } else if ("samesite".equalsIgnoreCase(key)) {
                     cookie.setSameSite(value);
                 } else if ("path".equalsIgnoreCase(key)) {
@@ -143,6 +147,8 @@ public class Cookies {
                     } catch (final Throwable e) {
                         LogV3.log(e);
                     }
+                } else {
+                    LogV3.info("unknown/unsupported cookie attribute:" + key + " = " + value);
                 }
             }
             try {
@@ -241,45 +247,46 @@ public class Cookies {
             } else {
                 continue;
             }
-            if (isSetCookie && tmp.size() == 0) {
-                if (StringUtils.isEmpty(key)) {
-                    break setCookie;
-                }
-                /**
-                 * SetCookie only contains a single cookie
-                 **/
-                tmp.put(key, value);
-            } else if ("samesite".equalsIgnoreCase(key)) {
-                sameSite = value;
-            } else if ("path".equalsIgnoreCase(key)) {
-                if (Cookie.testPath(value)) {
-                    path = value;
-                }
-            } else if ("expires".equalsIgnoreCase(key)) {
-                expires = value;
-            } else if ("domain".equalsIgnoreCase(key)) {
-                if (source.newCookieInstance().setDomain(value)) {
-                    /** no longer hostOnly **/
-                    domain = value;
-                    hostOnly = Boolean.FALSE;
-                }
-            } else if ("secure".equalsIgnoreCase(key)) {
-                /** now secure **/
-                secure = Boolean.TRUE;
-            } else if ("Partitioned".equalsIgnoreCase(key)) {
-                /** Partitioned **/
-            } else if ("HttpOnly".equalsIgnoreCase(key)) {
-                /** HttpOnly **/
-            } else if ("Max-Age".equalsIgnoreCase(key)) {
-                /** Max-Age **/
-                maxAgeValue = value;
-            } else {
-                if (!isSetCookie || tmp.size() == 0) {
-                    /**
-                     * SetCookie only contains a single cookie
-                     **/
+            if (isSetCookie) {
+                if (tmp.size() == 0) {
+                    /* first key/value in setCookie is our key/value */
+                    if (StringUtils.isEmpty(key)) {
+                        /* no key -> invalid setCookie */
+                        break setCookie;
+                    }
                     tmp.put(key, value);
+                } else if (StringUtils.isEmpty(key)) {
+                    /* no key -> invalid attribute */
+                    continue;
+                } else if ("samesite".equalsIgnoreCase(key)) {
+                    sameSite = value;
+                } else if ("path".equalsIgnoreCase(key)) {
+                    if (Cookie.testPath(value)) {
+                        path = value;
+                    }
+                } else if ("expires".equalsIgnoreCase(key)) {
+                    expires = value;
+                } else if ("domain".equalsIgnoreCase(key)) {
+                    if (source.newCookieInstance().setDomain(value)) {
+                        /** no longer hostOnly **/
+                        domain = value;
+                        hostOnly = Boolean.FALSE;
+                    }
+                } else if ("secure".equalsIgnoreCase(key)) {
+                    /** now secure **/
+                    secure = Boolean.TRUE;
+                } else if ("Partitioned".equalsIgnoreCase(key)) {
+                    /** Partitioned **/
+                } else if ("HttpOnly".equalsIgnoreCase(key)) {
+                    /** HttpOnly **/
+                } else if ("Max-Age".equalsIgnoreCase(key)) {
+                    /** Max-Age **/
+                    maxAgeValue = value;
+                } else {
+                    LogV3.info("unknown/unsupported cookie attribute:" + key + " = " + value);
                 }
+            } else if (StringUtils.isNotEmpty(key)) {
+                tmp.put(key, value);
             }
         }
         final Cookies cookies = new Cookies();
@@ -352,9 +359,23 @@ public class Cookies {
         return Cookies.parseCookiesFromObject(str, logger);
     }
 
+    public static interface CookieParser {
+        public Cookies parseFromObject(Object input, LogInterface logger);
+    }
+
     public static Cookies parseCookiesFromObject(Object input, final LogInterface logger) {
+        return parseCookiesFromObject(input, logger, null);
+    }
+
+    public static Cookies parseCookiesFromObject(Object input, final LogInterface logger, final CookieParser customParser) {
         if (input == null) {
             return null;
+        }
+        if (customParser != null) {
+            final Cookies customParserResult = customParser.parseFromObject(input, logger);
+            if (customParserResult != null) {
+                return customParserResult;
+            }
         }
         if (input instanceof String) {
             final String jsonStr = input.toString();
@@ -401,7 +422,15 @@ public class Cookies {
             final List<Object> entries = ReflectionUtils.wrapList(input, false, Object.class);
             if (entries != null) {
                 final Cookies ret = new Cookies();
-                for (final Object entry : entries) {
+                nextEntry: for (final Object entry : entries) {
+                    if (customParser != null) {
+                        final Cookies customParserResult = customParser.parseFromObject(entry, logger);
+                        if (customParserResult != null) {
+                            ret.add(customParserResult);
+                            ret.setUserAgent(customParserResult.getUserAgent());
+                            continue nextEntry;
+                        }
+                    }
                     final Cookie cookie;
                     final List<String> cookiesList = ReflectionUtils.wrapList(entry, false, String.class);
                     if (cookiesList != null) {
@@ -595,6 +624,11 @@ public class Cookies {
             cookies.add(newCookie);
             return;
         } else {
+            final ManualCookie dummyCookie = new ManualCookie();
+            dummyCookie.setPersistent(false);
+            dummyCookie.setExpired();
+            final IdentityHashMap<Cookie, Object> replaceMap = new IdentityHashMap<Cookie, Object>();
+            final AtomicReference<Cookie> newCookieReplaced = new AtomicReference<Cookie>(newCookie);
             switch (newCookie.getSource()) {
             case SERVER:
                 if (!newCookie.isSecureProtocol()) {
@@ -608,69 +642,43 @@ public class Cookies {
                     }
                 }
                 /* fallthrough */
-            case IMPORT: {
+            case IMPORT:
                 /* new server/import cookie replaces all matching cookies */
-                final ManualCookie dummyCookie = new ManualCookie();
-                dummyCookie.setPersistent(false);
-                dummyCookie.setExpired();
-                final IdentityHashMap<Cookie, Object> replaceMap = new IdentityHashMap<Cookie, Object>();
                 for (List<Cookie> candidates : candidatesMap.values()) {
                     for (Cookie candidate : candidates) {
                         replaceMap.put(candidate, this);
                     }
                 }
-                final AtomicReference<Cookie> newCookieReplaced = new AtomicReference<Cookie>(newCookie);
-                cookies.replaceAll(new UnaryOperator<Cookie>() {
-                    @Override
-                    public Cookie apply(Cookie t) {
-                        if (replaceMap.get(t) != null) {
-                            return newCookieReplaced.getAndSet(dummyCookie);
-                        }
-                        return t;
-                    }
-                });
-                if (newCookieReplaced.get() == newCookie) {
-                    cookies.add(newCookie);
-                    removeCookiesByIdentity(new ArrayList<Cookie>(replaceMap.keySet()));
-                } else {
-                    removeCookieByIdentity(dummyCookie);
-                }
-            }
-            break;
+                break;
             case LEGACY:
-            case MANUAL: {
+            case MANUAL:
                 /* new manual/legacy cookie only replaces matching manual/legacy cookies */
-                final ManualCookie dummyCookie = new ManualCookie();
-                dummyCookie.setPersistent(false);
-                dummyCookie.setExpired();
-                final IdentityHashMap<Cookie, Object> replaceMap = new IdentityHashMap<Cookie, Object>();
                 for (Cookie candidate : candidatesMap.get(Cookie.SOURCE.MANUAL)) {
                     replaceMap.put(candidate, this);
                 }
                 for (Cookie candidate : candidatesMap.get(Cookie.SOURCE.LEGACY)) {
                     replaceMap.put(candidate, this);
                 }
-                final AtomicReference<Cookie> newCookieReplaced = new AtomicReference<Cookie>(newCookie);
-                cookies.replaceAll(new UnaryOperator<Cookie>() {
-                    @Override
-                    public Cookie apply(Cookie t) {
-                        if (replaceMap.get(t) != null) {
-                            return newCookieReplaced.getAndSet(dummyCookie);
-                        }
-                        return t;
-                    }
-                });
-                if (newCookieReplaced.get() == newCookie) {
-                    cookies.add(newCookie);
-                    removeCookiesByIdentity(new ArrayList<Cookie>(replaceMap.keySet()));
-                } else {
-                    removeCookieByIdentity(dummyCookie);
-                }
-            }
-            break;
+                break;
             default:
                 DebugMode.debugger();
-                break;
+                return;
+            }
+            /* atomic replace/remove */
+            cookies.replaceAll(new UnaryOperator<Cookie>() {
+                @Override
+                public Cookie apply(Cookie t) {
+                    if (replaceMap.get(t) != null) {
+                        return newCookieReplaced.getAndSet(dummyCookie);
+                    }
+                    return t;
+                }
+            });
+            if (newCookieReplaced.get() == newCookie) {
+                cookies.add(newCookie);
+                removeCookiesByIdentity(new ArrayList<Cookie>(replaceMap.keySet()));
+            } else {
+                removeCookieByIdentity(dummyCookie);
             }
         }
     }
@@ -773,6 +781,7 @@ public class Cookies {
             }
             Collections.sort(values, BEST_MATCH_COMPARATOR);
         }
+        final boolean oneCookieOnlyMode = request == null || StringUtils.containsIgnoreCase(request.getHeaders().getValue(HTTPConstants.HEADER_REQUEST_USER_AGENT), "Firefox") || true;
         for (final Entry<String, List<Cookie>> keyValue : keyValues.entrySet()) {
             if (cookieString.length() > 0) {
                 cookieString.append("; ");
@@ -786,7 +795,7 @@ public class Cookies {
                 /* first cookie is customized/preferred */
                 cookieString.append(keyValue.getKey()).append("=");
                 cookieString.append(StringUtils.valueOrEmpty(values.get(0).getValue()));
-            } else if (request == null || StringUtils.containsIgnoreCase(request.getHeaders().getValue(HTTPConstants.HEADER_REQUEST_USER_AGENT), "Firefox") || true) {
+            } else if (oneCookieOnlyMode) {
                 /* no request available or firefox useragent, choose default/firefox handling to send only one cookie */
                 cookieString.append(keyValue.getKey()).append("=");
                 cookieString.append(StringUtils.valueOrEmpty(values.get(0).getValue()));

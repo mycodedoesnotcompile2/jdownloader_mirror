@@ -1406,7 +1406,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
         }
     }
 
-    private URL expandToURL(final String url) throws MalformedURLException {
+    public URL expandToURL(final String url) throws MalformedURLException {
         if (url == null) {
             DebugMode.debugger();
             return null;

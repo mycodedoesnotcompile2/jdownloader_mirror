@@ -174,20 +174,22 @@ public class CookieStorable implements Storable {
     }
 
     public Cookie _restore() {
-        Cookie.SOURCE source = Cookie.SOURCE.LEGACY;
+        Cookie.SOURCE source = null;
         try {
             if (getSource() != null) {
                 source = Cookie.SOURCE.valueOf(getSource());
             }
         } catch (IllegalArgumentException e) {
         }
-        if (Cookie.SOURCE.LEGACY.equals(source)) {
+        if (source == null) {
             if (getHostTime() > 0) {
                 source = Cookie.SOURCE.SERVER;
             } else if (getDomain() != null || getSecure() != null) {
                 source = Cookie.SOURCE.IMPORT;
             } else if (getDomain() == null && "/".equals(getPath())) {
                 source = Cookie.SOURCE.MANUAL;
+            } else {
+                source = Cookie.SOURCE.LEGACY;
             }
         }
         final Cookie ret = source.newCookieInstance();

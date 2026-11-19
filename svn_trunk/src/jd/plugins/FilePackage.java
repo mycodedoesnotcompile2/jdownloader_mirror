@@ -44,7 +44,7 @@ import jd.controlling.packagecontroller.PackageController;
 import jd.controlling.packagecontroller.PackageControllerComparator;
 
 /**
- * Diese Klasse verwaltet Pakete
+ * This class represents a package of DownloadLinks
  *
  * @author JD-Team
  */
@@ -55,6 +55,10 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
     private ArrayList<DownloadLink>      downloadLinkList;
     private static FilePackage           FP               = null;
     static {
+        /*
+         * Default package, see getDefaultFilePackage(): Its view reports an empty and disabled package and all modifications of its
+         * children are ignored.
+         */
         FP = new FilePackage() {
             final private FilePackageView view             = new FilePackageView(this) {
                                                                @Override
@@ -224,34 +228,34 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
         return FP == fp;
     }
 
-    private String                                                            name                 = null;
-    private long                                                              created              = -1l;
-    private long                                                              modified             = -1l;
-    private Boolean                                                           isExpanded           = null;
-    private PackageController<FilePackage, DownloadLink>                      controlledby         = null;
-    private UniqueAlltimeID                                                   uniqueID             = null;
-    private final static AtomicReferenceFieldUpdater<FilePackage, ModifyLock> MODIFYLOCK_UPDATER   = AtomicReferenceFieldUpdater.newUpdater(FilePackage.class, ModifyLock.class, "lock");
-    private volatile ModifyLock                                               lock                 = null;
-    public static final String                                                PROPERTY_EXPANDED    = "EXPANDED";
-    private static final String                                               PROPERTY_COMMENT     = "COMMENT";
-    private static final String                                               PROPERTY_PRIORITY    = "PRIORITY";
-    public static final String                                                PROPERTY_PACKAGE_KEY = "PACKAGE_KEY";
+    private String                                                                 name                    = null;
+    private long                                                                   created                 = -1l;
+    private long                                                                   modified                = -1l;
+    private Boolean                                                                isExpanded              = null;
+    private PackageController<FilePackage, DownloadLink>                           controlledby            = null;
+    public static final String                                                     PROPERTY_EXPANDED       = "EXPANDED";
+    private static final String                                                    PROPERTY_COMMENT        = "COMMENT";
+    private static final String                                                    PROPERTY_PRIORITY       = "PRIORITY";
+    public static final String                                                     PROPERTY_PACKAGE_KEY    = "PACKAGE_KEY";
+    private final static AtomicReferenceFieldUpdater<FilePackage, UniqueAlltimeID> UNIQUEALLTIMEID_UPDATER = AtomicReferenceFieldUpdater.newUpdater(FilePackage.class, UniqueAlltimeID.class, "uniqueID");
+    private volatile UniqueAlltimeID                                               uniqueID                = null;
 
     /**
      * @return the uniqueID
      */
     public UniqueAlltimeID getUniqueID() {
-        if (uniqueID == null) {
-            synchronized (this) {
-                if (uniqueID == null) {
-                    uniqueID = new UniqueAlltimeID();
-                }
+        while (true) {
+            UniqueAlltimeID ret = uniqueID;
+            if (ret != null) {
+                return ret;
+            }
+            if (UNIQUEALLTIMEID_UPDATER.compareAndSet(this, null, ret = new UniqueAlltimeID())) {
+                return ret;
             }
         }
-        return uniqueID;
     }
 
-    private FilePackageView                           fpInfo = null;
+    /* Sorter for the children of this package, null if the children are not sorted automatically (see constructor) */
     private PackageControllerComparator<AbstractNode> sorter;
 
     /*
@@ -278,8 +282,10 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
         } else if (!(obj instanceof FilePackage)) {
             return false;
         } else if (this.uniqueID != null) {
+            /* Packages are equal if they share the same UniqueAlltimeID instance */
             return ((FilePackage) obj).uniqueID == this.uniqueID;
         } else {
+            /* The ID of this package was never requested, so it can only be equal to itself (checked above) */
             return false;
         }
     }
@@ -294,7 +300,7 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
     }
 
     /**
-     * private constructor for FilePackage, sets created timestamp and downloadDirectory
+     * private constructor for FilePackage, sets created/modified timestamp, downloadDirectory, default name and sorter
      */
     private FilePackage() {
         downloadDirectory = GENERALSETTINGS.getDefaultDownloadFolder();
@@ -327,7 +333,7 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
     }
 
     /**
-     * add given DownloadLink to this FilePackage. delegates the call to DownloadControllerInterface if it is set
+     * add given DownloadLink to this FilePackage. delegates the call to the PackageController if it is set
      *
      * @param link
      */
@@ -336,7 +342,7 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
     }
 
     /**
-     * add the given DownloadLinks to this FilePackage. delegates the call to the DownloadControllerInterface if it is set
+     * add the given DownloadLinks to this FilePackage. delegates the call to the PackageController if it is set
      *
      * @param links
      */
@@ -348,7 +354,7 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
     }
 
     /**
-     * add the given DownloadLinks to this FilePackage. delegates the call to the DownloadControllerInterface if it is set
+     * add the given DownloadLinks to this FilePackage. delegates the call to the PackageController if it is set
      *
      * @param links
      */
@@ -356,25 +362,29 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
         if (links == null || links.length == 0) {
             return;
         }
-        if (this.controlledby == null) {
-            getModifyLock().writeLock();
-            boolean notifyStructureChanges = false;
-            try {
-                for (DownloadLink link : links) {
-                    if (!this.downloadLinkList.contains(link)) {
-                        notifyStructureChanges = true;
-                        link.setParentNode(this);
-                        this.downloadLinkList.add(link);
-                    }
-                }
-            } finally {
-                getModifyLock().writeUnlock();
-                if (notifyStructureChanges) {
-                    nodeUpdated(this, NOTIFY.STRUCTURE_CHANGE, null);
+        if (this.controlledby != null) {
+            /* The controller has to do the modification, it also takes care of its own maps and events */
+            this.controlledby.moveOrAddAt(this, Arrays.asList(links), -1);
+            return;
+        }
+        /* Not controlled by a PackageController: modify the children directly */
+        getModifyLock().writeLock();
+        boolean notifyStructureChanges = false;
+        try {
+            for (DownloadLink link : links) {
+                /* Links that are already part of this package are ignored */
+                if (!this.downloadLinkList.contains(link)) {
+                    notifyStructureChanges = true;
+                    link.setParentNode(this);
+                    this.downloadLinkList.add(link);
                 }
             }
-        } else {
-            this.controlledby.moveOrAddAt(this, Arrays.asList(links), -1);
+        } finally {
+            getModifyLock().writeUnlock();
+            /* Notify after the write lock has been released */
+            if (notifyStructureChanges) {
+                nodeUpdated(this, NOTIFY.STRUCTURE_CHANGE, null);
+            }
         }
     }
 
@@ -402,42 +412,43 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
     }
 
     /**
-     * remove the given DownloadLinks from this FilePackage. delegates remove call to DownloadControllerInterface if it is set
+     * remove the given DownloadLinks from this FilePackage. delegates the call to the PackageController if it is set
      *
-     * @param link
+     * @param links
      */
     public void remove(DownloadLink... links) {
         if (links == null || links.length == 0) {
             return;
         }
-        if (this.controlledby == null) {
-            getModifyLock().writeLock();
-            boolean notifyStructureChanges = false;
-            try {
-                for (DownloadLink link : links) {
-                    if ((this.downloadLinkList.remove(link))) {
-                        notifyStructureChanges = true;
-                        /*
-                         * set FilePackage to null if the link was controlled by this FilePackage
-                         */
-                        if (link.getFilePackage() == this) {
-                            link.setParentNode(null);
-                        }
+        if (this.controlledby != null) {
+            /* The controller has to do the modification, it also takes care of its own maps and events */
+            this.controlledby.removeChildren(this, Arrays.asList(links), true);
+            return;
+        }
+        /* Not controlled by a PackageController: modify the children directly */
+        getModifyLock().writeLock();
+        boolean notifyStructureChanges = false;
+        try {
+            for (DownloadLink link : links) {
+                if (this.downloadLinkList.remove(link)) {
+                    notifyStructureChanges = true;
+                    /* Reset the parent node of the link, but only if it still belongs to this FilePackage */
+                    if (link.getFilePackage() == this) {
+                        link.setParentNode(null);
                     }
                 }
-            } finally {
-                getModifyLock().writeUnlock();
-                if (notifyStructureChanges) {
-                    nodeUpdated(this, NOTIFY.STRUCTURE_CHANGE, null);
-                }
             }
-        } else {
-            this.controlledby.removeChildren(this, Arrays.asList(links), true);
+        } finally {
+            getModifyLock().writeUnlock();
+            if (notifyStructureChanges) {
+                nodeUpdated(this, NOTIFY.STRUCTURE_CHANGE, null);
+            }
         }
     }
 
     public void setComment(String comment) {
         final boolean changed;
+        /* An empty comment removes the property completely */
         if (comment == null || comment.length() == 0) {
             changed = this.setProperty(PROPERTY_COMMENT, Property.NULL);
         } else {
@@ -455,17 +466,20 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
     /**
      * set the download folder for this FilePackage
      *
-     * @param subFolder
+     * @param folder
      */
     public void setDownloadDirectory(String folder) {
         if (StringUtils.isEmpty(folder)) {
+            /* No folder given: use the default download folder */
             folder = GENERALSETTINGS.getDefaultDownloadFolder();
         } else if (!CrossSystem.isAbsolutePath(folder)) {
+            /* A FilePackage always contains the full absolute path, relative paths are rejected */
             LoggerFactory.I().getDefaultLogger().severe("FilePackage: setDownloadDirectory only allows absolute paths(" + folder + ")! Using default one!");
             folder = GENERALSETTINGS.getDefaultDownloadFolder();
         }
         final String lFolder = getDownloadDirectory();
         if (lFolder != null && lFolder.equals(folder)) {
+            /* Nothing changed */
             return;
         }
         downloadDirectory = dedupeString(folder.trim());
@@ -482,9 +496,11 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
     public void setName(String name) {
         final String lName = getName();
         if (StringUtils.isEmpty(name)) {
+            /* Packages always have a name, use the default one if none is given */
             name = _JDT.T.controller_packages_defaultname();
         }
         if (lName != null && lName.equals(name)) {
+            /* Nothing changed */
             return;
         }
         this.name = name.trim();
@@ -526,10 +542,22 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
         return this.getBooleanProperty(LinkCrawler.PACKAGE_CLEANUP_NAME, true);
     }
 
+    /**
+     * @deprecated Not needed anymore: The LinkCollector never moves items to the "Various" package if their FilePackage has a name or a
+     *             package key set. Only items without such a FilePackage can end up in "Various". Setting a package name (or package key)
+     *             is therefore enough, there is no need to set this flag additionally.
+     */
+    @Deprecated
     public void setIgnoreVarious(final Boolean ignorevarious) {
         this.setProperty(LinkCrawler.PACKAGE_IGNORE_VARIOUS, ignorevarious);
     }
 
+    /**
+     * @deprecated Not needed anymore: The LinkCollector never moves items to the "Various" package if their FilePackage has a name or a
+     *             package key set. Only items without such a FilePackage can end up in "Various". Setting a package name (or package key)
+     *             is therefore enough, there is no need to set this flag additionally.
+     */
+    @Deprecated
     public Boolean isIgnoreVarious() {
         return this.getBooleanProperty(LinkCrawler.PACKAGE_IGNORE_VARIOUS, (Boolean) null);
     }
@@ -576,6 +604,7 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
         if (isExpanded != null) {
             return isExpanded.booleanValue();
         }
+        /* Read the stored state once and cache it */
         isExpanded = getBooleanProperty(PROPERTY_EXPANDED, false);
         return isExpanded;
     }
@@ -590,6 +619,7 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
             return;
         }
         this.isExpanded = b;
+        /* The default (collapsed) is not stored: Property.NULL removes the property */
         if (b == false) {
             setProperty(PROPERTY_EXPANDED, Property.NULL);
         } else {
@@ -601,15 +631,17 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
         if (priority == null) {
             priority = Priority.DEFAULT;
         }
-        if (getPriorityEnum() != priority) {
-            if (Priority.DEFAULT.equals(priority)) {
-                setProperty(PROPERTY_PRIORITY, Property.NULL);
-            } else {
-                setProperty(PROPERTY_PRIORITY, priority.name());
-            }
-            if (hasNotificationListener()) {
-                nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new FilePackageProperty(this, FilePackageProperty.Property.PRIORITY, priority));
-            }
+        if (getPriorityEnum() == priority) {
+            return;
+        }
+        /* The default priority is not stored: Property.NULL removes the property */
+        if (Priority.DEFAULT.equals(priority)) {
+            setProperty(PROPERTY_PRIORITY, Property.NULL);
+        } else {
+            setProperty(PROPERTY_PRIORITY, priority.name());
+        }
+        if (hasNotificationListener()) {
+            nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new FilePackageProperty(this, FilePackageProperty.Property.PRIORITY, priority));
         }
     }
 
@@ -621,6 +653,7 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
             }
             return Priority.valueOf(priority);
         } catch (final Throwable e) {
+            /* Unknown or invalid stored value */
             return Priority.DEFAULT;
         }
     }
@@ -629,6 +662,9 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
         return this.getView().isEnabled();
     }
 
+    /**
+     * Returns the internal list of children, not a copy. Callers have to hold the modify lock while they iterate over it.
+     */
     public List<DownloadLink> getChildren() {
         return downloadLinkList;
     }
@@ -686,6 +722,7 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
     }
 
     public void setEnabled(boolean b) {
+        /* Work on a copy, so the lock is not held while the links are modified */
         final boolean readL = getModifyLock().readLock();
         final ArrayList<DownloadLink> links;
         try {
@@ -711,17 +748,20 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
         }
     }
 
+    private final static AtomicReferenceFieldUpdater<FilePackage, FilePackageView> FILEPACKAGEVIEW_UPDATER = AtomicReferenceFieldUpdater.newUpdater(FilePackage.class, FilePackageView.class, "view");
+    private volatile FilePackageView                                               view                    = null;
+
     @Override
     public FilePackageView getView() {
-        if (fpInfo == null) {
-            synchronized (this) {
-                if (fpInfo == null) {
-                    final FilePackageView lfpInfo = new FilePackageView(this);
-                    fpInfo = lfpInfo;
-                }
+        while (true) {
+            FilePackageView ret = view;
+            if (ret != null) {
+                return ret;
+            }
+            if (FILEPACKAGEVIEW_UPDATER.compareAndSet(this, null, ret = new FilePackageView(this))) {
+                return ret;
             }
         }
-        return fpInfo;
     }
 
     public void setModified(long modified) {
@@ -745,26 +785,30 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
     @Override
     public void nodeUpdated(AbstractNode source, NOTIFY notify, Object param) {
         if (source == this && NOTIFY.STRUCTURE_CHANGE.equals(notify)) {
+            /* Structure changes of this package itself only update the modified timestamp and are not forwarded to the controller */
             setModified(System.currentTimeMillis());
-        } else {
-            final PackageController<FilePackage, DownloadLink> n = getControlledBy();
-            if (n == null) {
-                return;
-            }
-            final AbstractNode lsource;
-            if (source == null) {
-                lsource = this;
-            } else {
-                lsource = source;
-            }
-            if (lsource instanceof AbstractPackageChildrenNode) {
-                final FilePackageView lfpInfo = fpInfo;
-                if (lfpInfo != null) {
-                    lfpInfo.requestUpdate();
-                }
-            }
-            n.nodeUpdated(lsource, notify, param);
+            return;
         }
+        final PackageController<FilePackage, DownloadLink> n = getControlledBy();
+        if (n == null) {
+            /* Not controlled by a PackageController, nobody to notify */
+            return;
+        }
+        /* No source means that this package itself changed */
+        final AbstractNode lsource;
+        if (source == null) {
+            lsource = this;
+        } else {
+            lsource = source;
+        }
+        if (lsource instanceof AbstractPackageChildrenNode) {
+            /* A child changed, the aggregated data of the view is outdated */
+            final FilePackageView view = this.view;
+            if (view != null) {
+                view.requestUpdate();
+            }
+        }
+        n.nodeUpdated(lsource, notify, param);
     }
 
     @Override
@@ -773,10 +817,14 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
         return n != null && n.hasNotificationListener();
     }
 
+    private final static AtomicReferenceFieldUpdater<FilePackage, ModifyLock> MODIFYLOCK_UPDATER = AtomicReferenceFieldUpdater.newUpdater(FilePackage.class, ModifyLock.class, "lock");
+    private volatile ModifyLock                                               lock               = null;
+
     @Override
     public ModifyLock getModifyLock() {
+        /* Created lazily and lock-free: If another thread set a lock first, the loop picks up that one */
         while (true) {
-            ModifyLock ret = MODIFYLOCK_UPDATER.get(this);
+            ModifyLock ret = lock;
             if (ret != null) {
                 return ret;
             }
@@ -787,14 +835,15 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
     }
 
     public void copyPropertiesTo(FilePackage dest) {
-        if (dest != null && dest != this) {
-            /* do not copy Property Properties as it currently only contains comment/expanded state */
-            dest.name = name;
-            dest.setComment(getComment());
-            dest.setDownloadDirectory(getView().getDownloadDirectory());
-            dest.setPriorityEnum(getPriorityEnum());
+        if (dest == null || dest == this) {
             return;
         }
+        /* Only selected values are copied, not the whole property map (e.g. the expanded state is not copied) */
+        /* The name is assigned directly, bypassing setName (no default name handling, no trimming, no change notification) */
+        dest.name = name;
+        dest.setComment(getComment());
+        dest.setDownloadDirectory(getView().getDownloadDirectory());
+        dest.setPriorityEnum(getPriorityEnum());
     }
 
     /**

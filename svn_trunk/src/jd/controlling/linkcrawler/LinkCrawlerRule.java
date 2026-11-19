@@ -13,6 +13,7 @@ import org.appwork.remoteapi.annotations.AllowNonStorableObjects;
 import org.appwork.serializer.Deser;
 import org.appwork.serializer.SC;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.net.URLHelper;
 import org.jdownloader.controlling.UniqueAlltimeID;
 
@@ -58,9 +59,40 @@ public class LinkCrawlerRule {
         return _getCookies();
     }
 
+    protected static final Cookies.CookieParser CUSTOM_PARSER = new Cookies.CookieParser() {
+        @Override
+        public Cookies parseFromObject(Object input, LogInterface logger) {
+            if (input instanceof List && ((List) input).size() == 1) {
+                final Object object = ((List) input).get(0);
+                return parseFromObject(object, logger);
+            } else if (input instanceof String) {
+                final String string = (String) input;
+                if (!string.matches("(?s)^\\s*\\{.*\\}\\s*$")) {
+                    return null;
+                }
+                final Cookies ret = new Cookies();
+                try {
+                    final Cookie cookie = Deser.fromString(string, CookieStorable.TYPE_REF)._restore();
+                    if (cookie != null) {
+                        ret.add(cookie);
+                    }
+                } catch (Exception e) {
+                    if (logger != null) {
+                        logger.log(e);
+                    } else {
+                        LogV3.log(e);
+                    }
+                }
+                return ret;
+            } else {
+                return null;
+            }
+        }
+    };
+
     @AllowNonStorableObjects
     public void setCookies(final Object obj) {
-        final Cookies cookies = Cookies.parseCookiesFromObject(obj, null);
+        final Cookies cookies = Cookies.parseCookiesFromObject(obj, null, CUSTOM_PARSER);
         if (cookies == null) {
             _setCookies(null);
             return;
@@ -191,7 +223,7 @@ public class LinkCrawlerRule {
         }
     }
 
-    public boolean updateCookies(final Browser br, final String url, final boolean forceUpdate, final boolean onlyOnPatternMatch) {
+    public boolean updateCookies(final Browser br, final URL url, final boolean forceUpdate, final boolean onlyOnPatternMatch) {
         if ((!onlyOnPatternMatch || matches(url)) && (forceUpdate || isUpdateCookies())) {
             final Cookies cookies = br.getCookies(url);
             final List<String[]> updateCookies = new ArrayList<String[]>();
@@ -224,12 +256,12 @@ public class LinkCrawlerRule {
         return cookies;
     }
 
-    public void applyCookiesAndHeaders(final Browser br, final String url, final boolean onlyOnPatternMatch) {
+    public void applyCookiesAndHeaders(final Browser br, final URL url, final boolean onlyOnPatternMatch) {
         applyCookies(br, url, onlyOnPatternMatch);
         applyHeaders(br);
     }
 
-    public boolean applyCookies(final Browser br, final String url, final boolean onlyOnPatternMatch) {
+    public boolean applyCookies(final Browser br, final URL url, final boolean onlyOnPatternMatch) {
         // TODO: psp: I can't find any usage where onlyOnPatternMatch is true
         if (onlyOnPatternMatch && !matches(url)) {
             return false;
@@ -244,12 +276,14 @@ public class LinkCrawlerRule {
             if (cookieEntry == null) {
                 continue;
             }
+            final ManualCookie cookie = new ManualCookie();
+            cookie.setHost(host);
             switch (cookieEntry.length) {
             case 0:
                 continue;
-            case 1: {
+            case 1:
                 try {
-                    if (cookieEntry[0].startsWith("{")) {
+                    if (cookieEntry[0] != null && cookieEntry[0].matches("(?s)^\\s*\\{.*\\}\\s*$")) {
                         cookies.add(Deser.fromString(cookieEntry[0], CookieStorable.TYPE_REF)._restore());
                         continue;
                     }
@@ -257,23 +291,20 @@ public class LinkCrawlerRule {
                     LogV3.log(e);
                     continue;
                 }
-            } // fallthrough
-            case 2: {
-                final ManualCookie cookie = new ManualCookie();
-                cookie.setHost(host);
                 cookie.setKey(cookieEntry[0]);
-                cookie.setKey(cookieEntry[1]);
                 cookies.add(cookie);
                 break;
-            }
+            case 2:
+                cookie.setKey(cookieEntry[0]);
+                cookie.setValue(cookieEntry[1]);
+                cookies.add(cookie);
+                break;
             case 3:
                 if (cookieEntry[2] != null && !StringUtils.equalsIgnoreCase(host, cookieEntry[2])) {
                     continue;
                 }
-                final ManualCookie cookie = new ManualCookie();
-                cookie.setHost(host);
                 cookie.setKey(cookieEntry[0]);
-                cookie.setKey(cookieEntry[1]);
+                cookie.setValue(cookieEntry[1]);
                 cookies.add(cookie);
                 break;
             default:
@@ -283,7 +314,7 @@ public class LinkCrawlerRule {
         if (cookies.isEmpty()) {
             return false;
         } else {
-            br.setCookies(url, cookies);
+            br.setCookies(url.toExternalForm(), cookies);
             return true;
         }
     }
@@ -312,15 +343,14 @@ public class LinkCrawlerRule {
         }
     }
 
-    public boolean matches(final String input) {
+    public boolean matches(final URL url) {
         final Pattern lPattern = _getPattern();
-        if (lPattern == null || input == null) {
+        if (lPattern == null || url == null) {
             return false;
-        } else if (lPattern.matcher(input).matches()) {
+        } else if (lPattern.matcher(url.toExternalForm()).matches()) {
             return true;
         } else {
             try {
-                final URL url = new URL(input);
                 if (url.getUserInfo() != null) {
                     return lPattern.matcher(URLHelper.getURL(url, true, false, true).toString()).matches();
                 } else {

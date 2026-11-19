@@ -285,15 +285,44 @@
       },
       "version":"1.85",
       "vulnerabilities":[]
+    },
+    {
+      "changes":"1.86\t: Bouncy Castle 1.86 is mostly a hardening release: it closes numerous timing/side-channel leaks across classical and post-quantum algorithms (RSA, ECDSA, Diffie-Hellman, MAYO, SNOVA, HQC, and others) and fixes several CVEs affecting OpenPGP, MLS, CMS, PKIX validation, and PKCS#12/BCFKS keystores.\r\n \r\n\r\nNew capabilities include SM9 identity-based cryptography, promoted (non-deprecated) XMSS and LMS/HSS implementations, wider javax.crypto.KEM support (FrodoKEM, Classic McEliece, NTRU+, SMAUG-T), TLS 1.3 OCSP stapling, C509 (CBOR-encoded X.509) certificates, and Destroyable support added across nearly all private key types for proper key zeroization\u2014plus many smaller correctness and compatibility fixes.\r\n \r\n\r\nFor more information on the 1.86 release, see the release notes on GitHub.",
+      "date":"2026-09-18T09:39:01.318+02:00",
+      "dependencies":[{
+        "groupId":"org.bouncycastle",
+        "artifactId":"bcutil-jdk15to18",
+        "version":"1.86",
+        "type":"jar"
+      }],
+      "description":"The Bouncy Castle Java APIs for CMS, PKCS, EAC, TSP, CMP, CRMF, OCSP, and certificate generation. This jar contains  APIs for Java 1.5 to Java 1.8. The APIs are designed primarily to be used in conjunction with the BC Java provider but may also be used with other providers providing cryptographic services.",
+      "files":null,
+      "hashes":{
+        "bcpkix-jdk15on.jar":"cf70d32101e53c3f92d55ba5c5f1329af51a9a44057fd21e81e20cfd6cd64953",
+        "../code-ressourcen/bcpkix-jdk15on-sources.jar":"a601ed466b1f4a6ab68584285c2ddc0858d9a6fcd4a33ff58509b6b6fc52e534"
+      },
+      "licenses":[{
+        "name":"Bouncy Castle Licence",
+        "url":"https://www.bouncycastle.org/licence.html",
+        "distribution":"repo"
+      }],
+      "minJRE":"JVM_1_5",
+      "name":"Bouncy Castle PKIX, CMS, EAC, TSP, PKCS, OCSP, CMP, and CRMF APIs",
+      "signatures":{
+        "bcpkix-jdk15on.jar":"-----BEGIN PGP SIGNATURE-----\n\niQGzBAABCgAdFiEEexIbdqftbObmCtUXhOkTqOOnSMAFAmqjqZAACgkQhOkTqOOn\nSMALHAv+NqM6bfnUFOLd5/4X6ZEkM2VU2gsmAdvoupsYz+rlbi49Byiz5QDij7mv\n7S3WWHVbRTtoUbyYTLMatt7NJSZTmXhqUnJC/bR3r+3qgtEpCYj3KPtOGpM1s4qx\noCkBw8GdBORCB1h8OXQ4idZ0pwcLWofmft4B8Q/krn613+MQFOIdjx1V2lHuvEhp\nlGf71gyrm3ZlwiCtZUy5uRKyPNHj4FnUhDBJ95VHGfN2BX3Q1Jc6JRM5OlxgThkw\nHYTwKt4g819oi0wRb1eI+GeUIYyqdFS1AgoLeoMvuw7g4Cl7OdOIdF0ncUya0YTH\nataAXHPODH9F3IWEojtv7M8bRaVzMVQrD03SpmmjTbgfQBJ87lKySaPXyju06nsd\ntt4j70igGM1jhkneH2b2tQiFOM8Yl+7XL3zmqwHEKyzS4nA5XR6u3xe13C72H8Yf\nC73rN5Fm8VoCFcrBTYnBBCzq4ogjP6aEvAfsphRVMn8fAyCIXSvlKPYFe20TUa9X\n80d5qzW0\n=a3L/\n-----END PGP SIGNATURE-----\n",
+        "../code-ressourcen/bcpkix-jdk15on-sources.jar":"-----BEGIN PGP SIGNATURE-----\n\niQGzBAABCgAdFiEEexIbdqftbObmCtUXhOkTqOOnSMAFAmqjqZAACgkQhOkTqOOn\nSMCYkgv9Es+mpPrQYNF4lrQb1gDf+fe6gP5ym640/jkfSXxVN6RgscFZxQSl6nZj\nTxdG9dL8Vek+hRKRHMOrFX8X07tELLzbycaI5eQQxz2s8n4/Gnr0hR71ksxX6v8W\nyeYr/ajmeOTRhKV3JWgvPhW+9VklFQaSS7jb2HOzFrcMMwh0l8YCRFY9JsBGcPD6\nEHoX3EGSkM91Mq9ZOH+SlbvB0LkBhxsph8NDM8knLuU49tb+8tOVm2CK2wABHBfN\n8Ohnjm1Tgr/pcTtCiPXu46zTDBGWGjMMB3sjYPryhv5ktHrlQYSUQP8QLE8pZpVJ\ng2qVeMC3qxjD1M+S6i/lA5C/bYGrk0jeSCeutLH233N6Rpgz96pfkfDwIPhKF+6g\nipQ7d68uXjxeIfD910pMYxNVW6FCikwFVmP2Ke5FYkONz8xuc4pEKFVaYSZ7qBkE\njvCn3NkB2FAup8TuX4jym7z0gwWDC850TqR/gcXj7F+c7bfoGoGRPqzfZyVeQZS7\n3gxLidUw\n=rbft\n-----END PGP SIGNATURE-----\n"
+      },
+      "version":"1.86",
+      "vulnerabilities":[]
     }
   ],
   "installed":{
-    "changes":"1.86\t: Bouncy Castle 1.86 is mostly a hardening release: it closes numerous timing/side-channel leaks across classical and post-quantum algorithms (RSA, ECDSA, Diffie-Hellman, MAYO, SNOVA, HQC, and others) and fixes several CVEs affecting OpenPGP, MLS, CMS, PKIX validation, and PKCS#12/BCFKS keystores.\r\n \r\n\r\nNew capabilities include SM9 identity-based cryptography, promoted (non-deprecated) XMSS and LMS/HSS implementations, wider javax.crypto.KEM support (FrodoKEM, Classic McEliece, NTRU+, SMAUG-T), TLS 1.3 OCSP stapling, C509 (CBOR-encoded X.509) certificates, and Destroyable support added across nearly all private key types for proper key zeroization\u2014plus many smaller correctness and compatibility fixes.\r\n \r\n\r\nFor more information on the 1.86 release, see the release notes on GitHub.",
-    "date":"2026-09-18T09:39:01.318+02:00",
+    "changes":"1.87\t: Bouncy Castle 1.87 is mainly a security and correctness release. It fixes twelve CVEs affecting OpenPGP key merging, RFC 3161 time-stamp validation (which no longer accepts MD5 imprints), X.500 name comparison, CMS and MIME parsing, PKIX revocation checking, and the NTRU+ and SNTRU Prime post-quantum KEMs. It also includes more than 200 other defect fixes across ASN.1/OER decoding, TLS 1.3, certificate path validation, the BCFKS, PKCS#12 and JKS key stores, and the ML-DSA, ML-KEM and SLH-DSA implementations.\r\n \r\n\r\nNew capabilities include OpenPGP post-quantum support per RFC 9980, composite ML-KEM through javax.crypto.KEM, updated HPKE, MLS, Merkle Tree Certificate and C509 drafts, Ascon algorithms in the BC provider, full RFC 4211 CRMF controls, and OpenPGP smart-card signing. There are also large speedups for SM9 (about 120× for pairing), BLS12-381, the NTRU-family KEMs, Blake3 and ChaCha20-Poly1305. Several changes are incompatible with 1.86, including HQC, Merkle Tree Certificates, C509 and ML-KEM key derivation. The old XMSS and LMS implementations under org.bouncycastle.pqc.crypto are removed, and Classic McEliece is deprecated.\r\n \r\n\r\nFor more information on the 1.87 release, see the release notes on GitHub.",
+    "date":"2026-11-18T21:47:45.168+01:00",
     "dependencies":[{
       "groupId":"org.bouncycastle",
       "artifactId":"bcutil-jdk15to18",
-      "version":"1.86",
+      "version":"1.87",
       "type":"jar"
     }],
     "description":"The Bouncy Castle Java APIs for CMS, PKCS, EAC, TSP, CMP, CRMF, OCSP, and certificate generation. This jar contains  APIs for Java 1.5 to Java 1.8. The APIs are designed primarily to be used in conjunction with the BC Java provider but may also be used with other providers providing cryptographic services.",
@@ -326,8 +355,8 @@
       "meta.json"
     ],
     "hashes":{
-      "bcpkix-jdk15on.jar":"cf70d32101e53c3f92d55ba5c5f1329af51a9a44057fd21e81e20cfd6cd64953",
-      "../code-ressourcen/bcpkix-jdk15on-sources.jar":"a601ed466b1f4a6ab68584285c2ddc0858d9a6fcd4a33ff58509b6b6fc52e534"
+      "bcpkix-jdk15on.jar":"c7dd4f507217399a0c7bb9737e4521077ce80a445f2752d83988ae08ece9a91d",
+      "../code-ressourcen/bcpkix-jdk15on-sources.jar":"eb9f8b1264d582fd8b891370b4003a6ef322eb7a465d18af2359d61caff7603c"
     },
     "licenses":[{
       "name":"Bouncy Castle Licence",
@@ -337,10 +366,10 @@
     "minJRE":"JVM_1_5",
     "name":"Bouncy Castle PKIX, CMS, EAC, TSP, PKCS, OCSP, CMP, and CRMF APIs",
     "signatures":{
-      "bcpkix-jdk15on.jar":"-----BEGIN PGP SIGNATURE-----\n\niQGzBAABCgAdFiEEexIbdqftbObmCtUXhOkTqOOnSMAFAmqjqZAACgkQhOkTqOOn\nSMALHAv+NqM6bfnUFOLd5/4X6ZEkM2VU2gsmAdvoupsYz+rlbi49Byiz5QDij7mv\n7S3WWHVbRTtoUbyYTLMatt7NJSZTmXhqUnJC/bR3r+3qgtEpCYj3KPtOGpM1s4qx\noCkBw8GdBORCB1h8OXQ4idZ0pwcLWofmft4B8Q/krn613+MQFOIdjx1V2lHuvEhp\nlGf71gyrm3ZlwiCtZUy5uRKyPNHj4FnUhDBJ95VHGfN2BX3Q1Jc6JRM5OlxgThkw\nHYTwKt4g819oi0wRb1eI+GeUIYyqdFS1AgoLeoMvuw7g4Cl7OdOIdF0ncUya0YTH\nataAXHPODH9F3IWEojtv7M8bRaVzMVQrD03SpmmjTbgfQBJ87lKySaPXyju06nsd\ntt4j70igGM1jhkneH2b2tQiFOM8Yl+7XL3zmqwHEKyzS4nA5XR6u3xe13C72H8Yf\nC73rN5Fm8VoCFcrBTYnBBCzq4ogjP6aEvAfsphRVMn8fAyCIXSvlKPYFe20TUa9X\n80d5qzW0\n=a3L/\n-----END PGP SIGNATURE-----\n",
-      "../code-ressourcen/bcpkix-jdk15on-sources.jar":"-----BEGIN PGP SIGNATURE-----\n\niQGzBAABCgAdFiEEexIbdqftbObmCtUXhOkTqOOnSMAFAmqjqZAACgkQhOkTqOOn\nSMCYkgv9Es+mpPrQYNF4lrQb1gDf+fe6gP5ym640/jkfSXxVN6RgscFZxQSl6nZj\nTxdG9dL8Vek+hRKRHMOrFX8X07tELLzbycaI5eQQxz2s8n4/Gnr0hR71ksxX6v8W\nyeYr/ajmeOTRhKV3JWgvPhW+9VklFQaSS7jb2HOzFrcMMwh0l8YCRFY9JsBGcPD6\nEHoX3EGSkM91Mq9ZOH+SlbvB0LkBhxsph8NDM8knLuU49tb+8tOVm2CK2wABHBfN\n8Ohnjm1Tgr/pcTtCiPXu46zTDBGWGjMMB3sjYPryhv5ktHrlQYSUQP8QLE8pZpVJ\ng2qVeMC3qxjD1M+S6i/lA5C/bYGrk0jeSCeutLH233N6Rpgz96pfkfDwIPhKF+6g\nipQ7d68uXjxeIfD910pMYxNVW6FCikwFVmP2Ke5FYkONz8xuc4pEKFVaYSZ7qBkE\njvCn3NkB2FAup8TuX4jym7z0gwWDC850TqR/gcXj7F+c7bfoGoGRPqzfZyVeQZS7\n3gxLidUw\n=rbft\n-----END PGP SIGNATURE-----\n"
+      "bcpkix-jdk15on.jar":"-----BEGIN PGP SIGNATURE-----\n\niQGzBAABCgAdFiEEexIbdqftbObmCtUXhOkTqOOnSMAFAmr1ao0ACgkQhOkTqOOn\nSMDpLgwAoyu2kkM//rD76Ixzc9QoZYSBN+DnvkJK5v3VfWtlg1YyqXxFQLGQIWfr\n0aYaBCZihXWT1rDYyQ0clI5rdzuYpKYB4weX+BLPeHUpIolRQmZhIitkfe2drjlf\nvcI6Fyq8gnq3BONikmj7Y0ntBmaZCHVMIK9zSlpRIQAUEb2Oi5Nu/zl4cz8tzDkA\nGL84+TvKIDIre8XKvCo62sDiLAwr6eVy3o1QirzeJ+dFmys8M3tnUFxF1XvQR3wz\nG4Ln8qJHMgNh1LN6p7Jptp7tFfVbbnAztvX4XVtsvho60ikwnzFTUyUNaWEN87RZ\n0M0XpNYBmgBugeQFlKnc2ZKeNlWak0cOIm66tojHc0Kbyotk4i72+eBaKKgxJpAK\nm7srr/k/pIrCLOOPDNwCPiYymnwjyScU8sCoL+ZVfyal9vzIJnAtnHS7xiWxtZKf\nU04tGVMqE9xTCa4yn92Ucl4BszL2kHHlfrfg5j/9l9S87IlcgSiH0tOJi24ZHB5F\ngbMX5YJf\n=5jeJ\n-----END PGP SIGNATURE-----\n",
+      "../code-ressourcen/bcpkix-jdk15on-sources.jar":"-----BEGIN PGP SIGNATURE-----\n\niQGzBAABCgAdFiEEexIbdqftbObmCtUXhOkTqOOnSMAFAmr1ao4ACgkQhOkTqOOn\nSMDPAgwAhjXpyOheFuG4OzD5BdV+Yst05l2TIsbSxftYyHifncjfrKAeNGQl96JM\nCLXgOeXHr7B0EwAVrwmZCcMBRZ3Tdnp5WNgoYQsLuxoM2UXmFSMRn7W0HbarAJ68\niWwZIR4HbxtUuHhAhM4oXWqc22n+NxslP/0HoB3rNVsc0vnO0vXlEEPUseVUS4Kq\nej8/1bpWIqKr9WbYdz0hU8g3PuCTvryBxbCYVJprwnW//Hur1FFbxTXidU7bf6KU\nD6zqX4PMTQc21WEL0S8VxyW57dMOl1HmcpK7iBt7TKq8hdBEP3Fes9XX0OU5tBR/\nMAaEevQEwfEGVLMhOtJuABOZkLmHvaL4A8yDkE0HLXslznR995P0xZfuVeL98moD\nqNnOGl2HzveT6cQldmNHxTEk51k4Gp1fBSi0sUTZh6o9x2RgVzy+UMvvoazSqcSN\noC6OB672YWVjIri2+blAJqzDlTVWQlmSwNKQrZ+pePOmcbjc4TfhMEDxOF8ndAGD\nk07aFw3V\n=tsmR\n-----END PGP SIGNATURE-----\n"
     },
-    "version":"1.86",
+    "version":"1.87",
     "vulnerabilities":[]
   },
   "minJRE":"1.8",

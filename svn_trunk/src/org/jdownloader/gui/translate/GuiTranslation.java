@@ -6002,6 +6002,33 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Unskip all skipped Links" })
     String UnskipAllSkippedLinksAction();
 
+    @Default(lngs = { "en" }, values = { "Skipped links: %s1" })
+    String SkippedLinksIndicator_links(int links);
+
+    @Default(lngs = { "en" }, values = { "Skipped captchas:" })
+    String SkippedLinksIndicator_captchas();
+
+    @Default(lngs = { "en" }, values = { "All captchas are skipped (%s1 links)" })
+    String SkippedLinksIndicator_all(String links);
+
+    @Default(lngs = { "en" }, values = { "%s1 (%s2 links)" })
+    String SkippedLinksIndicator_host(String host, String links);
+
+    @Default(lngs = { "en" }, values = { "Other: Single links and packages (%s1 links)" })
+    String SkippedLinksIndicator_others(String links);
+
+    @Default(lngs = { "en" }, values = { "Left click: Unskip everything. Right click: Choose what to unskip." })
+    String SkippedLinksIndicator_hint();
+
+    @Default(lngs = { "en" }, values = { "Unskip everything (all skipped links and captchas)" })
+    String SkippedLinksIndicator_unskipAll();
+
+    @Default(lngs = { "en" }, values = { "Do not skip captchas from %s1 any more" })
+    String SkippedLinksIndicator_unskipHost(String host);
+
+    @Default(lngs = { "en" }, values = { "Do not skip the other captchas (single links and packages) any more" })
+    String SkippedLinksIndicator_unskipOthers();
+
     @Default(lngs = { "en" }, values = { "Convert to..." })
     String PluginForHost_extendLinkgrabberContextMenu_generic_convert();
 

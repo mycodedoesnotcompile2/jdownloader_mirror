@@ -3,15 +3,7 @@ package jd.controlling.linkcrawler;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-
-import jd.config.Property;
-import jd.controlling.linkcollector.LinknameCleaner;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.packagecontroller.AbstractNodeNotifier;
-import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
-import jd.controlling.packagecontroller.AbstractPackageNode;
-import jd.controlling.packagecontroller.PackageController;
-import jd.controlling.packagecontroller.PackageControllerComparator;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.ModifyLock;
@@ -23,6 +15,15 @@ import org.jdownloader.controlling.packagizer.SubFolderByPackageRule;
 import org.jdownloader.gui.views.linkgrabber.addlinksdialog.LinkgrabberSettings;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.staticreferences.CFG_LINKCOLLECTOR;
+
+import jd.config.Property;
+import jd.controlling.linkcollector.LinknameCleaner;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.packagecontroller.AbstractNodeNotifier;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
+import jd.controlling.packagecontroller.AbstractPackageNode;
+import jd.controlling.packagecontroller.PackageController;
+import jd.controlling.packagecontroller.PackageControllerComparator;
 
 public class CrawledPackage implements AbstractPackageNode<CrawledLink, CrawledPackage> {
     public static enum TYPE {
@@ -42,34 +43,34 @@ public class CrawledPackage implements AbstractPackageNode<CrawledLink, CrawledP
         return type;
     }
 
-    private static final int                               SUBFOLDER_THRESHOLD        = JsonConfig.create(LinkgrabberSettings.class).getSubfolderThreshold();
-    private static final SubFolderByPackageRule.COUNT      SUBFOLDER_COUNT            = JsonConfig.create(LinkgrabberSettings.class).getSubfolderCount();
-    private static final GeneralSettings                   GENERALSETTINGS            = JsonConfig.create(GeneralSettings.class);
-    private List<CrawledLink>                              children;
-    private String                                         comment                    = null;
-    private PackageController<CrawledPackage, CrawledLink> controller                 = null;
-    private long                                           created                    = System.currentTimeMillis();
-    private long                                           modified                   = created;
-    private String                                         name                       = null;
-    private String                                         downloadFolder             = null;
-    private boolean                                        downloadFolderContainsTags = false;
-    private boolean                                        expanded                   = CFG_LINKCOLLECTOR.CFG.isPackageAutoExpanded();
-    private UniqueAlltimeID                                uniqueID                   = null;
-    protected CrawledPackageView                           view;
-    private String                                         compiledDownloadFolder     = null;
-    private ModifyLock                                     lock                       = null;
-    private PackageControllerComparator<AbstractNode>      sorter;
-    private Priority                                       priority                   = Priority.DEFAULT;
+    private static final int                                                          SUBFOLDER_THRESHOLD        = JsonConfig.create(LinkgrabberSettings.class).getSubfolderThreshold();
+    private static final SubFolderByPackageRule.COUNT                                 SUBFOLDER_COUNT            = JsonConfig.create(LinkgrabberSettings.class).getSubfolderCount();
+    private static final GeneralSettings                                              GENERALSETTINGS            = JsonConfig.create(GeneralSettings.class);
+    private List<CrawledLink>                                                         children;
+    private String                                                                    comment                    = null;
+    private PackageController<CrawledPackage, CrawledLink>                            controller                 = null;
+    private long                                                                      created                    = System.currentTimeMillis();
+    private long                                                                      modified                   = created;
+    private String                                                                    name                       = null;
+    private String                                                                    downloadFolder             = null;
+    private boolean                                                                   downloadFolderContainsTags = false;
+    private boolean                                                                   expanded                   = CFG_LINKCOLLECTOR.CFG.isPackageAutoExpanded();
+    private String                                                                    compiledDownloadFolder     = null;
+    private PackageControllerComparator<AbstractNode>                                 sorter;
+    private Priority                                                                  priority                   = Priority.DEFAULT;
+    private final static AtomicReferenceFieldUpdater<CrawledPackage, UniqueAlltimeID> UNIQUEALLTIMEID_UPDATER    = AtomicReferenceFieldUpdater.newUpdater(CrawledPackage.class, UniqueAlltimeID.class, "uniqueID");
+    private volatile UniqueAlltimeID                                                  uniqueID                   = null;
 
     public UniqueAlltimeID getUniqueID() {
-        if (uniqueID == null) {
-            synchronized (this) {
-                if (uniqueID == null) {
-                    uniqueID = new UniqueAlltimeID();
-                }
+        while (true) {
+            UniqueAlltimeID ret = uniqueID;
+            if (ret != null) {
+                return ret;
+            }
+            if (UNIQUEALLTIMEID_UPDATER.compareAndSet(this, null, ret = new UniqueAlltimeID())) {
+                return ret;
             }
         }
-        return uniqueID;
     }
 
     public CrawledPackage() {
@@ -259,16 +260,20 @@ public class CrawledPackage implements AbstractPackageNode<CrawledLink, CrawledP
         this.expanded = b;
     }
 
+    private final static AtomicReferenceFieldUpdater<CrawledPackage, CrawledPackageView> CRAWLEDPACKAGEVIEW_UPDATER = AtomicReferenceFieldUpdater.newUpdater(CrawledPackage.class, CrawledPackageView.class, "fpInfo");
+    private volatile CrawledPackageView                                                  view                       = null;
+
+    @Override
     public CrawledPackageView getView() {
-        if (view == null) {
-            synchronized (this) {
-                if (view == null) {
-                    final CrawledPackageView lfpInfo = new CrawledPackageView(this);
-                    view = lfpInfo;
-                }
+        while (true) {
+            CrawledPackageView ret = view;
+            if (ret != null) {
+                return ret;
+            }
+            if (CRAWLEDPACKAGEVIEW_UPDATER.compareAndSet(this, null, ret = new CrawledPackageView(this))) {
+                return ret;
             }
         }
-        return view;
     }
 
     public boolean isEnabled() {
@@ -341,16 +346,21 @@ public class CrawledPackage implements AbstractPackageNode<CrawledLink, CrawledP
         }
     }
 
+    private final static AtomicReferenceFieldUpdater<CrawledPackage, ModifyLock> MODIFYLOCK_UPDATER = AtomicReferenceFieldUpdater.newUpdater(CrawledPackage.class, ModifyLock.class, "lock");
+    private volatile ModifyLock                                                  lock               = null;
+
     @Override
     public ModifyLock getModifyLock() {
-        if (lock == null) {
-            synchronized (this) {
-                if (lock == null) {
-                    lock = new ModifyLock();
-                }
+        /* Created lazily and lock-free: If another thread set a lock first, the loop picks up that one */
+        while (true) {
+            ModifyLock ret = lock;
+            if (ret != null) {
+                return ret;
+            }
+            if (MODIFYLOCK_UPDATER.compareAndSet(this, null, ret = new ModifyLock())) {
+                return ret;
             }
         }
-        return lock;
     }
 
     @Override

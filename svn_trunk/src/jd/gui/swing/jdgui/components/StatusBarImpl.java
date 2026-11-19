@@ -17,8 +17,6 @@ package jd.gui.swing.jdgui.components;
 
 import java.awt.Component;
 import java.awt.HeadlessException;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
 import java.util.ArrayList;
 import java.util.concurrent.CopyOnWriteArraySet;
 
@@ -59,17 +57,14 @@ import org.appwork.exceptions.WTFException;
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.swing.components.tooltips.ToolTipController;
 import org.appwork.utils.Application;
-import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.EDTRunner;
 import org.jdownloader.captcha.event.ChallengeResponseListener;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.ChallengeResponseController;
 import org.jdownloader.captcha.v2.ChallengeSolver;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
-import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.linkgrabber.bottombar.AutoConfirmProcessIndicator;
-import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
 public class StatusBarImpl extends JPanel implements DownloadWatchdogListener {
@@ -80,6 +75,7 @@ public class StatusBarImpl extends JPanel implements DownloadWatchdogListener {
     }
     private static final long serialVersionUID = 3676496738341246846L;
     private ReconnectProgress reconnectIndicator;
+    private SkippedLinksIndicator skippedLinksIndicator;
     private JLabel            statusLabel;
     private DelayedRunnable   updateDelayer;
 
@@ -109,6 +105,7 @@ public class StatusBarImpl extends JPanel implements DownloadWatchdogListener {
         reconnectIndicator.setTitle(_GUI.T.StatusBarImpl_initGUI_reconnect());
         reconnectIndicator.setIndeterminate(false);
         reconnectIndicator.setEnabled(false);
+        skippedLinksIndicator = new SkippedLinksIndicator(this);
         DownloadWatchDog.getInstance().getEventSender().addListener(this);
         Reconnecter.getInstance().getEventSender().addListener(new ReconnecterListener() {
             @Override
@@ -310,7 +307,6 @@ public class StatusBarImpl extends JPanel implements DownloadWatchdogListener {
     }
 
     private CopyOnWriteArraySet<JComponent> processIndicators = new CopyOnWriteArraySet<JComponent>();
-    private IconedProcessIndicator          downloadWatchdogIndicator;
 
     public void remove(Component comp) {
         throw new WTFException("Use #removeProcessIndicator");
@@ -324,90 +320,46 @@ public class StatusBarImpl extends JPanel implements DownloadWatchdogListener {
         throw new WTFException("Use #addProcessIndicator");
     }
 
-    private JComponent lazyGetDownloadWatchdogIndicator() {
-        if (downloadWatchdogIndicator != null) {
-            return downloadWatchdogIndicator;
-        }
-        downloadWatchdogIndicator = new EDTHelper<IconedProcessIndicator>() {
-            @Override
-            public IconedProcessIndicator edtRun() {
-                if (downloadWatchdogIndicator != null) {
-                    return downloadWatchdogIndicator;
-                }
-                IconedProcessIndicator ldownloadWatchdogIndicator = new IconedProcessIndicator(new AbstractIcon(IconKey.ICON_SKIPPED, 16));
-                ldownloadWatchdogIndicator.setTitle(_GUI.T.StatusBarImpl_skippedLinksMarker_title());
-                ldownloadWatchdogIndicator.setIndeterminate(false);
-                ldownloadWatchdogIndicator.setEnabled(true);
-                ldownloadWatchdogIndicator.setValue(100);
-                ldownloadWatchdogIndicator.addMouseListener(new MouseListener() {
-                    public void mouseReleased(MouseEvent e) {
-                        DownloadWatchDog.getInstance().unSkipAllSkipped();
-                    }
-
-                    public void mousePressed(MouseEvent e) {
-                    }
-
-                    public void mouseExited(MouseEvent e) {
-                    }
-
-                    public void mouseEntered(MouseEvent e) {
-                    }
-
-                    public void mouseClicked(MouseEvent e) {
-                    }
-                });
-                return ldownloadWatchdogIndicator;
-            }
-        }.getReturnValue();
-        return downloadWatchdogIndicator;
-    }
-
     @Override
     public void onDownloadWatchdogDataUpdate() {
-        if (DownloadWatchDog.getInstance().getSession().getSkipCounter() > 0) {
-            if (!hasProcessIndicator(lazyGetDownloadWatchdogIndicator())) {
-                addProcessIndicator(lazyGetDownloadWatchdogIndicator());
-            }
-            new EDTRunner() {
-                @Override
-                protected void runInEDT() {
-                    if (downloadWatchdogIndicator != null) {
-                        downloadWatchdogIndicator.setDescription(_GUI.T.StatusBarImpl_skippedLinksMarker_desc(DownloadWatchDog.getInstance().getSession().getSkipCounter()));
-                    }
-                }
-            };
-        } else if (DownloadWatchDog.getInstance().getSession().getSkipCounter() <= 0) {
-            if (downloadWatchdogIndicator != null) {
-                removeProcessIndicator(lazyGetDownloadWatchdogIndicator());
-            }
-        }
+        refreshSkippedLinksIndicator();
     }
 
-    private boolean hasProcessIndicator(JComponent icon) {
-        return processIndicators.contains(icon);
+    /** The skipped links or the state of the downloads changed: The indicator is only shown while the downloads are running. */
+    private void refreshSkippedLinksIndicator() {
+        new EDTRunner() {
+            @Override
+            protected void runInEDT() {
+                if (skippedLinksIndicator != null) {
+                    skippedLinksIndicator.refresh();
+                }
+            }
+        };
     }
 
     @Override
     public void onDownloadWatchdogStateIsIdle() {
+        refreshSkippedLinksIndicator();
     }
 
     @Override
     public void onDownloadWatchdogStateIsPause() {
+        refreshSkippedLinksIndicator();
     }
 
     @Override
     public void onDownloadWatchdogStateIsRunning() {
+        refreshSkippedLinksIndicator();
     }
 
     @Override
     public void onDownloadWatchdogStateIsStopped() {
-        if (downloadWatchdogIndicator != null) {
-            removeProcessIndicator(lazyGetDownloadWatchdogIndicator());
-        }
+        refreshSkippedLinksIndicator();
     }
 
     @Override
     public void onDownloadWatchdogStateIsStopping() {
+        refreshSkippedLinksIndicator();
     }
 
     @Override

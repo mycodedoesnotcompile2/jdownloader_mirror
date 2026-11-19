@@ -1,17 +1,22 @@
 package jd.controlling.linkcrawler;
 
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
+
 import org.appwork.utils.StringUtils;
 import org.jdownloader.controlling.UniqueAlltimeID;
+import org.jdownloader.controlling.packagizer.PackagizerController;
+import org.jdownloader.controlling.packagizer.PackagizerRuleWrapper;
 
 import jd.controlling.linkcollector.LinknameCleaner;
 
 public class PackageInfo {
-    private UniqueAlltimeID uniqueId              = null;
-    private boolean         packagizerRuleMatched = false;
-    private Boolean         ignoreVarious         = null;
-    private Boolean         allowInheritance      = null;
-    private String          packageKey            = null;
-    private String          comment               = null;
+    private UniqueAlltimeID uniqueId               = null;
+    private Set<String>     matchedPackagizerRules = new CopyOnWriteArraySet<String>();
+    private Boolean         ignoreVarious          = null;
+    private Boolean         allowInheritance       = null;
+    private String          packageKey             = null;
+    private String          comment                = null;
 
     public String getComment() {
         return comment;
@@ -23,6 +28,18 @@ public class PackageInfo {
 
     public String getPackageKey() {
         return packageKey;
+    }
+
+    public boolean isPackagenameSubfolderOnly() {
+        return getDestinationFolderRoot() == null && PackagizerController.PACKAGETAG.equals(getDestinationFolder());
+    }
+
+    public boolean isPackageSet() {
+        return StringUtils.isNotEmpty(getName()) || StringUtils.isNotEmpty(getPackageKey());
+    }
+
+    public boolean isIgnoreSpecialPackages() {
+        return Boolean.TRUE.equals(isIgnoreVarious()) || isPackageSet() || (isPackagizerRuleMatched() && !isPackagenameSubfolderOnly());
     }
 
     public void setPackageKey(String packageKey) {
@@ -64,7 +81,7 @@ public class PackageInfo {
         ret.setDestinationFolder(getDestinationFolder());
         ret.setDestinationFolderRoot(getDestinationFolderRoot());
         ret.setIgnoreVarious(isIgnoreVarious());
-        ret.setPackagizerRuleMatched(isPackagizerRuleMatched());
+        ret.matchedPackagizerRules = new CopyOnWriteArraySet<>(getMatchingPackagizerRules());
         ret.setUniqueId(getUniqueId());
         ret.setAllowInheritance(isAllowInheritance());
         ret.setPackageKey(getPackageKey());
@@ -113,15 +130,19 @@ public class PackageInfo {
      * @return the packagizerRuleMatched
      */
     public boolean isPackagizerRuleMatched() {
-        return packagizerRuleMatched;
+        return !matchedPackagizerRules.isEmpty();
     }
 
     /**
      * @param packagizerRuleMatched
      *            the packagizerRuleMatched to set
      */
-    public void setPackagizerRuleMatched(boolean packagizerRuleMatched) {
-        this.packagizerRuleMatched = packagizerRuleMatched;
+    public void addMatchingPackagizerRule(PackagizerRuleWrapper rule) {
+        matchedPackagizerRules.add(rule.getRule().getId());
+    }
+
+    public Set<String> getMatchingPackagizerRules() {
+        return matchedPackagizerRules;
     }
 
     /**
@@ -144,6 +165,6 @@ public class PackageInfo {
     }
 
     public boolean isNotEmpty() {
-        return ignoreVarious != null || packageKey != null || uniqueId != null || destinationFolder != null || destinationFolderRoot != null || name != null || packagizerRuleMatched;
+        return ignoreVarious != null || packageKey != null || uniqueId != null || destinationFolder != null || destinationFolderRoot != null || name != null || isPackagizerRuleMatched();
     }
 }

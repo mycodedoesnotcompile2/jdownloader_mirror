@@ -450,9 +450,9 @@ public class LinkCrawler {
         }
     }
 
-    private static final Object LINKCRAWLERRULESLOCK = new Object();
+    private static final Object  LINKCRAWLERRULESLOCK = new Object();
     /* Compiled once: used for every match in getCryptedLinks to find the first http(s) URL inside a source URL. */
-    private static final Pattern HTTP_URL_START      = Pattern.compile("https?://");
+    private static final Pattern HTTP_URL_START       = Pattern.compile("https?://");
 
     public void updateLinkCrawlerRule(final LinkCrawlerRule updateRule) {
         boolean refresh = false;
@@ -1783,7 +1783,7 @@ public class LinkCrawler {
             previousRequests.addAll(((BrowserCrawledLink) source).getPreviousRequests());
         }
         if (previousRequests.size() == 0 && matchingRule != null) {
-            matchingRule.applyCookiesAndHeaders(br, req.getUrl(), false);
+            matchingRule.applyCookiesAndHeaders(br, req.getURL(), false);
         }
         previousRequests.add(req);
         URLConnectionAdapter con = null;
@@ -1819,7 +1819,7 @@ public class LinkCrawler {
                 next = new BrowserCrawledLink(br, previousRequests);
             }
             if (matchingRule != null) {
-                if (matchingRule.updateCookies(br, req.getUrl(), false, false)) {
+                if (matchingRule.updateCookies(br, req.getURL(), false, false)) {
                     updateLinkCrawlerRule(matchingRule);
                 }
                 next.setMatchingRule(matchingRule);
@@ -2645,12 +2645,18 @@ public class LinkCrawler {
         }
     }
 
-    protected LinkCrawlerRule getFirstMatchingRule(CrawledLink link, String url, LinkCrawlerRule.RULE... ruleTypes) {
+    protected LinkCrawlerRule getFirstMatchingRule(CrawledLink link, final String stringUrl, LinkCrawlerRule.RULE... ruleTypes) {
         final List<LinkCrawlerRule> rules = getLinkCrawlerRules();
         if (rules == null) {
             return null;
         }
-        if (StringUtils.startsWithCaseInsensitive(url, "file:/") || StringUtils.startsWithCaseInsensitive(url, "http://") || StringUtils.startsWithCaseInsensitive(url, "https://")) {
+        if (StringUtils.startsWithCaseInsensitive(stringUrl, "file:/") || StringUtils.startsWithCaseInsensitive(stringUrl, "http://") || StringUtils.startsWithCaseInsensitive(stringUrl, "https://")) {
+            final URL url;
+            try {
+                url = new URL(stringUrl);
+            } catch (MalformedURLException ignore) {
+                return null;
+            }
             for (final LinkCrawlerRule.RULE ruleType : ruleTypes) {
                 for (final LinkCrawlerRule rule : rules) {
                     if (ruleType.equals(rule.getRule()) && rule.matches(url)) {

@@ -4932,6 +4932,11 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
         return stateMachine.isState(RUNNING_STATE, PAUSE_STATE);
     }
 
+    /** True while the downloads are running: Not paused, not stopping and not stopped. */
+    public boolean isRunningAndNotPaused() {
+        return stateMachine.isState(RUNNING_STATE);
+    }
+
     public boolean isIdle() {
         return stateMachine.isState(IDLE_STATE, STOPPED_STATE);
     }

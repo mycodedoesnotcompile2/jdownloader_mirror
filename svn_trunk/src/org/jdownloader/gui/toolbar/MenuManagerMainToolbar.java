@@ -148,7 +148,7 @@ public class MenuManagerMainToolbar extends ContextMenuManager<FilePackage, Down
         opt.add(new MenuItemData(OpenDefaultDownloadFolderAction.class));
         opt.add(new MenuItemData(ShowSettingsAction.class));
         opt.add(new MenuItemData(ExitToolbarAction.class));
-        opt.add(UnskipAllSkippedLinksAction.class);
+        opt.add(UnskipLinksAction.class);
         //
         opt.add(AlwaysOnTopGuiToogleAction.class);
         opt.add(AddLinksMenuAction.class);
