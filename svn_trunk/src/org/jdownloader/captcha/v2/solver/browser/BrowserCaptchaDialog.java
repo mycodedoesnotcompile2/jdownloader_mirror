@@ -163,6 +163,11 @@ public class BrowserCaptchaDialog extends AbstractCaptchaDialog<String> {
             @Override
             public void addCancelButton(final JButton cancelButton) {
                 super.addCancelButton(cancelButton);
+                customizeCancelButton(cancelButton);
+                if (isLoginCaptcha()) {
+                    /* Login captchas can only be skipped one by one, so there is no dropdown. */
+                    return;
+                }
                 final JButton bt = new JButton(new AbstractIcon(IconKey.ICON_POPDOWNSMALL, -1)) {
                     public void setBounds(int x, int y, int width, int height) {
                         int delta = 5;
@@ -179,11 +184,7 @@ public class BrowserCaptchaDialog extends AbstractCaptchaDialog<String> {
             }
         };
         ret.setOpaque(false);
-        if (isSoundToggleVisible()) {
-            ret.add(createSoundToggle(), "width 28!");
-        }
-        /* The refresh button always stands directly next to the sound toggle, in front of the "Hate captchas" text. */
-        ret.add(createRefreshButton(), "width 28!");
+        captchaToolbar = createCaptchaToolbar();
         ExtButton premium = new ExtButton(new AppAction() {
             /**
              *
@@ -368,8 +369,15 @@ public class BrowserCaptchaDialog extends AbstractCaptchaDialog<String> {
     }
 
     @Override
+    protected JButton createOkButton() {
+        final JButton ret = super.createOkButton();
+        ret.setIcon(new AbstractIcon(IconKey.ICON_BROWSE, 18));
+        return ret;
+    }
+
+    @Override
     public String getOKButtonText() {
-        return _GUI.T.BrowserCaptchaDialog_getOKButtonText_open_browser();
+        return _GUI.T.BrowserCaptchaDialog_getOKButtonText_open_browser() + " (" + BrowserSolverService.getInstance().getBrowserName() + ")";
     }
 
     public void mouseClicked(final MouseEvent e) {

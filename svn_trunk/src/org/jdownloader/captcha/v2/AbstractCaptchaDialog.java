@@ -18,6 +18,7 @@ import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -49,6 +50,9 @@ import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
 import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.captcha.CaptchaSettings;
+import jd.controlling.captcha.CaptchaSettings.CrawlerCaptchaDialogDefaultAction;
+import jd.controlling.captcha.CaptchaSettings.HosterCaptchaDialogDefaultAction;
 import jd.gui.swing.dialog.DialogType;
 import jd.gui.swing.jdgui.JDGui;
 import jd.gui.swing.jdgui.views.settings.components.Checkbox;
@@ -135,99 +139,186 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
         return null;
     }
 
+    /** The skip actions a captcha dialog can offer. Which of them a dialog offers depends on its type, see {@link #getSkipActions()}. */
+    protected static enum SkipAction {
+        SKIP_SINGLE,
+        BLOCK_HOSTER,
+        BLOCK_PACKAGE,
+        BLOCK_ALL_CAPTCHAS,
+        STOP_DOWNLOADS,
+        CANCEL_LINKGRABBING,
+        STOP_SHOWING_CRAWLER_CAPTCHAS
+    }
+
+    /** The skip actions of this dialog in the order of the dropdown: Download captchas have other actions than the other dialogs. */
+    protected List<SkipAction> getSkipActions() {
+        switch (getType()) {
+        case HOSTER:
+            return Arrays.asList(SkipAction.SKIP_SINGLE, SkipAction.BLOCK_HOSTER, SkipAction.BLOCK_PACKAGE, SkipAction.BLOCK_ALL_CAPTCHAS, SkipAction.STOP_DOWNLOADS);
+        case CRAWLER:
+        case ACCOUNT:
+        case OTHER:
+        default:
+            return Arrays.asList(SkipAction.SKIP_SINGLE, SkipAction.CANCEL_LINKGRABBING, SkipAction.STOP_SHOWING_CRAWLER_CAPTCHAS);
+        }
+    }
+
+    /** The skip action behind the visible cancel button: The setting of the dialog type (hoster, else crawler). */
+    protected SkipAction getDefaultSkipAction() {
+        if (isLoginCaptcha()) {
+            /* Login captchas can only be skipped one by one, there is no dropdown. */
+            return SkipAction.SKIP_SINGLE;
+        }
+        switch (getType()) {
+        case HOSTER:
+            final HosterCaptchaDialogDefaultAction hoster = CaptchaSettings.CFG.getHosterCaptchaDialogDefaultAction();
+            if (hoster == null) {
+                return SkipAction.SKIP_SINGLE;
+            }
+            switch (hoster) {
+            case BLOCK_HOSTER:
+                return SkipAction.BLOCK_HOSTER;
+            case BLOCK_PACKAGE:
+                return SkipAction.BLOCK_PACKAGE;
+            case BLOCK_ALL_CAPTCHAS:
+                return SkipAction.BLOCK_ALL_CAPTCHAS;
+            case STOP_DOWNLOADS:
+                return SkipAction.STOP_DOWNLOADS;
+            case SKIP_SINGLE:
+            default:
+                return SkipAction.SKIP_SINGLE;
+            }
+        case CRAWLER:
+        case ACCOUNT:
+        case OTHER:
+        default:
+            final CrawlerCaptchaDialogDefaultAction crawler = CaptchaSettings.CFG.getCrawlerCaptchaDialogDefaultAction();
+            if (crawler == null) {
+                return SkipAction.SKIP_SINGLE;
+            }
+            switch (crawler) {
+            case CANCEL_LINKGRABBING:
+                return SkipAction.CANCEL_LINKGRABBING;
+            case STOP_SHOWING_CRAWLER_CAPTCHAS:
+                return SkipAction.STOP_SHOWING_CRAWLER_CAPTCHAS;
+            case SKIP_SINGLE:
+            default:
+                return SkipAction.SKIP_SINGLE;
+            }
+        }
+    }
+
+    /** Sets the flag of the skip action, so the handler knows what to do after the dialog is closed, see ChallengeDialogHandler. */
+    protected void applySkipAction(final SkipAction action) {
+        switch (action) {
+        case BLOCK_HOSTER:
+            hideCaptchasForHost = true;
+            break;
+        case BLOCK_PACKAGE:
+            hideCaptchasForPackage = true;
+            break;
+        case BLOCK_ALL_CAPTCHAS:
+            hideAllCaptchas = true;
+            break;
+        case STOP_DOWNLOADS:
+            stopDownloads = true;
+            break;
+        case CANCEL_LINKGRABBING:
+            stopCrawling = true;
+            break;
+        case STOP_SHOWING_CRAWLER_CAPTCHAS:
+            stopShowingCrawlerCaptchas = true;
+            break;
+        case SKIP_SINGLE:
+        default:
+            break;
+        }
+    }
+
+    protected String getSkipActionName(final SkipAction action) {
+        switch (action) {
+        case BLOCK_HOSTER:
+            return _GUI.T.AbstractCaptchaDialog_createPopup_skip_and_disable_all_downloads_from(getHost());
+        case BLOCK_PACKAGE:
+            return _GUI.T.AbstractCaptchaDialog_createPopup_skip_and_disable_package(getPackageName());
+        case BLOCK_ALL_CAPTCHAS:
+            return _GUI.T.AbstractCaptchaDialog_createPopup_skip_and_hide_all_captchas_download();
+        case STOP_DOWNLOADS:
+            return _GUI.T.AbstractCaptchaDialog_createPopup_skip_and_stop_all_downloads();
+        case CANCEL_LINKGRABBING:
+            return _GUI.T.AbstractCaptchaDialog_createPopup_cancel_linkgrabbing();
+        case STOP_SHOWING_CRAWLER_CAPTCHAS:
+            return _GUI.T.AbstractCaptchaDialog_createPopup_cancel_stop_showing_crawlercaptchs();
+        case SKIP_SINGLE:
+        default:
+            if (isLoginCaptcha()) {
+                return _GUI.T.AbstractCaptchaDialog_skipLoginCaptcha();
+            }
+            return type == DialogType.CRAWLER ? _GUI.T.lit_cancel() : _GUI.T.AbstractCaptchaDialog_AbstractCaptchaDialog_cancel();
+        }
+    }
+
+    protected Icon getSkipActionIcon(final SkipAction action) {
+        switch (action) {
+        case BLOCK_HOSTER:
+            try {
+                return getDomainInfo().getIcon(16);
+            } catch (final Throwable e) {
+                e.printStackTrace();
+                return null;
+            }
+        case BLOCK_PACKAGE:
+            return new BadgeIcon(IconKey.ICON_PACKAGE_OPEN, IconKey.ICON_SKIPPED, 16);
+        case BLOCK_ALL_CAPTCHAS:
+            return NewTheme.I().getIcon(IconKey.ICON_CLEAR, 16);
+        case STOP_DOWNLOADS:
+        case CANCEL_LINKGRABBING:
+            return new AbstractIcon(IconKey.ICON_STOP, 16);
+        case STOP_SHOWING_CRAWLER_CAPTCHAS:
+            return new AbstractIcon(IconKey.ICON_FIND, 16);
+        case SKIP_SINGLE:
+        default:
+            return new AbstractIcon(IconKey.ICON_SKIPPED, 16);
+        }
+    }
+
+    /** Gives the visible cancel button the name and the icon of the default skip action (like in the dropdown), see {@link #getDefaultSkipAction()}. */
+    protected void customizeCancelButton(final JButton cancelButton) {
+        final SkipAction action = getDefaultSkipAction();
+        cancelButton.setText(getSkipActionName(action));
+        cancelButton.setIcon(getSkipActionIcon(action));
+    }
+
+    /** The click on the cancel button does the default skip action. Closing the dialog (ESC, close button) does not, it skips only the single captcha. */
+    @Override
+    public void actionPerformed(final ActionEvent e) {
+        if (e.getSource() == cancelButton) {
+            applySkipAction(getDefaultSkipAction());
+        }
+        super.actionPerformed(e);
+    }
+
+    /** The dropdown of the cancel button: All skip actions of this dialog except the one that is already behind the button. */
     protected void createPopup() {
         final JPopupMenu popup = new JPopupMenu();
-        JMenuItem mi;
-        if (getType() == DialogType.HOSTER) {
-            mi = new JMenuItem(new AppAction() {
+        final SkipAction defaultAction = getDefaultSkipAction();
+        for (final SkipAction action : getSkipActions()) {
+            if (action.equals(defaultAction)) {
+                continue;
+            }
+            popup.add(new JMenuItem(new AppAction() {
                 {
-                    setName(_GUI.T.AbstractCaptchaDialog_createPopup_skip_and_disable_all_downloads_from(getHost()));
-                    try {
-                        setSmallIcon(getDomainInfo().getIcon(16));
-                    } catch (final Throwable e) {
-                        e.printStackTrace();
-                    }
+                    setName(getSkipActionName(action));
+                    setSmallIcon(getSkipActionIcon(action));
                 }
 
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    hideCaptchasForHost = true;
+                    applySkipAction(action);
                     setReturnmask(false);
                     dispose();
                 }
-            });
-            popup.add(mi);
-            mi = new JMenuItem(new AppAction() {
-                {
-                    setName(_GUI.T.AbstractCaptchaDialog_createPopup_skip_and_disable_package(getPackageName()));
-                    setSmallIcon(new BadgeIcon(IconKey.ICON_PACKAGE_OPEN, IconKey.ICON_SKIPPED, 16));
-                }
-
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    hideCaptchasForPackage = true;
-                    setReturnmask(false);
-                    dispose();
-                }
-            });
-            popup.add(mi);
-            mi = new JMenuItem(new AppAction() {
-                {
-                    setName(_GUI.T.AbstractCaptchaDialog_createPopup_skip_and_hide_all_captchas_download());
-                    setSmallIcon(NewTheme.I().getIcon(IconKey.ICON_CLEAR, 16));
-                }
-
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    hideAllCaptchas = true;
-                    setReturnmask(false);
-                    dispose();
-                }
-            });
-            popup.add(mi);
-            mi = new JMenuItem(new AppAction() {
-                {
-                    setName(_GUI.T.AbstractCaptchaDialog_createPopup_skip_and_stop_all_downloads());
-                    setSmallIcon(new AbstractIcon(IconKey.ICON_STOP, 16));
-                }
-
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    stopDownloads = true;
-                    setReturnmask(false);
-                    dispose();
-                }
-            });
-            popup.add(mi);
-        } else {
-            mi = new JMenuItem(new AppAction() {
-                {
-                    setName(_GUI.T.AbstractCaptchaDialog_createPopup_cancel_linkgrabbing());
-                    setSmallIcon(new AbstractIcon(IconKey.ICON_STOP, 16));
-                }
-
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    stopCrawling = true;
-                    setReturnmask(false);
-                    dispose();
-                }
-            });
-            popup.add(mi);
-            mi = new JMenuItem(new AppAction() {
-                {
-                    setName(_GUI.T.AbstractCaptchaDialog_createPopup_cancel_stop_showing_crawlercaptchs());
-                    setSmallIcon(new AbstractIcon(IconKey.ICON_FIND, 16));
-                }
-
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    stopShowingCrawlerCaptchas = true;
-                    setReturnmask(false);
-                    dispose();
-                }
-            });
-            popup.add(mi);
+            }));
         }
         Insets insets = LAFOptions.getInstance().getExtension().customizePopupBorderInsets();
         Dimension pref = popup.getPreferredSize();
@@ -287,7 +378,7 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
         this.hosterInfo = domainInfo;
         this.type = type;
         setPlugin(challenge.getPlugin());
-        if (!challenge.keepAlive()) {
+        if (!challenge.canKeepAlive()) {
             // no reason to let the user stop the countdown if the result cannot be used after the countdown anyway
             setCountdownPausable(false);
         }
@@ -409,8 +500,37 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
         }
     }
 
-    /** Hook for subclasses to add further buttons to the button panel, right before the sound toggle. */
-    protected void addAdditionalButtons(final DefaultButtonPanel buttonPanel) {
+    /** Hook for subclasses to add further buttons to the toolbar, right before the sound toggle. */
+    protected void addAdditionalButtons(final JPanel toolbar) {
+    }
+
+    /**
+     * The toolbar of the dialog: The additional buttons of the subclass, the sound toggle and the refresh button. It has a row of its own
+     * above the countdown and the buttons (see {@link #createBottomPanel()}), so the dialog does not get wider if a button (e.g. the skip
+     * button with the name of a long skip action) is wide.
+     */
+    protected MigPanel createCaptchaToolbar() {
+        final MigPanel ret = new MigPanel("ins 0", "[]", "[grow,fill]");
+        ret.setOpaque(false);
+        addAdditionalButtons(ret);
+        if (isSoundToggleVisible()) {
+            ret.add(createSoundToggle(), "width 28!");
+        }
+        ret.add(createRefreshButton(), "width 28!");
+        return ret;
+    }
+
+    /** The toolbar of the dialog, created together with the button panel. */
+    protected MigPanel captchaToolbar;
+
+    /** Two rows: The toolbar, then the countdown, the "Hate captchas" text and the buttons which the dialog adds. */
+    @Override
+    protected MigPanel createBottomPanel() {
+        final MigPanel ret = new MigPanel("ins 0", "[]20[grow,fill][]", "[][]");
+        if (captchaToolbar != null) {
+            ret.add(captchaToolbar, "spanx 3,alignx left,wrap");
+        }
+        return ret;
     }
 
     /** True if the dialog shows the toggle for the (global) captcha sound. Not the case for dialogs that are no real captchas. */
@@ -539,6 +659,11 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
             @Override
             public void addCancelButton(final JButton cancelButton) {
                 super.addCancelButton(cancelButton);
+                customizeCancelButton(cancelButton);
+                if (isLoginCaptcha()) {
+                    /* Login captchas can only be skipped one by one, so there is no dropdown. */
+                    return;
+                }
                 final JButton bt = new JButton(new AbstractIcon(IconKey.ICON_POPDOWNSMALL, -1)) {
                     public void setBounds(int x, int y, int width, int height) {
                         int delta = 5;
@@ -555,12 +680,7 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
             }
         };
         ret.setOpaque(false);
-        addAdditionalButtons(ret);
-        if (isSoundToggleVisible()) {
-            ret.add(createSoundToggle(), "width 28!");
-        }
-        /* The refresh button always stands directly next to the sound toggle, in front of the "Hate captchas" text. */
-        ret.add(createRefreshButton(), "width 28!");
+        captchaToolbar = createCaptchaToolbar();
         ExtButton premium = new ExtButton(new AppAction() {
             /**
              *
@@ -912,6 +1032,12 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
         container.add(externalPanel, "growy 0");
     }
 
+    /** True if the captcha is needed to log in to an account, see {@link Plugin#isAccountLoginCaptchaChallenge(Challenge)}. */
+    protected boolean isLoginCaptcha() {
+        final Plugin plugin = this.plugin;
+        return plugin != null && plugin.isAccountLoginCaptchaChallenge(challenge);
+    }
+
     /**
      * Adds the setting "Avoid external solvers for login captchas" with a short description (the long one is the tooltip) to the given
      * dialog content. It is only shown for login captchas (see {@link Plugin#isAccountLoginCaptchaChallenge(Challenge)}) and only if the
@@ -919,8 +1045,7 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
      * to be called by the subclass after the rest of the content has been added.
      */
     protected void addLoginCaptchaPanel(final JComponent container) {
-        final Plugin plugin = this.plugin;
-        if (plugin == null || !plugin.isAccountLoginCaptchaChallenge(challenge)) {
+        if (!isLoginCaptcha()) {
             return;
         }
         if (!ChallengeResponseController.getInstance().isUsableExternalSolverAvailable(CAPTCHA_TYPE.getCaptchaTypeForChallenge(challenge))) {

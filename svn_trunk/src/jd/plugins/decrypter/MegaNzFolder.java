@@ -9,6 +9,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,6 +47,7 @@ import jd.plugins.hoster.MegaNz;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.MaxTimeSoftReference;
 import org.appwork.storage.config.MaxTimeSoftReferenceCleanupCallback;
 import org.appwork.storage.simplejson.JSonParser;
@@ -61,7 +63,7 @@ import org.jdownloader.plugins.components.config.MegaNzFolderConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 53802 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54074 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { MegaNz.class })
 public class MegaNzFolder extends PluginForDecrypt {
     private static AtomicLong CS = new AtomicLong(System.currentTimeMillis());
@@ -314,7 +316,10 @@ public class MegaNzFolder extends PluginForDecrypt {
             } else {
                 final Map<String, List<Map<String, Object>>> nodeUpdates = new HashMap<String, List<Map<String, Object>>>();
                 final List<Map<String, Object>> parsedNodes = new ArrayList<Map<String, Object>>();
-                pagination: while (!isAbort()) {
+                pagination: while (true) {
+                    if (isAbort()) {
+                        throw new InterruptedException();
+                    }
                     final URLConnectionAdapter con;
                     if (sn != null) {
                         if (w != null) {
@@ -346,7 +351,7 @@ public class MegaNzFolder extends PluginForDecrypt {
                             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                         }
                     }
-                    final Object response;
+                    final Object parsedResponse;
                     try {
                         JSonParser factory = new JSonParser(IO.BOM.read(IO.readStream(-1, con.getInputStream()), IO.BOM.UTF8.getCharSet())) {
                             @Override
@@ -363,11 +368,21 @@ public class MegaNzFolder extends PluginForDecrypt {
                                 super.putKeyValuePair(newPath, map, key, value);
                             }
                         };
-                        response = factory.parse();
+                        parsedResponse = factory.parse();
                         // allow GC of JSonFactory
                         factory = null;
                     } finally {
                         con.disconnect();
+                    }
+                    /*
+                     * Errors of a single command are returned as a list with one number, e.g. "[-9]". Unwrap them so they are handled
+                     * together with request-level errors (plain number) below instead of being mistaken for an empty node list.
+                     */
+                    final Object response;
+                    if (parsedResponse instanceof List && ((List<?>) parsedResponse).size() == 1 && toObject(((List<?>) parsedResponse).get(0)) instanceof Number) {
+                        response = ((List<?>) parsedResponse).get(0);
+                    } else {
+                        response = parsedResponse;
                     }
                     if (response instanceof List && StringUtils.isEmpty(sn)) {
                         // TODO: check if this response can also contain updates/deletions
@@ -391,7 +406,7 @@ public class MegaNzFolder extends PluginForDecrypt {
                             logger.info("no next page");
                             break pagination;
                         } else if (!StringUtils.equals(sn, nextSN)) {
-                            logger.info("next page:" + sn);
+                            logger.info("next page:" + nextSN);
                             sn = nextSN;
                         } else {
                             logger.info("same next page?:" + sn);
@@ -475,7 +490,10 @@ public class MegaNzFolder extends PluginForDecrypt {
                              */
                             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                         } else {
-                            /* Unknown error code, typically -2 or -9 */
+                            /*
+                             * Unknown error code, typically -2 or -9. Intentionally treated as offline for all other codes as well (e.g.
+                             * -4 rate limit, -6, -11, -16, -18), no differentiation between permanent and temporary errors for now.
+                             */
                             // https://help.servmask.com/knowledgebase/mega-error-codes/
                             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                         }
@@ -484,10 +502,12 @@ public class MegaNzFolder extends PluginForDecrypt {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
                 }
-                if (this.isAbort()) {
-                    throw new InterruptedException();
-                }
                 final Iterator<Map<String, Object>> it = parsedNodes.iterator();
+                /* True as soon as at least one node attribute could be decrypted with the folder master key. */
+                boolean anyNodeAttrDecrypted = false;
+                /* True if at least one node reached the node attribute decryption. */
+                boolean anyNodeAttrTried = false;
+                int keyAskAttempts = 0;
                 while (it.hasNext()) {
                     final Map<String, Object> parsedNode = it.next();
                     if (isAbort()) {
@@ -502,31 +522,60 @@ public class MegaNzFolder extends PluginForDecrypt {
                     String nodeKey = null;
                     String nodeAttr = null;
                     final String encryptedNodeAttr = toString(parsedNode.remove("a"));
-                    for (final String encryptedNodeKey : encryptedNodeKeys) {
-                        boolean success = false;
-                        int password_tries = 0;
-                        password: while (!this.isAbort() && password_tries <= 3) {
-                            if (password_tries > 0 || !isValidFolderDecryptionKey(folderMasterKey)) {
-                                folderMasterKey = getUserInput("Decryption key", param);
-                            }
-                            try {
-                                nodeKey = decryptNodeKey(encryptedNodeKey, folderMasterKey);
-                                success = true;
-                                break password;
-                            } catch (final InvalidKeyException e) {
-                                password_tries++;
-                                if (!InvalidOrMissingDecryptionKeyAction.ASK.equals(config.getInvalidOrMissingDecryptionKeyAction().getAction())) {
+                    anyNodeAttrTried = true;
+                    attrLoop: while (true) {
+                        nodeKey = null;
+                        nodeAttr = null;
+                        for (final String encryptedNodeKey : encryptedNodeKeys) {
+                            boolean success = false;
+                            int password_tries = 0;
+                            password: while (password_tries <= 3) {
+                                if (isAbort()) {
+                                    throw new InterruptedException();
+                                }
+                                if (password_tries > 0 || !isValidFolderDecryptionKey(folderMasterKey)) {
+                                    folderMasterKey = toUrlSafeKey(getUserInput("Decryption key", param));
+                                }
+                                try {
+                                    nodeKey = decryptNodeKey(encryptedNodeKey, folderMasterKey);
+                                    success = true;
                                     break password;
+                                } catch (final InvalidKeyException e) {
+                                    password_tries++;
+                                    if (!InvalidOrMissingDecryptionKeyAction.ASK.equals(config.getInvalidOrMissingDecryptionKeyAction().getAction())) {
+                                        break password;
+                                    }
                                 }
                             }
+                            if (!success) {
+                                throw new DecrypterException(DecrypterException.PASSWORD);
+                            }
+                            // see crypto_procattr
+                            try {
+                                nodeAttr = decrypt(encryptedNodeAttr, nodeKey);
+                            } catch (final InvalidKeyException e) {
+                                /* Key of unexpected length -> result of a wrong master key */
+                                nodeAttr = null;
+                            }
+                            if (nodeAttr != null) {
+                                break;
+                            }
                         }
-                        if (!success) {
-                            throw new DecrypterException(DecrypterException.PASSWORD);
-                        }
-                        // see crypto_procattr
-                        nodeAttr = decrypt(encryptedNodeAttr, nodeKey);
                         if (nodeAttr != null) {
-                            break;
+                            anyNodeAttrDecrypted = true;
+                            break attrLoop;
+                        } else if (anyNodeAttrDecrypted) {
+                            /* Master key works for other nodes -> only this node is broken. */
+                            break attrLoop;
+                        } else if (keyAskAttempts < 3 && InvalidOrMissingDecryptionKeyAction.ASK.equals(config.getInvalidOrMissingDecryptionKeyAction().getAction())) {
+                            /*
+                             * No node could be decrypted so far: The master key is well-formed but most likely wrong -> Ask user for a new
+                             * one and retry this node.
+                             */
+                            keyAskAttempts++;
+                            folderMasterKey = toUrlSafeKey(getUserInput("Decryption key", param));
+                        } else {
+                            break attrLoop;
                         }
                     }
                     if (nodeAttr == null) {
@@ -534,7 +583,8 @@ public class MegaNzFolder extends PluginForDecrypt {
                         logger.info("NodeAttr missing:" + JSonStorage.toString(parsedNode));
                         continue;
                     }
-                    final String nodeName = removeEscape(new Regex(nodeAttr, "\"n\"\\s*?:\\s*?\"(.*?)(?<!\\\\)\"").getMatch(0));
+                    final Map<String, Object> nodeAttrMap = restoreFromString(nodeAttr, TypeRef.MAP);
+                    final String nodeName = (String) nodeAttrMap.get("n");
                     final String nodeType = String.valueOf(toObject(parsedNode.remove("t")));
                     if ("1".equals(nodeType)) {
                         parsedNode.put("nodeDirectory", Boolean.TRUE);
@@ -555,6 +605,13 @@ public class MegaNzFolder extends PluginForDecrypt {
                     }
                     parsedNode.put("nodeKey", nodeKey);
                     parsedNode.put("nodeName", nodeName);
+                }
+                if (anyNodeAttrTried && !anyNodeAttrDecrypted) {
+                    /*
+                     * No node could be decrypted -> wrong master key. Do not fill the cache with an empty result, otherwise retrying with
+                     * the correct key would use the cached empty result.
+                     */
+                    throw new DecrypterException(DecrypterException.PASSWORD);
                 }
                 final Iterator<Map<String, Object>> it2 = parsedNodes.iterator();
                 nodeUpdatesLoop: while (it2.hasNext()) {
@@ -618,10 +675,10 @@ public class MegaNzFolder extends PluginForDecrypt {
         final LinkedHashMap<String, MegaFolder> folders = new LinkedHashMap<String, MegaFolder>();
         final ArrayList<DownloadLink> desiredItems = new ArrayList<DownloadLink>();
         for (final Map<String, Object> folderNode : folderNodes) {
-            if (folderNode.containsKey("folderMetaInfos")) {
+            if (isAbort()) {
+                throw new InterruptedException();
+            } else if (folderNode.containsKey("folderMetaInfos")) {
                 continue;
-            } else if (isAbort()) {
-                break;
             }
             final String nodeID = toString(folderNode.get("h"));
             final String nodeParentID = toString(folderNode.get("p"));
@@ -723,7 +780,12 @@ public class MegaNzFolder extends PluginForDecrypt {
                 }
             }
         }
-        if (desiredItems.size() > 0) {
+        /*
+         * If the preferred file/subfolder was found, only its items are returned. Note: If the preferred subfolder exists but is empty,
+         * desiredItems is empty too and all items of the whole folder are returned instead (intended behavior).
+         */
+        final boolean preferredNodeFound = desiredItems.size() > 0;
+        if (preferredNodeFound) {
             ret.clear();
             ret.addAll(desiredItems);
         }
@@ -734,51 +796,56 @@ public class MegaNzFolder extends PluginForDecrypt {
         for (DownloadLink link : ret) {
             link.setContainerUrl(containerURL);
         }
-        if (!isAbort()) {
-            if (preferredNodeID != null) {
-                /* Preferred file/subfolder was not found --> Reurn all items instead */
-                logger.info("Preferred NodeID NOT found:" + preferredNodeID);
-            }
-            if (ret.size() == 0) {
-                boolean hasFiles = false;
-                for (final MegaFolder folder : folders.values()) {
-                    if (folder.content != null) {
-                        for (final Object item : folder.content.values()) {
-                            if (item instanceof DownloadLink) {
-                                hasFiles = true;
-                                break;
-                            }
+        if (isAbort()) {
+            throw new InterruptedException();
+        }
+        if (preferredNodeID != null && !preferredNodeFound) {
+            /* Preferred file/subfolder was not found or is empty --> Return all items instead */
+            logger.info("Preferred NodeID NOT found:" + preferredNodeID);
+        }
+        if (ret.size() == 0) {
+            boolean hasFiles = false;
+            for (final MegaFolder folder : folders.values()) {
+                if (folder.content != null) {
+                    for (final Object item : folder.content.values()) {
+                        if (item instanceof DownloadLink) {
+                            hasFiles = true;
+                            break;
                         }
                     }
                 }
-                if (!hasFiles) {
-                    MegaFolder emptyFolder = null;
-                    if (folders.size() > 0) {
-                        if (preferredNodeID != null) {
-                            emptyFolder = folders.get(preferredNodeID);
-                        }
-                        if (emptyFolder == null) {
-                            emptyFolder = folders.entrySet().iterator().next().getValue();
-                        }
+            }
+            if (!hasFiles) {
+                MegaFolder emptyFolder = null;
+                if (folders.size() > 0) {
+                    if (preferredNodeID != null) {
+                        emptyFolder = folders.get(preferredNodeID);
                     }
-                    if (emptyFolder != null) {
-                        /* Show name/path of empty folder to user */
-                        final String path = getRelPath(emptyFolder, folders);
-                        throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, emptyFolder.id + "_" + path);
-                    } else {
-                        throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
+                    if (emptyFolder == null) {
+                        emptyFolder = folders.entrySet().iterator().next().getValue();
                     }
+                }
+                if (emptyFolder != null) {
+                    /* Show name/path of empty folder to user */
+                    final String path = getRelPath(emptyFolder, folders);
+                    throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, emptyFolder.id + "_" + path);
+                } else {
+                    throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
                 }
             }
         }
         return ret;
     }
 
-    private String removeEscape(String match) {
-        if (match != null) {
-            return match.replaceAll("\\\\", "");
-        } else {
+    /**
+     * Converts a key entered by the user (standard Base64 with '+', '/' and optional '=' padding) into the URL-safe form used in URLs and
+     * stored properties.
+     */
+    private static String toUrlSafeKey(final String key) {
+        if (key == null) {
             return null;
+        } else {
+            return key.trim().replace('+', '-').replace('/', '_').replace("=", "");
         }
     }
 
@@ -787,11 +854,14 @@ public class MegaNzFolder extends PluginForDecrypt {
             return "/";
         }
         final StringBuilder ret = new StringBuilder();
+        /* Remember visited folders to be safe against cycles in the parent chain (a -> b -> a). */
+        final HashSet<String> visited = new HashSet<String>();
         while (true) {
+            visited.add(folder.id);
             ret.insert(0, folder.name);
             ret.insert(0, "/");
             final MegaFolder parent = folders.get(folder.parent);
-            if (parent == null || parent == folder) {
+            if (parent == null || parent == folder || visited.contains(parent.id)) {
                 final String path = ret.toString();
                 if (path.startsWith("/") && path.length() > 1) {
                     /* Remove flash from beginning */

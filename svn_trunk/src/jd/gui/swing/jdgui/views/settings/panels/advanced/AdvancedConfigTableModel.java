@@ -240,6 +240,10 @@ public class AdvancedConfigTableModel extends ExtTableModel<AdvancedConfigEntry>
         });
     }
 
+    /** Called in the EDT after refresh has put the (filtered) entries into the table. */
+    protected void onRefreshed() {
+    }
+
     public void refresh(final String filterText) {
         AdvancedConfigTableModel.this.text = filterText;
         TaskQueue.getQueue().add(new QueueAction<Void, RuntimeException>() {
@@ -250,6 +254,7 @@ public class AdvancedConfigTableModel extends ExtTableModel<AdvancedConfigEntry>
                     @Override
                     protected void runInEDT() {
                         _fireTableStructureChanged(list, true);
+                        onRefreshed();
                     }
                 };
                 return null;

@@ -1,6 +1,7 @@
 package jd.gui.swing.jdgui.views.settings.panels.advanced;
 
 import java.awt.AlphaComposite;
+import java.awt.CardLayout;
 import java.awt.Composite;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -14,6 +15,8 @@ import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.Icon;
 import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
@@ -21,6 +24,7 @@ import javax.swing.SwingUtilities;
 import jd.gui.swing.jdgui.JDGui;
 
 import org.appwork.scheduler.DelayedRunnable;
+import org.appwork.swing.MigPanel;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.swing.EDTRunner;
 import org.jdownloader.gui.IconKey;
@@ -151,7 +155,31 @@ public class AdvancedSettings extends AbstractConfigPanel implements AdvancedCon
         // filterText.setBorder(null);
         filterText.setBorder(BorderFactory.createCompoundBorder(filterText.getBorder(), BorderFactory.createEmptyBorder(0, 20, 0, 0)));
         add(filterText, "gapleft " + getLeftGap() + ",spanx,growx,pushx");
-        add(new JScrollPane(table = new AdvancedTable()));
+        /*
+         * The first load of all entries can take a while (plugin config interfaces are loaded): a loading hint is shown in place of the
+         * table until the first refresh has filled it, then the table is shown for good.
+         */
+        final CardLayout tableCards = new CardLayout();
+        final JPanel tableContainer = new JPanel(tableCards);
+        tableContainer.setOpaque(false);
+        final JComponent loadingPanel = createLoadingPanel();
+        table = new AdvancedTable(new AdvancedConfigTableModel("AdvancedTable") {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            protected void onRefreshed() {
+                if (loadingPanel.getParent() == tableContainer) {
+                    tableCards.show(tableContainer, CARD_TABLE);
+                    /* Not needed anymore */
+                    tableContainer.remove(loadingPanel);
+                    tableContainer.revalidate();
+                }
+            }
+        });
+        tableContainer.add(loadingPanel, CARD_LOADING);
+        tableContainer.add(new JScrollPane(table), CARD_TABLE);
+        tableCards.show(tableContainer, CARD_LOADING);
+        add(tableContainer);
         delayedRefresh = new DelayedRunnable(200, 1000) {
 
             @Override
@@ -176,6 +204,19 @@ public class AdvancedSettings extends AbstractConfigPanel implements AdvancedCon
             }
 
         };
+    }
+
+    private static final String CARD_LOADING = "loading";
+    private static final String CARD_TABLE   = "table";
+
+    /** Loading hint (static image plus text) shown until the table has been filled for the first time. */
+    private static JComponent createLoadingPanel() {
+        final MigPanel loaderPanel = new MigPanel("ins 0,wrap 1", "[grow]", "40[][]");
+        loaderPanel.setOpaque(false);
+        loaderPanel.setBackground(null);
+        loaderPanel.add(new JLabel(new AbstractIcon(IconKey.ICON_BOTTY_ROBOT, 128)), "alignx center");
+        loaderPanel.add(new JLabel(_GUI.T.AdvancedSettings_AdvancedSettings_loading_()), "alignx center");
+        return loaderPanel;
     }
 
     @Override

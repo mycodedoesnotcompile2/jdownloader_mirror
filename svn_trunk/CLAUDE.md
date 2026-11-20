@@ -275,6 +275,13 @@ Every **search field** (a field that only filters or looks something up, and is 
 - `HistorySearchField` draws it for all its subclasses (including `SearchField` of the download list and linkgrabber), so there is only one implementation. Do not draw an own clear button in a subclass. It reserves the space via `getInsets()`, so do not add an extra right border for it. Its click is consumed (`MouseEvent.consume()`): other click handlers of the field (e.g. "click into the empty field opens the history") must check `e.isConsumed()`. `isClearButtonEnabled()` returning `false` is only for fields that must not have one.
 - Do **not** add it to fields that must always hold a value, e.g. the download directory selection, package name or file name fields. An X there would let the user create an invalid state.
 
+## Search Fields: Search Icon
+
+Every **search field** (same definition as above) shows a small search icon at the left, in front of the text: `IconKey.ICON_SEARCH`, 16 px, painted with 60 % opacity (`AlphaComposite` 0.6), vertically centered. Reserve its space with an empty left border (about 20 px) so the text starts behind the icon. A click on the icon behaves like a click into the text field.
+
+- References: the search field of the advanced settings (`AdvancedSettings`, icon at the left edge) and `SearchField` of the download list and linkgrabber (icon right of the separator line of the category button, `SEARCH_ICON_SPACE`).
+- If the field has a button or label at its left end (like the category button of `SearchField`), the icon goes right of it, directly in front of the text.
+
 ## Time and Durations
 
 - Write durations with the existing constants, not with manual multiplication: `TimeUnit.MINUTES.toMillis(5)` instead of `5 * 60 * 1000l`.
@@ -286,6 +293,15 @@ Every **search field** (a field that only filters or looks something up, and is 
 ## File Names and Package Names in the GUI
 
 File names and package names can be very long. To display them safely in the GUI, prefer the existing components `jd.controlling.downloadcontroller.FileNameField` and `jd.controlling.downloadcontroller.PackageNameField` over plain labels / text fields.
+
+## Context Menu Actions: Selection via Callback
+
+Applies to every action of the package tables (download list, linkgrabber) that derives from `CustomizableTableContextAppAction` / `CustomizableSelectionAppAction`. Reference implementation: `UnskipSelectionAction`, `UnskipCaptchasPackageAction`.
+
+- Do **not** override the (deprecated) `actionPerformed` and do **not** call the blocking `getSelection()` / `getSelectionInfo(...)` in it. Building a `SelectionInfo` of a big selection takes time and would block the EDT.
+- Override `onActionPerformed(ActionEvent, SelectionType, SelectionInfo)` instead. The base class delivers the selection through a callback (`EDTSelectionInfoCallback`), so it is calculated off the EDT and the method is then called in the EDT with the ready `SelectionInfo`.
+- The same holds for the enabled state and name: calculate them in `onRequestUpdateSelection(Object, SelectionType, SelectionInfo)`, never read the selection synchronously in `requestUpdate`.
+- Whatever else can take long (e.g. searching the whole download list with `DownloadController.getChildrenByFilter`) does not run in these callbacks either: use the `TaskQueue` (`TaskQueue.getQueue().add(new QueueAction<Void, RuntimeException>() { ... })`, so it runs in order with the other changes of the download list) and not a thread of its own, and only touch the GUI back in the EDT. Reference: `UnskipLinksAction#enqueue`.
 
 ## Captcha Wizard: JAntiCaptcha Is Minor
 

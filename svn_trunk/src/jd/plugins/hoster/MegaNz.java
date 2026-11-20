@@ -11,6 +11,8 @@ import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.security.DigestOutputStream;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
@@ -28,6 +30,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.WeakHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -42,6 +45,50 @@ import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
+
+import org.appwork.shutdown.ShutdownController;
+import org.appwork.shutdown.ShutdownRequest;
+import org.appwork.shutdown.ShutdownVetoException;
+import org.appwork.shutdown.ShutdownVetoListener;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.storage.config.JsonConfig;
+import org.appwork.uio.InputDialogInterface;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Exceptions;
+import org.appwork.utils.JDK8BufferHelper;
+import org.appwork.utils.JVMVersion;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.net.HTTPHeader;
+import org.appwork.utils.parser.UrlQuery;
+import org.appwork.utils.swing.dialog.DialogNoAnswerException;
+import org.appwork.utils.swing.dialog.InputDialog;
+import org.bouncycastle.crypto.PBEParametersGenerator;
+import org.bouncycastle.crypto.digests.SHA512Digest;
+import org.bouncycastle.crypto.generators.PKCS5S2ParametersGenerator;
+import org.bouncycastle.crypto.params.KeyParameter;
+import org.jdownloader.controlling.FileStateManager;
+import org.jdownloader.controlling.FileStateManager.FILESTATE;
+import org.jdownloader.controlling.UniqueAlltimeID;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.plugins.PluginTaskID;
+import org.jdownloader.plugins.components.config.MegaNzConfig;
+import org.jdownloader.plugins.components.config.MegaNzConfig.InvalidOrMissingDecryptionKeyAction;
+import org.jdownloader.plugins.components.config.MegaNzConfig.LimitMode;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+import org.jdownloader.settings.GeneralSettings;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+import org.jdownloader.translate._JDT;
 
 import jd.PluginWrapper;
 import jd.config.Property;
@@ -71,50 +118,7 @@ import jd.plugins.download.Downloadable;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashResult;
 
-import org.appwork.shutdown.ShutdownController;
-import org.appwork.shutdown.ShutdownRequest;
-import org.appwork.shutdown.ShutdownVetoException;
-import org.appwork.shutdown.ShutdownVetoListener;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.config.JsonConfig;
-import org.appwork.uio.InputDialogInterface;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Exceptions;
-import org.appwork.utils.JDK8BufferHelper;
-import org.appwork.utils.JVMVersion;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.formatter.HexFormatter;
-import org.appwork.utils.logging2.LogInterface;
-import org.appwork.utils.net.HTTPHeader;
-import org.appwork.utils.parser.UrlQuery;
-import org.appwork.utils.swing.dialog.DialogNoAnswerException;
-import org.appwork.utils.swing.dialog.InputDialog;
-import org.bouncycastle.crypto.PBEParametersGenerator;
-import org.bouncycastle.crypto.digests.SHA512Digest;
-import org.bouncycastle.crypto.generators.PKCS5S2ParametersGenerator;
-import org.bouncycastle.crypto.params.KeyParameter;
-import org.jdownloader.controlling.FileStateManager;
-import org.jdownloader.controlling.FileStateManager.FILESTATE;
-import org.jdownloader.controlling.UniqueAlltimeID;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.images.AbstractIcon;
-import org.jdownloader.plugins.PluginTaskID;
-import org.jdownloader.plugins.components.config.MegaNzConfig;
-import org.jdownloader.plugins.components.config.MegaNzConfig.InvalidOrMissingDecryptionKeyAction;
-import org.jdownloader.plugins.components.config.MegaNzConfig.LimitMode;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-import org.jdownloader.settings.GeneralSettings;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-import org.jdownloader.translate._JDT;
-
-@HostPlugin(revision = "$Revision: 53996 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54074 $", interfaceVersion = 2, names = {}, urls = {})
 public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     private final String       USED_PLUGIN = "usedPlugin";
     private final String       encrypted   = ".encrypted";
@@ -283,7 +287,7 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
         final String decodedPluginPatternMatcher = getDecodedPluginPatternMatcher(link.getPluginPatternMatcher());
         String ret = getFileID(decodedPluginPatternMatcher);
         final String type = new Regex(decodedPluginPatternMatcher, PATTERN_FILE_NEW).getMatch(0);
-        if (StringUtils.equalsIgnoreCase(type, "embed")) {
+        if (ret != null && StringUtils.equalsIgnoreCase(type, "embed")) {
             ret += ".mp4";
         }
         return ret;
@@ -303,7 +307,8 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
         if (getMegaNzConfig().is5GBFreeLimitEnabled() && !isPremium && link.getView().getBytesTotal() > 5368709120l) {
             /**
              * 2024-07-02: Skip files over 5GB as we cannot download them in free mode and user has configured plugin to skip them
-             * immediately, see: </br> https://board.jdownloader.org/showthread.php?t=75268
+             * immediately, see: </br>
+             * https://board.jdownloader.org/showthread.php?t=75268
              */
             throw new AccountRequiredException("Free download of files >5GB is disabled in plugin settings");
         }
@@ -509,7 +514,8 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         synchronized (account) {
             final String sid = apiLogin(account);
-            final Map<String, Object> uq = apiRequest(account, sid, null, "uq"/* userQuota */, new Object[] { "xfer"/* xfer */, 1 }, new Object[] { "pro"/* pro */, 1 });
+            final Map<String, Object> uq = apiRequest(account, sid, null, "uq"/* userQuota */, new Object[] { "xfer"/* xfer */, 1 },
+                    new Object[] { "pro"/* pro */, 1 });
             if (uq == null || uq.size() == 0) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -546,7 +552,7 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
                     if (bandwidthUsed == 0) {
                         bandwidthUsed = ((Number) trafficInfo.get(trafficInfo.size() - 1)).longValue();
                     }
-                    statusAddition += " | Bandwidth used: " + SIZEUNIT.formatValue((SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue(), bandwidthUsed);
+                    statusAddition += " | Bandwidth used: " + SIZEUNIT.formatValue(CFG_GUI.MAX_SIZE_UNIT.getValue(), bandwidthUsed);
                 } catch (final Throwable e) {
                     logger.log(e);
                 }
@@ -655,9 +661,9 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
             }
             if (uq.containsKey("srvratio")) {
                 final Number srvratio = getNumber(uq, "srvratio");
-                final long transfer_srv_reserved = getNumber(uq, "ruo", 0l).longValue();// 3rd party
+                final long transfer_srv_reserved = getNumber(uq, "rua", 0l).longValue();// 3rd party
                 if (srvratio.intValue() > 0 && transfer_srv_reserved > 0) {
-                    statusAddition += " | TrafficShare Ratio: " + String.format("%.02f", srvratio.floatValue()) + "% (" + SIZEUNIT.formatValue((SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue(), transfer_srv_reserved) + ")";
+                    statusAddition += " | TrafficShare Ratio: " + String.format(Locale.ENGLISH, "%.02f", srvratio.floatValue()) + "% (" + SIZEUNIT.formatValue(CFG_GUI.MAX_SIZE_UNIT.getValue(), transfer_srv_reserved) + ")";
                 }
                 if (srvratio.intValue() == 100) {
                     /**
@@ -765,7 +771,8 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
                     try {
-                        response = apiRequest(account, null, null, "us"/* logIn */, new Object[] { "user"/* email */, lowerCaseEmail }, new Object[] { "uh"/* emailHash */, uh });
+                        response = apiRequest(account, null, null, "us"/* logIn */, new Object[] { "user"/* email */, lowerCaseEmail },
+                                new Object[] { "uh"/* emailHash */, uh });
                     } catch (PluginException e) {
                         if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM && e.getValue() == PluginException.VALUE_ID_PREMIUM_TEMP_DISABLE && account.getBooleanProperty("mfa", Boolean.FALSE)) {
                             try {
@@ -773,7 +780,8 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
                                 mfaDialog.setTimeout(5 * 60 * 1000);
                                 final InputDialogInterface handler = UIOManager.I().show(InputDialogInterface.class, mfaDialog);
                                 handler.throwCloseExceptions();
-                                response = apiRequest(account, null, null, "us"/* logIn */, new Object[] { "user"/* email */, lowerCaseEmail }, new Object[] { "uh"/* emailHash */, uh }, new Object[] { "mfa"/* ping */, handler.getText() });
+                                response = apiRequest(account, null, null, "us"/* logIn */, new Object[] { "user"/* email */, lowerCaseEmail },
+                                        new Object[] { "uh"/* emailHash */, uh }, new Object[] { "mfa"/* ping */, handler.getText() });
                             } catch (DialogNoAnswerException e2) {
                                 throw Exceptions.addSuppressed(e, e2);
                             }
@@ -1037,11 +1045,11 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     }
 
     public static byte[] aes_cbc_encrypt_aByte(final byte[] aByte_key, final byte[] aByte_data) throws Exception {
-        return aes_cbc_aByte(Cipher.ENCRYPT_MODE, aByte_data, aByte_data);
+        return aes_cbc_aByte(Cipher.ENCRYPT_MODE, aByte_key, aByte_data);
     }
 
     public static byte[] aes_cbc_decrypt_aByte(final byte[] aByte_key, final byte[] aByte_data) throws Exception {
-        return aes_cbc_aByte(Cipher.DECRYPT_MODE, aByte_data, aByte_data);
+        return aes_cbc_aByte(Cipher.DECRYPT_MODE, aByte_key, aByte_data);
     }
 
     public static long[] aes_cbc_aLong(final int mode, final long[] aLong_key, final long... aLong_data) throws Exception {
@@ -1330,8 +1338,8 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
                     link.setVerifiedFileSize(-1);
-                    dl.setAllowFilenameFromURL(false);
                     dl = jd.plugins.BrowserAdapter.openDownload(br, link, request, false, 1);
+                    dl.setAllowFilenameFromURL(false);
                 } else {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
@@ -1342,10 +1350,11 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
                 if (dl.getConnection().getResponseCode() == 509 || StringUtils.containsIgnoreCase(dl.getConnection().getResponseMessage(), "Bandwidth Limit Exceeded")) {
                     br.followConnection(true);
                     final String timeLeftString = dl.getConnection().getHeaderField("X-MEGA-Time-Left");
-                    final long minTimeLeft = 30 * 60 * 1000l;
+                    /* Minimum wait time, also used if the server gives zero or no wait time. */
+                    final long minTimeLeft = TimeUnit.SECONDS.toMillis(60);
                     final long timeLeft;
                     if (timeLeftString != null && timeLeftString.matches("^\\d+$")) {
-                        timeLeft = Long.parseLong(timeLeftString) * 1000l;
+                        timeLeft = TimeUnit.SECONDS.toMillis(Long.parseLong(timeLeftString));
                     } else {
                         /* Fallback */
                         timeLeft = minTimeLeft;
@@ -1379,11 +1388,12 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     /**
      * MEGA limits can be tricky: They can sit on specific files, on IP ("global limit") or also quota based (also global) e.g. 5GB per day
      * per IP or per Free-Account. For these reasons the user can define the max wait time. The wait time given by MEGA must not be true.
-     * </br> 2021-01-21 TODO: Use this for ALL limit based errors?
+     * </br>
+     * 2021-01-21 TODO: Use this for ALL limit based errors?
      */
     private void fileOrIPDownloadlimitReached(final Account account, final String msg, final long waitMilliseconds) throws PluginException {
         final MegaNzConfig config = getMegaNzConfig();
-        final long userDefinedMaxWaitMilliseconds = config.getMaxWaittimeOnLimitReachedMinutes() * 60 * 1000;
+        final long userDefinedMaxWaitMilliseconds = TimeUnit.MINUTES.toMillis(config.getMaxWaittimeOnLimitReachedMinutes());
         if (waitMilliseconds == 0) {
             /* Special handling for zero given serverside waittime -> Old stuff - no idea whether this is still relevant */
             /** 2021-01-21: TODO: Re-Check this account limit handling */
@@ -1476,11 +1486,10 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
         String ret = new String(payLoadBytes, "UTF-8");
         ret = new Regex(ret, "(?i)MEGA(\\{.+\\})").getMatch(0);
         if (ret == null) {
-            /* verify if the keyString is correct */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else {
-            return restoreFromString(ret, TypeRef.MAP);
+            /* Decrypted data is garbage -> The key is well-formed but wrong. Let the caller handle it like any other invalid key. */
+            throw new InvalidKeyException();
         }
+        return restoreFromString(ret, TypeRef.MAP);
     }
 
     public String getError(final Browser br) {
@@ -1565,15 +1574,12 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
                 private final SecretKeySpec keySpec;
                 private final byte[]        nonceIv;
                 private byte[]              macState          = new byte[16]; // entspricht mac_str (globaler Zustand)
-
                 private long                totalProcessed    = 0;
-                private long                currentChunkLimit = 131072;      // Start 128KB
+                private long                currentChunkLimit = 131072;       // Start 128KB
                 private long                nextBoundary      = 131072;
-
                 // Puffer für den aktuellen Chunk
                 private byte[]              chunkBuffer;
                 private int                 bufferPos         = 0;
-
                 private final Cipher        chunkEncryptor;
                 private final Cipher        macEncryptor;
 
@@ -1681,19 +1687,28 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
                 }
                 dst = new File(path2);
             } else {
+                /*
+                 * Path has no ".encrypted" suffix, e.g. a custom internal tmp filename is set (encrypted file was downloaded via another
+                 * plugin/multihoster). The encrypted file is therefore the destination file itself and gets decrypted "in place": Decrypt
+                 * into a ".decrypted" tmp file, then replace the encrypted file with it.
+                 */
                 src = new File(path);
                 tmp = new File(path + ".decrypted");
                 dst = new File(path);
             }
+            /* True if encrypted source file and destination file are the same file. */
+            final boolean decryptInPlace = src.equals(dst);
             if (tmp != null && tmp.exists() && tmp.delete() == false) {
                 throw new IOException("Could not delete temp:" + tmp);
             }
-            if (dst.exists() && dst.delete() == false) {
+            /* Never delete dst if it is the encrypted source file we are about to read! */
+            if (!decryptInPlace && dst.exists() && dst.delete() == false) {
                 throw new IOException("Could not delete dest:" + dst);
             }
             FileInputStream fis = null;
             FileOutputStream fos = null;
             boolean deleteDst = true;
+            boolean deleteSrc = false;
             final long total = src.length();
             final AtomicReference<String> message = new AtomicReference<String>();
             final PluginProgress progress = new PluginProgress(0, total, null) {
@@ -1714,11 +1729,11 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
                     super.updateValues(current, total);
                     if (lastCurrent == -1 || lastCurrent > current) {
                         lastCurrent = current;
-                        startTimeStamp = System.currentTimeMillis();
+                        startTimeStamp = Time.systemIndependentCurrentJVMTimeMillis();
                         this.setETA(-1);
                         return;
                     }
-                    long currentTimeDifference = System.currentTimeMillis() - startTimeStamp;
+                    long currentTimeDifference = Time.systemIndependentCurrentJVMTimeMillis() - startTimeStamp;
                     if (currentTimeDifference <= 0) {
                         return;
                     }
@@ -1791,6 +1806,13 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
                                 cos.close();
                                 final byte[] calcMac = macCalc.finish();
                                 if (!Arrays.equals(expMac, calcMac)) {
+                                    /*
+                                     * The encrypted file is corrupt (or the key is wrong). Delete it and reset the progress: Otherwise the
+                                     * next attempt would find a complete encrypted file, skip the download, decrypt it again and fail again
+                                     * forever.
+                                     */
+                                    logger.info("MAC check failed -> Deleting encrypted file and resetting progress: " + src);
+                                    deleteSrc = true;
                                     throw new PluginException(LinkStatus.ERROR_DOWNLOAD_FAILED, "MAC check failed");
                                 }
                                 if (os instanceof DigestOutputStream) {
@@ -1810,6 +1832,13 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
                         }
                         if (tmp == null) {
                             src.delete();
+                        } else if (decryptInPlace) {
+                            /*
+                             * renameTo would fail on Windows if the target exists and on other systems it would overwrite it, after which
+                             * "src.delete()" would delete the decrypted result. Replace the encrypted file atomically instead. On failure
+                             * the encrypted file stays untouched.
+                             */
+                            Files.move(tmp.toPath(), dst.toPath(), StandardCopyOption.REPLACE_EXISTING);
                         } else {
                             if (tmp.renameTo(dst)) {
                                 src.delete();
@@ -1838,9 +1867,14 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
                     if (deleteDst) {
                         if (tmp != null) {
                             tmp.delete();
-                        } else {
+                        } else if (!decryptInPlace) {
                             dst.delete();
                         }
+                    }
+                    if (deleteSrc) {
+                        src.delete();
+                        link.setDownloadCurrent(0);
+                        link.setChunksProgress(null);
                     }
                 }
             } finally {
@@ -2059,7 +2093,7 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
         final String folderMasterKey = getFolderMasterKey(link);
         if (fileID != null && parentNodeID != null && folderMasterKey == null) {
             // raw legacy node URLs don't contain folderMasterKey
-            return buildFileFolderLink(parentNodeID, "", "file", fileID);
+            return buildFileFolderLink(parentNodeID, null, "file", fileID);
         } else if (fileID != null && parentNodeID != null && folderMasterKey != null) {
             return buildFileFolderLink(parentNodeID, folderMasterKey, "file", fileID);
         } else if (fileID != null) {
@@ -2143,7 +2177,7 @@ public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     public void onShutdownVetoRequest(final ShutdownRequest request) throws ShutdownVetoException {
         final ShutdownVetoListener vetoListener = SHUTDOWN_VETO_LISTENER.get();
         if (vetoListener != null) {
-            vetoListener.onShutdownVeto(request);
+            vetoListener.onShutdownVetoRequest(request);
         }
     }
 

@@ -19,11 +19,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
 import org.jdownloader.plugins.components.config.XtremestreamCoConfig;
 import org.jdownloader.plugins.components.config.XtremestreamCoConfig.DownloadMode;
 import org.jdownloader.plugins.components.config.XtremestreamCoConfig.Quality;
@@ -44,7 +46,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52434 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54085 $", interfaceVersion = 3, names = {}, urls = {})
 public class XtremestreamCo extends PluginForHost {
     public XtremestreamCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -129,6 +131,12 @@ public class XtremestreamCo extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String title = br.getRegex("var video_title = .([^\"]*?)`;").getMatch(0);
+        if (title == null) {
+            title = br.getRegex("infoTitle:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"").getMatch(0);
+            if (title != null) {
+                title = title.replace("\\'", "'");
+            }
+        }
         if (title != null) {
             title = Encoding.htmlDecode(title).trim();
         } else {
@@ -212,60 +220,96 @@ public class XtremestreamCo extends PluginForHost {
             }
         }
         logger.info("Attempting stream download");
-        String query = br.getRegex("const\\s*query\\s*=\\s*\"(.*?)\"").getMatch(0);
-        if (query == null && fid != null) {
-            query = "data=" + fid;
+        /*
+         * 2026-11-20: The old playlist (xs1.php) now only returns segment URLs which respond with 404 because the web player loads the
+         * (encrypted) segments via a script. The server offers a regular HLS playlist with AES-128 encryption for Chromecast clients
+         * ("castmaster") which only needs a token from the player page and a signature ("castsign").
+         */
+        final String playerOrigin = new Regex(link.getPluginPatternMatcher(), "^(https?://[^/]+)").getMatch(0);
+        final String playerToken = br.getRegex("XSFTK\\.boot\\(\"[^\"]+\"\\s*,\\s*\"([^\"]+)\"").getMatch(0);
+        if (playerOrigin == null || fid == null || playerToken == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find player token");
         }
-        final String subdomain_from_added_url = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
-        String subdomain = data_xtremestream;
-        if (subdomain == null && subdomain_from_added_url != null && !subdomain_from_added_url.equalsIgnoreCase("www")) {
-            subdomain = subdomain_from_added_url;
+        final String apiBase = playerOrigin + "/player/proto_api.php?data=" + fid + "&vt=" + Encoding.urlEncode(playerToken);
+        br.getHeaders().put("Referer", playerOrigin + "/");
+        String downloadurl = null;
+        List<M3U8Playlist> legacyPlaylist = null;
+        try {
+            br.getHeaders().put("X-XS-P", "1");
+            br.getPage(apiBase + "&op=castsign");
+            br.getHeaders().remove("X-XS-P");
+            final String castSignature = br.getRequest().getHtmlCode().trim();
+            if (StringUtils.isEmpty(castSignature)) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to get cast signature");
+            }
+            br.getPage(apiBase + "&ct=" + Encoding.urlEncode(castSignature) + "&op=castmaster");
+            downloadurl = selectHlsQualityUrl(HlsContainer.getHlsQualities(this.br));
+        } catch (final InterruptedException ie) {
+            throw ie;
+        } catch (final Exception e) {
+            logger.log(e);
+            logger.info("Cast playlist failed -> Fallback to legacy playlist with fixed (encrypted) segment URLs");
+            br.getHeaders().remove("X-XS-P");
+            legacyPlaylist = loadLegacyEncryptedPlaylist(playerOrigin, fid, apiBase);
         }
-        if (subdomain == null) {
-            logger.warning("Failed to find cdn subdomain -> Fallback to default which could mean that we will only get one (= the lowest) resolution");
-            subdomain = "xporn";
+        checkFFmpeg(link, "Download a HLS Stream");
+        /*
+         * Small workaround for stable.
+         */
+        final String hlsUrl = legacyPlaylist != null ? br.getURL() : downloadurl;
+        dl = new HLSDownloader(link, br, hlsUrl, legacyPlaylist) {
+            @Override
+            public boolean isEncrypted() {
+                return false;
+            }
+
+            @Override
+            protected boolean isSupported(final M3U8Playlist m3u8) {
+                return true;
+            }
+        };
+        dl.startDownload();
+    }
+
+    /** Returns the download url of the quality preferred by the user or of the best quality if the preferred one is not available. */
+    private String selectHlsQualityUrl(final List<HlsContainer> qualities) throws PluginException {
+        if (qualities == null || qualities.isEmpty()) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find any stream qualities");
         }
-        if (query == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        final String hlsMaster = "https://" + subdomain + ".xtremestream.xyz/player/xs1.php?" + query;
-        br.getPage(hlsMaster);
-        final List<HlsContainer> qualities = HlsContainer.getHlsQualities(this.br);
-        final HlsContainer bestQuality = HlsContainer.findBestVideoByBandwidth(qualities);
-        HlsContainer selectedQuality = null;
         final int preferredQualityHeight = this.getUserPreferredQualityHeight();
         for (final HlsContainer quality : qualities) {
             if (quality.getHeight() == preferredQualityHeight) {
-                selectedQuality = quality;
-                break;
+                return quality.getDownloadurl();
             }
         }
-        final String downloadurl;
-        if (selectedQuality != null) {
-            downloadurl = selectedQuality.getDownloadurl();
-        } else {
-            downloadurl = bestQuality.getDownloadurl();
+        return HlsContainer.findBestVideoByBandwidth(qualities).getDownloadurl();
+    }
+
+    /**
+     * Legacy way: The playlist from xs1.php contains plain segment URLs (/cdn/down/ID/1080/10800.html) which return 404. The real segments
+     * are AES-128 encrypted and located in "/cdn/down/ID/1080_enc/10800.html". The key is available via proto_api.php (op=key) and needs
+     * the header X-XS-P. The IV is the segment index (default HLS behavior). Therefore we fix the playlist content and let HLSDownloader
+     * handle the decryption.
+     */
+    private List<M3U8Playlist> loadLegacyEncryptedPlaylist(final String playerOrigin, final String fid, final String apiBase) throws Exception {
+        br.getPage(playerOrigin + "/player/xs1.php?data=" + fid);
+        br.getPage(selectHlsQualityUrl(HlsContainer.getHlsQualities(this.br)));
+        String playlist = br.getRequest().getHtmlCode();
+        if (!playlist.contains("#EXTM3U")) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Invalid legacy playlist");
         }
-        checkFFmpeg(link, "Download a HLS Stream");
-        dl = new HLSDownloader(link, br, downloadurl);
-        dl.startDownload();
+        playlist = playlist.replaceAll("(/cdn/down/[^/\\s]+/)(\\d+p?)/(\\2\\d+\\.html)", "$1$2_enc/$3");
+        final String keyLine = "#EXT-X-KEY:METHOD=AES-128,URI=\"" + apiBase + "&op=key\"\n";
+        playlist = playlist.replaceFirst("(#EXTM3U\\r?\\n)", "$1" + Matcher.quoteReplacement(keyLine));
+        /* The key request is sent with the headers of this browser instance. */
+        br.getHeaders().put("X-XS-P", "1");
+        br.getRequest().setHtmlCode(playlist);
+        return M3U8Playlist.parseM3U8(br);
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 
     @Override

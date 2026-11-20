@@ -37,7 +37,6 @@ import org.appwork.utils.URLStream;
 import org.appwork.utils.ImageProvider.ImageProvider;
 import org.appwork.utils.images.IconIO;
 import org.appwork.utils.images.Interpolation;
-import org.appwork.utils.swing.dialog.DefaultButtonPanel;
 import org.jdownloader.DomainInfo;
 import org.jdownloader.captcha.v2.AbstractCaptchaDialog;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
@@ -275,8 +274,8 @@ public abstract class AbstractImageCaptchaDialog<T> extends AbstractCaptchaDialo
     }
 
     @Override
-    protected void addAdditionalButtons(final DefaultButtonPanel buttonPanel) {
-        buttonPanel.add(createGreyscaleToggle(), "width 28!");
+    protected void addAdditionalButtons(final JPanel toolbar) {
+        toolbar.add(createGreyscaleToggle(), "width 28!");
     }
 
     /**

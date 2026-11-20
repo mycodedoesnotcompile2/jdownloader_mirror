@@ -21,10 +21,10 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
+import org.jdownloader.utils.HelpLinks;
 
 import jd.gui.swing.jdgui.views.settings.panels.anticaptcha.SelectBrowserDialog;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-import org.jdownloader.utils.HelpLinks;
 
 public class BrowserSolverService extends AbstractSolverService {
     public static final String                  ID       = "browser";
@@ -151,17 +151,25 @@ public class BrowserSolverService extends AbstractSolverService {
         return getMissingBrowserPath() != null;
     }
 
-    @Override
-    protected String getReadyStatusText() {
+    /**
+     * The name of the browser this solver opens: The name of the configured browser, "custom browser" if its name is not known or "OS
+     * default browser" if none is configured. Used for the status of the solver and the button of the browser captcha dialog.
+     */
+    public String getBrowserName() {
         final String[] commandline = getConfig().getBrowserCommandline();
         if (commandline != null && commandline.length > 0) {
             final String browserName = ExternalBrowserManager.getInstance().getLazyBrowserName(commandline);
             if (browserName != null) {
-                return "Ready | using " + browserName;
+                return browserName;
             }
-            return "Ready | using custom browser";
+            return "custom browser";
         }
-        return "Ready | using OS default browser";
+        return "OS default";
+    }
+
+    @Override
+    protected String getReadyStatusText() {
+        return "Ready | using " + getBrowserName();
     }
 
     @Override

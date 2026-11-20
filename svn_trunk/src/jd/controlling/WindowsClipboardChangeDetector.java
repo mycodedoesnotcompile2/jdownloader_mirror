@@ -5,9 +5,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
-import jd.controlling.ClipboardMonitoring.ClipboardHash;
-
 import org.appwork.jna.windows.JNAOptions;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.logging2.LogSource;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
@@ -16,6 +15,8 @@ import com.sun.jna.Pointer;
 import com.sun.jna.platform.win32.WinDef.HWND;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.win32.StdCallLibrary;
+
+import jd.controlling.ClipboardMonitoring.ClipboardHash;
 
 public class WindowsClipboardChangeDetector extends ClipboardMonitoring.ClipboardChangeDetector {
     private interface User32 extends StdCallLibrary {
@@ -42,6 +43,7 @@ public class WindowsClipboardChangeDetector extends ClipboardMonitoring.Clipboar
 
     private final User32         user32;
     private volatile Integer     lastClipboardSequenceNumber   = null;
+    private volatile String      lastClipboardOwnerProcess     = null;
     private final psapi          psapi;
     private final Kernel32       kernel32;
     private final Pattern[]      blackListPatterns;
@@ -119,8 +121,10 @@ public class WindowsClipboardChangeDetector extends ClipboardMonitoring.Clipboar
     /**
      * Returns true if the clipboard owner is Firefox (or a fork) or unknown. In both cases a changed sequence number alone is not
      * trustworthy and the content has to be compared. <br>
-     * This is possibly only neded for Windows 11 users. <br>
-     * Background: https://github.com/mozilla-firefox/firefox/blob/main/widget/windows/nsClipboard.cpp#L773
+     * Firefox flushes the clipboard on exit (all Windows versions) and, since Windows 11 22H2, also directly after every copy of text (Bug
+     * 1774285), so the sequence number can increase without a content change. <br>
+     * Background: https://github.com/mozilla-firefox/firefox/blob/main/widget/windows/nsClipboard.cpp (search for "Bug 1774285" and
+     * "OleFlushClipboard")
      */
     private final boolean needsContentCompare(final String ownerProcess) {
         if (ownerProcess == null || ownerProcess.length() == 0) {
@@ -179,15 +183,16 @@ public class WindowsClipboardChangeDetector extends ClipboardMonitoring.Clipboar
             }
         }
         final int currentClipboardSequenceNumber = user32.GetClipboardSequenceNumber();
+        final String previousClipboardOwnerProcess = lastClipboardOwnerProcess;
         final boolean changed = currentClipboardSequenceNumber != 0 && (lastClipboardSequenceNumber == null || currentClipboardSequenceNumber != lastClipboardSequenceNumber.intValue());
         if (changed) {
             /* detection after reset(): the sequence number is unknown, so the content may be unchanged */
             final boolean resyncDetection = lastClipboardSequenceNumber == null;
             lastClipboardSequenceNumber = currentClipboardSequenceNumber;
             /* read the owner right at detection time, it may already have changed when equals(...) is called later */
-            final String ownerProcess = getClipboardOwnerProcess();
-            lastChangeNeedsContentCompare = resyncDetection || needsContentCompare(ownerProcess);
-            if (isChangeBlacklisted(ownerProcess)) {
+            lastClipboardOwnerProcess = getClipboardOwnerProcess();
+            lastChangeNeedsContentCompare = resyncDetection || !StringUtils.equals(previousClipboardOwnerProcess, lastClipboardOwnerProcess) || needsContentCompare(lastClipboardOwnerProcess);
+            if (isChangeBlacklisted(lastClipboardOwnerProcess)) {
                 return CHANGE_FLAG.BLACKLISTED;
             }
             if (isSkipFlagSet()) {

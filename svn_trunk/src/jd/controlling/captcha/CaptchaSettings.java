@@ -31,6 +31,38 @@ public interface CaptchaSettings extends ConfigInterface {
         ASK
     }
 
+    /**
+     * The skip actions of the download (HOSTER) captcha dialogs. The one chosen in
+     * {@link CaptchaSettings#getHosterCaptchaDialogDefaultAction()} is the action of the visible button of the dialog, the other ones are
+     * available in its dropdown.
+     */
+    public static enum HosterCaptchaDialogDefaultAction {
+        /** Skips only this captcha. */
+        SKIP_SINGLE,
+        /** Skips this captcha and all further captchas of the host. */
+        BLOCK_HOSTER,
+        /** Skips this captcha and all further captchas of the package. */
+        BLOCK_PACKAGE,
+        /** Skips this captcha and all further download captchas. */
+        BLOCK_ALL_CAPTCHAS,
+        /** Skips this captcha and stops all downloads. */
+        STOP_DOWNLOADS
+    }
+
+    /**
+     * The skip actions of the CRAWLER captcha dialogs (and of all other dialogs that are no download captchas). The one chosen in
+     * {@link CaptchaSettings#getCrawlerCaptchaDialogDefaultAction()} is the action of the visible button of the dialog, the other ones are
+     * available in its dropdown.
+     */
+    public static enum CrawlerCaptchaDialogDefaultAction {
+        /** Cancels only this captcha. */
+        SKIP_SINGLE,
+        /** Cancels this captcha and stops the crawl job. */
+        CANCEL_LINKGRABBING,
+        /** Cancels this captcha and does not ask for further crawler captchas. */
+        STOP_SHOWING_CRAWLER_CAPTCHAS
+    }
+
     public static enum INTERACTIVE_CAPTCHA_PRIVACY_LEVEL {
         AUTO,
         NORMAL,
@@ -77,6 +109,20 @@ public interface CaptchaSettings extends ConfigInterface {
     void setOnCrawlerCaptchaTimeoutAction(CAPTCHA_TIMEOUT_ACTION b);
 
     @AboutConfig
+    @DefaultEnumValue("SKIP_SINGLE")
+    @DescriptionForConfigEntry("The skip action that is behind the visible button of the HOSTER (download) captcha dialogs, all other skip actions are available in the dropdown of the button. It only applies to the button, closing the dialog (ESC, close button) just skips the single captcha. Login captchas can only be skipped one by one.")
+    HosterCaptchaDialogDefaultAction getHosterCaptchaDialogDefaultAction();
+
+    void setHosterCaptchaDialogDefaultAction(HosterCaptchaDialogDefaultAction action);
+
+    @AboutConfig
+    @DefaultEnumValue("SKIP_SINGLE")
+    @DescriptionForConfigEntry("The skip action that is behind the visible button of the CRAWLER captcha dialogs (and of all other captcha dialogs that are no download captchas), all other skip actions are available in the dropdown of the button. It only applies to the button, closing the dialog (ESC, close button) just skips the single captcha.")
+    CrawlerCaptchaDialogDefaultAction getCrawlerCaptchaDialogDefaultAction();
+
+    void setCrawlerCaptchaDialogDefaultAction(CrawlerCaptchaDialogDefaultAction action);
+
+    @AboutConfig
     @DefaultIntValue(95)
     @DescriptionForConfigEntry("Do not Change me unless you know 100000% what this value is used for!")
     int getAutoCaptchaPriorityThreshold();
@@ -114,12 +160,14 @@ public interface CaptchaSettings extends ConfigInterface {
 
     @AboutConfig
     @DefaultBooleanValue(true)
+    @DescriptionForConfigEntry("If enabled, a click on the \"Hate captchas\" text of a captcha dialog stops the countdown of the dialog, so the dialog stays open while the user reads the premium information. Only captchas that can be kept alive have a countdown that can be stopped (currently reCAPTCHA v2), the countdown of all other captchas always runs until the end. A stopped countdown does not extend the timeout of the captcha itself: The dialog is closed when the captcha runs out.")
     boolean isCancelDialogCountdownOnHateCaptchaClick();
 
     void setCancelDialogCountdownOnHateCaptchaClick(boolean b);
 
     @AboutConfig
     @DefaultBooleanValue(false)
+    @DescriptionForConfigEntry("If enabled, moving or dragging the mouse over the captcha image of a captcha dialog stops the countdown of the dialog. Only captchas that can be kept alive have a countdown that can be stopped (currently reCAPTCHA v2), the countdown of all other captchas always runs until the end. A stopped countdown does not extend the timeout of the captcha itself: The dialog is closed when the captcha runs out. See also CancelDialogCountdownOnMouseClick.")
     boolean isCancelDialogCountdownOnMouseMove();
 
     void setCancelDialogCountdownOnMouseMove(boolean b);

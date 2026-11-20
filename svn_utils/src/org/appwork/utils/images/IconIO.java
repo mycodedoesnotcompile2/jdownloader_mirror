@@ -108,7 +108,7 @@ public class IconIO {
         PNG
     }
 
-    public static class ScaledIcon extends AbstractIconPipe implements Icon, IDIcon {
+    public static class ScaledIcon extends AbstractIconPipe implements Icon, IDIcon, CachableIcon {
         private final int                          width;
         private final int                          height;
         private Interpolation                      interpolation = org.appwork.utils.images.Interpolation.BICUBIC;
@@ -200,6 +200,7 @@ public class IconIO {
             paintDelegate(c, g2, 0, 0, parents);
             g2.setTransform(old);
         }
+
     }
 
     @AWTestValidateClassReference

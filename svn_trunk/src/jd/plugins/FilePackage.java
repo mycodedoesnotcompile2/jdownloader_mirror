@@ -803,9 +803,9 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
         }
         if (lsource instanceof AbstractPackageChildrenNode) {
             /* A child changed, the aggregated data of the view is outdated */
-            final FilePackageView view = this.view;
-            if (view != null) {
-                view.requestUpdate();
+            final FilePackageView lview = this.view;
+            if (lview != null) {
+                lview.requestUpdate();
             }
         }
         n.nodeUpdated(lsource, notify, param);

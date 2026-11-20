@@ -78,7 +78,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.TwitterCom;
 
-@DecrypterPlugin(revision = "$Revision: 54059 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54073 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterComCrawler extends PluginForDecrypt {
     private String  resumeURL                                     = null;
     private Number  maxTweetsToCrawl                              = null;
@@ -265,6 +265,9 @@ public class TwitterComCrawler extends PluginForDecrypt {
         final String contenturl = getContentURL(param);
         /* Some profiles can only be accessed if they accepted others as followers --> Login if the user has added his twitter account */
         final Account account = getUserLogin(false);
+        if (this.isAbort()) {
+            throw new InterruptedException();
+        }
         if (ACCOUNT_IS_ALWAYS_REQUIRED && account == null) {
             throw new AccountRequiredException();
         }
@@ -366,7 +369,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
     /** Base URL of all static web client files (main.js and lazy loaded chunks). */
     private static final String GRAPHQL_CLIENT_WEB_BASE_URL = "https://abs.twimg.com/responsive-web/client-web/";
 
-    private String getGraphqlQueryID(final String operationName) throws IOException, PluginException {
+    private String getGraphqlQueryID(final String operationName) throws IOException, PluginException, InterruptedException {
         synchronized (graphqlQueryids) {
             if (graphqlQueryids.isEmpty() || !graphqlQueryids.containsKey(operationName)) {
                 final HashSet<String> operationNamesToCache = new HashSet<String>();
@@ -389,12 +392,19 @@ public class TwitterComCrawler extends PluginForDecrypt {
                 /* URL last updated: 2025-03-11 */
                 this.findGraphqlQueryIDs(GRAPHQL_CLIENT_WEB_BASE_URL + "main.bb7184fa.js", missingOperationNames);
                 if (!missingOperationNames.isEmpty()) {
+                    /* Abort early between the requests */
+                    if (this.isAbort()) {
+                        throw new InterruptedException();
+                    }
                     /*
                      * Step 2: Operations which are not part of the fixed main.js (e.g. "Bookmarks"): Look them up in the current main.js and
                      * in the lazy loaded chunks of the current web client.
                      */
                     logger.info("Operations missing in fixed main.js: " + missingOperationNames);
                     this.findGraphqlQueryIDsInCurrentWebClient(missingOperationNames);
+                    if (this.isAbort()) {
+                        throw new InterruptedException();
+                    }
                 }
                 for (final String missingOperationName : missingOperationNames) {
                     logger.warning("Failed to find ID for operationName: " + missingOperationName);
@@ -418,6 +428,9 @@ public class TwitterComCrawler extends PluginForDecrypt {
      * set.
      */
     private void findGraphqlQueryIDs(final String jsURL, final Set<String> missingOperationNames) {
+        if (this.isAbort()) {
+            return;
+        }
         try {
             final Browser brJs = this.createNewBrowserInstance();
             brJs.getPage(jsURL);
@@ -448,6 +461,9 @@ public class TwitterComCrawler extends PluginForDecrypt {
             final Browser brHtml = this.createNewBrowserInstance();
             brHtml.getPage("https://" + this.getHost() + "/");
             final String html = brHtml.getRequest().getHtmlCode();
+            if (this.isAbort()) {
+                return;
+            }
             final String currentMainJsURL = new Regex(html, "(https?://abs\\.twimg\\.com/responsive-web/client-web/main\\.[a-z0-9]+\\.js)").getMatch(0);
             if (currentMainJsURL != null) {
                 this.findGraphqlQueryIDs(currentMainJsURL, missingOperationNames);
@@ -478,7 +494,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
                     final String hash = chunkHashes.get(idAndName[0]);
                     if (hash == null || !idAndName[1].contains(operationName)) {
                         continue;
-                    } else if (++chunksChecked > 5) {
+                    } else if (++chunksChecked > 5 || this.isAbort()) {
                         break;
                     }
                     final HashSet<String> thisMissing = new HashSet<String>();
@@ -720,6 +736,9 @@ public class TwitterComCrawler extends PluginForDecrypt {
 
     private ArrayList<DownloadLink> crawlUserByUserID(final CryptedLink param, final Account account, final String user_id) throws Exception {
         final Map<String, Object> user_info = this.getUserInfoByUserID(br, account, user_id);
+        if (this.isAbort()) {
+            throw new InterruptedException();
+        }
         return this.crawlUserViaGraphqlAPI(param, account, ProfileCrawlMode.ALL_ITEMS, user_info);
     }
 
@@ -847,7 +866,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
             fp.setName(username);
             final ArrayList<DownloadLink> results1 = crawlTweetsViaGraphqlAPI("UserTweets", param, user, account, crawlmode, fp);
             ret.addAll(results1);
-            if (globalProfileCrawlerSkippedResultsByMaxitems.size() == 0 && media_count > 0) {
+            if (globalProfileCrawlerSkippedResultsByMaxitems.size() == 0 && media_count > 0 && !this.isAbort()) {
                 logger.info("Crawling remaining " + media_count + " media items from profile");
                 if (account == null) {
                     /**
@@ -939,6 +958,9 @@ public class TwitterComCrawler extends PluginForDecrypt {
         }
         final TwitterConfigInterface cfg = PluginJsonConfig.get(TwitterConfigInterface.class);
         final long waitBetweenPaginationRequestsMillis = cfg.getProfileCrawlerWaittimeBetweenPaginationMilliseconds();
+        if (this.isAbort()) {
+            throw new InterruptedException();
+        }
         final String queryID = this.getGraphqlQueryID(queryName);
         logger.info("Crawling query " + queryName + " | queryID: " + queryID);
         do {
@@ -1685,6 +1707,9 @@ public class TwitterComCrawler extends PluginForDecrypt {
             user = users.get(0);
         } else {
             final String queryID = this.getGraphqlQueryID("UserByScreenName");
+            if (this.isAbort()) {
+                throw new InterruptedException();
+            }
             if (account == null) {
                 if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                     throw new AccountRequiredException();

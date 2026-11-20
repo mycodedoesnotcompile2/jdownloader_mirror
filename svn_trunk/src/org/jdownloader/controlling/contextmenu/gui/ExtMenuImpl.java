@@ -39,7 +39,8 @@ public class ExtMenuImpl extends JMenu implements ExtMenuInterface {
         public void componentAdded(ContainerEvent e) {
             final Component child = e.getChild();
             child.addPropertyChangeListener(propertyChangeListener);
-            if (!isEnabled() && child.isEnabled()) {
+            /* A separator is always enabled, it must not enable the menu. */
+            if (!isEnabled() && child.isEnabled() && !(child instanceof JSeparator)) {
                 refreshEnabledState(true);
             }
             if (touchesJSeparator(child)) {
@@ -82,7 +83,8 @@ public class ExtMenuImpl extends JMenu implements ExtMenuInterface {
         } else {
             boolean isEnabled = false;
             for (final Component elem : getMenuComponents()) {
-                if (elem.isEnabled()) {
+                /* A separator is always enabled, it must not enable the menu. */
+                if (!(elem instanceof JSeparator) && elem.isEnabled()) {
                     isEnabled = true;
                     break;
                 }

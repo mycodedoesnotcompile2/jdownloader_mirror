@@ -15,10 +15,17 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
@@ -36,8 +43,9 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 48544 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54085 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { WCOForever.class })
 public class WCOStream extends PluginForDecrypt {
     public WCOStream(PluginWrapper wrapper) {
@@ -52,8 +60,14 @@ public class WCOStream extends PluginForDecrypt {
     }
 
     public static List<String[]> getPluginDomains() {
-        return WCOForever.getPluginDomains();
+        final List<String[]> ret = new ArrayList<String[]>(WCOForever.getPluginDomains());
+        /* WCOStream itself, including its embed player (embed.wcostream.com) */
+        ret.add(new String[] { WCOSTREAM_DOMAIN });
+        return ret;
     }
+
+    private static final String  WCOSTREAM_DOMAIN = "wcostream.com";
+    private static final Pattern PATTERN_EMBED    = Pattern.compile("https?://embed\\." + Pattern.quote(WCOSTREAM_DOMAIN) + "/.+", Pattern.CASE_INSENSITIVE);
 
     public static String[] getAnnotationNames() {
         return buildAnnotationNames(getPluginDomains());
@@ -71,12 +85,119 @@ public class WCOStream extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www[0-9]*\\.)?" + buildHostsPatternPart(domains) + "/(?:anime/)?.+");
+            if (WCOSTREAM_DOMAIN.equals(domains[0])) {
+                ret.add("https?://(?:www[0-9]*\\.|embed\\.)?" + buildHostsPatternPart(domains) + "/.+");
+            } else {
+                ret.add("https?://(?:www[0-9]*\\.)?" + buildHostsPatternPart(domains) + "/(?:anime/)?.+");
+            }
         }
         return ret.toArray(new String[0]);
     }
 
+    /**
+     * Crawls the WCOStream embed player (embed.wcostream.com/inc/embed/index.php?file=...). The player page loads getvidlink.php which
+     * returns the video IDs (enc = SD, hd = HD, fhd = FHD) and the server. Each ID is then downloadable via server/getvid?evid=ID.
+     */
+    private ArrayList<DownloadLink> crawlEmbedPage(final CryptedLink param) throws Exception {
+        final String contenturl = param.getCryptedUrl();
+        /* Embed player is meant to be loaded from within an iframe of WCOForever */
+        br.getHeaders().put("Referer", "https://www." + WCOForever.getPluginDomains().get(0)[1] + "/");
+        br.getPage(contenturl);
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        /*
+         * index.php only shows an announcement and an ad-block check (pre-init.js): It sends a beacon with a random nonce to /ad-verify and
+         * then redirects to video-js.php with the same query plus 'n=NONCE'. Do the same.
+         */
+        final String query = new Regex(contenturl, "\\?(.+)$").getMatch(0);
+        final String pid = new Regex(contenturl, "[?&]pid=(\\d+)").getMatch(0);
+        final String nonce = UUID.randomUUID().toString().replace("-", "");
+        final Browser brBeacon = br.cloneBrowser();
+        brBeacon.getHeaders().put("Content-Type", "application/json");
+        brBeacon.postPageRaw("/ad-verify", "{\"nonce\":\"" + nonce + "\",\"status\":\"clear\",\"id\":\"" + pid + "\"}");
+        br.getPage("/inc/embed/video-js.php?" + query + "&n=" + nonce);
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final String vidlinkPath = br.getRegex("getJSON\\(\\s*\"([^\"]*getvidlink\\.php[^\"]*)\"").getMatch(0);
+        if (vidlinkPath == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final Browser brJson = br.cloneBrowser();
+        brJson.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+        brJson.getPage(vidlinkPath);
+        final Map<String, Object> entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(brJson.getRequest().getHtmlCode());
+        final String server = (String) entries.get("server");
+        final String enc = (String) entries.get("enc");
+        /* HD and FHD are optional: Not every video has them. */
+        final String hd = (String) entries.get("hd");
+        final String fhd = (String) entries.get("fhd");
+        /* SD: The server redirects to the final file host. Resolve it so we can check if the servers are at capacity. */
+        final Browser brResolve = br.cloneBrowser();
+        brResolve.getPage(server + "/getvid?evid=" + enc + "&json");
+        String sdUrl = brResolve.getRegex("\"(https?:[^\"]+)\"").getMatch(0);
+        if (sdUrl != null) {
+            sdUrl = sdUrl.replace("\\/", "/");
+            if (!hasSubdomain(new URL(sdUrl).getHost())) {
+                /* Website shows "all servers are full" in this case. */
+                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "All servers are at capacity", TimeUnit.MINUTES.toMillis(10));
+            }
+        } else {
+            sdUrl = server + "/getvid?evid=" + enc;
+        }
+        /* Build filename from the 'file' parameter e.g. 'benim-yeni/[Group] Title - S02E09 [English Dub].flv' */
+        String name = new Regex(contenturl, "[?&]file=([^&]+)").getMatch(0);
+        if (name != null) {
+            name = Encoding.htmlDecode(Encoding.urlDecode(name, false));
+            name = name.replaceFirst("^.*/", "").replaceFirst("\\.[A-Za-z0-9]{2,4}$", "").trim();
+        }
+        if (StringUtils.isEmpty(name)) {
+            name = "WCOStream_" + new Regex(contenturl, "[?&]pid=(\\d+)").getMatch(0);
+        }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        if (StringUtils.isNotEmpty(fhd)) {
+            ret.add(createEmbedQualityLink(server + "/getvid?evid=" + fhd, name, "FHD"));
+        }
+        if (StringUtils.isNotEmpty(hd)) {
+            ret.add(createEmbedQualityLink(server + "/getvid?evid=" + hd, name, "HD"));
+        }
+        ret.add(createEmbedQualityLink(sdUrl, name, "SD"));
+        final FilePackage fp = FilePackage.getInstance();
+        fp.setName(name);
+        fp.addLinks(ret);
+        return ret;
+    }
+
+    private DownloadLink createEmbedQualityLink(final String url, final String name, final String quality) {
+        final DownloadLink dl = createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
+        dl.setFinalFileName(name + " [" + quality + "].mp4");
+        dl.setAvailable(true);
+        dl.setProperty(DirectHTTP.PROPERTY_REQUEST_TYPE, "GET");
+        return dl;
+    }
+
+    /** Returns false for hosts without subdomain e.g. 'wcostream.com' or '.wcostream.com' */
+    private static boolean hasSubdomain(final String host) {
+        if (StringUtils.isEmpty(host)) {
+            return false;
+        }
+        final String[] parts = host.toLowerCase(Locale.ENGLISH).replaceFirst("\\.+$", "").split("\\.", -1);
+        if (parts.length < 3) {
+            return false;
+        }
+        for (final String part : parts) {
+            if (part.length() == 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
+        if (PATTERN_EMBED.matcher(param.getCryptedUrl()).matches()) {
+            return crawlEmbedPage(param);
+        }
         br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -85,11 +206,11 @@ public class WCOStream extends PluginForDecrypt {
         if (title != null) {
             title = Encoding.htmlDecode(title).trim();
         }
-        final ArrayList<String> links = new ArrayList<String>();
+        final Set<String> links = new LinkedHashSet<String>();
         // Handle list page
         Collections.addAll(links, br.getRegex("<li><a[^>]+href\\s*=\\s*\"\\s*([^\"]+)\\s*\"[^>]+class\\s*=\\s*\"[^\"]*sonra[^\"]*\"").getColumn(0));
         // Handle video page
-        ArrayList<String> embedPageLinks = new ArrayList<String>();
+        final Set<String> embedPageLinks = new LinkedHashSet<String>();
         String[][] encodedSections = br.getRegex("var\\s+\\w+\\s*=\\s*\"\\s*\"\\;\\s*var\\s+\\w+\\s*=\\s*\\[([^\\]]+)\\][^>]+replace[^>]+-\\s*(\\d+)").getMatches();
         if (encodedSections != null && encodedSections.length > 0) {
             for (String[] encodedSection : encodedSections) {
@@ -160,6 +281,7 @@ public class WCOStream extends PluginForDecrypt {
                 final DownloadLink dl = createDownloadlink(url);
                 if (StringUtils.startsWithCaseInsensitive(url, "directhttp://")) {
                     dl.setFinalFileName(title + ".mp4");
+                    dl.setProperty(DirectHTTP.PROPERTY_REQUEST_TYPE, "GET");
                 }
                 dl.setAvailable(true);
                 ret.add(dl);

@@ -46,7 +46,7 @@ import javax.swing.Icon;
  * @date Feb 12, 2025
  *
  */
-public abstract class AbstractIconPipe implements IconPipe, Icon {
+public abstract class AbstractIconPipe implements IconPipe, CachableIcon {
     /**
      *
      */
@@ -67,6 +67,27 @@ public abstract class AbstractIconPipe implements IconPipe, Icon {
     @Override
     public void paintIcon(Component c, Graphics g, int x, int y) {
         this.paintIcon(c, g, x, y, null);
+    }
+
+    /**
+     * @see org.appwork.utils.images.CachableIcon#isCachable()
+     */
+    @Override
+    public boolean isCachable() {
+        final CachableIcon icon = CachableIcon.getCachableIcon(this);
+        return icon != null && icon != this && icon.isCachable();
+    }
+
+    /**
+     * @see org.appwork.utils.images.CachableIcon#setCachable(boolean)
+     */
+    @Override
+    public void setCachable(boolean b) {
+        final CachableIcon icon = CachableIcon.getCachableIcon(this);
+        if (icon == null || icon == this) {
+            return;
+        }
+        icon.setCachable(b);
     }
 
     /**

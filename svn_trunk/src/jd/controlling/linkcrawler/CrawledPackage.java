@@ -260,7 +260,7 @@ public class CrawledPackage implements AbstractPackageNode<CrawledLink, CrawledP
         this.expanded = b;
     }
 
-    private final static AtomicReferenceFieldUpdater<CrawledPackage, CrawledPackageView> CRAWLEDPACKAGEVIEW_UPDATER = AtomicReferenceFieldUpdater.newUpdater(CrawledPackage.class, CrawledPackageView.class, "fpInfo");
+    private final static AtomicReferenceFieldUpdater<CrawledPackage, CrawledPackageView> CRAWLEDPACKAGEVIEW_UPDATER = AtomicReferenceFieldUpdater.newUpdater(CrawledPackage.class, CrawledPackageView.class, "view");
     private volatile CrawledPackageView                                                  view                       = null;
 
     @Override

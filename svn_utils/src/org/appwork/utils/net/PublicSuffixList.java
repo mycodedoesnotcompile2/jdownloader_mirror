@@ -38,20 +38,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
-import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 import org.appwork.utils.Application;
-import org.appwork.utils.ByteArrayMapKey;
-import org.appwork.utils.ByteArrayWrapper;
-import org.appwork.utils.Regex;
 import org.appwork.utils.URLStream;
 
 /**
@@ -59,7 +51,7 @@ import org.appwork.utils.URLStream;
  *
  *         https://publicsuffix.org/list/
  */
-public class PublicSuffixList {
+public final class PublicSuffixList {
     private static PublicSuffixList INSTANCE;
     static {
         try {
@@ -73,22 +65,86 @@ public class PublicSuffixList {
         return PublicSuffixList.INSTANCE;
     }
 
+    public enum RuleType {
+        NORMAL_ICANN {
+            @Override
+            public boolean isICANN() {
+                return true;
+            }
+        },
+        NORMAL_PRIVATE,
+        WILDCARD_ICANN {
+            @Override
+            public boolean isICANN() {
+                return true;
+            }
+
+            @Override
+            public boolean isWildcard() {
+                return true;
+            }
+        },
+        WILDCARD_PRIVATE {
+
+            @Override
+            public boolean isWildcard() {
+                return true;
+            }
+        },
+        EXCEPTION_ICANN {
+            @Override
+            public boolean isICANN() {
+                return true;
+            }
+
+            @Override
+            public boolean isException() {
+                return true;
+            }
+        },
+        EXCEPTION_PRIVATE {
+            @Override
+            public boolean isException() {
+                return true;
+            }
+        };
+
+        public boolean isICANN() {
+            return false;
+        }
+
+        public boolean isNormal() {
+            return !isWildcard() && !isException();
+        }
+
+        public boolean isWildcard() {
+            return false;
+        }
+
+        public boolean isException() {
+            return false;
+        }
+
+    }
+
+    public Map<String, RuleType> getRules() {
+        return rules;
+    }
+
+    private final Map<String, RuleType> rules;
+
+    public PublicSuffixList(URL publicSuffixList) throws IOException {
+        this.rules = Collections.unmodifiableMap(parse(publicSuffixList));
+    }
+
     /**
      * Implementation for https://publicsuffix.org/list/
      */
-    private final Map<ByteArrayMapKey, List<ByteArrayWrapper>> map;
-    private final Charset                                      UTF8;
-
-    public PublicSuffixList(URL publicSuffixList) throws IOException {
-        UTF8 = Charset.forName("UTF-8");
-        this.map = this.parse(publicSuffixList);
-    }
-
     private PublicSuffixList() throws IOException {
         this(Application.getRessourceURL("org/appwork/utils/net/effective_tld_names.dat"));
     }
 
-    public class InternetDomainName {
+    public final class InternetDomainName {
         private final String domain;
 
         private InternetDomainName(final String domain) {
@@ -100,169 +156,226 @@ public class PublicSuffixList {
         }
 
         public String publicSuffix() {
-            final List<String> ret = find(getDomain());
-            if (ret == null) {
-                return null;
-            }
-            return ret.get(0);
-        }
-
-        public boolean isPublicSuffix() {
-            final List<String> ret = find(getDomain());
-            if (ret == null) {
-                return false;
-            }
-            for (String entry : ret) {
-                if (entry.equalsIgnoreCase(getDomain())) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        public String topPrivateDomain() {
-            final List<String> ret = find(getDomain());
-            if (ret == null) {
-                return null;
-            }
-            final String top = new Regex(getDomain(), "([^\\.]+\\." + Pattern.quote(ret.get(0)) + ")$").getMatch(0);
-            return top;
+            return findSuffix(getDomain(), false);
         }
 
         public String registrySuffix() {
-            final List<String> ret = find(getDomain());
-            if (ret == null) {
-                return null;
-            }
-            return ret.get(ret.size() - 1);
+            return findSuffix(getDomain(), true);
         }
 
+        public boolean hasPublicSuffix() {
+            return publicSuffix() != null;
+        }
+
+        public boolean hasRegistrySuffix() {
+            return registrySuffix() != null;
+        }
+
+        // --- 2. Exakte Suffix-Prüfungen ---
+
+        public boolean isPublicSuffix() {
+            String suffix = publicSuffix();
+            return suffix != null && suffix.equals(getDomain());
+        }
+
+        public boolean isRegistrySuffix() {
+            String suffix = registrySuffix();
+            return suffix != null && suffix.equals(getDomain());
+        }
+
+        // --- 3. Registrierbare Hauptdomain (eTLD+1) ---
+
+        /**
+         * Entspricht Guava topPrivateDomain(): "www.google.co.uk" -> "google.co.uk" "user.blogspot.com" -> "user.blogspot.com"
+         * "blogspot.com" -> null (ist selbst ein Public Suffix, hat keine eTLD+1)
+         */
+        public String topPrivateDomain() {
+            return extractTopDomain(getDomain(), publicSuffix());
+        }
+
+        /**
+         * Entspricht Guava topDomainUnderRegistrySuffix(): "user.blogspot.com" -> "blogspot.com" "blogspot.com" -> "blogspot.com" "com" ->
+         * null
+         */
+        public String topDomainUnderRegistrySuffix() {
+            return extractTopDomain(getDomain(), registrySuffix());
+        }
+
+        public boolean isTopPrivateDomain() {
+            String top = topPrivateDomain();
+            return top != null && top.equals(getDomain());
+        }
+
+        public boolean isTopDomainUnderRegistrySuffix() {
+            String top = topDomainUnderRegistrySuffix();
+            return top != null && top.equals(getDomain());
+        }
+
+        /**
+         * Gibt den Subdomain-Teil links von topPrivateDomain() zurück (oder null, falls keiner existiert): "www.google.co.uk" -> "www"
+         * "a.b.google.co.uk" -> "a.b" "google.co.uk" -> null "www.user.blogspot.com" -> "www" "user.blogspot.com" -> null "blogspot.com" ->
+         * null (kein topPrivateDomain vorhanden)
+         */
         public String subDomain() {
-            final String topPrivateDomain = topPrivateDomain();
-            if (topPrivateDomain == null) {
-                return null;
-            }
-            final String subDomain = new Regex(getDomain(), "(.+)\\." + Pattern.quote(topPrivateDomain) + "$").getMatch(0);
-            return subDomain;
+            return extractSubDomain(domain, topPrivateDomain());
+        }
+
+        /**
+         * Gibt den Subdomain-Teil links von topDomainUnderRegistrySuffix() zurück: "www.user.blogspot.com" -> "www.user"
+         * "user.blogspot.com" -> "user" "blogspot.com" -> null
+         */
+        public String subDomainUnderRegistrySuffix() {
+            return extractSubDomain(domain, topDomainUnderRegistrySuffix());
         }
     }
 
-    public InternetDomainName parse(final String domain) {
-        return new InternetDomainName(domain);
+    public InternetDomainName from(final URL url) {
+        return from(url.getHost());
+    }
+
+    public InternetDomainName from(final String domain) {
+        String lookupDomain = domain;
+        if (lookupDomain.endsWith(".")) {
+            lookupDomain = lookupDomain.substring(0, lookupDomain.length() - 1);
+        }
+        lookupDomain = Punycode.toASCII(lookupDomain);
+        return new InternetDomainName(lookupDomain);
     }
 
     public String getSubDomain(final String fullDomain) {
-        final String domain = getDomain(fullDomain);
-        if (domain != null) {
-            final String pattern = "(.+)\\." + Pattern.quote(domain);
-            final String subDomain = new Regex(fullDomain, pattern).getMatch(0);
-            return subDomain;
-        }
-        return null;
+        return from(fullDomain).subDomain();
     }
 
     public String getDomain(String fullDomain) {
-        final String topLeveLDomain = this.getTopLevelDomain(fullDomain);
-        if (topLeveLDomain != null) {
-            final String pattern = "([^\\.]+\\." + Pattern.quote(topLeveLDomain) + ")$";
-            final String domain = new Regex(fullDomain, pattern).getMatch(0);
-            return domain;
-        }
-        return null;
+        return from(fullDomain).topPrivateDomain();
     }
 
-    private List<String> find(final String fullDomain) {
-        if (fullDomain != null) {
-            final int tldIndex = fullDomain.lastIndexOf('.');
-            if (tldIndex > 0 && tldIndex + 1 < fullDomain.length()) {
-                final String tld = fullDomain.substring(tldIndex + 1);
-                final ByteArrayMapKey tldbA = new ByteArrayMapKey(tld.getBytes(UTF8));
-                final List<ByteArrayWrapper> list = this.map.get(tldbA);
-                if (list != null) {
-                    if (list.size() == 0) {
-                        return Arrays.asList(new String[] { tld });
-                    }
-                    final List<String> hits = new ArrayList<String>();
-                    hits.add(tld);
-                    for (ByteArrayWrapper entry : list) {
-                        final String item = entry.toString(UTF8);
-                        if (item.startsWith("*")) {
-                            final String pattern = "([^\\.]+" + Pattern.quote(item.substring(1)) + ")";
-                            final String domain = new Regex(fullDomain, pattern).getMatch(0);
-                            if (domain != null) {
-                                hits.add(domain);
-                            }
-                        } else if (item.startsWith("!") && fullDomain.contains(item.substring(1))) {
-                            return Arrays.asList(item.substring(item.indexOf('.') + 1));
-                        } else if (fullDomain.contains(item)) {
-                            hits.add(item);
-                        }
-                    }
-                    Collections.sort(hits, new Comparator<String>() {
-                        public int compare(int x, int y) {
-                            return x < y ? 1 : x == y ? 0 : -1;
-                        }
+    public String getTopLevelDomain(String fullDomain) {
+        return from(fullDomain).publicSuffix();
+    }
 
-                        @Override
-                        public int compare(String o1, String o2) {
-                            return this.compare(o1.length(), o2.length());
-                        }
-                    });
-                    return hits;
+    protected String extractSubDomain(String normalizedDomain, String topDomain) {
+        if (normalizedDomain == null || topDomain == null) {
+            return null;
+        }
+        // Keine Subdomain vorhanden (domain == topDomain)
+        if (normalizedDomain.length() <= topDomain.length()) {
+            return null;
+        }
+        // Erwarteter Punkt unmittelbar vor dem topDomain: "<subDomain>.<topDomain>"
+        final int dotBeforeTop = normalizedDomain.length() - topDomain.length() - 1;
+        if (dotBeforeTop <= 0 || normalizedDomain.charAt(dotBeforeTop) != '.') {
+            return null;
+        }
+        return normalizedDomain.substring(0, dotBeforeTop);
+    }
+
+    protected String extractTopDomain(String normalizedDomain, String suffix) {
+        if (suffix == null || normalizedDomain == null) {
+            return null;
+        }
+        // Domain ist identisch mit dem Suffix (z. B. "co.uk" oder "blogspot.com") -> kein +1 Label vorhanden
+        if (normalizedDomain.length() <= suffix.length()) {
+            return null;
+        }
+        // Erwartete Position des Punktes unmittelbar vor dem Suffix: "...<label>.<suffix>"
+        final int dotBeforeSuffix = normalizedDomain.length() - suffix.length() - 1;
+        if (dotBeforeSuffix <= 0 || normalizedDomain.charAt(dotBeforeSuffix) != '.') {
+            return null;
+        }
+        // Den Punkt links vor diesem einen Label suchen (falls Subdomains davor liegen)
+        final int prevDot = normalizedDomain.lastIndexOf('.', dotBeforeSuffix - 1);
+        return prevDot < 0 ? normalizedDomain : normalizedDomain.substring(prevDot + 1);
+    }
+
+    protected String findSuffix(String domain, boolean registryOnly) {
+        int start = 0;
+        while (true) {
+            final String candidate = domain.substring(start);
+            final RuleType exact = rules.get(candidate);
+            if (exact != null && (!registryOnly || exact.isICANN())) {
+                if (exact.isException()) {
+                    int nextDot = candidate.indexOf('.');
+                    return nextDot > 0 ? candidate.substring(nextDot + 1) : null;
                 }
+                if (exact.isNormal()) {
+                    return candidate;
+                }
+            }
+
+            final int nextDot = candidate.indexOf('.');
+            if (nextDot > 0) {
+                final String parent = candidate.substring(nextDot + 1);
+                final RuleType parentRule = rules.get(parent);
+                if (parentRule != null && parentRule.isWildcard() && (!registryOnly || parentRule.isICANN())) {
+                    return candidate;
+                }
+                start += nextDot + 1;
+            } else {
+                break;
             }
         }
         return null;
     }
 
-    public String getTopLevelDomain(String fullDomain) {
-        final List<String> ret = find(fullDomain);
-        if (ret != null) {
-            return ret.get(0);
-        }
-        return null;
-    }
-
-    protected Map<ByteArrayMapKey, List<ByteArrayWrapper>> parse(final URL publicSuffixList) throws IOException {
-        final HashMap<ByteArrayMapKey, List<ByteArrayWrapper>> map = new HashMap<ByteArrayMapKey, List<ByteArrayWrapper>>();
+    protected Map<String, RuleType> parse(final URL publicSuffixList) throws IOException {
+        final Map<String, RuleType> map = new HashMap<String, RuleType>();
         if (publicSuffixList != null) {
             final InputStream is = URLStream.openStream(publicSuffixList);
             if (is != null) {
+                final BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
                 try {
-                    final BufferedReader reader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
-                    final List<ByteArrayWrapper> emptyList = new ArrayList<ByteArrayWrapper>(0);
                     String line = null;
+                    Boolean isICANN = null;
                     while ((line = reader.readLine()) != null) {
-                        if (!line.startsWith("//") && line.length() > 0) {
-                            final String tld;
-                            final int tldIndex = line.lastIndexOf('.');
-                            if (tldIndex == -1) {
-                                tld = line;
-                            } else {
-                                tld = line.substring(tldIndex + 1);
-                            }
-                            final ByteArrayMapKey tldbA = new ByteArrayMapKey(tld.getBytes(UTF8));
-                            List<ByteArrayWrapper> list = map.get(tldbA);
-                            if (list == null) {
-                                list = emptyList;
-                                map.put(tldbA, list);
-                            }
-                            if (tldIndex > 0) {
-                                if (list == emptyList) {
-                                    list = new ArrayList<ByteArrayWrapper>();
-                                    map.put(tldbA, list);
-                                }
-                                list.add(new ByteArrayWrapper(line.getBytes(UTF8), false));
-                            }
+                        line = line.trim();
+                        if (line.length() == 0) {
+                            continue;
                         }
-                    }
-                    for (List<ByteArrayWrapper> list : map.values()) {
-                        if (list != emptyList && list instanceof ArrayList) {
-                            ((ArrayList) list).trimToSize();
+                        if (line.startsWith("//")) {
+                            if (line.contains("===BEGIN ICANN DOMAINS===")) {
+                                if (isICANN != null) {
+                                    throw new IOException("invalid/broken list?");
+                                }
+                                isICANN = true;
+                            } else if (line.contains("===END ICANN DOMAINS===")) {
+                                if (!Boolean.TRUE.equals(isICANN)) {
+                                    throw new IOException("invalid/broken list?");
+                                }
+                                isICANN = null;
+                            } else if (line.contains("===BEGIN PRIVATE DOMAINS===")) {
+                                if (isICANN != null) {
+                                    throw new IOException("invalid/broken list?");
+                                }
+                                isICANN = false;
+                            } else if (line.contains("===END PRIVATE DOMAINS===")) {
+                                if (!Boolean.FALSE.equals(isICANN)) {
+                                    throw new IOException("invalid/broken list?");
+                                }
+                                isICANN = null;
+                            }
+                            continue;
+                        }
+                        if (isICANN == null) {
+                            throw new IOException("invalid/broken list?");
+                        }
+                        final RuleType ruleType;
+                        if (line.startsWith("*")) {
+                            ruleType = isICANN ? RuleType.WILDCARD_ICANN : RuleType.WILDCARD_PRIVATE;
+                            line = line.substring(2);
+                        } else if (line.startsWith("!")) {
+                            ruleType = isICANN ? RuleType.EXCEPTION_ICANN : RuleType.EXCEPTION_PRIVATE;
+                            line = line.substring(1);
+                        } else {
+                            ruleType = isICANN ? RuleType.NORMAL_ICANN : RuleType.NORMAL_PRIVATE;
+                        }
+                        final String normalized = Punycode.toASCII(line);
+                        if (map.put(normalized, ruleType) != null) {
+                            throw new IOException("invalid/broken list?:" + normalized);
                         }
                     }
                 } finally {
-                    is.close();
+                    reader.close();
                 }
             }
         }

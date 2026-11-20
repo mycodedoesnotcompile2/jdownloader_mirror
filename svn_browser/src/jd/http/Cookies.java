@@ -118,8 +118,11 @@ public class Cookies {
                     if (Cookie.testPath(value)) {
                         cookie.setPath(value);
                     }
-                } else if ("expires".equalsIgnoreCase(key) && !isMaxAgeSet) {
-                    cookie.setExpires(value);
+                } else if ("expires".equalsIgnoreCase(key)) {
+                    /* Max-Age has priority over Expires */
+                    if (!isMaxAgeSet) {
+                        cookie.setExpires(value);
+                    }
                 } else if ("domain".equalsIgnoreCase(key)) {
                     /* test on new instance first */
                     if (cookie.newCookieInstance().setDomain(value)) {
@@ -148,7 +151,7 @@ public class Cookies {
                         LogV3.log(e);
                     }
                 } else {
-                    LogV3.info("unknown/unsupported cookie attribute:" + key + " = " + value);
+                    LogV3.fine("unknown/unsupported cookie attribute:" + key + " = " + value);
                 }
             }
             try {
@@ -283,7 +286,7 @@ public class Cookies {
                     /** Max-Age **/
                     maxAgeValue = value;
                 } else {
-                    LogV3.info("unknown/unsupported cookie attribute:" + key + " = " + value);
+                    LogV3.fine("unknown/unsupported cookie attribute:" + key + " = " + value);
                 }
             } else if (StringUtils.isNotEmpty(key)) {
                 tmp.put(key, value);

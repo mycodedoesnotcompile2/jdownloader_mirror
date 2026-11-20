@@ -49,6 +49,10 @@ import org.jdownloader.gui.views.downloads.action.ResumeAction;
 import org.jdownloader.gui.views.downloads.action.RunCheckSumAction;
 import org.jdownloader.gui.views.downloads.action.SetDownloadFolderInDownloadTableAction;
 import org.jdownloader.gui.views.downloads.action.SkipAction;
+import org.jdownloader.gui.views.downloads.action.UnskipAllCaptchasAction;
+import org.jdownloader.gui.views.downloads.action.UnskipCaptchasBlockedHostersAction;
+import org.jdownloader.gui.views.downloads.action.UnskipCaptchasPackageAction;
+import org.jdownloader.gui.views.downloads.action.UnskipSelectionAction;
 import org.jdownloader.gui.views.downloads.action.SplitPackagesByHostDownloadlist;
 import org.jdownloader.gui.views.downloads.action.StopsignAction;
 import org.jdownloader.gui.views.downloads.context.submenu.DeleteMenuContainer;
@@ -56,6 +60,7 @@ import org.jdownloader.gui.views.downloads.context.submenu.DevChunksMenuContaine
 import org.jdownloader.gui.views.downloads.context.submenu.MoreMenuContainer;
 import org.jdownloader.gui.views.downloads.context.submenu.PriorityMenuContainer;
 import org.jdownloader.gui.views.downloads.context.submenu.SettingsMenuContainer;
+import org.jdownloader.gui.views.downloads.context.submenu.UnskipMenuContainer;
 import org.jdownloader.gui.views.downloads.table.DownloadsTable;
 import org.jdownloader.gui.views.downloads.table.DownloadsTableModel;
 import org.jdownloader.gui.views.linkgrabber.bottombar.IncludedSelectionSetup;
@@ -102,6 +107,7 @@ public class MenuManagerDownloadTableContext extends ContextMenuManager<FilePack
         mr.add(new MenuItemData(new ActionData(SortAction.class)));
         mr.add(new MenuItemData(new ActionData(EnabledAction.class)));
         mr.add(new MenuItemData(new ActionData(SkipAction.class)));
+        mr.add(createUnskipMenu());
         mr.add(new SeparatorData());
         mr.add(new MenuItemData(new ActionData(ForceDownloadAction.class)));
         mr.add(new MenuItemData(new ActionData(StopsignAction.class)));
@@ -121,6 +127,16 @@ public class MenuManagerDownloadTableContext extends ContextMenuManager<FilePack
         opt.add(MarkDownloadFinishedAction.class);
         opt.add(MarkExistingOnDiskAsFinishedAction.class);
         return mr;
+    }
+
+    private MenuItemData createUnskipMenu() {
+        final UnskipMenuContainer unskip = new UnskipMenuContainer();
+        unskip.add(new MenuItemData(new ActionData(UnskipSelectionAction.class)));
+        unskip.add(new SeparatorData());
+        unskip.add(new MenuItemData(new ActionData(UnskipCaptchasPackageAction.class)));
+        unskip.add(new MenuItemData(new ActionData(UnskipCaptchasBlockedHostersAction.class)));
+        unskip.add(new MenuItemData(new ActionData(UnskipAllCaptchasAction.class)));
+        return unskip;
     }
 
     private MenuItemData createDeleteMenu() {

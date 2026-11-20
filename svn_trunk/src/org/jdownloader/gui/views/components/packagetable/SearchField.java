@@ -48,6 +48,7 @@ import org.jdownloader.gui.packagehistorycontroller.AbstractSearchHistoryManager
 import org.jdownloader.gui.packagehistorycontroller.SearchHistoryManager;
 import org.jdownloader.gui.views.components.HistorySearchField;
 import org.jdownloader.gui.views.components.SearchCatInterface;
+import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.updatev2.gui.LAFOptions;
@@ -62,6 +63,10 @@ public class SearchField<SearchCat extends SearchCatInterface, PackageType exten
     private static final long                                                                  serialVersionUID        = -8079363840549073686L;
     private static final int                                                                   SIZE                    = 20;
     private Image                                                                              img;
+    /* Small search icon at the left of the text area (next to the category button), like in the search field of the advanced settings */
+    private final AbstractIcon                                                                 searchIcon              = new AbstractIcon(IconKey.ICON_SEARCH, 16);
+    /* Horizontal space reserved in front of the text for searchIcon */
+    private static final int                                                                   SEARCH_ICON_SPACE       = 20;
     private DelayedRunnable                                                                    delayedFilter;
     private PackageControllerTable<PackageType, ChildType>                                     table2Filter;
     private volatile JLabel                                                                    label;
@@ -200,6 +205,10 @@ public class SearchField<SearchCat extends SearchCatInterface, PackageType exten
             g2.drawImage(popIcon, labelWidth + 3, (getHeight() - popIcon.getHeight(null)) / 2, null);
             // label.paintComponents(g2);
             g2.translate(-iconGap - 1, 0);
+            /* Search icon right of the separator line of the category button, slightly transparent like in the advanced settings */
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.6f));
+            searchIcon.paintIcon(this, g2, labelWidth + 5 + iconGap + 8 + 3, (getHeight() - searchIcon.getIconHeight()) / 2);
+            g2.setComposite(comp);
         } else {
             if (isSynthButtonUIAvailable(button.getUI())) {
                 try {
@@ -457,7 +466,8 @@ public class SearchField<SearchCat extends SearchCatInterface, PackageType exten
         }
         label.setSize(labelWidth, 24);
         // label.setEnabled(false);
-        setBorder(BorderFactory.createCompoundBorder(orgBorder, BorderFactory.createEmptyBorder(0, labelWidth + 14 + iconGap, 0, 0)));
+        /* Left: category button plus the space for the search icon in front of the text */
+        setBorder(BorderFactory.createCompoundBorder(orgBorder, BorderFactory.createEmptyBorder(0, labelWidth + 14 + iconGap + SEARCH_ICON_SPACE, 0, 0)));
         final SearchCat sel = getSelectedCategory();
         label.setText(sel.getLabel());
         setHelpText(sel.getHelpText());

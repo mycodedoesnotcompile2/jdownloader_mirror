@@ -288,9 +288,15 @@ public abstract class Challenge<T> {
         return lastActivity;
     }
 
-    public boolean keepAlive() {
+    /** True if the plugin allows to keep this challenge alive, see {@link Plugin#keepAlive(Challenge)}. Has no side effects. */
+    public boolean canKeepAlive() {
         final Plugin plugin = getPlugin();
-        if (plugin != null && plugin.keepAlive(this)) {
+        return plugin != null && plugin.keepAlive(this);
+    }
+
+    /** Keeps the challenge alive if possible: Sets the time of the last activity, so the challenge is valid for its timeout from now on. */
+    public boolean keepAlive() {
+        if (canKeepAlive()) {
             lastActivity = Time.systemIndependentCurrentJVMTimeMillis();
             return true;
         } else {

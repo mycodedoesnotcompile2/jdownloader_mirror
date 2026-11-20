@@ -2323,6 +2323,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Filter Settings" })
     String AdvancedSettings_AdvancedSettings_filter_();
 
+    @Default(lngs = { "en" }, values = { "Please wait. Loading settings..." })
+    String AdvancedSettings_AdvancedSettings_loading_();
+
     @Default(lngs = { "en" }, values = { "Key" })
     String AdvancedTableModel_initColumns_key_();
 
@@ -2451,6 +2454,9 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Skip" })
     String AbstractCaptchaDialog_AbstractCaptchaDialog_cancel();
+
+    @Default(lngs = { "en" }, values = { "Skip login captcha" })
+    String AbstractCaptchaDialog_skipLoginCaptcha();
 
     @Default(lngs = { "en" }, values = { "Send" })
     String AbstractCaptchaDialog_AbstractCaptchaDialog_continue();
@@ -6008,26 +6014,41 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Skipped captchas:" })
     String SkippedLinksIndicator_captchas();
 
-    @Default(lngs = { "en" }, values = { "All captchas are skipped (%s1 links)" })
-    String SkippedLinksIndicator_all(String links);
+    @Default(lngs = { "en" }, values = { "All captchas" })
+    String SkippedLinksIndicator_all();
 
-    @Default(lngs = { "en" }, values = { "%s1 (%s2 links)" })
-    String SkippedLinksIndicator_host(String host, String links);
+    @Default(lngs = { "en" }, values = { "%s1" })
+    String SkippedLinksIndicator_host(String host);
 
-    @Default(lngs = { "en" }, values = { "Other: Single links and packages (%s1 links)" })
-    String SkippedLinksIndicator_others(String links);
+    @Default(lngs = { "en" }, values = { "Single links and packages" })
+    String SkippedLinksIndicator_others();
 
-    @Default(lngs = { "en" }, values = { "Left click: Unskip everything. Right click: Choose what to unskip." })
+    @Default(lngs = { "en" }, values = { "Left click: Unskip all. Right click: Choose what to unskip." })
     String SkippedLinksIndicator_hint();
 
-    @Default(lngs = { "en" }, values = { "Unskip everything (all skipped links and captchas)" })
+    @Default(lngs = { "en" }, values = { "Unskip all" })
     String SkippedLinksIndicator_unskipAll();
 
-    @Default(lngs = { "en" }, values = { "Do not skip captchas from %s1 any more" })
+    @Default(lngs = { "en" }, values = { "Unskip captchas for %s1" })
     String SkippedLinksIndicator_unskipHost(String host);
 
-    @Default(lngs = { "en" }, values = { "Do not skip the other captchas (single links and packages) any more" })
-    String SkippedLinksIndicator_unskipOthers();
+    @Default(lngs = { "en" }, values = { "Unskip captchas" })
+    String SkippedLinksIndicator_unskipCaptchas();
+
+    @Default(lngs = { "en" }, values = { "Unskip" })
+    String UnskipMenuContainer();
+
+    @Default(lngs = { "en" }, values = { "Unskip selected" })
+    String UnskipSelectionAction();
+
+    @Default(lngs = { "en" }, values = { "Unskip captchas for package" })
+    String UnskipCaptchasPackageAction();
+
+    @Default(lngs = { "en" }, values = { "Unskip captchas for all blocked hosters in selection" })
+    String UnskipCaptchasBlockedHostersAction();
+
+    @Default(lngs = { "en" }, values = { "Unskip all skipped captchas" })
+    String UnskipAllCaptchasAction();
 
     @Default(lngs = { "en" }, values = { "Convert to..." })
     String PluginForHost_extendLinkgrabberContextMenu_generic_convert();

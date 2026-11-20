@@ -33,7 +33,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48544 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54085 $", interfaceVersion = 2, names = {}, urls = {})
 public class WCOForever extends PluginForDecrypt {
     public WCOForever(PluginWrapper wrapper) {
         super(wrapper);
@@ -85,7 +85,14 @@ public class WCOForever extends PluginForDecrypt {
         }
         final ArrayList<String> links = new ArrayList<String>();
         Collections.addAll(links, br.getRegex("<div[^>]*class\\s*=\\s*\"[^\"]*cat-eps[^\"]*\"[^>]*>\\s*<a[^>]*href\\s*=\\s*\"([^\"]+)\"").getColumn(0));
-        Collections.addAll(links, br.getRegex("(?i)Is the video too slow[^<]+<a[^>]+href\\s*=\\s*\"([^\"]+)\"").getColumn(0));
+        /* Embedded WCOStream player (iframe). This link is processed by the WCOStream plugin. */
+        final String[] embedLinks = br.getRegex("<iframe[^>]+src\\s*=\\s*\"(https?://embed\\.wcostream\\.com/[^\"]+)\"").getColumn(0);
+        if (embedLinks.length > 0) {
+            Collections.addAll(links, embedLinks);
+        } else {
+            /* Fallback: Link to the same video on the WCOStream website */
+            Collections.addAll(links, br.getRegex("Is the video too slow[^<]+<a[^>]+href\\s*=\\s*\"([^\"]+)\"").getColumn(0));
+        }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         for (String link : links) {
             if (StringUtils.isEmpty(link)) {
