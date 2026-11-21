@@ -147,6 +147,18 @@ public class CookieStorable implements Storable {
 
     private Boolean secure   = null;
     private Boolean hostOnly = null;
+    private long    version  = -1;
+
+    public long getVersion() {
+        if (cookie != null) {
+            return cookie.getVersion();
+        }
+        return version;
+    }
+
+    public void setVersion(long version) {
+        this.version = version;
+    }
 
     public Boolean getSecure() {
         if (this.cookie != null) {
@@ -181,7 +193,7 @@ public class CookieStorable implements Storable {
             }
         } catch (IllegalArgumentException e) {
         }
-        if (source == null) {
+        if (source == null || (Cookie.SOURCE.LEGACY.equals(source) && getVersion() == -1)) {
             if (getHostTime() > 0) {
                 source = Cookie.SOURCE.SERVER;
             } else if (getDomain() != null || getSecure() != null) {

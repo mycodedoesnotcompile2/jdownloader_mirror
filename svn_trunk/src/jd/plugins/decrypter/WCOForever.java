@@ -19,11 +19,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.StringUtils;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
+import jd.http.Request;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -33,23 +35,24 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 54085 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54089 $", interfaceVersion = 2, names = {}, urls = {})
 public class WCOForever extends PluginForDecrypt {
     public WCOForever(PluginWrapper wrapper) {
         super(wrapper);
-    }
-
-    @Override
-    public Browser createNewBrowserInstance() {
-        final Browser br = super.createNewBrowserInstance();
-        br.setFollowRedirects(true);
-        return br;
     }
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "wcoforever.tv", "wcoforever.net", "wcoforever.com" });
+        return ret;
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser ret = super.createNewBrowserInstance();
+        ret.setFollowRedirects(true);
+        ret.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, Request.getSuggestedUserAgent("153.0"));
         return ret;
     }
 

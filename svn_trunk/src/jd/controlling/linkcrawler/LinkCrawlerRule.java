@@ -11,7 +11,8 @@ import java.util.regex.Pattern;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.remoteapi.annotations.AllowNonStorableObjects;
 import org.appwork.serializer.Deser;
-import org.appwork.serializer.SC;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.net.URLHelper;
@@ -70,12 +71,18 @@ public class LinkCrawlerRule {
                 if (!string.matches("(?s)^\\s*\\{.*\\}\\s*$")) {
                     return null;
                 }
-                final Cookies ret = new Cookies();
                 try {
-                    final Cookie cookie = Deser.fromString(string, CookieStorable.TYPE_REF)._restore();
-                    if (cookie != null) {
-                        ret.add(cookie);
+                    final Map<String, Object> map = JSonStorage.restoreFromString(string, TypeRef.MAP);
+                    if (map == null || !map.containsKey("key") || !map.containsKey("value") || map.containsKey("creationTime")) {
+                        return null;
                     }
+                    final Cookie cookie = JSonStorage.restoreFromString(string, CookieStorable.TYPE_REF)._restore();
+                    if (cookie == null) {
+                        return null;
+                    }
+                    final Cookies ret = new Cookies();
+                    ret.add(cookie);
+                    return ret;
                 } catch (Exception e) {
                     if (logger != null) {
                         logger.log(e);
@@ -83,10 +90,8 @@ public class LinkCrawlerRule {
                         LogV3.log(e);
                     }
                 }
-                return ret;
-            } else {
-                return null;
             }
+            return null;
         }
     };
 
@@ -106,7 +111,7 @@ public class LinkCrawlerRule {
             } else if (!cookie.isPersistent()) {
                 continue;
             }
-            cookielist.add(new String[] { Deser.toString(new CookieStorable(cookie), SC.NETWORK_TRANSFER) });
+            cookielist.add(new String[] { JSonStorage.serializeToJson(new CookieStorable(cookie)) });
         }
         _setCookies(cookielist);
     }
@@ -235,7 +240,7 @@ public class LinkCrawlerRule {
                 } else if (!cookie.isPersistent()) {
                     continue;
                 }
-                updateCookies.add(new String[] { Deser.toString(new CookieStorable(cookie), SC.NETWORK_TRANSFER) });
+                updateCookies.add(new String[] { JSonStorage.serializeToJson(new CookieStorable(cookie)) });
             }
             _setCookies(updateCookies);
             // TODO: add support for length==3, url pattern matching support

@@ -292,11 +292,11 @@ public class Cookies {
                 tmp.put(key, value);
             }
         }
-        final Cookies cookies = new Cookies();
+        final Cookies cookies = new Cookies();       
         for (final Entry<String, String> next : tmp.entrySet()) {
             final Cookie cookie = source.newCookieInstance();
             cookie.setHost(host);
-            if (!cookie.setPath(path) && isSetCookie) {
+            if ((path == null || !cookie.setPath(path)) && isSetCookie) {
                 cookie.setPath(url);
             }
             cookie.setProtocol(protocol);
@@ -430,7 +430,10 @@ public class Cookies {
                         final Cookies customParserResult = customParser.parseFromObject(entry, logger);
                         if (customParserResult != null) {
                             ret.add(customParserResult);
-                            ret.setUserAgent(customParserResult.getUserAgent());
+                            final String userAgent = customParserResult.getUserAgent();
+                            if (userAgent != null) {
+                                ret.setUserAgent(userAgent);
+                            }
                             continue nextEntry;
                         }
                     }
@@ -784,7 +787,6 @@ public class Cookies {
             }
             Collections.sort(values, BEST_MATCH_COMPARATOR);
         }
-        final boolean oneCookieOnlyMode = request == null || StringUtils.containsIgnoreCase(request.getHeaders().getValue(HTTPConstants.HEADER_REQUEST_USER_AGENT), "Firefox") || true;
         for (final Entry<String, List<Cookie>> keyValue : keyValues.entrySet()) {
             if (cookieString.length() > 0) {
                 cookieString.append("; ");
@@ -798,25 +800,10 @@ public class Cookies {
                 /* first cookie is customized/preferred */
                 cookieString.append(keyValue.getKey()).append("=");
                 cookieString.append(StringUtils.valueOrEmpty(values.get(0).getValue()));
-            } else if (oneCookieOnlyMode) {
-                /* no request available or firefox useragent, choose default/firefox handling to send only one cookie */
+            } else {
+                /* choose default/firefox handling to send only one cookie */
                 cookieString.append(keyValue.getKey()).append("=");
                 cookieString.append(StringUtils.valueOrEmpty(values.get(0).getValue()));
-            } else {
-                /* disabled for now */
-                /* we first test this in IDE if chrome UA and sorted cookie values are causing issues */
-                final StringBuilder sortedCookiesString = new StringBuilder();
-                for (final Cookie cookie : values) {
-                    if (cookie.isCustomCookie()) {
-                        continue;
-                    }
-                    if (sortedCookiesString.length() > 0) {
-                        sortedCookiesString.append("; ");
-                    }
-                    sortedCookiesString.append(keyValue.getKey()).append("=");
-                    sortedCookiesString.append(StringUtils.valueOrEmpty(cookie.getValue()));
-                }
-                cookieString.append(sortedCookiesString);
             }
         }
         return cookieString.toString();

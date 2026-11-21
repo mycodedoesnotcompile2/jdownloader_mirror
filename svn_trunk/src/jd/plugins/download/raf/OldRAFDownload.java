@@ -158,6 +158,10 @@ public class OldRAFDownload extends DownloadInterface {
         return startTimeStamp;
     }
 
+    protected boolean isInitialConnectFollowingEnabled(Request request) {
+        return true;
+    }
+
     @Override
     public URLConnectionAdapter connect(Browser br) throws Exception {
         /* reset timeouts here, because it can be they got not set yet */
@@ -201,7 +205,7 @@ public class OldRAFDownload extends DownloadInterface {
                 logger.finer(".....connectRangeless");
                 /* our connection happens rangeless */
                 request.getHeaders().remove("Range");
-                browser.openRequestConnection(request, false);
+                browser.openRequestConnection(request, isInitialConnectFollowingEnabled(request));
             }
         }
         if (downloadable.isDebug()) {
@@ -209,6 +213,7 @@ public class OldRAFDownload extends DownloadInterface {
         }
         connection = request.getHttpConnection();
         if (request.getLocation() != null) {
+            browser.followConnection();
             throw new PluginException(LinkStatus.ERROR_DOWNLOAD_INCOMPLETE, BrowserAdapter.ERROR_REDIRECTED);
         }
         if (downloadable.getVerifiedFileSize() < 0) {
@@ -336,7 +341,12 @@ public class OldRAFDownload extends DownloadInterface {
             part = fileSize / this.getChunkNum();
             request.getHeaders().put("Range", "bytes=" + (0) + "-" + (part - 1));
         }
-        browser.openRequestConnection(request, false);
+        browser.openRequestConnection(request, isInitialConnectFollowingEnabled(request));
+        if (request.getLocation() != null) {
+            browser.followConnection();
+            logger.info("redirect to:" + request.getLocation());
+            return;
+        }
         if (request.getHttpConnection().getResponseCode() == 416) {
             logger.warning("HTTP/1.1 416 Requested Range Not Satisfiable");
             if (downloadable.isDebug()) {

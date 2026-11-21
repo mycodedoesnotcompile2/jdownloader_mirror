@@ -3,10 +3,6 @@ package org.jdownloader.gui.views.downloads.action;
 import java.util.HashSet;
 import java.util.Set;
 
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-
 import org.jdownloader.captcha.blacklist.BlacklistEntry;
 import org.jdownloader.captcha.blacklist.BlockDownloadCaptchasByHost;
 import org.jdownloader.captcha.blacklist.CaptchaBlackList;
@@ -14,6 +10,10 @@ import org.jdownloader.controlling.contextmenu.CustomizableTableContextAppAction
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 import org.jdownloader.plugins.SkipReason;
+
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
 
 /**
  * Base of the actions in the Unskip menu of the download list: The action is always shown for a selection, but only enabled if it can do
@@ -41,7 +41,7 @@ public abstract class AbstractUnskipAction extends CustomizableTableContextAppAc
     }
 
     protected static boolean isCaptchaSkipped(final DownloadLink link) {
-        return link.isSkipped() && SkipReason.CAPTCHA.equals(link.getSkipReason());
+        return SkipReason.CAPTCHA.equals(link.getSkipReason());
     }
 
     /** The hosts whose captchas are blocked as a whole. */

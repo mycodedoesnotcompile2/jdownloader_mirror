@@ -263,6 +263,10 @@ public abstract class Cookie {
         return ret;
     }
 
+    public long getVersion() {
+        return 2026_11_20l;
+    }
+
     public boolean isSecureProtocol() {
         final String protocol = getProtocol();
         if (protocol == null) {
@@ -749,10 +753,10 @@ public abstract class Cookie {
     }
 
     public boolean setPath(String path) {
-        if (!testPath(path)) {
-            return false;
-        }
         final String oldPath = this.path;
+        if (!testPath(path)) {
+            path = null;
+        }
         return !StringUtils.equals(oldPath, this.path = cleanAttributeValue(path));
     }
 

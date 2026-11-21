@@ -55,21 +55,7 @@ public class AbstractIcon implements Icon, IDIcon, CachableIcon {
     }
 
     /*
-     * TODO: This method may return null, which causes a NullPointerException in lazyUpdate() and paintIcon() (both call it without a null
-     * check, and both are hot paths: layout and painting).
-     *
-     * When: NewTheme.I().getIcon(key, size) returns null if the Theme has no icon for the key and the ThemeContext does not allow a "not
-     * available" fallback image (Theme.onIconNotAvailable returns null if !context.isCreateFileNotFoundFallbackImage() or the target is not
-     * Target.ICON). With the default context Theme creates a fallback image itself, so this is rare, but not impossible.
-     *
-     * Previously a fallback existed here (empty image, size <= 0 mapped to 32 like Theme.createNotAvailableImage does, because
-     * IconIO.createEmptyImage throws an IllegalArgumentException for sizes <= 0, e.g. new AbstractIcon(key, -1)), and lazyUpdate() returned
-     * UNKNOWN for null. Both were removed.
-     *
-     * Note: null is also stored in cache in that case (the assignment in the last branch), so the lookup is repeated on every call, which is
-     * the desired behavior (the icon may become available later).
-     *
-     * Decide whether null is a bug of the caller/theme (then document it and fail loudly) or restore a fallback icon.
+     * NewTheme.getIcon will newer return null, always returns a dummy icon if icon with key is not found
      */
     public Icon loadIcon() {
         final Object cache = this.cache;
