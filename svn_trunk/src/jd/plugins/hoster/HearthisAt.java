@@ -17,11 +17,15 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.requests.GetRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.parser.html.HTMLSearch;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -30,10 +34,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.download.DownloadInterface;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 49518 $", interfaceVersion = 3, names = { "hearthis.at" }, urls = { "https?://(?:www\\.)?hearthis\\.at/([^/]+)/([A-Za-z0-9-\\.]+)/?" })
+@HostPlugin(revision = "$Revision: 54099 $", interfaceVersion = 3, names = { "hearthis.at" }, urls = { "https?://(?:www\\.)?hearthis\\.at/([^/]+)/([A-Za-z0-9-\\.]+)/?" })
 public class HearthisAt extends PluginForHost {
     public HearthisAt(PluginWrapper wrapper) {
         super(wrapper);
@@ -49,11 +50,10 @@ public class HearthisAt extends PluginForHost {
     // protocol: no https
     // other:
     /* Connection stuff */
-    private boolean   free_resume        = false;
-    private int       free_maxchunks     = 1;
-    private final int free_maxdownloads  = -1;
-    private String    dllink             = null;
-    private boolean   isOfficialDownload = false;
+    private boolean   free_resume       = false;
+    private int       free_maxchunks    = 1;
+    private final int free_maxdownloads = -1;
+    private String    dllink            = null;
 
     @Override
     public String getAGBLink() {
@@ -77,10 +77,7 @@ public class HearthisAt extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        return requestFileInformation(link, false);
-    }
-
-    private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws IOException, PluginException {
+        final boolean isDownload = PluginEnvironment.DOWNLOAD.isCurrentPluginEnvironment();
         final String extDefault = ".mp3";
         dllink = null;
         if (!link.isNameSet()) {
@@ -91,26 +88,26 @@ public class HearthisAt extends PluginForHost {
         final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
         final String url_title = urlinfo.getMatch(1);
         br.getPage(link.getPluginPatternMatcher());
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (!this.br.containsHTML("track\\-detail track_")) {
+        if (br.getHttpConnection().getResponseCode() == 404 || br.getHttpConnection().getResponseCode() == 410) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (StringUtils.containsIgnoreCase(br.getURL(), "/search/")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         // String filename = br.getRegex("data-playlist-title=\"([^<>\"]*?)\"").getMatch(0); // Always get "pause" (1st match)
-        String title = br.getRegex("<title>([^<>]*?) \\|[^<>]+</title>").getMatch(0);
+        String title = br.getRegex("<title>\\s*([^<>]*?)\\s*\\|[^<>]+</title>").getMatch(0);
         if (title == null) {
             /* Fallback */
             title = urlinfo.getMatch(0) + " - " + url_title;
         }
         // final String downloadlink_stream = br.getRegex("data-mp3=\"(http[^<>\"]*?)\"").getMatch(0); // Always get dummy link (1st)
-        String downloadlink_stream = null;
-        String[] mp3Links = br.getRegex("data-mp3=\"(http[^<>\"]*?)\"").getColumn(0);
-        for (String mp3Link : mp3Links) {
-            if (!mp3Link.contains("/untitled/")) {
-                downloadlink_stream = mp3Link;
-                break;
+        String downloadlink_stream = HTMLSearch.searchMetaTag(br, "og:audio");
+        if (downloadlink_stream == null) {
+            final String[] mp3Links = br.getRegex("data-(?:mp3|src)\\s*=\\s*\"(http[^<>\"]*?)\"").getColumn(0);
+            for (String mp3Link : mp3Links) {
+                if (!mp3Link.contains("/untitled/")) {
+                    downloadlink_stream = mp3Link;
+                    break;
+                }
             }
         }
         br.setFollowRedirects(true);
@@ -138,7 +135,6 @@ public class HearthisAt extends PluginForHost {
                         officialDownloadURL = "https://" + this.getHost() + officialDownloadURL;
                     }
                     this.dllink = officialDownloadURL;
-                    isOfficialDownload = true;
                 } else {
                     logger.warning("Failed to find official downloadurl");
                 }
@@ -148,16 +144,19 @@ public class HearthisAt extends PluginForHost {
         }
         if (dllink == null) {
             dllink = this.br.getRegex("\"(https?://download\\.hearthis\\.at/\\?track=[^<>\"]*?)\"").getMatch(0);
-        }
-        if (dllink == null) {
-            dllink = this.br.getRegex("\"(https?://[^<>\"]*?)\">click here to download</a>").getMatch(0);
+            if (dllink == null) {
+                dllink = this.br.getRegex("\"(https?://[^<>\"]*?/download/[^<>\"]*?)\"").getMatch(0);
+                if (dllink == null) {
+                    dllink = this.br.getRegex("\"(https?://[^<>\"]*?)\">click here to download</a>").getMatch(0);
+                }
+            }
         }
         if (dllink == null) {
             /* We failed to get a 'real' downloadlink --> Fallback to stream (lower quality) */
             /* Stream urls can be downloaded with multiple connections and resume is possible! */
             free_resume = true;
             free_maxchunks = 1; // 2021-09-30: Disabled chunkload as it causes issues
-            dllink = downloadlink_stream;
+            dllink = Encoding.htmlDecode(downloadlink_stream);
             logger.info("\n\n-> Failed to get download link -> Checking stream link: " + dllink + "\n");
         }
         title = Encoding.htmlDecode(title);
@@ -177,7 +176,7 @@ public class HearthisAt extends PluginForHost {
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
-        requestFileInformation(link, true);
+        requestFileInformation(link);
         if (dllink == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         } else if (link.getBooleanProperty("ticket89269", false)) {
@@ -192,17 +191,5 @@ public class HearthisAt extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return free_maxdownloads;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetPluginGlobals() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

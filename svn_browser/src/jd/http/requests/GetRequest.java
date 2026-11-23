@@ -50,7 +50,7 @@ public class GetRequest extends Request {
         super(url);
     }
 
-    public GetRequest(final URL url) throws IOException {
+    public GetRequest(final URL url)  {
         super(url);
     }
 

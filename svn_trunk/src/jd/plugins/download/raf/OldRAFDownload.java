@@ -205,7 +205,11 @@ public class OldRAFDownload extends DownloadInterface {
                 logger.finer(".....connectRangeless");
                 /* our connection happens rangeless */
                 request.getHeaders().remove("Range");
-                browser.openRequestConnection(request, isInitialConnectFollowingEnabled(request));
+                final boolean followRedirect = isInitialConnectFollowingEnabled(request);
+                browser.openRequestConnection(request, followRedirect);
+                if (followRedirect) {
+                    request = browser.getRequest();
+                }
             }
         }
         if (downloadable.isDebug()) {
@@ -341,7 +345,11 @@ public class OldRAFDownload extends DownloadInterface {
             part = fileSize / this.getChunkNum();
             request.getHeaders().put("Range", "bytes=" + (0) + "-" + (part - 1));
         }
-        browser.openRequestConnection(request, isInitialConnectFollowingEnabled(request));
+        final boolean followRedirect = isInitialConnectFollowingEnabled(request);
+        browser.openRequestConnection(request, followRedirect);
+        if (followRedirect) {
+            request = browser.getRequest();
+        }
         if (request.getLocation() != null) {
             browser.followConnection();
             logger.info("redirect to:" + request.getLocation());

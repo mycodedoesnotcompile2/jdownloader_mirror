@@ -40,6 +40,7 @@ import jd.http.Cookie.ImportCookie;
 import jd.http.Cookie.LegacyCookie;
 import jd.http.Cookie.ManualCookie;
 import jd.http.Cookie.ServerCookie;
+import jd.http.requests.GetRequest;
 import jd.parser.Regex;
 
 import org.appwork.exceptions.WTFException;
@@ -53,13 +54,13 @@ import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.HexFormatter;
 import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.net.httpconnection.HTTPHeaderMap;
 
 public class Cookies {
     public static Cookies parseSetCookies(final Request request) throws IOException {
-        final URLConnectionAdapter httpConnection = request.getHttpConnection();
         final String protocol = request.getURL().getProtocol();
-        final String date = httpConnection.getHeaderField("Date");
-        final List<String> setCookies = httpConnection.getHeaderFields("Set-Cookie");
+        final String date = request.getResponseHeader(HTTPConstants.HEADER_REQUEST_DATE);
+        final List<String> setCookies = request.getResponseHeaders(HTTPConstants.HEADER_RESPONSE_SET_COOKIE);
         final Cookies ret = new Cookies();
         if (setCookies == null || setCookies.size() == 0) {
             return ret;
@@ -207,7 +208,38 @@ public class Cookies {
     }
 
     @Deprecated
-    public static Cookies parseCookies(final String cookieString, final URL url, final String serverTime, final boolean isSetCookie) {
+    public static Cookies parseCookies(final String cookieString, final URL url, final String serverTime, final boolean isSetCookie) throws IOException {
+        if (isSetCookie) {
+            final Request dummyRequest = new GetRequest(url) {
+                final HTTPHeaderMap<List<String>> headers = new HTTPHeaderMap<List<String>>();
+
+                @Override
+                public List<String> getResponseHeaders(String key) {
+                    final List<String> ret = getResponseHeaders().get(key);
+                    if (ret == null || ret.size() == 0) {
+                        return null;
+                    } else {
+                        return ret;
+                    }
+                }
+
+                @Override
+                public Map<String, List<String>> getResponseHeaders() {
+                    return headers;
+                }
+
+                @Override
+                public String getResponseHeader(String key) {
+                    final List<String> ret = getResponseHeaders(key);
+                    if (ret == null || ret.size() == 0) {
+                        return null;
+                    } else {
+                        return ret.get(0);
+                    }
+                }
+            };
+            return parseSetCookies(dummyRequest);
+        }
         final String header = cookieString;
         String path = null;
         String expires = null;
@@ -292,7 +324,7 @@ public class Cookies {
                 tmp.put(key, value);
             }
         }
-        final Cookies cookies = new Cookies();       
+        final Cookies cookies = new Cookies();
         for (final Entry<String, String> next : tmp.entrySet()) {
             final Cookie cookie = source.newCookieInstance();
             cookie.setHost(host);
@@ -585,7 +617,7 @@ public class Cookies {
     }
 
     @Deprecated
-    public static Cookies parseCookies(final String cookieString, final URL url, final String serverTime) {
+    public static Cookies parseCookies(final String cookieString, final URL url, final String serverTime) throws IOException {
         return Cookies.parseCookies(cookieString, url, serverTime, false);
     }
 

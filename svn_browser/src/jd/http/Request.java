@@ -280,7 +280,7 @@ public abstract class Request {
         this.setXHR(cloneRequest.isXHR());
     }
 
-    public Request(final URL url) throws IOException {
+    public Request(final URL url)  {
         this.setURL(url);
         this.setHeaders(this.getDefaultRequestHeader(this.getURL()));
     }

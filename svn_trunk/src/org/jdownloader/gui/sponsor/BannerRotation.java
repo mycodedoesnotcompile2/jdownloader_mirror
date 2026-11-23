@@ -2,6 +2,8 @@ package org.jdownloader.gui.sponsor;
 
 import java.awt.Cursor;
 import java.awt.Dialog.ModalityType;
+import java.awt.Font;
+import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
@@ -10,11 +12,42 @@ import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.swing.Icon;
+import javax.swing.JLabel;
+import javax.swing.UIManager;
+
+import org.appwork.scheduler.DelayedRunnable;
+import org.appwork.storage.config.JsonConfig;
+import org.appwork.storage.config.ValidationException;
+import org.appwork.storage.config.events.GenericConfigEventListener;
+import org.appwork.storage.config.handler.KeyHandler;
+import org.appwork.swing.components.ExtMergedIcon;
+import org.appwork.txtresource.TranslationFactory;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.event.queue.Queue;
+import org.appwork.utils.event.queue.QueueAction;
+import org.appwork.utils.images.Interpolation;
+import org.appwork.utils.swing.EDTRunner;
+import org.appwork.utils.swing.dialog.ConfirmDialog;
+import org.appwork.utils.swing.dialog.Dialog;
+import org.appwork.utils.swing.dialog.DialogNoAnswerException;
+import org.jdownloader.DomainInfo;
+import org.jdownloader.controlling.download.DownloadControllerListener;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.images.NewTheme;
+import org.jdownloader.logging.LogController;
+import org.jdownloader.myjdownloader.client.json.AvailableLinkState;
+import org.jdownloader.premium.OpenURLAction;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
 
 import jd.SecondLevelLaunch;
 import jd.controlling.AccountController;
@@ -49,40 +82,12 @@ import jd.plugins.DownloadLinkProperty;
 import jd.plugins.FilePackage;
 import jd.plugins.FilePackageProperty;
 
-import org.appwork.scheduler.DelayedRunnable;
-import org.appwork.storage.config.JsonConfig;
-import org.appwork.storage.config.ValidationException;
-import org.appwork.storage.config.events.GenericConfigEventListener;
-import org.appwork.storage.config.handler.KeyHandler;
-import org.appwork.swing.components.ExtMergedIcon;
-import org.appwork.txtresource.TranslationFactory;
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.event.queue.Queue;
-import org.appwork.utils.event.queue.QueueAction;
-import org.appwork.utils.images.Interpolation;
-import org.appwork.utils.swing.EDTRunner;
-import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.appwork.utils.swing.dialog.Dialog;
-import org.appwork.utils.swing.dialog.DialogNoAnswerException;
-import org.jdownloader.DomainInfo;
-import org.jdownloader.controlling.download.DownloadControllerListener;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.images.AbstractIcon;
-import org.jdownloader.images.NewTheme;
-import org.jdownloader.logging.LogController;
-import org.jdownloader.myjdownloader.client.json.AvailableLinkState;
-import org.jdownloader.premium.OpenURLAction;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
 public class BannerRotation implements Sponsor, AccountControllerListener {
     private final List<AvailableBanner> allBanners = new CopyOnWriteArrayList<AvailableBanner>();
     private final Queue                 queue      = new Queue("Banner") {
-        public void killQueue() {
-        };
-    };
+                                                       public void killQueue() {
+                                                       };
+                                                   };
 
     private class AvailableBanner implements DownloadControllerListener, LinkCollectorListener, DownloadWatchdogListener, AccountControllerListener {
         private volatile boolean    hasDownloadLinks        = false;
@@ -848,12 +853,78 @@ public class BannerRotation implements Sponsor, AccountControllerListener {
         }
     }
 
+    public static final String SHORT_AD_LABEL = getShortAdLabel(TranslationFactory.getDesiredLocale());
+
+    private static String getShortAdLabel(final Locale locale) {
+        if (locale == null) {
+            return "Ad";
+        }
+        final String lang = locale.getLanguage();
+        if (lang == null || lang.length() == 0) {
+            return "Ad";
+        }
+        // ISO 639-1 Sprachcodes (inkl. Legacy-Codes für he/id/yi falls relevant)
+        if ("de".equals(lang)) {
+            return "Anzeige";
+        } else if ("fr".equals(lang)) {
+            return "Pub";
+        } else if ("es".equals(lang)) {
+            return "Publi";
+        } else if ("it".equals(lang)) {
+            return "Adv";
+        } else if ("nl".equals(lang)) {
+            return "Adv.";
+        } else if ("pl".equals(lang)) {
+            return "Reklama";
+        } else if ("pt".equals(lang)) {
+            return "Pub";
+        } else if ("sv".equals(lang) || "da".equals(lang) || "no".equals(lang) || "nb".equals(lang) || "nn".equals(lang)) {
+            return "Annons"; // Skandinavien (in no/da auch "Annonce", aber "Ad" ist dort ebenfalls üblich)
+        } else if ("tr".equals(lang)) {
+            return "Reklam";
+        } else if ("ru".equals(lang) || "uk".equals(lang)) {
+            return "Реклама";
+        } else if ("ja".equals(lang)) {
+            return "広告";
+        } else if ("zh".equals(lang)) {
+            return "广告";
+        } else if ("ko".equals(lang)) {
+            return "광고";
+        }
+        return "Ad";
+    }
+
     @Override
     public Rectangle paint(Graphics2D g) {
         final Banner banner = this.current;
         final Icon icon;
         if (isVisible() && isEnabled() && banner != null && (icon = banner.icon) != null) {
-            final Rectangle bannerRectangle = new Rectangle(pane.getWidth() - icon.getIconWidth() - 2, 25 - icon.getIconHeight(), icon.getIconWidth(), icon.getIconHeight() + 2);
+            final int gap = 0; // Abstand zwischen Text und Icon
+            // 1. Font (JLabel-Default) & Maße ermitteln
+            Font baseFont = UIManager.getFont("Label.font");
+            if (baseFont == null) {
+                baseFont = new JLabel().getFont();
+            }
+            final Font adFont = baseFont.deriveFont(8f);
+            final FontMetrics fm = g.getFontMetrics(adFont);
+            final int textWidth = fm.stringWidth(SHORT_AD_LABEL);
+            // 2. Position für das Icon (wie bisher)
+            final int iconX = pane.getWidth() - icon.getIconWidth() - 2;
+            final int iconY = 25 - icon.getIconHeight();
+            // 3. Text links vor dem Icon zeichnen (vertikal mittig zum Icon ausgerichtet)
+            final Graphics2D gText = (Graphics2D) g.create();
+            try {
+                gText.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+                gText.setFont(adFont);
+                gText.setColor(UIManager.getColor("Label.foreground")); // Passt sich automatisch an Dark/Light-Theme an
+                final int textX = iconX - gap - textWidth;
+                final int textY = iconY + fm.getAscent();
+                gText.drawString(SHORT_AD_LABEL, textX, textY);
+            } finally {
+                gText.dispose();
+            }
+            // 4. Dein bestehender Code zum Zeichnen des Icons
+            final Rectangle bannerRectangle = new Rectangle(iconX, iconY, icon.getIconWidth(), icon.getIconHeight() + 2);
             g = (Graphics2D) g.create(bannerRectangle.x, bannerRectangle.y, bannerRectangle.width, bannerRectangle.height);
             try {
                 if (g.getTransform().getScaleX() != 1 || g.getTransform().getScaleY() != 1) {
@@ -861,10 +932,9 @@ public class BannerRotation implements Sponsor, AccountControllerListener {
                     // TODO: Use banner images with higher resolution
                     g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, Interpolation.BILINEAR.getHint());
                 }
-                // g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-                // g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 icon.paintIcon(pane, g, 0, 0);
-                return bannerRectangle;
+                // Gibt das gesamte Rechteck (Text + Icon) zurück; falls nur das Icon gewünscht ist: return bannerRectangle;
+                return new Rectangle(iconX - gap - textWidth, bannerRectangle.y, textWidth + gap + bannerRectangle.width, bannerRectangle.height);
             } finally {
                 g.dispose();
             }
