@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -21,11 +20,12 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.SxyprnCom;
 
-@DecrypterPlugin(revision = "$Revision: 50650 $", interfaceVersion = 2, names = { "sxyprn.com" }, urls = { "https?://(?:www\\.)?sxyprn\\.(?:com|net)/.+" })
-public class SxyprnComCrawler extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 2, names = { "sxyprn.com" }, urls = { "https?://(?:www\\.)?sxyprn\\.(?:com|net)/.+" })
+public class SxyprnComCrawler extends PluginForDecrypt {
     public SxyprnComCrawler(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -50,7 +50,7 @@ public class SxyprnComCrawler extends antiDDoSForDecrypt {
         if (account != null) {
             ((jd.plugins.hoster.SxyprnCom) plg).login(this.br, account, false);
         }
-        getPage(param.getCryptedUrl());
+        br.getPage(param.getCryptedUrl());
         if (SxyprnCom.isOffline(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }

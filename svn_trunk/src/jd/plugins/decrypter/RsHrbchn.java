@@ -18,7 +18,6 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -29,9 +28,10 @@ import jd.parser.html.Form;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52140 $", interfaceVersion = 2, names = { "hoerbuch.in" }, urls = { "https?://(?:www\\.)?hoerbuch\\.(in|us)/(protection/(folder_\\d+|[a-z0-9]+/[a-z0-9]+)\\.html|wp/goto/Download/\\d+)" })
-public class RsHrbchn extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 2, names = { "hoerbuch.in" }, urls = { "https?://(?:www\\.)?hoerbuch\\.(in|us)/(protection/(folder_\\d+|[a-z0-9]+/[a-z0-9]+)\\.html|wp/goto/Download/\\d+)" })
+public class RsHrbchn extends PluginForDecrypt {
     private final String ua = RandomUserAgent.generate();
 
     public RsHrbchn(PluginWrapper wrapper) {
@@ -49,8 +49,8 @@ public class RsHrbchn extends antiDDoSForDecrypt {
         passwords.add("www.hoerbuch.us");
         br.setFollowRedirects(false);
         br.getHeaders().put("User-Agent", ua);
-        String parameter = param.toString().replace("hoerbuch.in", "hoerbuch.us").replace("http://", "https://");
-        getPage("https://" + current_domain + "/wp/");
+        String parameter = param.getCryptedUrl().replace("hoerbuch.in", "hoerbuch.us").replace("http://", "https://");
+        br.getPage("https://" + current_domain + "/wp/");
         boolean done = false;
         int counter = 0;
         do {
@@ -58,7 +58,7 @@ public class RsHrbchn extends antiDDoSForDecrypt {
              * 2017-01-26: New: do-while-loop to detect- and avoid redirects to external websites here - this resulted in failures before.
              */
             try {
-                getPage(parameter);
+                br.getPage(parameter);
                 if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML(">\\s*404 error - Page not found")) {
                     decryptedLinks.add(this.createOfflinelink(parameter));
                     return decryptedLinks;
@@ -66,7 +66,7 @@ public class RsHrbchn extends antiDDoSForDecrypt {
                 if (parameter.matches(FOLDER_REDIRECTLINK)) {
                     br.setFollowRedirects(true);
                     if (br.getRedirectLocation() != null) {
-                        getPage(br.getRedirectLocation());
+                        br.getPage(br.getRedirectLocation());
                     }
                     final String newid = new Regex(br.getURL(), "folder_(\\d+)\\.html").getMatch(0);
                     if (newid == null && !this.br.getURL().contains(current_domain)) {
@@ -79,7 +79,7 @@ public class RsHrbchn extends antiDDoSForDecrypt {
                     }
                     final String newlink = "https://hoerbuch.us/protection/folder_" + newid + ".html";
                     parameter = newlink;
-                    getPage(newlink);
+                    br.getPage(newlink);
                 }
                 if (this.br.getURL().contains(current_domain)) {
                     done = true;
@@ -112,7 +112,7 @@ public class RsHrbchn extends antiDDoSForDecrypt {
                 if (link.contains("us/protection")) {
                     final Browser brc = br.cloneBrowser();
                     brc.setFollowRedirects(false);
-                    getPage(brc, link);
+                    brc.getPage(link);
                     if (brc.getRedirectLocation() != null) {
                         decryptedLinks.add(this.createDownloadlink(brc.getRedirectLocation()));
                     }

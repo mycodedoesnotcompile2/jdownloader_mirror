@@ -5,7 +5,6 @@ import java.util.List;
 
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -22,11 +21,12 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 51353 $", interfaceVersion = 3, names = {}, urls = {})
-public class OnlySpankingOrg extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = {}, urls = {})
+public class OnlySpankingOrg extends PluginForDecrypt {
     public OnlySpankingOrg(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -65,7 +65,7 @@ public class OnlySpankingOrg extends antiDDoSForDecrypt {
         final String contenturl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
         if (contenturl.matches("(?i)https?://[^/]+/vfile/[a-z0-9]{12}")) {
             br.setFollowRedirects(false);
-            getPage(contenturl);
+            br.getPage(contenturl);
             final String redirect = br.getRedirectLocation();
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -75,7 +75,7 @@ public class OnlySpankingOrg extends antiDDoSForDecrypt {
             ret.add(this.createDownloadlink(redirect));
         } else {
             br.setFollowRedirects(true);
-            getPage(contenturl);
+            br.getPage(contenturl);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -110,7 +110,7 @@ public class OnlySpankingOrg extends antiDDoSForDecrypt {
             for (int i = 0; i <= 2; i++) {
                 /* Important! */
                 br.getHeaders().put("Referer", startURL);
-                getPage("/engine/ajax/getlink2.php");
+                br.getPage("/engine/ajax/getlink2.php");
                 if (ubiqfile_premium_mail == null && isPremiumAccountRequired(br)) {
                     throw new AccountRequiredException(error_msg_premium_required);
                 }
@@ -130,13 +130,12 @@ public class OnlySpankingOrg extends antiDDoSForDecrypt {
                         /* E.g. spanking.photos */
                         captchaform.setAction("/engine/ajax/getlink.php");
                     }
-                    submitForm(br, captchaform);
+                    br.submitForm(captchaform);
                     /* Do not allow retries for reCaptcha and assume it is solved correctly with one attempt. */
                     captchaSuccess = true;
                     break;
                 } else {
                     /* Simple image captcha */
-                    // captchaform.setAction(ajax_action);
                     final String code = getCaptchaCode(br, getHost(), "/engine/modules/antibot/antibot.php?rndval=" + System.currentTimeMillis(), param);
                     captchaform.put("sec_code", code);
                     captchaform.put("skin", Encoding.urlEncode(dle_skin));
@@ -146,7 +145,7 @@ public class OnlySpankingOrg extends antiDDoSForDecrypt {
                         /* E.g. spanking.photos */
                         captchaform.setAction("/engine/ajax/getlink.php");
                     }
-                    submitForm(br, captchaform);
+                    br.submitForm(captchaform);
                 }
                 if (br.getRequest().getHtmlCode().length() == 0) {
                     /* Empty page = Wrong captcha */
@@ -175,7 +174,7 @@ public class OnlySpankingOrg extends antiDDoSForDecrypt {
                     premiumForm.put("email", Encoding.urlEncode(ubiqfile_premium_mail));
                     /* Important! */
                     br.getHeaders().put("Referer", startURL);
-                    this.submitForm(br, premiumForm);
+                    br.submitForm(premiumForm);
                     finallink = br.getRegex("href=\"(https?[^\"]+)\"[^<>\"]*?target=\"_blank\" rel=\"external noopener\"").getMatch(0);
                     if (finallink == null) {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -184,7 +183,7 @@ public class OnlySpankingOrg extends antiDDoSForDecrypt {
             }
             if (finallink == null && redirect != null) {
                 br.setFollowRedirects(false);
-                this.getPage(redirect);
+                br.getPage(redirect);
                 finallink = br.getRedirectLocation();
             }
             if (finallink == null) {

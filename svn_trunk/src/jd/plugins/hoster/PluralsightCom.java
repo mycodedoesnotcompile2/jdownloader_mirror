@@ -54,7 +54,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 53803 $", interfaceVersion = 1, names = { "pluralsight.com" }, urls = { "https://app\\.pluralsight\\.com/course-player\\?clipId=[a-f0-9\\-]+" })
+@HostPlugin(revision = "$Revision: 54117 $", interfaceVersion = 1, names = { "pluralsight.com" }, urls = { "https://app\\.pluralsight\\.com/course-player\\?clipId=[a-f0-9\\-]+" })
 public class PluralsightCom extends antiDDoSForHost {
     private static final boolean                    cookieLoginOnly                          = true;
     private static WeakHashMap<Account, List<Long>> map100PerHour                            = new WeakHashMap<Account, List<Long>>();
@@ -506,7 +506,7 @@ public class PluralsightCom extends antiDDoSForHost {
         if (plugin instanceof PluralsightCom) {
             ((PluralsightCom) plugin).sendRequest(br, request);
         } else if (plugin instanceof PluralsightComDecrypter) {
-            ((PluralsightComDecrypter) plugin).sendRequest(br, request);
+            br.getPage(request);
         }
     }
 

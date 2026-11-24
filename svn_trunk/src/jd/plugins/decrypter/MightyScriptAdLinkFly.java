@@ -37,7 +37,6 @@ import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 import org.jdownloader.captcha.v2.solver.browser.BrowserViewport;
 import org.jdownloader.captcha.v2.solver.browser.BrowserWindow;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -53,6 +52,7 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
@@ -64,8 +64,8 @@ import jd.plugins.components.SiteType.SiteTemplate;
  *            With reCaptchaV2 (like most): sh2rt.com <br />
  *
  */
-@DecrypterPlugin(revision = "$Revision: 52955 $", interfaceVersion = 2, names = {}, urls = {})
-public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54118 $", interfaceVersion = 2, names = {}, urls = {})
+public abstract class MightyScriptAdLinkFly extends PluginForDecrypt {
     public enum CaptchaType {
         hCaptcha,
         reCaptchaV2,
@@ -245,7 +245,6 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
                 final InputField action = form.getInputField("action");
                 if (action == null || !"continue".equals(action.getValue()) || "captcha".equals(action.getValue())) {
                     /* Captcha type will usually stay the same even on bad solve attempts! */
-                    // captchaType = getCaptchaType();
                     if (captchaType == CaptchaType.turnstile) {
                         requiresCaptchaWhichCanFail = false;
                         final String key = getAppVarsResult("turnstile_site_key");
@@ -350,7 +349,7 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA);
             }
         }
-        hookAfterCaptcha(this.br, lastSubmitForm);
+        hookAfterCaptcha(param, this.br, lastSubmitForm);
         final boolean skipWait = waittimeIsSkippable(Browser.getHost(contentURL));
         Form f2 = getContinueForm(param, lastSubmitForm, br);
         if (f2 != null) {
@@ -458,7 +457,9 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
         return finallink;
     }
 
-    @Override
+    /**
+     * Runs a task after each request sent via getPage/submitForm: Replaces inline base64 encoded scripts with their decoded content.
+     */
     protected void runPostRequestTask(Browser br) throws Exception {
         String html = br.getRequest().getHtmlCode();
         final Matcher m = Pattern.compile("<script[^>]*src\\s*=\\s*\"data:text/javascript;base64[^>]*>[^<]*</script>").matcher(html);
@@ -496,7 +497,7 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
      * Override to do something after the captcha (also gets called when no captcha was needed).
      *
      */
-    protected void hookAfterCaptcha(final Browser br, Form form) throws Exception {
+    protected void hookAfterCaptcha(final CryptedLink param, final Browser br, Form form) throws Exception {
         /*
          * Special: Previous form will redirect to external website e.g. "makemoneywithurl.com" or "wp2host.com" which will then redirect
          * back to the initial site.
@@ -641,14 +642,19 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
         return false;
     }
 
-    @Override
+    protected void getPage(final String page) throws Exception {
+        br.getPage(page);
+        runPostRequestTask(br);
+    }
+
+    protected void submitForm(final Form form) throws Exception {
+        submitForm(br, form);
+    }
+
     protected void submitForm(Browser ibr, Form form) throws Exception {
-        super.submitForm(ibr, form);
+        ibr.submitForm(form);
+        runPostRequestTask(ibr);
         // TODO: add support for special wordpress pages, exe.io
-        // final Form landing = getLandingForm(ibr);
-        // if (landing != null) {
-        // submitForm(landing);
-        // }
     }
 
     protected Form getLandingForm(final Browser br) {
@@ -692,7 +698,6 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
     private boolean evalulateCaptcha(final CaptchaType captchatype, final String url_source) {
         // if ("yes" !== app_vars.enable_captcha) return !0;
         final String source_host = Browser.getHost(url_source);
-        // String captchaIndicatorValue = getAppVarsResult("enable_captcha");
         final String captchaIndicator = getAppVarsResult("captcha_shortlink");
         Boolean hasCaptcha = null;
         if (captchaIndicator != null) {

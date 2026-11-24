@@ -19,7 +19,6 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.regex.Pattern;
 
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -33,9 +32,11 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.components.UserAgents;
 
-@DecrypterPlugin(revision = "$Revision: 52802 $", interfaceVersion = 2, names = { "hdporn92.com" }, urls = { "https?://(?:www\\.)?hdporn92\\.com/[A-Za-z0-9\\-]+/?" })
-public class HdPorn92Com extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54119 $", interfaceVersion = 2, names = { "hdporn92.com" }, urls = { "https?://(?:www\\.)?hdporn92\\.com/[A-Za-z0-9\\-]+/?" })
+public class HdPorn92Com extends PluginForDecrypt {
     public HdPorn92Com(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -48,13 +49,9 @@ public class HdPorn92Com extends antiDDoSForDecrypt {
     }
 
     @Override
-    protected boolean useRUA() {
-        return true;
-    }
-
-    @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put("User-Agent", UserAgents.stringUserAgent());
         br.setFollowRedirects(true);
         return br;
     }
@@ -68,7 +65,7 @@ public class HdPorn92Com extends antiDDoSForDecrypt {
             logger.info("Ignoring invalid/unsupported url");
             return new ArrayList<DownloadLink>();
         }
-        getPage(contenturl);
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }

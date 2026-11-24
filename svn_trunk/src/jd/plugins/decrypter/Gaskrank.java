@@ -26,20 +26,20 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 45878 $", interfaceVersion = 2, names = { "gaskrank.tv" }, urls = { "https?://(?:www\\.)?gaskrank\\.tv/tv/.*?(/filme[^/]+\\.htm|/$)" })
-public class Gaskrank extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 2, names = { "gaskrank.tv" }, urls = { "https?://(?:www\\.)?gaskrank\\.tv/tv/.*?(/filme[^/]+\\.htm|/$)" })
+public class Gaskrank extends PluginForDecrypt {
     public Gaskrank(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        String parameter = param.toString();
+        String parameter = param.getCryptedUrl();
         br.setFollowRedirects(true);
-        getPage(parameter);
+        br.getPage(parameter);
         final String fpName = br.getRegex("<title>([^<]+)").getMatch(0);
         final String[] clips = br.getRegex("class\\s*=\\s*\"gkVidPu\\d+\"\\s*href\\s*=\\s*\"(/[^\"]*.htm)\"\\s*>").getColumn(0);
         if (clips.length == 0) {

@@ -18,7 +18,6 @@ package jd.plugins.decrypter;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -32,9 +31,10 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 47818 $", interfaceVersion = 3, names = { "viz.com" }, urls = { "https?://(?:www\\.)?viz\\.com/(read/)?[^/]+/[^/]+/(?:chapter/|issue/|product/|manga/product/|manga/product/digital/|promo/)\\d+" })
-public class VizComCrawler extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = { "viz.com" }, urls = { "https?://(?:www\\.)?viz\\.com/(read/)?[^/]+/[^/]+/(?:chapter/|issue/|product/|manga/product/|manga/product/digital/|promo/)\\d+" })
+public class VizComCrawler extends PluginForDecrypt {
     public VizComCrawler(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -47,9 +47,9 @@ public class VizComCrawler extends antiDDoSForDecrypt {
     /* Tags: MangaPictureCrawler */
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        final String parameter = param.toString();
+        final String parameter = param.getCryptedUrl();
         br.setFollowRedirects(true);
-        getPage(parameter);
+        br.getPage(parameter);
         final Regex urlinfo = new Regex(parameter, "([^/]+)/(?:[^/]+)/(\\d+)");
         final String url_name = urlinfo.getMatch(0);
         final String manga_id = urlinfo.getMatch(1);
@@ -106,8 +106,6 @@ public class VizComCrawler extends antiDDoSForDecrypt {
                 return decryptedLinks;
             }
             final int page_for_url_access = page_current;
-            // accessPage(br, manga_id, Integer.toString(page_for_url_access));
-            // final String[] urls = br.getRegex("url=\"(http[^<>\"]+)\"").getColumn(0);
             final String[] dummyarray = new String[] { Integer.toString(page_current), Integer.toString(page_current + 1) };
             page_added_num = dummyarray.length;
             for (final String dummy : dummyarray) {
@@ -120,7 +118,6 @@ public class VizComCrawler extends antiDDoSForDecrypt {
                 dl.setLinkID(filename);
                 dl.setAvailable(true);
                 decryptedLinks.add(dl);
-                // distribute(dl);
                 page_current++;
                 if (page_current > pages) {
                     /* Do not add too many pages - without this check, we might get one page too much! */

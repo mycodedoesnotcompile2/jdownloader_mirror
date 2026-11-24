@@ -17,15 +17,16 @@ package jd.plugins.decrypter;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
-import jd.http.requests.PostRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
@@ -39,10 +40,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 import jd.utils.JDUtilities;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54102 $", interfaceVersion = 3, names = {}, urls = {})
 public class HighpornNetCrawler extends PluginForDecrypt {
     public HighpornNetCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -64,9 +62,19 @@ public class HighpornNetCrawler extends PluginForDecrypt {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "highporn.net" });
+        /**
+         * 2026-11-23: tanix.net mostly redirects to javhub.net <br>
+         * tanix.net: /id/... --> Such links redirect to javhub.net <br>
+         * TODO: possibly remove tanix.net domain from this plugin, it's unnecessary.
+         */
         ret.add(new String[] { "tanix.net" });
         ret.add(new String[] { "japanhub.net" });
+        /**
+         * 2026-11-23: thatav.net website is very slow <br>
+         * Looks like most of their video urls point to a broken/offline ad website: ja.tikpornk.com
+         */
         ret.add(new String[] { "thatav.net" });
+        ret.add(new String[] { "javhub.net" });
         return ret;
     }
 
@@ -86,7 +94,11 @@ public class HighpornNetCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/video/(\\d+)(?:/[a-z0-9\\-]+)?");
+            if (domains[0].equals("javhub.net")) {
+                ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/play/([A-Za-z0-9_\\-]+)(?:/[a-z0-9\\-]+)?");
+            } else {
+                ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/video/(\\d+)(?:/[a-z0-9\\-]+)?");
+            }
         }
         return ret.toArray(new String[0]);
     }
@@ -106,6 +118,9 @@ public class HighpornNetCrawler extends PluginForDecrypt {
             /* Offline --> Redirect to (external) ads page / search-page */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        if (StringUtils.equalsIgnoreCase(Browser.getHost(contenturl), "javhub.net")) {
+            return crawlJavhub(contenturl);
+        }
         final String title = getTitle(this.br, contenturl);
         /* 2021-02-10: thatav.net */
         final String specialVideoURL = br.getRegex("\"file\":\\s*\"(https?://[^<>\"]+\\.mp4[^<>\"]+)").getMatch(0);
@@ -123,13 +138,11 @@ public class HighpornNetCrawler extends PluginForDecrypt {
         String[] videoIDs = br.getRegex("data-src\\s*=\\s*\"([^\"]+)\"").getColumn(0);
         if (videoIDs == null || videoIDs.length == 0) {
             if (videoLink == null) {
-                logger.warning("Decrypter broken for link: " + contenturl);
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            } else {
-                videoIDs = new String[1];
-                videoIDs[0] = (Long.toString(System.currentTimeMillis())); // dummy videoID
-                singleVideo = true;
             }
+            videoIDs = new String[1];
+            videoIDs[0] = (Long.toString(System.currentTimeMillis())); // dummy videoID
+            singleVideo = true;
         }
         final int padLength = StringUtils.getPadLength(videoIDs.length);
         int counter = 0;
@@ -141,19 +154,15 @@ public class HighpornNetCrawler extends PluginForDecrypt {
             final String orderid_formatted = String.format(Locale.ROOT, "%0" + padLength + "d", counter);
             final String filename = title + "_" + orderid_formatted + ".mp4";
             final DownloadLink dl = createDownloadlink("highporndecrypted://" + videoID);
-            dl.setName(filename);
-            dl.setProperty("decryptername", filename);
-            dl.setProperty("mainlink", contenturl);
+            dl.setFinalFileName(filename);
+            /* Save final filename as property so the hoster plugin can set it again later. */
+            dl.setProperty(jd.plugins.hoster.HighpornNet.PROPERTY_DECRYPTERNAME, filename);
+            dl.setProperty(jd.plugins.hoster.HighpornNet.PROPERTY_MAINLINK, contenturl);
             dl.setContentUrl(contenturl);
             if (singleVideo) {
-                dl.setProperty("singlevideo", true);
+                dl.setProperty(jd.plugins.hoster.HighpornNet.PROPERTY_SINGLEVIDEO, true);
             } else {
-                final PostRequest postRequest = new PostRequest("https://play.openhub.tv/playurl?random=" + (new Date().getTime() / 1000));
-                postRequest.setContentType("application/x-www-form-urlencoded");
-                postRequest.addVariable("v", videoID);
-                postRequest.addVariable("source_play", "highporn");
-                final Browser brc = br.cloneBrowser();
-                final String file = brc.getPage(postRequest);
+                final String file = jd.plugins.hoster.HighpornNet.requestPlayUrl(br.getURL(), br, videoID);
                 URLConnectionAdapter con = null;
                 try {
                     con = br.cloneBrowser().openHeadConnection(file);
@@ -181,9 +190,47 @@ public class HighpornNetCrawler extends PluginForDecrypt {
         return ret;
     }
 
+    /**
+     * javhub.net: Every play button (e.g. different qualities) has an encoded "data-src" attribute. The hoster plugin turns it into the
+     * final URL via /playapi.
+     */
+    private ArrayList<DownloadLink> crawlJavhub(final String contenturl) throws Exception {
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        String title = br.getRegex("<title>\\s*Watch Free Jav\\s+(.*?)\\s+from Javhub").getMatch(0);
+        if (title == null) {
+            /* Fallback: Slug of the URL */
+            title = new Regex(contenturl, "/play/[^/]+/([^/\\?#]+)").getMatch(0);
+        }
+        if (title == null) {
+            title = new Regex(contenturl, this.getSupportedLinks()).getMatch(0);
+        }
+        title = Encoding.htmlDecode(title).trim();
+        final String[][] buttons = br.getRegex("<button[^>]*class=\"[^\"]*playbtn[^\"]*\"[^>]*data-src=\"([^\"]+)\"[^>]*>(.*?)</button>").getMatches();
+        if (buttons == null || buttons.length == 0) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final FilePackage fp = FilePackage.getInstance();
+        fp.setName(title);
+        for (final String[] button : buttons) {
+            final String videoID = button[0];
+            final String label = Encoding.htmlDecode(button[1].replaceAll("<[^>]+>", " ")).replaceAll("\\s+", " ").trim();
+            final String filename = title + (label.length() > 0 ? "_" + label : "") + ".mp4";
+            final DownloadLink dl = createDownloadlink("highporndecrypted://" + videoID);
+            dl.setFinalFileName(filename);
+            dl.setProperty(jd.plugins.hoster.HighpornNet.PROPERTY_DECRYPTERNAME, filename);
+            dl.setProperty(jd.plugins.hoster.HighpornNet.PROPERTY_MAINLINK, contenturl);
+            dl.setProperty(jd.plugins.hoster.HighpornNet.PROPERTY_PLAYAPI, true);
+            dl.setContentUrl(contenturl);
+            dl.setAvailable(true);
+            ret.add(dl);
+        }
+        fp.addLinks(ret);
+        return ret;
+    }
+
     private void getPage(final String parameter) throws Exception {
         final PluginForHost plugin = JDUtilities.getPluginForHost("highporn.net");
-        ((jd.plugins.hoster.HighpornNet) plugin).setBrowser(br);
+        plugin.setBrowser(br);
         ((jd.plugins.hoster.HighpornNet) plugin).getPage(parameter);
     }
 
@@ -198,45 +245,4 @@ public class HighpornNetCrawler extends PluginForDecrypt {
         }
         return title;
     }
-    // public static void main(String[] args) throws InterruptedException, MalformedURLException, ScriptException {
-    // /* Simple method for decoding msg values obtained from real browser requests. */
-    // final StringBuilder sb = new StringBuilder();
-    // sb.append(
-    // "function _0x3bbf() { var _0xad5001 = ['HTXyy', 'r_script_f', 'charAt', 'HnnWl', 'epUkB', 'ODkNs', 'HJKLNMPQRS', 'stateObjec',
-    // '__nightmar', 'uFXvr', 'Sequentum', 'sZsMg', 'aMAhK', 'RAXbe', 'setup', 'outerHeigh', 'hidden', 'IFIjP', 'yqpGp', 'aEpaf', 'JjWRM',
-    // '__webdrive', 'VRtul', 'DYuQh', 'RPLuu', 'aqyby', '305UmmDux', 'pjUOp', 'FUeub', 'eqMXg', 'wunnS', 'rn\\\\x20this\\\\x22)(',
-    // 'data-src', 'l?random=', 'removeClas', 'aBnPU', 'LpYgA', 'gger', 'MNUmC', 'mHyLy', 'ajax', 'QUrNW', 'XcGiF', 'FJJzZ', 'click',
-    // '2631284xNFRVw', 'zORJj', 'tcbBp', 'ode\\\\x20receiv', 'crKgh', 'ctor(\\\\x22retu', 'table\\\\x20inpu', 'DqDEz', 'vGDOh',
-    // '.playlist_', '__driver_e', 'highporn', 'POST', 'constructo', '4297965OrgDCf', 'length', 'LqxfT', 'djGCn', 'UWhHL', 'split',
-    // '550HElZhf', 'ACryd', '620MIDKMs', 'Ucmmm', 'zOYUa', 'Rkmzi', 'attr', 'UNyFV', 'languages', 'Vwrrd', 'qvBor', 'yXlDD', 'frameEleme',
-    // 'rqAlZ', 'QRzSU', 'BehIZ', '35361aWsESU', 'DgYmp', 'log', 'QXGAb', '__karma__', 'find', 'uOjJZ', 'prototype', 'ZcTJe', 'MTndT',
-    // 'Xuokx', 'uvfXT', 'contains', 'counter', 'nPMLV', '#playlist', 'cjjfn', '__proto__', 'lbPjz', 'plugins', 'Trident/', 'ljGtX',
-    // 'qAvlC', 'info', 'LaTIP', 'player_con', 'webdriver', 'documentEl', 'userAgent', 'n\\\\x20the\\\\x20Base', 'html5', 'pvEoP', 'tGPVt',
-    // '.fel-playc', 'callSeleni', 'mvWWW', 'r_evaluate', '99770kJDkRO', 'ECJuK', 'search', 'toString', '789ABCDEFG', 'jvKjv', '{}.constru',
-    // 'ASftc', '_unwrapped', 'qmJcu', 'qOxpX', 'YZabcdefgh', 'PChAd', 'edxjI', 'nHPMv', 'MPQRSTUVWX', 'Base58.dec', '__selenium',
-    // 'unction', 'yMmAN', 'FuHHs', 'call', 'NlPtp', 'aGMpG', 'cache_', '\\\\x27\\\\x20is\\\\x20not\\\\x20i', 'sFlMA', 'exception', 'VWetC',
-    // 'NhepH', 'vGiJz', 'push', 'a-zA-Z_$][', 'jGjUB', 'ReDji', 'FLUaV', 'getTime', 'addClass', 'OgBkp', 'YiJiU', 'Yjenp', 'JCbep',
-    // 'er\\\\x20\\\\x27', 'Jwjxu', 'nhdoi', '$]*)', 'AEXns', 'RHzFW', '_Selenium_', 'BQBaM', 'ay.openhub', 'map', 'lXNec', 'gxfbh',
-    // 'cyZOU', 'oMvLT', 'tMwZd', 'nuHep', 'WDYZM', '0-9a-zA-Z_', 'lsxpX', '58\\\\x20xx88aa.', 'function\\\\x20*', 'HYJUV', 'qJIVD',
-    // 'ffxQC', 'DnAwi', 'lose', '4|0|5|3|2|', 'TZWCh', 'waLxU', '_selenium', '__driver_u', 'external', 'reverse', 'uljFO', '__fxdriver',
-    // 'IULbh', 'XxIbu', 'string', 'vSYMw', 'VZuZV', '101862AioVqs', 'uugqQ', 'https://pl', 'jVAHt', 'AbmDO', 'yJmrW', '.tv/playur',
-    // 'eCyTU', 'join', 'YnPOk', 'ZBSpZ', '.mjs-close', 'hwAGu', 'jhuOt', '1820VmJHhg', 'kmXQS', 'NoQKi', 'pVxxv', 'charCodeAt', 'test',
-    // 'IZeNh', 'ement', 'indexOf', 'YOcVr', 'trace', 'PSWba', 'NnFeZ', 'rNTQu', 'apply', 'RUIDx', 'HmfGf', 'yPTvX', 'xwTFS', '23456789AB',
-    // '2128155ocIJBi', 'nCTsb', 'GgRPl', '_evaluate', 'VIyNq', 'fziBm', 'DZTuU', 'SJhJG', 'sngrE', 'tuvwxyz1', 'hsvvT', 'VHSeT', 'yGDgx',
-    // 'PeLsL', 'fromCharCo', 'match', 'tainer', 'mNoZY', 'OVySg', 'selenium', 'IKVgl', 'document', 'phEtg', 'pltge', 'lfwdH', 'rUANi',
-    // 'getAttribu', 'init', 'UiLFc', 'toLowerCas', 'console', 'IRvkj', 'arQmM', 'nction()\\\\x20', 'setInterva', 'uaSBl', 'cUAUQ', 'iHdCe',
-    // 'cdRzL', 'OaAlC', 'bWBha', 'play__butt', 'SxgEy', 'input', 'IaIJt', 'e)\\\\x20{}', 'PNUKw', 'scene', 'gtEde', 'uneHu', 'RQyij',
-    // 'icFHX', 'BRZrc', 'XIAgt', 'return\\\\x20(fu', 'JtkcZ', 'unc', 'cRwSK', '8LodgeK', 'cPjfo', 'pMuYp', 'zWVFG', 'bind', 'BbGil',
-    // 'debu', 'osRrv', 'uniform', 'cxsVt', 'VLNxj', 'nfdwg', 'while\\\\x20(tru', 'bioSP', 'pause', 'error', 't.\\\\x20Charact', 'zAKGh',
-    // 'ed\\\\x20unaccep', 'KuvKL', 'pxlDn', 'ZIymQ', 'kEJuW', 'Llram', '1|4|3|5|6', 'kZbad', 'callPhanto', 'bSmfp', 'xNWZs', 'tvSUy',
-    // 'done', 'rwrYT']; _0x3bbf = function() { return _0xad5001; }; return _0x3bbf(); }");
-    // sb.append("var result = _0x3bbf();");
-    // final ScriptEngineManager manager = JavaScriptEngineFactory.getScriptEngineManager(null);
-    // final ScriptEngine engine = manager.getEngineByName("javascript");
-    // String result = null;
-    // engine.eval(sb.toString());
-    // final Object resultO = engine.get("result");
-    // result = engine.get("result").toString();
-    // System.out.println("Result = ");
-    // }
 }

@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.appwork.utils.Regex;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
@@ -31,10 +30,11 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.ReverBnationComHoster;
 
-@DecrypterPlugin(revision = "$Revision: 45058 $", interfaceVersion = 3, names = { "reverbnation.com" }, urls = { "https?://(?:www\\.)?reverbnation\\.com/([^/]+)/songs" })
-public class ReverBnationCom extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = { "reverbnation.com" }, urls = { "https?://(?:www\\.)?reverbnation\\.com/([^/]+)/songs" })
+public class ReverBnationCom extends PluginForDecrypt {
     public ReverBnationCom(final PluginWrapper wrapper) {
         super(wrapper);
     }

@@ -5,16 +5,16 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.appwork.utils.Regex;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 43196 $", interfaceVersion = 3, names = { "artstation.com" }, urls = { "https?://[a-z0-9\\-]+\\.artstation\\.com/(projects/[A-Z0-9]+|(?!artwork)$)" })
-public class ArtStationComProjects extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = { "artstation.com" }, urls = { "https?://[a-z0-9\\-]+\\.artstation\\.com/(projects/[A-Z0-9]+|(?!artwork)$)" })
+public class ArtStationComProjects extends PluginForDecrypt {
     public ArtStationComProjects(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -28,7 +28,7 @@ public class ArtStationComProjects extends antiDDoSForDecrypt {
         } else {
             br.setFollowRedirects(true);
             final Set<String> dups = new HashSet<String>();
-            getPage(parameter.getCryptedUrl());
+            br.getPage(parameter.getCryptedUrl());
             String[] projects = br.getRegex("/projects/([A-Z0-9]+)").getColumn(0);
             if (projects != null) {
                 for (final String project : projects) {
@@ -37,7 +37,7 @@ public class ArtStationComProjects extends antiDDoSForDecrypt {
                     }
                 }
             }
-            getPage("/projects");
+            br.getPage("/projects");
             /* Projects == "artwork" URLs */
             projects = br.getRegex("/projects/([A-Z0-9]+)").getColumn(0);
             if (projects != null) {

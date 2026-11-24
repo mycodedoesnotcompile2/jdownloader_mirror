@@ -53,14 +53,15 @@ import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSo
 import jd.gui.swing.jdgui.BasicJDTable;
 import jd.gui.swing.jdgui.views.settings.components.MultiComboBox;
 import jd.gui.swing.jdgui.views.settings.components.SettingsComponent;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.BuyAction;
 import jd.plugins.CaptchaType;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 /**
- * "Solver comparison table" tab: shows which captcha solver supports which captcha type (rows = solvers, columns =
- * captcha types). Above the table the user picks which captcha types are shown: a dropdown preselects a set of types (manual
- * selection, all types at the start / the types the user ever needed according to the {@link CaptchaHistoryManager}) and a multi-select popup allows changing
- * that selection freely afterwards.
+ * "Solver comparison table" tab: shows which captcha solver supports which captcha type (rows = solvers, columns = captcha types). Above
+ * the table the user picks which captcha types are shown: a dropdown preselects a set of types (manual selection, all types at the start /
+ * the types the user ever needed according to the {@link CaptchaHistoryManager}) and a multi-select popup allows changing that selection
+ * freely afterwards.
  */
 public class SolverComparisonContainer extends MigPanel implements SettingsComponent {
     /** Sets of captcha types the "preselected captcha types" dropdown can select. */
@@ -99,60 +100,62 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
         USABLE
     }
 
-    private final SolverComparisonTableModel     model;
-    private final BasicJDTable<SolverService>    table;
-    private final JComboBox                      presetCombo;
-    private final JCheckBox                      onlyFullSupportCheckBox;
-    private final JLabel                         emptyLabel;
+    private final SolverComparisonTableModel   model;
+    private final BasicJDTable<SolverService>  table;
+    private final JComboBox                    presetCombo;
+    private final JCheckBox                    onlyFullSupportCheckBox;
+    private final JLabel                       emptyLabel;
     /**
-     * Hint below the "only full support" check box, shown while the check box is greyed out: red and bold if the check box is checked
-     * (the filter the user wants cannot be applied), otherwise only an information.
+     * Hint below the "only full support" check box, shown while the check box is greyed out: red and bold if the check box is checked (the
+     * filter the user wants cannot be applied), otherwise only an information.
      */
-    private final JLabel                         fullSupportHintLabel;
-    private final Font                           hintFont;
-    private final Font                           hintBoldFont;
-    private final Color                          hintColor;
+    private final JLabel                       fullSupportHintLabel;
+    private final Font                         hintFont;
+    private final Font                         hintBoldFont;
+    private final Color                        hintColor;
     /**
-     * Multi-select "[x/y] [Type1, Type2, ...]" control (same widget/label format as the multi-select ENUM columns in the Advanced
-     * Settings, see {@code AdvancedValueColumn}), doubling as its own button and popup.
+     * Multi-select "[x/y] [Type1, Type2, ...]" control (same widget/label format as the multi-select ENUM columns in the Advanced Settings,
+     * see {@code AdvancedValueColumn}), doubling as its own button and popup.
      */
-    private final MultiComboBox<CAPTCHA_TYPE>    typesCombo;
+    private final MultiComboBox<CAPTCHA_TYPE>  typesCombo;
     /** All captcha types JDownloader can process, i.e. all possible columns. */
-    private final Set<CAPTCHA_TYPE>              allTypes;
+    private final Set<CAPTCHA_TYPE>            allTypes;
     /** Captcha types whose columns are currently shown. */
-    private final Set<CAPTCHA_TYPE>              selectedTypes = new LinkedHashSet<CAPTCHA_TYPE>();
+    private final Set<CAPTCHA_TYPE>            selectedTypes             = new LinkedHashSet<CAPTCHA_TYPE>();
     /** True while the dropdown/multi-select is modified programmatically so that its listener does not reset the user's selection. */
-    private boolean                              adjusting     = false;
+    private boolean                            adjusting                 = false;
     /** True if the captcha history contains captcha types, i.e. the "Used by me" preset can be selected (otherwise it is greyed out). */
-    private boolean                              usedAvailable = false;
-    private final JScrollPane                    scrollPane;
+    private boolean                            usedAvailable             = false;
+    private final JScrollPane                  scrollPane;
     /** Hint below the table about the self-declared captcha types of external solvers, only shown if the table contains one. */
-    private final JLabel                         disclaimerLabel;
-    private final JComboBox                      solverTypePresetCombo;
+    private final JLabel                       disclaimerLabel;
+    private final JComboBox                    solverTypePresetCombo;
     /** Multi-select "[x/y] [Type1, Type2, ...]" control of the solver types. */
-    private final MultiComboBox<SolverType>      solverTypesCombo;
+    private final MultiComboBox<SolverType>    solverTypesCombo;
     /** The solver types whose solvers are shown, see {@link #allSolvers}. */
-    private final Set<SolverType>                selectedSolverTypes = new LinkedHashSet<SolverType>();
+    private final Set<SolverType>              selectedSolverTypes       = new LinkedHashSet<SolverType>();
     /** True while the solver type dropdown/multi-select is modified programmatically so that its listener does not reset the selection. */
-    private boolean                              adjustingSolverTypes = false;
+    private boolean                            adjustingSolverTypes      = false;
     /** All solvers of all types, before the solver type selection is applied. */
-    private final List<SolverService>            allServices         = new ArrayList<SolverService>();
-    private final JComboBox                      solverPresetCombo;
+    private final List<SolverService>          allServices               = new ArrayList<SolverService>();
+    private final JComboBox                    solverPresetCombo;
     /** Multi-select "[x/y] [Solver1, Solver2, ...]" control of the solver selection. */
-    private final MultiComboBox<SolverService>   solversCombo;
+    private final MultiComboBox<SolverService> solversCombo;
     /** All solvers of the selected solver types, i.e. all possible rows. */
-    private final List<SolverService>            allSolvers          = new ArrayList<SolverService>();
+    private final List<SolverService>          allSolvers                = new ArrayList<SolverService>();
     /** Solvers which are currently shown as rows. */
-    private final Set<SolverService>             selectedSolvers     = new LinkedHashSet<SolverService>();
+    private final Set<SolverService>           selectedSolvers           = new LinkedHashSet<SolverService>();
     /** True while the solver dropdown/multi-select is modified programmatically so that its listener does not reset the selection. */
-    private boolean                              adjustingSolvers    = false;
-    /** The solvers of the "Custom" preset, remembered for the running session only. null = the user never populated it, then all solvers. */
-    private Set<SolverService>                   rememberedSolverSelection = null;
+    private boolean                            adjustingSolvers          = false;
     /**
-     * The captcha types of the "Selection" preset, remembered for the running session only (not persisted). null = the user never
-     * populated it, the preset then selects all types.
+     * The solvers of the "Custom" preset, remembered for the running session only. null = the user never populated it, then all solvers.
      */
-    private Set<CAPTCHA_TYPE>                    rememberedSelection = null;
+    private Set<SolverService>                 rememberedSolverSelection = null;
+    /**
+     * The captcha types of the "Selection" preset, remembered for the running session only (not persisted). null = the user never populated
+     * it, the preset then selects all types.
+     */
+    private Set<CAPTCHA_TYPE>                  rememberedSelection       = null;
 
     public SolverComparisonContainer() {
         super("ins 0, wrap 1", "[grow,fill]", "[][][grow,fill][]");
@@ -167,7 +170,8 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
 
             /*
              * Large red hint in the top left corner of the table's visible area. The table can have many columns and scroll horizontally,
-             * so the hint is anchored to the visible rectangle (not to the table) and wrapped to its width: it is never partly out of sight.
+             * so the hint is anchored to the visible rectangle (not to the table) and wrapped to its width: it is never partly out of
+             * sight.
              */
             @Override
             public void paintComponent(final Graphics g) {
@@ -224,20 +228,21 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
                         }
                     });
                     popup.add(openAccountManager);
-                    if (external.getBuyURL() != null) {
+                    if (external.isPremiumEnabled()) {
                         final JMenuItem buyCredits = new JMenuItem(_GUI.T.SolverOrderTable_context_buyCredits(), new AbstractIcon(IconKey.ICON_BUY, 18));
                         buyCredits.addActionListener(new ActionListener() {
                             @Override
                             public void actionPerformed(final ActionEvent e) {
-                                external.openBuyPage("captchasolver/comparisontable/context");
+                                /* Same buy dialog as the Buy button of the account manager, with the hoster of this solver preselected. */
+                                new BuyAction(external.getPlugin().getLazyP(), "captchasolver/comparisontable/context").actionPerformed(e);
                             }
                         });
                         popup.add(buyCredits);
                     }
                     if (CaptchaConfigPanel.isDebugTabShown()) {
                         /*
-                         * Only shown if the "Test & Debug" tab exists. Refers to all selected solvers if the right-clicked one is part of the
-                         * selection, otherwise only to the right-clicked one. Only enabled if at least one of them can be tested there.
+                         * Only shown if the "Test & Debug" tab exists. Refers to all selected solvers if the right-clicked one is part of
+                         * the selection, otherwise only to the right-clicked one. Only enabled if at least one of them can be tested there.
                          */
                         final List<SolverService> testSolvers = selection != null && selection.contains(external) ? new ArrayList<SolverService>(selection) : new ArrayList<SolverService>(java.util.Collections.singletonList((SolverService) external));
                         boolean anyTestable = false;
@@ -274,7 +279,10 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
         };
         /* Many captcha type columns: keep their width and scroll horizontally instead of squeezing them. */
         table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
-        /* Multi-select "[x/y] [Type1, Type2]" control; CAPTCHA_TYPE has no LabelInterface, so the per-item label comes from getDisplayName(). */
+        /*
+         * Multi-select "[x/y] [Type1, Type2]" control; CAPTCHA_TYPE has no LabelInterface, so the per-item label comes from
+         * getDisplayName().
+         */
         typesCombo = new MultiComboBox<CAPTCHA_TYPE>(new ArrayList<CAPTCHA_TYPE>(allTypes)) {
             private static final long serialVersionUID = 1L;
 
@@ -423,8 +431,8 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
             }
         });
         /*
-         * Both selection rows (captcha types and solvers) share one grid: the labels, the preselect dropdowns and the multi-select
-         * controls line up, the multi-select controls take the remaining width.
+         * Both selection rows (captcha types and solvers) share one grid: the labels, the preselect dropdowns and the multi-select controls
+         * line up, the multi-select controls take the remaining width.
          */
         solverTypesCombo = new MultiComboBox<SolverType>(SolverType.values()) {
             private static final long serialVersionUID = 1L;
@@ -625,9 +633,9 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
     }
 
     /**
-     * Selects the given solvers in the table and scrolls to the first one. If one of them is not in the table because of the selections
-     * and filters above it, they are reset first: all solver groups and solvers, all captcha types and the filter "only solvers that
-     * support all selected captcha types" is switched off.
+     * Selects the given solvers in the table and scrolls to the first one. If one of them is not in the table because of the selections and
+     * filters above it, they are reset first: all solver groups and solvers, all captcha types and the filter "only solvers that support
+     * all selected captcha types" is switched off.
      */
     public void showSolvers(final java.util.Collection<SolverService> solvers) {
         refresh();
@@ -736,7 +744,9 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
         disclaimerLabel.setVisible(externalSolverShown);
     }
 
-    /** True if the given dropdown entry of the captcha type presets is greyed out, i.e. it cannot be selected: "Used by me" without history. */
+    /**
+     * True if the given dropdown entry of the captcha type presets is greyed out, i.e. it cannot be selected: "Used by me" without history.
+     */
     private boolean isPresetDisabled(final Object preset) {
         return preset == Preselect.USED && !usedAvailable;
     }
@@ -852,8 +862,8 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
     }
 
     /**
-     * Called when the user changed the solver selection manually: as soon as it differs from what the current preset selects, the
-     * preselect dropdown switches to "Custom".
+     * Called when the user changed the solver selection manually: as soon as it differs from what the current preset selects, the preselect
+     * dropdown switches to "Custom".
      */
     private void onManualSolverSelectionChange() {
         final Object currentPreset = solverPresetCombo.getSelectedItem();
@@ -933,8 +943,8 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
     }
 
     /**
-     * Reloads the rows (solvers of the selected solver types) and the offered presets. Call this whenever the tab becomes visible again, since solvers and the
-     * captcha history change while the application is running.
+     * Reloads the rows (solvers of the selected solver types) and the offered presets. Call this whenever the tab becomes visible again,
+     * since solvers and the captcha history change while the application is running.
      */
     public void refresh() {
         allServices.clear();
@@ -949,9 +959,9 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
     /** Rebuilds the rows and the solver selection from all solvers of the selected solver types. */
     /**
      * @param resetToAll
-     *            true if the solver types changed: then all solvers of the selected types are selected ("All by selected types"),
-     *            whatever the solver preset was before. The remembered "Custom" selection is not touched. false: the current solver
-     *            preset is applied again (enabled/usable solvers change while the application is running).
+     *            true if the solver types changed: then all solvers of the selected types are selected ("All by selected types"), whatever
+     *            the solver preset was before. The remembered "Custom" selection is not touched. false: the current solver preset is
+     *            applied again (enabled/usable solvers change while the application is running).
      */
     private void reloadSolvers(final boolean resetToAll) {
         final List<SolverService> typedSolvers = new ArrayList<SolverService>();
@@ -1181,8 +1191,8 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
     }
 
     /**
-     * Greys out the "only full support" check box (and tells why) if no solver supports all selected captcha types: Applying it would
-     * hide every solver. The check box keeps its state, the filter applies again as soon as the selection allows it.
+     * Greys out the "only full support" check box (and tells why) if no solver supports all selected captcha types: Applying it would hide
+     * every solver. The check box keeps its state, the filter applies again as soon as the selection allows it.
      */
     private void updateFullSupportCheckBox() {
         /* No rows or columns (nothing selected): the filter is meaningless then, so the check box is greyed out (it keeps its state). */
@@ -1197,8 +1207,8 @@ public class SolverComparisonContainer extends MigPanel implements SettingsCompo
     }
 
     /**
-     * Few columns: stretch them over the full table width. So many columns that they do not fit with their default width: keep the
-     * default width and scroll horizontally.
+     * Few columns: stretch them over the full table width. So many columns that they do not fit with their default width: keep the default
+     * width and scroll horizontally.
      */
     private void updateResizeMode() {
         int neededWidth = model.getSolverColumnWidth();

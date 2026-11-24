@@ -43,29 +43,32 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.Regex;
+import org.appwork.utils.encoding.Base64;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
 
 /**
- * Simple HTTP proxy server for testing purposes.
- * Handles CONNECT requests and forwards the connection to the target server.
- * 
+ * Simple HTTP proxy server for testing purposes. Handles CONNECT requests and forwards the connection to the target server.
+ *
  * @author thomas
  * @date 01.02.2026
  */
 public class TestHttpProxyServer {
-    private ServerSocket serverSocket;
-    private Thread serverThread;
+    private ServerSocket        serverSocket;
+    private Thread              serverThread;
     private final AtomicBoolean running = new AtomicBoolean(false);
-    private int port;
-    private String username;
-    private String password;
+    private int                 port;
+    private String              username;
+    private String              password;
 
     /**
      * Creates a new HTTP proxy server.
-     * 
-     * @param port Port to listen on (0 for automatic port selection)
-     * @param username Optional username for proxy authentication (null if no auth)
-     * @param password Optional password for proxy authentication (null if no auth)
+     *
+     * @param port
+     *            Port to listen on (0 for automatic port selection)
+     * @param username
+     *            Optional username for proxy authentication (null if no auth)
+     * @param password
+     *            Optional password for proxy authentication (null if no auth)
      */
     public TestHttpProxyServer(int port, String username, String password) {
         this.port = port;
@@ -75,8 +78,9 @@ public class TestHttpProxyServer {
 
     /**
      * Creates a new HTTP proxy server without authentication.
-     * 
-     * @param port Port to listen on (0 for automatic port selection)
+     *
+     * @param port
+     *            Port to listen on (0 for automatic port selection)
      */
     public TestHttpProxyServer(int port) {
         this(port, null, null);
@@ -84,8 +88,9 @@ public class TestHttpProxyServer {
 
     /**
      * Starts the proxy server.
-     * 
-     * @throws IOException If the server cannot be started
+     *
+     * @throws IOException
+     *             If the server cannot be started
      */
     public void start() throws IOException {
         if (running.get()) {
@@ -135,7 +140,7 @@ public class TestHttpProxyServer {
 
     /**
      * Gets the port the server is listening on.
-     * 
+     *
      * @return The port number
      */
     public int getPort() {
@@ -165,8 +170,9 @@ public class TestHttpProxyServer {
 
     /**
      * Handles a client connection.
-     * 
-     * @param clientSocket The client socket
+     *
+     * @param clientSocket
+     *            The client socket
      */
     private void handleClient(Socket clientSocket) {
         OutputStream output = null;
@@ -184,7 +190,7 @@ public class TestHttpProxyServer {
             byte[] requestLineBytes = new byte[requestLineBuffer.limit()];
             requestLineBuffer.get(requestLineBytes);
             String requestLine = new String(requestLineBytes, "ISO-8859-1").trim();
-            
+
             if (!requestLine.startsWith("CONNECT")) {
                 sendErrorResponse(output, 400, "Bad Request");
                 return;
@@ -217,13 +223,13 @@ public class TestHttpProxyServer {
                 byte[] headerLineBytes = new byte[headerLineBuffer.limit()];
                 headerLineBuffer.get(headerLineBytes);
                 String headerLine = new String(headerLineBytes, "ISO-8859-1").trim();
-                
+
                 if (headerLine.startsWith("Proxy-Authorization:")) {
                     if (username != null && password != null) {
                         String auth = headerLine.substring("Proxy-Authorization:".length()).trim();
                         if (auth.startsWith("Basic ")) {
                             try {
-                                String credentials = new String(java.util.Base64.getDecoder().decode(auth.substring(6)));
+                                String credentials = new String(Base64.decode(auth.substring(6)));
                                 String[] creds = credentials.split(":", 2);
                                 if (creds.length == 2 && creds[0].equals(username) && creds[1].equals(password)) {
                                     authenticated = true;
@@ -294,9 +300,11 @@ public class TestHttpProxyServer {
 
     /**
      * Sends a success response (200 Connection established).
-     * 
-     * @param writer The output stream
-     * @throws IOException If writing fails
+     *
+     * @param writer
+     *            The output stream
+     * @throws IOException
+     *             If writing fails
      */
     private void sendSuccessResponse(OutputStream writer) throws IOException {
         writer.write("HTTP/1.1 200 Connection established\r\n".getBytes());
@@ -306,11 +314,15 @@ public class TestHttpProxyServer {
 
     /**
      * Sends an error response.
-     * 
-     * @param writer The output stream
-     * @param code The HTTP status code
-     * @param message The status message
-     * @throws IOException If writing fails
+     *
+     * @param writer
+     *            The output stream
+     * @param code
+     *            The HTTP status code
+     * @param message
+     *            The status message
+     * @throws IOException
+     *             If writing fails
      */
     private void sendErrorResponse(OutputStream writer, int code, String message) throws IOException {
         writer.write(("HTTP/1.1 " + code + " " + message + "\r\n").getBytes());
@@ -323,9 +335,11 @@ public class TestHttpProxyServer {
 
     /**
      * Forwards data from input to output stream.
-     * 
-     * @param input The input stream
-     * @param output The output stream
+     *
+     * @param input
+     *            The input stream
+     * @param output
+     *            The output stream
      */
     private void forwardData(java.io.InputStream input, OutputStream output) {
         byte[] buffer = new byte[8192];
@@ -347,7 +361,7 @@ public class TestHttpProxyServer {
 
     /**
      * Checks if the server is running.
-     * 
+     *
      * @return true if running, false otherwise
      */
     public boolean isRunning() {

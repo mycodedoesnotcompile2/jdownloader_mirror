@@ -20,7 +20,6 @@ import java.util.HashSet;
 
 import org.appwork.utils.StringUtils;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.plugins.components.config.EightMusesComConfig;
 import org.jdownloader.plugins.components.config.EightMusesComConfig.CrawlMode;
 import org.jdownloader.plugins.config.PluginJsonConfig;
@@ -36,11 +35,12 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 45136 $", interfaceVersion = 3, names = { "8muses.com" }, urls = { "https?://(?:www\\.|comics\\.)?8muses\\.com/((?:comix/|comics/)?(?:index/category/[a-z0-9\\-_]+|album(?:/[a-z0-9\\-_]+){1,6})|forum/[a-z0-9\\-]+/\\d+/[a-z0-9\\-]+/(page-\\d+)?)" })
-public class EightMusesComDecrypter extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = { "8muses.com" }, urls = { "https?://(?:www\\.|comics\\.)?8muses\\.com/((?:comix/|comics/)?(?:index/category/[a-z0-9\\-_]+|album(?:/[a-z0-9\\-_]+){1,6})|forum/[a-z0-9\\-]+/\\d+/[a-z0-9\\-]+/(page-\\d+)?)" })
+public class EightMusesComDecrypter extends PluginForDecrypt {
     public EightMusesComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -50,7 +50,7 @@ public class EightMusesComDecrypter extends antiDDoSForDecrypt {
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
         br.setFollowRedirects(true);
-        getPage(param.getCryptedUrl());
+        br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }

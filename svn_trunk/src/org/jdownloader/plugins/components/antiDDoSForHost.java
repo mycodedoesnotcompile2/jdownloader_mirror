@@ -37,6 +37,7 @@ import jd.plugins.Account;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
@@ -62,7 +63,7 @@ import org.mozilla.javascript.ScriptableObject;
  *
  */
 @SuppressWarnings({ "deprecation", "unused" })
-@HostPlugin(revision = "$Revision: 53943 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54122 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class antiDDoSForHost extends PluginForHost {
     public antiDDoSForHost(PluginWrapper wrapper) {
         super(wrapper);
@@ -492,7 +493,7 @@ public abstract class antiDDoSForHost extends PluginForHost {
                 }
                 // BlazingFast
                 else if (containsBlazingFast(ibr)) {
-                    antiDDoSForDecrypt.processBlazingFast(this, ibr, cookies);
+                    processBlazingFast(this, ibr, cookies);
                 }
                 // ddosprotectionru
                 else if (containsDDoSProtectionRu(ibr)) {
@@ -1224,6 +1225,44 @@ public abstract class antiDDoSForHost extends PluginForHost {
             return true;
         }
         return false;
+    }
+
+    public static void processBlazingFast(final Plugin plugin, final Browser ibr, final Cookies cookies) throws Exception {
+        // only one known protection measure (at this time)
+        final Browser br = ibr.cloneBrowser();
+        final Form blzgfstshark = br.getFormbyAction("/blzgfst-shark/");
+        if (blzgfstshark != null) {
+            br.cloneBrowser().getPage("/bf.jquery.max.js");// required!
+            final String bfu = br.getRegex("r\\.value\\s*=\\s*\"(.*?)\"").getMatch(0);
+            String sleep = br.getRegex("submit\\(\\);\\s*\\}\\s*,\\s*(\\d+)\\)\\s*;").getMatch(0);
+            if (sleep == null) {
+                sleep = "5100";
+            }
+            String blazing_answer = br.getRegex("a\\[_.*?\\]\\s*=\\s*(.*?);").getMatch(0);
+            if (bfu != null && blazing_answer != null) {
+                try {
+                    final ScriptEngineManager manager = JavaScriptEngineFactory.getScriptEngineManager(plugin);
+                    final ScriptEngine engine = manager.getEngineByName("javascript");
+                    engine.eval("var result = " + blazing_answer);
+                    blazing_answer = StringUtils.valueOfOrNull(engine.get("result"));
+                } catch (final Exception e) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, null, e);
+                }
+                if (blazing_answer != null) {
+                    blzgfstshark.put("bfu", bfu);
+                    blzgfstshark.put("blazing_answer", blazing_answer);
+                    Thread.sleep(Integer.parseInt(sleep));// timing is important!
+                    ibr.submitForm(blzgfstshark);
+                    final Cookies add = ibr.getCookies(ibr.getHost());
+                    for (final Cookie c : add.getCookies()) {
+                        if (new Regex(c.getKey(), bfRequiredCookies).matches()) {
+                            cookies.add(c);
+                        }
+                    }
+                    return;
+                }
+            }
+        }
     }
 
     protected boolean containsBlazingFast(final Browser ibr) {

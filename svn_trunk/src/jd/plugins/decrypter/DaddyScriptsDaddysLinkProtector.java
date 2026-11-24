@@ -16,13 +16,15 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.http.Cookies;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -34,10 +36,11 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 51879 $", interfaceVersion = 3, names = {}, urls = {})
-public class DaddyScriptsDaddysLinkProtector extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54119 $", interfaceVersion = 3, names = {}, urls = {})
+public class DaddyScriptsDaddysLinkProtector extends PluginForDecrypt {
     public DaddyScriptsDaddysLinkProtector(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -69,11 +72,20 @@ public class DaddyScriptsDaddysLinkProtector extends antiDDoSForDecrypt {
         return ret.toArray(new String[0]);
     }
 
+    /* Session cookies of hosts that only require a captcha on the first try. */
+    private static Map<String, Cookies> SESSION_COOKIES = new HashMap<String, Cookies>();
+
     /* Tags: Daddy's Link Protector */
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.setFollowRedirects(true);
-        getPage(param.getCryptedUrl());
+        synchronized (SESSION_COOKIES) {
+            final Cookies sessionCookies = SESSION_COOKIES.get(Browser.getHost(param.getCryptedUrl()));
+            if (sessionCookies != null) {
+                br.setCookies(Browser.getHost(param.getCryptedUrl()), sessionCookies);
+            }
+        }
+        br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("class=\"error\"")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -118,7 +130,7 @@ public class DaddyScriptsDaddysLinkProtector extends antiDDoSForDecrypt {
                 captchaFail = false;
                 break;
             }
-            submitForm(confirmationForm);
+            br.submitForm(confirmationForm);
         } while (confirmationForm != null && counter <= 4);
         /*
          * 2020-02-12: Some hosts will only require a captcha on the first try and allow all further URLs to be processed without captchas
@@ -126,8 +138,8 @@ public class DaddyScriptsDaddysLinkProtector extends antiDDoSForDecrypt {
          */
         final Cookies cookies = br.getCookies(br.getHost());
         // save the session!
-        synchronized (antiDDoSCookies) {
-            antiDDoSCookies.put(br.getHost(), cookies);
+        synchronized (SESSION_COOKIES) {
+            SESSION_COOKIES.put(br.getHost(), cookies);
         }
         if (captchaFail) {
             throw new PluginException(LinkStatus.ERROR_CAPTCHA);

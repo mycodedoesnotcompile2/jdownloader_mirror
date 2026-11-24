@@ -26,7 +26,6 @@ import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCra
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 
 import jd.PluginWrapper;
-import jd.controlling.ProgressController;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
 import jd.parser.html.InputField;
@@ -36,7 +35,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 50687 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54118 $", interfaceVersion = 3, names = {}, urls = {})
 public class ShrtflyVip extends MightyScriptAdLinkFly {
     public ShrtflyVip(PluginWrapper wrapper) {
         super(wrapper);
@@ -82,8 +81,6 @@ public class ShrtflyVip extends MightyScriptAdLinkFly {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String contentURL = this.getContentURL(param);
         br.setFollowRedirects(true);
-        /* Pre-setting Referer was an attempt to skip their captcha but this did not work. */
-        // br.getHeaders().put("Referer", "https://itsguider.com/");
         getPage(contentURL);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -92,7 +89,6 @@ public class ShrtflyVip extends MightyScriptAdLinkFly {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         /* They call this "alias". */
-        // final String contentID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
         br.getHeaders().put("Origin", "https://" + br.getHost());
         br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
         final Form form = br.getFormbyKey("alias");
@@ -131,7 +127,7 @@ public class ShrtflyVip extends MightyScriptAdLinkFly {
             if (StringUtils.isEmpty(next_page) || StringUtils.isEmpty(speed_token)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            this.postPage(next_page, "speed_token=" + Encoding.urlEncode(speed_token));
+            br.postPage(next_page, "speed_token=" + Encoding.urlEncode(speed_token));
             nextForm = br.getFormbyProperty("id", "form");
             if (nextForm == null) {
                 /* 2022-12-09 */
@@ -187,31 +183,7 @@ public class ShrtflyVip extends MightyScriptAdLinkFly {
             this.submitForm(nextForm);
             page++;
         } while (true);
-        /* Old handling down below */
-        // final String alias = br.getRegex("var alias\\s*=\\s*'([a-z0-9]+)';").getMatch(0);
-        // final String token = br.getRegex("var token\\s*=\\s*'([a-f0-9]{32})';").getMatch(0);
-        // final String continueURL = br.getRegex("<a href=\"(https?://[^\"]+)\" id=\"surl\"[^>]*>Generating Link").getMatch(0);
-        // if (alias == null || token == null || continueURL == null) {
-        // throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        // }
-        // final Browser brc = br.cloneBrowser();
-        // brc.getHeaders().put("x-Requested-With", "XMLHttpRequest");
-        // brc.getPage("/shrtfly/verify.php?alias=" + alias + "&token=" + token);
-        // if (!brc.toString().equalsIgnoreCase("true")) {
-        // throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        // }
-        // getPage(continueURL);
-        // if (this.regexAppVars(this.br) == null) {
-        // logger.warning("Possible crawler failure...");
-        // }
         /* Now continue with parent class code (requires 2nd captcha + waittime) */
         return ret;
-        /* 2022-09-13: Special handling not required anymore */
-        /* 2022-11-23: Special handling is now required again */
-        // return super.handlePreCrawlProcess(param);
-    }
-
-    public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        return super.decryptIt(param, progress);
     }
 }

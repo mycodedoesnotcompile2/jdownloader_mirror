@@ -2,10 +2,6 @@ package org.jdownloader.captcha.v2.solver.service;
 
 import java.util.Set;
 
-import jd.SecondLevelLaunch;
-import jd.gui.swing.jdgui.components.premiumbar.ServicePanel;
-import jd.plugins.CaptchaType.CAPTCHA_TYPE;
-
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
@@ -14,6 +10,10 @@ import org.jdownloader.captcha.v2.SolverService;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.settings.SilentModeController;
 import org.jdownloader.settings.staticreferences.CFG_SILENTMODE;
+
+import jd.SecondLevelLaunch;
+import jd.gui.swing.jdgui.components.premiumbar.ServicePanel;
+import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 public abstract class AbstractSolverService implements SolverService {
     public AbstractSolverService() {
@@ -39,14 +39,9 @@ public abstract class AbstractSolverService implements SolverService {
         return null;
     }
 
-    @Override
-    public String getBuyURL() {
-        return null;
-    }
-
     /**
-     * A problem which makes a solver that is otherwise ready unusable (e.g. every captcha type it supports is disabled), as status text,
-     * or null if there is none. Such a solver is not ready and shows a warning. Subclasses add their own problems and call super first.
+     * A problem which makes a solver that is otherwise ready unusable (e.g. every captcha type it supports is disabled), as status text, or
+     * null if there is none. Such a solver is not ready and shows a warning. Subclasses add their own problems and call super first.
      */
     protected String getBlockingStatusIssue() {
         if (isAllCaptchaTypesDisabled()) {
@@ -71,8 +66,9 @@ public abstract class AbstractSolverService implements SolverService {
     }
 
     /**
-     * True if the silent mode is active (see {@link SilentModeController#isActive()}) and the user could be asked on this computer otherwise. Never
-     * in headless mode: There the dialogs are answered remotely (MyJDownloader), so manual solving is not blocked by the silent mode.
+     * True if the silent mode is active (see {@link SilentModeController#isActive()}) and the user could be asked on this computer
+     * otherwise. Never in headless mode: There the dialogs are answered remotely (MyJDownloader), so manual solving is not blocked by the
+     * silent mode.
      */
     public static boolean isSilentModeActive() {
         return !Application.isHeadless() && SilentModeController.getInstance().isActive();
@@ -120,8 +116,8 @@ public abstract class AbstractSolverService implements SolverService {
     }
 
     /**
-     * For solvers which need the user to solve the captcha on this computer: the status text if the silent mode is switched on (manually
-     * or automatically) or active right now, else null. It is shown as soon as the silent mode is set, not only while it is effectively
+     * For solvers which need the user to solve the captcha on this computer: the status text if the silent mode is switched on (manually or
+     * automatically) or active right now, else null. It is shown as soon as the silent mode is set, not only while it is effectively
      * active: Effectively it is not while a window of JDownloader has the focus (e.g. when the user switches it on), but then the user
      * should know why captcha dialogs might not be displayed later. One text for all silent mode settings, what exactly happens to the
      * captchas depends on the settings of the silent mode.
@@ -194,8 +190,8 @@ public abstract class AbstractSolverService implements SolverService {
     }
 
     /**
-     * Default: a solver is ready when it does not require a status action (e.g. "Add Account"/"Configure") and has no blocking problem
-     * (see {@link #getBlockingStatusIssue()}). Overridable.
+     * Default: a solver is ready when it does not require a status action (e.g. "Add Account"/"Configure") and has no blocking problem (see
+     * {@link #getBlockingStatusIssue()}). Overridable.
      */
     @Override
     public boolean isReady() {

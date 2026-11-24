@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -33,9 +32,10 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 49519 $", interfaceVersion = 3, names = {}, urls = {})
-public class CamshowdownloadCom extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = {}, urls = {})
+public class CamshowdownloadCom extends PluginForDecrypt {
     public CamshowdownloadCom(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -82,12 +82,12 @@ public class CamshowdownloadCom extends antiDDoSForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String addedurl = param.toString().replaceFirst("(?i)http://", "https://");
+        final String addedurl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
         String fpName = null;
         if (addedurl.matches(PATTERN_SINGLE)) {
             /* Add single url to array of urls to decrypt. */
             br.setFollowRedirects(false);
-            getPage(addedurl);
+            br.getPage(addedurl);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -95,12 +95,12 @@ public class CamshowdownloadCom extends antiDDoSForDecrypt {
             if (captchaForm != null) {
                 final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
                 captchaForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                super.submitForm(captchaForm);
+                br.submitForm(captchaForm);
             }
             String redirect = this.br.getRedirectLocation();
             if (redirect != null && redirect.matches(PATTERN_SINGLE)) {
                 /* Redirect to url before can happen after captcha (basically one step extra). */
-                this.getPage(redirect);
+                br.getPage(redirect);
                 redirect = br.getRedirectLocation();
             }
             if (redirect == null || this.canHandle(redirect)) {
@@ -109,7 +109,7 @@ public class CamshowdownloadCom extends antiDDoSForDecrypt {
             ret.add(createDownloadlink(redirect));
         } else {
             br.setFollowRedirects(true);
-            getPage(addedurl);
+            br.getPage(addedurl);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -122,7 +122,7 @@ public class CamshowdownloadCom extends antiDDoSForDecrypt {
                 }
                 final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
                 captchaForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                submitForm(captchaForm);
+                br.submitForm(captchaForm);
             }
             fpName = br.getRegex("<title>(.*?)</title>").getMatch(0);
             if (fpName == null) {

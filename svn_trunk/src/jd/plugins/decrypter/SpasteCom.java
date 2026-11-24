@@ -20,10 +20,10 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperCrawlerPluginHCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 import org.jdownloader.controlling.PasswordUtils;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -38,9 +38,10 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52335 $", interfaceVersion = 3, names = { "spaste.com" }, urls = { "https?://(?:www\\.)?spaste\\.com/(?:(?:site/checkPasteUrl|p/?)\\?c=[a-zA-Z0-9]{10}|s/[a-zA-Z0-9]{6}|r/[a-zA-Z0-9]{6}\\?link=.+)" })
-public class SpasteCom extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = { "spaste.com" }, urls = { "https?://(?:www\\.)?spaste\\.com/(?:(?:site/checkPasteUrl|p/?)\\?c=[a-zA-Z0-9]{10}|s/[a-zA-Z0-9]{6}|r/[a-zA-Z0-9]{6}\\?link=.+)" })
+public class SpasteCom extends PluginForDecrypt {
     public SpasteCom(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -59,7 +60,7 @@ public class SpasteCom extends antiDDoSForDecrypt {
         if (browserReferrer != null) {
             br.setCurrentURL(browserReferrer);
         }
-        getPage(param.getCryptedUrl());
+        br.getPage(param.getCryptedUrl());
         /* Error handling */
         if (br.getHttpConnection() == null || br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -126,11 +127,11 @@ public class SpasteCom extends antiDDoSForDecrypt {
                 // form only has one input...its static
                 form.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
                 br.submitForm(form);
-            } else if (this.containsHCaptcha(form)) {
+            } else if (AbstractHCaptcha.containsHCaptcha(form)) {
                 final String hcaptchaResponse = new CaptchaHelperCrawlerPluginHCaptcha(this, br).getToken();
                 form.put("g-recaptcha-response", Encoding.urlEncode(hcaptchaResponse));
                 form.put("h-captcha-response", Encoding.urlEncode(hcaptchaResponse));
-                submitForm(form);
+                br.submitForm(form);
                 break;
             } else if (captchaScript != null) {
                 // hello!
@@ -167,19 +168,19 @@ public class SpasteCom extends antiDDoSForDecrypt {
                 }
                 if (result.length() != getQuestion.length) {
                     // refresh
-                    getPage(param.getCryptedUrl());
+                    br.getPage(param.getCryptedUrl());
                     continue;
                 }
                 /* E.g. "techCaptcha" or "sPasteCaptcha" */
                 form.put(captchaAnswerFieldName, Encoding.urlEncode(hash));
                 form.put("userEnterHashHere", result);
                 form.put("pasteUrlForm%5Bsubmit%5D", "submit");
-                submitForm(form);
+                br.submitForm(form);
             } else if (captchaImageURL != null) {
                 /* Simple image captcha */
                 final String code = this.getCaptchaCode(captchaImageURL, param);
                 form.put("DynamicModel%5BverificationCode%5D", code);
-                submitForm(form);
+                br.submitForm(form);
             } else {
                 break;
             }
@@ -208,7 +209,7 @@ public class SpasteCom extends antiDDoSForDecrypt {
             br.getHeaders().put("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
             br.getHeaders().put("Accept", "*/*");
             sleep(5000, param);
-            postPage("/site/getRedirectLink", "id=" + Encoding.urlEncode(id));
+            br.postPage("/site/getRedirectLink", "id=" + Encoding.urlEncode(id));
             plaintxt = br.toString();
         } else {
             // look for content! within '/p/c=? + uid', by the way you cant just jump to it.

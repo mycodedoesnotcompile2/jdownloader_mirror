@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -32,9 +31,10 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 47519 $", interfaceVersion = 3, names = {}, urls = {})
-public class MirroraceCom extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = {}, urls = {})
+public class MirroraceCom extends PluginForDecrypt {
     public MirroraceCom(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -76,7 +76,7 @@ public class MirroraceCom extends antiDDoSForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String parameter = param.getCryptedUrl();
         br.setFollowRedirects(true);
-        getPage(parameter);
+        br.getPage(parameter);
         if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML(">\\s*Links Unavailable\\s*<")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -86,7 +86,7 @@ public class MirroraceCom extends antiDDoSForDecrypt {
             if (preReCaptchaForm != null) {
                 final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
                 preReCaptchaForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                this.submitForm(preReCaptchaForm);
+                br.submitForm(preReCaptchaForm);
             }
         }
         final String fpName = br.getRegex("<title>\\s*(?:Download)?\\s*([^<]*?)\\s*(?:-\\s*MirrorAce)?\\s*</title>").getMatch(0);
@@ -112,14 +112,14 @@ public class MirroraceCom extends antiDDoSForDecrypt {
             prgress++;
             logger.info("Crawling item " + prgress + "/" + links.length);
             final Browser br = this.br.cloneBrowser();
-            getPage(br, singleLink);
+            br.getPage(singleLink);
             {
                 // sometimes a captcha event can happen here
                 final Form captchaForm = br.getFormByRegex("class=\"g-recaptcha\"");
                 if (captchaForm != null) {
                     final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
                     captchaForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                    submitForm(br, captchaForm);
+                    br.submitForm(captchaForm);
                 }
             }
             final String finallink = br.getRegex("<a class=\"uk-button[^\"]*\"\\s*href=\"(https?[^<>\"]+\\&k=[^<>\"]+)\"").getMatch(0);

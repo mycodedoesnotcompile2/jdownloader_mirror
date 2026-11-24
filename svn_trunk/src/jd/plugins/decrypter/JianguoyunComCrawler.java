@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
@@ -33,10 +32,11 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.JianguoyunCom;
 
-@DecrypterPlugin(revision = "$Revision: 51090 $", interfaceVersion = 3, names = { "jianguoyun.com" }, urls = { "https?://(?:www\\.)?jianguoyun\\.com/p/[A-Za-z0-9\\-_]+(?:#dir=[^<>\"/:]+)?" })
-public class JianguoyunComCrawler extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = { "jianguoyun.com" }, urls = { "https?://(?:www\\.)?jianguoyun\\.com/p/[A-Za-z0-9\\-_]+(?:#dir=[^<>\"/:]+)?" })
+public class JianguoyunComCrawler extends PluginForDecrypt {
     public JianguoyunComCrawler(PluginWrapper wrapper) {
         super(wrapper);
     }

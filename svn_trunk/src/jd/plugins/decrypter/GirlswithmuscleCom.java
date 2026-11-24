@@ -17,7 +17,6 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -28,10 +27,11 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 48446 $", interfaceVersion = 3, names = { "girlswithmuscle.com" }, urls = { "https?://(www.)?girlswithmuscle\\.com/\\d+/?" })
-public class GirlswithmuscleCom extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = { "girlswithmuscle.com" }, urls = { "https?://(www.)?girlswithmuscle\\.com/\\d+/?" })
+public class GirlswithmuscleCom extends PluginForDecrypt {
     public GirlswithmuscleCom(final PluginWrapper wrapper) {
         super(wrapper);
     }

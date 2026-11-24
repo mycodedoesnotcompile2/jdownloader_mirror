@@ -21,10 +21,10 @@ import java.util.HashSet;
 import java.util.regex.Pattern;
 
 import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.http.Request;
 import jd.nutils.encoding.Encoding;
 import jd.nutils.encoding.HTMLEntities;
@@ -35,22 +35,26 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.components.UserAgents;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 52904 $", interfaceVersion = 3, names = { "hoerbuch.in", "hi10anime.com", "scene-rls.com", "cgpersia.com" }, urls = { "https?://(www\\.)?hoerbuch\\.in/blog\\.php\\?id=[\\d]+", "https?://(www\\.)?hi10anime\\.com/\\?page_id=.+", "https?://((www|nfo)\\.)?scene-rls\\.(com|net)/(?!(?:category/|releases/|contact/|wp-json/))[\\w-/]+/?$", "https?://(?:www\\.)?cgpersia\\.com/\\d+/\\d+/[^/$]+\\.html?" })
-public class Wrdprss extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54119 $", interfaceVersion = 3, names = { "hoerbuch.in", "hi10anime.com", "scene-rls.com", "cgpersia.com" }, urls = { "https?://(www\\.)?hoerbuch\\.in/blog\\.php\\?id=[\\d]+", "https?://(www\\.)?hi10anime\\.com/\\?page_id=.+", "https?://((www|nfo)\\.)?scene-rls\\.(com|net)/(?!(?:category/|releases/|contact/|wp-json/))[\\w-/]+/?$", "https?://(?:www\\.)?cgpersia\\.com/\\d+/\\d+/[^/$]+\\.html?" })
+public class Wrdprss extends PluginForDecrypt {
     private HashMap<String, String[]> defaultPasswords = new HashMap<String, String[]>();
 
     public Wrdprss(PluginWrapper wrapper) {
         super(wrapper);
-        /* Die defaultpasswörter der einzelnen seiten */
+        /* Default passwords of the individual websites */
         defaultPasswords.put("cgpersia.com", new String[] { "cgpersia.com" });
     }
 
     @Override
-    protected boolean useRUA() {
-        return true;
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put("User-Agent", UserAgents.stringUserAgent());
+        return br;
     }
 
     @SuppressWarnings("deprecation")
@@ -58,14 +62,14 @@ public class Wrdprss extends antiDDoSForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         String contenturl = param.getCryptedUrl();
         contenturl = contenturl.replaceFirst("^http://", "https://");
-        getPage(contenturl);
+        br.getPage(contenturl);
         br.followRedirect();
         if (br.getHttpConnection().getResponseCode() == 403) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        /* Defaultpasswörter der Seite setzen */
+        /* Set default passwords of the website */
         final ArrayList<String> link_passwds = new ArrayList<String>();
         final String[] passwords = defaultPasswords.get(this.getHost());
         if (passwords != null) {
@@ -77,7 +81,7 @@ public class Wrdprss extends antiDDoSForDecrypt {
         if (contenturl.matches(".+hi10anime\\.com.+")) {
             customHeaders.add(new String[] { "Referer", br.getURL() });
         }
-        /* Passwort suchen */
+        /* Find password */
         final String password = br.getRegex(Pattern.compile("<.*?>Passwor(?:t|d)[<|:].*?[>|:]\\s*(.*?)[\\||<]", Pattern.CASE_INSENSITIVE)).getMatch(0);
         if (password != null) {
             link_passwds.add(password.trim());
@@ -86,7 +90,6 @@ public class Wrdprss extends antiDDoSForDecrypt {
             if (br.getRedirectLocation() != null) {
                 br.followRedirect();
             }
-            // final String BaseURL = new Regex(br.getBaseURL(), "(https?://[^/]+)/").getMatch(0);
             final String[] preBlocks = br.getRegex("<pre>\\s*([^<]+)\\s*</pre>").getColumn(0);
             if (preBlocks != null) {
                 for (final String preBlock : preBlocks) {
@@ -98,7 +101,7 @@ public class Wrdprss extends antiDDoSForDecrypt {
             }
             return ret;
         }
-        /* Alle Parts suchen */
+        /* Find all parts */
         final String[] links = br.getRegex(Pattern.compile("href=.*?((?:(?:https?|ftp):)?//[^\"']{2,}|(&#x[a-f0-9]{2};)+)", Pattern.CASE_INSENSITIVE)).getColumn(0);
         final HashSet<String> dupe = new HashSet<String>();
         final String filesizeStr = br.getRegex(">\\s*(\\d+(\\.\\d+)? (MB|GB))\\s*<br").getMatch(0);

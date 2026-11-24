@@ -36,16 +36,16 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
 import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.plugins.components.config.GldSlToConfig;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
-@DecrypterPlugin(revision = "$Revision: 50756 $", interfaceVersion = 2, names = {}, urls = {})
-public class GldSlTo extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 2, names = {}, urls = {})
+public class GldSlTo extends PluginForDecrypt {
     public GldSlTo(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -102,7 +102,7 @@ public class GldSlTo extends antiDDoSForDecrypt {
         }
         final String domainFromContentURL = Browser.getHost(contenturl);
         br.setFollowRedirects(true);
-        getPage(contenturl);
+        br.getPage(contenturl);
         if (this.br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -212,13 +212,9 @@ public class GldSlTo extends antiDDoSForDecrypt {
         boolean captchafailed = false;
         for (final String decryptID : userAllowedDecryptIDs) {
             logger.info("Crawling item " + counter + " / " + decryptIDs.length + " | " + decryptID);
-            // br.setCookie("goldesel.to", "__utma", "222304525.384242273.1432990594.1432990594.1433159390.2");
-            // br.setCookie("goldesel.to", "__utmz", "222304525.1432990594.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none)");
-            // br.setCookie("goldesel.to", "__utmb", "222304525.1.10.1433159390");
-            // br.setCookie("goldesel.to", "__utmc", "222304525");
             /* IMPORTANT */
             br.setCookie(this.br.getHost(), "__utmt", "1");
-            postPage("/res/links", "data=" + Encoding.urlEncode(decryptID));
+            br.postPage("/res/links", "data=" + Encoding.urlEncode(decryptID));
             if (isCaptchaRequired(br)) {
                 for (int i = 1; i <= 3; i++) {
                     if (this.isAbort()) {
@@ -241,7 +237,7 @@ public class GldSlTo extends antiDDoSForDecrypt {
                     if (cp == null) {
                         throw new PluginException(LinkStatus.ERROR_CAPTCHA);
                     }
-                    postPage("/res/links", "data=" + Encoding.urlEncode(decryptID) + "&xC=" + cp.getX() + "&yC=" + cp.getY());
+                    br.postPage("/res/links", "data=" + Encoding.urlEncode(decryptID) + "&xC=" + cp.getX() + "&yC=" + cp.getY());
                     if (this.isCaptchaLimitReached(br)) {
                         logger.info("We have to wait because the user entered too many wrong captchas...");
                         int wait = 60;
@@ -269,7 +265,7 @@ public class GldSlTo extends antiDDoSForDecrypt {
                 }
             } else if (br.containsHTML("\"g\\-recaptcha\"")) {
                 final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
-                postPage("/res/links", "data=" + Encoding.urlEncode(decryptID) + "&rcc=" + Encoding.urlEncode(recaptchaV2Response));
+                br.postPage("/res/links", "data=" + Encoding.urlEncode(decryptID) + "&rcc=" + Encoding.urlEncode(recaptchaV2Response));
             }
             if (this.isCaptchaLimitReached(br)) {
                 throw new DecrypterRetryException(RetryReason.CAPTCHA, "HOURLY_LIMIT_REACHED", "Hourly limit has been reached! Change your IP or try again later.", null);

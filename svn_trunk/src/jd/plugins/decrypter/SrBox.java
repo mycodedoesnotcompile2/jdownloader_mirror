@@ -22,7 +22,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.appwork.utils.Regex;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -35,10 +34,11 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
 /** 2020-06-08: Current main domain is: isrbx.net */
-@DecrypterPlugin(revision = "$Revision: 49049 $", interfaceVersion = 2, names = { "isrbx.me" }, urls = { "https?://[\\w\\.]*(?:isra?bo?x(?:-music)?\\.(?:[a-zA-Z]+)|isbox\\.net|isrbx\\.me)/[0-9]+-.*?\\.html|https?://(?:www\\.)?(?:biq\\.to|(?:isra?bo?x(?:-music)?\\.(?:[a-zA-Z]+)|isbox\\.net|isrbx\\.me))/go/[a-f0-9]{100,}" })
-public class SrBox extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 2, names = { "isrbx.me" }, urls = { "https?://[\\w\\.]*(?:isra?bo?x(?:-music)?\\.(?:[a-zA-Z]+)|isbox\\.net|isrbx\\.me)/[0-9]+-.*?\\.html|https?://(?:www\\.)?(?:biq\\.to|(?:isra?bo?x(?:-music)?\\.(?:[a-zA-Z]+)|isbox\\.net|isrbx\\.me))/go/[a-f0-9]{100,}" })
+public class SrBox extends PluginForDecrypt {
     public SrBox(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -61,7 +61,7 @@ public class SrBox extends antiDDoSForDecrypt {
             /* Crawl single redirect-URL. */
             /* 2020-10-22: Referer is required - mainpage is enough to make it work. */
             br.getHeaders().put("Referer", "https://" + this.getHost() + "/");
-            this.getPage(parameter);
+            br.getPage(parameter);
             final String initialHost = Browser.getHost(parameter);
             final String redirect = br.getRedirectLocation();
             /* Redirect on mainpage = also offline */
@@ -72,7 +72,7 @@ public class SrBox extends antiDDoSForDecrypt {
             }
         } else {
             /* Crawl multiple URLs */
-            getPage(parameter);
+            br.getPage(parameter);
             Browser.setRequestIntervalLimitGlobal(br.getHost(), 1000);
             final String redirect = br.getRedirectLocation();
             if (br.containsHTML("(An error has occurred|The article cannot be found)") || (redirect != null && redirect.matches(base))) {
@@ -80,7 +80,7 @@ public class SrBox extends antiDDoSForDecrypt {
             }
             if (redirect != null) {
                 br.setFollowRedirects(true);
-                getPage(redirect);
+                br.getPage(redirect);
             }
             String fpName = br.getRegex("<h1 itemprop=\"name\">(.*?)</h1>").getMatch(0);
             if (fpName == null) {
@@ -127,18 +127,10 @@ public class SrBox extends antiDDoSForDecrypt {
                 if (base64 != null) {
                     ret.add(createDownloadlink(base64));
                 } else {
-                    // final Browser br2 = br.cloneBrowser();
-                    // getPage(br2, redirectlink);
-                    // final String finallink = br2.getRedirectLocation();
-                    // if (finallink != null) {
-                    // decryptedLinks.add(createDownloadlink(finallink));
                     // }
                     /* 2020-10-23: There can be a lot of URLs and this can take quite some time --> URLs go into crawler again */
                     ret.add(createDownloadlink(redirectlink));
                 }
-                // if (this.isAbort()) {
-                // break;
-                // }
             }
             /*
              * Array of image to download the cover (It can be usable if the user want to create a subfolder with the name of the package
@@ -392,7 +384,6 @@ public class SrBox extends antiDDoSForDecrypt {
             List<String> CapitalCharacterInException = new ArrayList<String>();
             CapitalCharacterInException.add("-");
             CapitalCharacterInException.add(".");
-            // CapitalCharacterInException.add("'");
             CapitalCharacterInException.add("\"");
             CapitalCharacterInException.add("/");
             CapitalCharacterInException.add("\\");

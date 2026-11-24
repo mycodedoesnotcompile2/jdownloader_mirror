@@ -27,14 +27,14 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 2, names = { "readallcomics.com" }, urls = { "https?://(?:www\\.)?readallcomics\\.com/(?:category/)?[^/]+/?" })
-public class ReadAllComics extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 2, names = { "readallcomics.com" }, urls = { "https?://(?:www\\.)?readallcomics\\.com/(?:category/)?[^/]+/?" })
+public class ReadAllComics extends PluginForDecrypt {
     public ReadAllComics(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -43,7 +43,7 @@ public class ReadAllComics extends antiDDoSForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String contenturl = param.getCryptedUrl();
         br.setFollowRedirects(true);
-        getPage(contenturl);
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }

@@ -6,15 +6,6 @@ import java.net.InetAddress;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import jd.http.BlockLevelType;
-import jd.http.BlockSourceType;
-import jd.http.BlockedTypeInterface;
-import jd.http.Browser;
-import jd.http.Request;
-import jd.http.RequestHeader;
-import jd.http.URLConnectionAdapter;
-import jd.parser.Regex;
-
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
@@ -27,6 +18,17 @@ import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter.CompiledFiletypeExtension;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+
+import jd.http.BlockLevelType;
+import jd.http.BlockSourceType;
+import jd.http.BlockedTypeInterface;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.http.Request;
+import jd.http.RequestHeader;
+import jd.http.URLConnectionAdapter;
+import jd.parser.Regex;
 
 public class PluginBrowser<T extends Plugin> extends Browser {
     private final T plugin;
@@ -62,6 +64,29 @@ public class PluginBrowser<T extends Plugin> extends Browser {
             }
         }
         return null;
+    }
+
+    @Override
+    public void setCookies(String url, Cookies iCookies) {
+        final Plugin plugin = getPlugin();
+        setCookiesOnSiteSupportedNames: if (plugin.getHost().equals(url) && !plugin.hasFeature(FEATURE.GENERIC)) {
+            final String[] siteSupportedNames = plugin.siteSupportedNames();
+            if (siteSupportedNames == null || siteSupportedNames.length < 2) {
+                break setCookiesOnSiteSupportedNames;
+            }
+            for (final String siteSupportedName : siteSupportedNames) {
+                if (siteSupportedName == null || siteSupportedName.equals(url)) {
+                    continue;
+                }
+                super.setCookies(siteSupportedName, iCookies);
+            }
+        }
+        super.setCookies(url, iCookies);
+    }
+
+    @Override
+    public void setCookies(Cookies iCookies) {
+        setCookies(getPlugin().getHost(), iCookies);
     }
 
     @Override
@@ -113,7 +138,6 @@ public class PluginBrowser<T extends Plugin> extends Browser {
     }
 
     public final static class SunriseChecker implements BlockedTypeInterface {
-
         private final static BlockedTypeInterface TYPE = new SunriseChecker();
 
         @Override
@@ -226,7 +250,6 @@ public class PluginBrowser<T extends Plugin> extends Browser {
 
     protected DNSResolver getDNSResolver(final Request request, final HTTPProxy proxy) throws IOException {
         final DNSResolver resolver = new DNSResolver() {
-
             @Override
             public InetAddress[] resolveDomain(REQUESTOR requestor, IPVERSION ipVersion, String domain) throws IOException {
                 final InetAddress[] ret = DEFAULT.resolveDomain(requestor, ipVersion, domain);

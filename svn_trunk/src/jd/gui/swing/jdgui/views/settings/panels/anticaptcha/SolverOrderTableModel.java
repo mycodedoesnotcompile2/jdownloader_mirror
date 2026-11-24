@@ -2,24 +2,22 @@ package jd.gui.swing.jdgui.views.settings.panels.anticaptcha;
 
 import java.awt.Color;
 import java.awt.Component;
-import java.awt.Dimension;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
-import java.util.Set;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Currency;
 import java.util.List;
+import java.util.Set;
 
 import javax.swing.Icon;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
 import javax.swing.JButton;
 import javax.swing.JComponent;
-import javax.swing.SwingConstants;
 import javax.swing.JTable;
+import javax.swing.SwingConstants;
 import javax.swing.table.JTableHeader;
 
 import org.appwork.storage.config.ValidationException;
@@ -29,8 +27,8 @@ import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtDefaultRowSorter;
-import org.appwork.swing.exttable.ExtTableHeaderRenderer;
 import org.appwork.swing.exttable.ExtTable;
+import org.appwork.swing.exttable.ExtTableHeaderRenderer;
 import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.swing.exttable.columns.ExtCheckColumn;
 import org.appwork.swing.exttable.columns.ExtComponentColumn;
@@ -50,25 +48,25 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
+import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSolverService;
+import org.jdownloader.settings.SilentModeController;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.settings.staticreferences.CFG_MYJD;
+import org.jdownloader.settings.staticreferences.CFG_SILENTMODE;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
 import jd.controlling.AccountController;
-import org.jdownloader.captcha.v2.solver.service.BrowserSolverService;
-import org.jdownloader.settings.SilentModeController;
-import org.jdownloader.settings.staticreferences.CFG_SILENTMODE;
-
 import jd.controlling.AccountControllerEvent;
 import jd.controlling.AccountControllerListener;
 import jd.gui.swing.jdgui.TriStateSorterTableModel;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.BuyAction;
 import jd.plugins.AccountInfo;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 public class SolverOrderTableModel extends ExtTableModel<SolverService> implements TriStateSorterTableModel {
     /* Third state of the tri-state sorting: back to the real order of the solvers. */
-    private static final String SORT_ORIGINAL = "ORIGINAL";
-
+    private static final String      SORT_ORIGINAL = "ORIGINAL";
     /* Assigned in initColumns() (called by the super constructor), so it must not have an initializer. */
     private ExtColumn<SolverService> activeJobsColumn;
 
@@ -108,8 +106,8 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> implemen
             }
         });
         /*
-         * The "Enable solver accounts" warning (Status column) and the sort order (ready solvers first) both depend on this global
-         * setting, so toggling it via CaptchaToggleUseAvailableSolverAccountsAction must redraw the table immediately.
+         * The "Enable solver accounts" warning (Status column) and the sort order (ready solvers first) both depend on this global setting,
+         * so toggling it via CaptchaToggleUseAvailableSolverAccountsAction must redraw the table immediately.
          */
         CFG_GENERAL.USE_AVAILABLE_CAPTCHA_SOLVER_ACCOUNTS.getEventSender().addListener(new GenericConfigEventListener<Boolean>() {
             @Override
@@ -125,7 +123,8 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> implemen
         addSilentModeListeners();
         /*
          * The enabled state of a solver can be changed outside of this table (e.g. via CaptchaToggleSolverServicesAction), so every
-         * solver's "enabled" setting must redraw the rows, too. Weak listener: enabledListener is a field, so it lives as long as this model.
+         * solver's "enabled" setting must redraw the rows, too. Weak listener: enabledListener is a field, so it lives as long as this
+         * model.
          */
         for (final SolverService service : ChallengeResponseController.getInstance().listServices()) {
             final BooleanKeyHandler enabledKey = service.getConfigV3()._getStorageHandler().getKeyHandler("enabled", BooleanKeyHandler.class);
@@ -170,9 +169,9 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> implemen
     };
 
     /**
-     * The MyJDownloader solver's Status column depends on whether a MyJD login is configured (email/password) and on the latest MyJD
-     * error, so changes of those settings must redraw the rows, too. Connection status changes are already covered by the
-     * MyJDownloaderListener above.
+     * The MyJDownloader solver's Status column depends on whether a MyJD login is configured (email/password) and on the latest MyJD error,
+     * so changes of those settings must redraw the rows, too. Connection status changes are already covered by the MyJDownloaderListener
+     * above.
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
     private void addMyJDownloaderListeners() {
@@ -462,8 +461,13 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> implemen
 
             /* Double click opens the page where an account for this solver can be bought. */
             @Override
-            public boolean onDoubleClick(final MouseEvent e, final SolverService value) {
-                return SolverComparisonTableModel.openBuyPage(value);
+            public boolean onDoubleClick(final MouseEvent e, final SolverService solver) {
+                if (!(solver instanceof PluginForCaptchaSolverSolverService)) {
+                    return false;
+                }
+                final ActionEvent actionEvent = new ActionEvent(e.getSource(), ActionEvent.ACTION_PERFORMED, "Buy", e.getWhen(), e.getModifiersEx());
+                new BuyAction(((PluginForCaptchaSolverSolverService) solver).getPlugin().getLazyP(), "captchasolver/comparisontable").actionPerformed(actionEvent);
+                return true;
             }
 
             /* Like the Enabled column, the solver name must always be visible. */
@@ -526,8 +530,8 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> implemen
                 rendererBtn.setHorizontalAlignment(SwingConstants.LEFT);
                 rendererBtn.setMargin(new Insets(0, 4, 0, 4));
                 /*
-                 * Icon-only warning button in front of the status (e.g. "solver accounts are globally disabled"); its explanation is
-                 * shown as tooltip (see getTooltipText). Status label and action button share the second cell.
+                 * Icon-only warning button in front of the status (e.g. "solver accounts are globally disabled"); its explanation is shown
+                 * as tooltip (see getTooltipText). Status label and action button share the second cell.
                  */
                 rendererWarnBtn = new JButton();
                 rendererWarnBtn.setIcon(warningIcon);
@@ -582,9 +586,9 @@ public class SolverOrderTableModel extends ExtTableModel<SolverService> implemen
                 editor.add(editorLabel, "cell 1 0, hidemode 3");
                 setClickcount(1);
                 /*
-                 * No single scalar backs this column (it shows either a status text or an action button), so sort by readiness first
-                 * (ready solvers before those needing an action, warnings before routine actions like "Add Account"), then alphabetically
-                 * by the displayed text within each group.
+                 * No single scalar backs this column (it shows either a status text or an action button), so sort by readiness first (ready
+                 * solvers before those needing an action, warnings before routine actions like "Add Account"), then alphabetically by the
+                 * displayed text within each group.
                  */
                 this.setRowSorter(new ExtDefaultRowSorter<SolverService>() {
                     @Override

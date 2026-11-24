@@ -23,7 +23,6 @@ import java.util.Map;
 import java.util.Random;
 
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
@@ -40,10 +39,12 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.SiteType.SiteTemplate;
+import jd.plugins.components.UserAgents;
 
-@DecrypterPlugin(revision = "$Revision: 48308 $", interfaceVersion = 3, names = { "uploadonall.com" }, urls = { "https?://(?:www\\.)?uploadonall\\.com/((download|files)/|download\\.php\\?uid=)[A-Z0-9]{8}" })
-public class GeneralMultiuploadDecrypter extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54119 $", interfaceVersion = 3, names = { "uploadonall.com" }, urls = { "https?://(?:www\\.)?uploadonall\\.com/((download|files)/|download\\.php\\?uid=)[A-Z0-9]{8}" })
+public class GeneralMultiuploadDecrypter extends PluginForDecrypt {
     public GeneralMultiuploadDecrypter(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -54,19 +55,13 @@ public class GeneralMultiuploadDecrypter extends antiDDoSForDecrypt {
     private boolean      notOK        = false;
 
     @Override
-    protected boolean useRUA() {
-        return true;
-    }
-
-    @Override
-    protected Browser prepBrowser(Browser prepBr, String host) {
-        if (!(this.browserPrepped.containsKey(prepBr) && this.browserPrepped.get(prepBr) == Boolean.TRUE)) {
-            super.prepBrowser(prepBr, host);
-            prepBr.setReadTimeout(2 * 60 * 1000);
-            prepBr.setConnectTimeout(2 * 60 * 1000);
-            prepBr.setFollowRedirects(true);
-        }
-        return prepBr;
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put("User-Agent", UserAgents.stringUserAgent());
+        br.setReadTimeout(2 * 60 * 1000);
+        br.setConnectTimeout(2 * 60 * 1000);
+        br.setFollowRedirects(true);
+        return br;
     }
 
     // This decrypter should handle nearly all sites using the qooy.com script!
@@ -82,7 +77,7 @@ public class GeneralMultiuploadDecrypter extends antiDDoSForDecrypt {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         String customFileName = null;
-        getPage(br, Request.getLocation("/status.php?uid=" + id, br.createGetRequest(parameter)));
+        getPageWithRetry(br, Request.getLocation("/status.php?uid=" + id, br.createGetRequest(parameter)));
         /* Error handling */
         final boolean looksLikeOffline = !br.containsHTML("<img src=") && !br.containsHTML("<td class=\"host\">");
         br.setFollowRedirects(false);
@@ -108,7 +103,7 @@ public class GeneralMultiuploadDecrypter extends antiDDoSForDecrypt {
             String dllink = null;
             // Handling for links that need to be regexed or that need to be get by redirect
             if (singleLink.matches("(?i)/(redirect|rd?|dl|mirror).+")) {
-                getPage(br, singleLink);
+                getPageWithRetry(br, singleLink);
                 handleCaptcha(br);
                 dllink = decryptLink(br, parameter);
             } else {
@@ -121,7 +116,7 @@ public class GeneralMultiuploadDecrypter extends antiDDoSForDecrypt {
                     logger.info("No link Available");
                     numberofUnavailableItems++;
                 } else {
-                    logger.warning("Possible plugin error: " + param.toString());
+                    logger.warning("Possible plugin error: " + param.getCryptedUrl());
                 }
                 logger.warning("Continuing...");
                 continue;
@@ -211,7 +206,7 @@ public class GeneralMultiuploadDecrypter extends antiDDoSForDecrypt {
                 };
             }.getToken();
             captcha.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-            submitForm(br, captcha);
+            br.submitForm(captcha);
         }
     }
 
@@ -223,8 +218,7 @@ public class GeneralMultiuploadDecrypter extends antiDDoSForDecrypt {
         return dllink;
     }
 
-    @Override
-    protected void getPage(final Browser ibr, final String url) throws Exception {
+    private void getPageWithRetry(final Browser ibr, final String url) throws Exception {
         if (ibr == null || url == null) {
             return;
         }
@@ -237,34 +231,7 @@ public class GeneralMultiuploadDecrypter extends antiDDoSForDecrypt {
                 failed = false;
             }
             try {
-                super.getPage(ibr, url);
-                return;
-            } catch (final BrowserException e) {
-                failed = true;
-                continue;
-            }
-        }
-        if (failed) {
-            logger.warning("Exausted getPage retry count");
-        }
-        return;
-    }
-
-    @Override
-    protected void postPage(final Browser ibr, final String url, final String args) throws Exception {
-        if (ibr == null || url == null) {
-            return;
-        }
-        boolean failed = false;
-        int repeat = 4;
-        for (int i = 0; i <= repeat; i++) {
-            if (failed) {
-                long meep = new Random().nextInt(5) * 1000;
-                sleep(meep, param);
-                failed = false;
-            }
-            try {
-                super.postPage(ibr, url, args);
+                ibr.getPage(url);
                 return;
             } catch (final BrowserException e) {
                 failed = true;

@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 
 import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -30,9 +29,10 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 47423 $", interfaceVersion = 3, names = { "propstoreauction.com" }, urls = { "https?://(?:\\w+\\.)?propstoreauction\\.com/(?:lot-details/index/catalog/|(?:view-)?auctions/catalog/id/|search\\?)[\\w/?=&%\\.+]+" })
-public class PropStoreAuction extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = { "propstoreauction.com" }, urls = { "https?://(?:\\w+\\.)?propstoreauction\\.com/(?:lot-details/index/catalog/|(?:view-)?auctions/catalog/id/|search\\?)[\\w/?=&%\\.+]+" })
+public class PropStoreAuction extends PluginForDecrypt {
     public PropStoreAuction(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -40,7 +40,7 @@ public class PropStoreAuction extends antiDDoSForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
         ArrayList<String> links = new ArrayList<String>();
-        getPage(param.getCryptedUrl());
+        br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }

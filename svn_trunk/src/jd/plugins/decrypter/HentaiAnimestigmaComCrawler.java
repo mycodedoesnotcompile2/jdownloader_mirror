@@ -21,7 +21,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -36,9 +35,10 @@ import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52796 $", interfaceVersion = 3, names = { "hentai.animestigma.com" }, urls = { "https?://(?:www\\.)?hentai\\.animestigma\\.com/([a-z0-9\\-]{2,})/?" })
-public class HentaiAnimestigmaComCrawler extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = { "hentai.animestigma.com" }, urls = { "https?://(?:www\\.)?hentai\\.animestigma\\.com/([a-z0-9\\-]{2,})/?" })
+public class HentaiAnimestigmaComCrawler extends PluginForDecrypt {
     public HentaiAnimestigmaComCrawler(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -63,7 +63,7 @@ public class HentaiAnimestigmaComCrawler extends antiDDoSForDecrypt {
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.setFollowRedirects(true);
-        getPage(contenturl);
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -95,7 +95,7 @@ public class HentaiAnimestigmaComCrawler extends antiDDoSForDecrypt {
             brc.setFollowRedirects(true);
             boolean success = false;
             for (int i = 0; i <= 3; i++) {
-                con = openAntiDDoSRequestConnection(brc, brc.createHeadRequest(downloadlink));
+                con = brc.openRequestConnection(brc.createHeadRequest(downloadlink));
                 if (con.getResponseCode() == 503) {
                     logger.info("Retry on error 503");
                     continue;
@@ -134,7 +134,7 @@ public class HentaiAnimestigmaComCrawler extends antiDDoSForDecrypt {
         Matcher nextpage2 = br.getRegex("<a href=\"([^\"]+)\">([^<]+)</a>").getMatcher();
         while (nextpage2.find()) {
             if (nextpage2.group(1) != null && nextpage2.group(2) != null) {
-                getPage(nextpage2.group(1));
+                br.getPage(nextpage2.group(1));
                 handleEmbedFinal(decryptedLinks);
             }
         }
@@ -145,7 +145,7 @@ public class HentaiAnimestigmaComCrawler extends antiDDoSForDecrypt {
         Matcher nextpage3 = br.getRegex("<a href=\"([^\"]+)\" rel=\"bookmark\" title=\"([^\"]+)\">").getMatcher();
         while (nextpage3.find()) {
             if (nextpage3.group(1) != null && nextpage3.group(2) != null) {
-                getPage(nextpage3.group(1));
+                br.getPage(nextpage3.group(1));
                 handleEmbedSingle(decryptedLinks, nextpage3.group(1));
             }
         }

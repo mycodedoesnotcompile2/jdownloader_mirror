@@ -17,7 +17,6 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -27,10 +26,11 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.UploaderJp;
 
-@DecrypterPlugin(revision = "$Revision: 47794 $", interfaceVersion = 3, names = { "uploader.jp" }, urls = { "https?://u[a-z0-9]\\.getuploader\\.com/.+" })
-public class UploaderJpFolder extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = { "uploader.jp" }, urls = { "https?://u[a-z0-9]\\.getuploader\\.com/.+" })
+public class UploaderJpFolder extends PluginForDecrypt {
     public UploaderJpFolder(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -42,10 +42,10 @@ public class UploaderJpFolder extends antiDDoSForDecrypt {
             ret.add(createDownloadlink(param.getCryptedUrl()));
         } else {
             br.setFollowRedirects(true);
-            getPage(param.getCryptedUrl());
+            br.getPage(param.getCryptedUrl());
             final Form form = br.getFormByInputFieldKeyValue("q", "age_confirmation");
             if (form != null) {
-                submitForm(form);
+                br.submitForm(form);
             }
             if (UploaderJp.isOffline(this.br)) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

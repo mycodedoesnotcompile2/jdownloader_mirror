@@ -24,8 +24,8 @@ import javax.script.ScriptEngineManager;
 
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.FunctionObject;
@@ -42,19 +42,20 @@ import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 53803 $", interfaceVersion = 3, names = { "downl.ink" }, urls = { "https?://(?:www\\.)?downl\\.ink/(?-i)[a-f0-9]{6,}" })
+@DecrypterPlugin(revision = "$Revision: 54119 $", interfaceVersion = 3, names = { "downl.ink" }, urls = { "https?://(?:www\\.)?downl\\.ink/(?-i)[a-f0-9]{6,}" })
 @SuppressWarnings("deprecation")
-public class DownlInk extends antiDDoSForDecrypt {
+public class DownlInk extends PluginForDecrypt {
     public DownlInk(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     @Override
-    protected Browser prepBrowser(Browser prepBr, String host) {
-        super.prepBrowser(prepBr, host);
-        prepBr.addAllowedResponseCodes(new int[] { 401, 429 });
-        return prepBr;
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.addAllowedResponseCodes(new int[] { 401, 429 });
+        return br;
     }
 
     private String                  contenturl                         = null;
@@ -111,18 +112,17 @@ public class DownlInk extends antiDDoSForDecrypt {
                     logger.info("Waiting until next crawl task is allowed [millis]: " + timeToWaitMillis);
                     this.sleep(timeToWaitMillis, param);
                 }
-                getPage(contenturl);
+                getPageChecked(contenturl);
                 // recaptchav2 can be here, they monitor based ip ? or maybe cloudflare cookie
                 final Form captcha = br.getForm(0);
-                if (captcha != null && containsRecaptchaV2Class(br)) {
+                if (captcha != null && AbstractRecaptchaV2.containsRecaptchaV2Class(br)) {
                     final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
                     captcha.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                    // no need for runPostRequestTask. usually cloudflare event is on FIRST request, so lets bypass.
                     br.submitForm(captcha);
                     // they will respond with 401 here which can throw exception without response code adding.
                     // then another get here, here comes the JS we need
-                    getPage(br.getURL());
-                    if (containsRecaptchaV2Class(br)) {
+                    getPageChecked(br.getURL());
+                    if (AbstractRecaptchaV2.containsRecaptchaV2Class(br)) {
                         /* This shall be a rare case */
                         throw new PluginException(LinkStatus.ERROR_CAPTCHA);
                     }
@@ -142,9 +142,8 @@ public class DownlInk extends antiDDoSForDecrypt {
         }
     }
 
-    @Override
-    protected void getPage(String page) throws Exception {
-        super.getPage(page);
+    private void getPageChecked(final String page) throws Exception {
+        br.getPage(page);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getHttpConnection().getResponseCode() == 429) {

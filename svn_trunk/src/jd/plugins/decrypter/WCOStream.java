@@ -27,7 +27,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
-import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
@@ -35,7 +34,6 @@ import org.jdownloader.scripting.JavaScriptEngineFactory;
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
-import jd.http.Request;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -47,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 54089 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54143 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { WCOForever.class })
 public class WCOStream extends PluginForDecrypt {
     public WCOStream(PluginWrapper wrapper) {
@@ -81,7 +79,8 @@ public class WCOStream extends PluginForDecrypt {
     public Browser createNewBrowserInstance() {
         final Browser ret = super.createNewBrowserInstance();
         ret.setFollowRedirects(true);
-        ret.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, Request.getSuggestedUserAgent("153.0"));
+        /* 2026-11-24: This UA is blocked for me. */
+        // ret.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, Request.getSuggestedUserAgent("153.0"));
         return ret;
     }
 

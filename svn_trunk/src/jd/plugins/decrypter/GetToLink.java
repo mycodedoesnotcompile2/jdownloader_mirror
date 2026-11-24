@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.appwork.utils.Regex;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -30,9 +29,10 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 44694 $", interfaceVersion = 3, names = {}, urls = {})
-public class GetToLink extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = {}, urls = {})
+public class GetToLink extends PluginForDecrypt {
     public GetToLink(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -67,8 +67,8 @@ public class GetToLink extends antiDDoSForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        final String parameter = param.toString();
-        getPage(parameter);
+        final String parameter = param.getCryptedUrl();
+        br.getPage(parameter);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }

@@ -26,12 +26,12 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52202 $", interfaceVersion = 3, names = { "short.am" }, urls = { "https?://(?:www\\.)?s(ho)?rt\\.am/(?!images|include|login|templates|js|assets|join|manage)[A-Za-z0-9]+" })
-public class ShortAm extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = { "short.am" }, urls = { "https?://(?:www\\.)?s(ho)?rt\\.am/(?!images|include|login|templates|js|assets|join|manage)[A-Za-z0-9]+" })
+public class ShortAm extends PluginForDecrypt {
     public ShortAm(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -39,9 +39,9 @@ public class ShortAm extends antiDDoSForDecrypt {
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         br = createNewBrowserInstance();
         final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        final String parameter = param.toString();
+        final String parameter = param.getCryptedUrl();
         br.setFollowRedirects(true);
-        getPage(parameter);
+        br.getPage(parameter);
         if (br.getHttpConnection().getResponseCode() == 404) {
             decryptedLinks.add(this.createOfflinelink(parameter));
             return decryptedLinks;
@@ -65,14 +65,14 @@ public class ShortAm extends antiDDoSForDecrypt {
         } else {
             sleep(2000l, param);
         }
-        submitForm(continueform);
+        br.submitForm(continueform);
         continueform = br.getForm(0);
         if (continueform == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         sleep(6123l, param);
         br.setFollowRedirects(false);
-        submitForm(continueform);
+        br.submitForm(continueform);
         final String finallink = br.getRegex("window\\.location\\.replace\\('(http[^<>\"\\']+)'\\)").getMatch(0);
         if (finallink == null) {
             /* Basically via browser there just isn't any redirect present if a user uses an invalid url. */

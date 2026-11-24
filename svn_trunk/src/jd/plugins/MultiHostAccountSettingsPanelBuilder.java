@@ -40,8 +40,8 @@ import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SizeUnitInterface;
 
-import jd.controlling.AccountController;
 import jd.gui.swing.jdgui.BasicJDTable;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.BuyAction;
 import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import net.miginfocom.swing.MigLayout;
 
@@ -272,14 +272,15 @@ public class MultiHostAccountSettingsPanelBuilder {
             }
 
             @Override
-            public boolean onDoubleClick(MouseEvent e, MultiHostHost mhost) {
+            public boolean onDoubleClick(final MouseEvent e, MultiHostHost mhost) {
                 if (mhost.getStatus() == MultihosterHostStatus.DEACTIVATED_JDOWNLOADER_UNSUPPORTED) {
                     /* Host is not supported by JD -> It doesn't make sense to even try to open an affiliate link. */
                     return false;
                 }
                 final LazyHostPlugin lazyHostPlugin = HostPluginController.getInstance().get(mhost.getDomain());
                 if (lazyHostPlugin != null && lazyHostPlugin.isPremium()) {
-                    AccountController.openAfflink(lazyHostPlugin, null, "MultiHostSupportedHostsDetailTable");
+                    final ActionEvent actionEvent = new ActionEvent(e.getSource(), ActionEvent.ACTION_PERFORMED, "Buy", e.getWhen(), e.getModifiersEx());
+                    new BuyAction(lazyHostPlugin, "MultiHostSupportedHostsDetailTable").actionPerformed(actionEvent);
                 }
                 return false;
             }

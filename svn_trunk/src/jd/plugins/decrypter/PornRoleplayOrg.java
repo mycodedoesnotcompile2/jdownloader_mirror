@@ -3,7 +3,6 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 
 import org.appwork.utils.Regex;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -17,10 +16,11 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 45822 $", interfaceVersion = 3, names = { "pornroleplay.org" }, urls = { "https?://(\\w+\\.)?pornroleplay.org/\\d+-[a-zA-Z0-9\\-_]+\\.html" })
-public class PornRoleplayOrg extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = { "pornroleplay.org" }, urls = { "https?://(\\w+\\.)?pornroleplay.org/\\d+-[a-zA-Z0-9\\-_]+\\.html" })
+public class PornRoleplayOrg extends PluginForDecrypt {
     // finallink will usually be an hotlink.cc URL
     public PornRoleplayOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -35,7 +35,7 @@ public class PornRoleplayOrg extends antiDDoSForDecrypt {
     public ArrayList<DownloadLink> decryptIt(CryptedLink parameter, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.setFollowRedirects(true);
-        getPage(parameter.getCryptedUrl().replace("http://", "https://"));
+        br.getPage(parameter.getCryptedUrl().replace("http://", "https://"));
         final String dle_skin = br.getRegex("var\\s*dle_skin\\s*=\\s*'(.*?)'").getMatch(0);
         if (dle_skin == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -44,7 +44,7 @@ public class PornRoleplayOrg extends antiDDoSForDecrypt {
         }
         final String id = new Regex(parameter, "pornroleplay.org/(\\d+)").getMatch(0);
         Browser brc = br.cloneBrowser();
-        getPage(brc, "/engine/ajax/getcap.php");
+        brc.getPage("/engine/ajax/getcap.php");
         final Form form = new Form();
         final String ajax_action = "https://pornroleplay.org/engine/ajax/getlink.php";
         form.setAction(ajax_action);
@@ -55,7 +55,7 @@ public class PornRoleplayOrg extends antiDDoSForDecrypt {
         form.put("id", id);
         /* Important!! */
         brc = br.cloneBrowser();
-        submitForm(brc, form);
+        brc.submitForm(form);
         final String redirect = brc.getRegex("(https?://(\\w+\\.)?pornroleplay\\.org/(video|file)/[a-zA-Z0-9]+)").getMatch(0);
         if (redirect == null) {
             if (brc.containsHTML("To access the exclusive category you need to purchase")) {
@@ -66,7 +66,7 @@ public class PornRoleplayOrg extends antiDDoSForDecrypt {
         }
         brc = br.cloneBrowser();
         brc.setFollowRedirects(false);
-        getPage(brc, redirect);
+        brc.getPage(redirect);
         final String finallink = brc.getRedirectLocation();
         if (finallink == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

@@ -26,7 +26,6 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperCrawlerPluginHCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.plugins.components.config.NaughtyBlgOrgConfig;
 import org.jdownloader.plugins.components.config.NaughtyBlgOrgConfig.PreviewCrawlMode;
 
@@ -44,9 +43,10 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 53362 $", interfaceVersion = 5, names = {}, urls = {})
-public class NaughtyBlgOrg extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 5, names = {}, urls = {})
+public class NaughtyBlgOrg extends PluginForDecrypt {
     private enum Category {
         UNDEF,
         SITERIP,
@@ -97,17 +97,14 @@ public class NaughtyBlgOrg extends antiDDoSForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         br.setFollowRedirects(true);
-        getPage(contenturl);
+        br.getPage(contenturl);
         if (br.getRequest().getHttpConnection().getResponseCode() == 404 || br.containsHTML(">Page not found \\(404\\)<|>403 Forbidden<") || br.containsHTML("No htmlCode read")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML(">Deleted due DMCA report<")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        // String content = this.br.getRegex(Pattern.compile("<div id=\"main\\-content\" class=\"main\\-content\\-single\">(.*?)<h3
-        // class=\"comments\"", 34)).getMatch(0);
         String contentReleaseName = br.getRegex("<h1 class=\"post\\-title entry\\-title\">(.*?)</h1>").getMatch(0);
         if (contentReleaseName == null) {
-            // contentReleaseName = br.getRegex("<h1 class=\"post\\-title\">([^<>\"]*?)</h1>").getMatch(0);
             contentReleaseName = br.getRegex("<h1 class=\"post\\-title(.*?)</h1>").getMatch(0);
         }
         if (contentReleaseName == null) {
@@ -134,7 +131,6 @@ public class NaughtyBlgOrg extends antiDDoSForDecrypt {
         if (contentReleaseNamePreciseSceneRelease != null && contentReleaseNamePrecise == null) {
             // remove possible link to tag-cloud
             contentReleaseNamePreciseSceneRelease = contentReleaseNamePreciseSceneRelease.replaceAll("<.*?>", "");
-            // contentReleaseNamePreciseSceneRelease = Encoding.htmlDecode(contentReleaseNamePreciseSceneRelease).trim();
             contentReleaseName = contentReleaseNamePreciseSceneRelease;
         }
         // check if DL is from the 'clips' section
@@ -200,7 +196,6 @@ public class NaughtyBlgOrg extends antiDDoSForDecrypt {
             }
         }
         // Known image-preview hosts are always treated as preview links, wherever they appear on the page.
-        // final String[] imgs = br.getRegex("(https://([\\w\\.]+)?pixhost\\.to/show/[^\"]+)").getColumn(0);
         final String[] pixhostPreviews = br.getRegex("(https?://(?:[\\w\\.]+)?pixhost\\.(?:to|cc)/(?:show|gallery)/[^\"\\'<>]+)").getColumn(0);
         if (pixhostPreviews != null) {
             for (final String url : pixhostPreviews) {
@@ -376,7 +371,6 @@ public class NaughtyBlgOrg extends antiDDoSForDecrypt {
             }
             break;
         case MOVIE:
-            // filePackageName += " - Movie";
             break;
         case SITERIP:
             if (!filePackageName.toLowerCase().contains("siterip")) {

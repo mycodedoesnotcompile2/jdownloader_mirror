@@ -22,15 +22,15 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Files;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 52649 $", interfaceVersion = 3, names = { "discuss.eroscripts.com" }, urls = { "https?://discuss\\.eroscripts\\.com/t/([\\w\\-/]+)" })
-public class EroScriptsComCrawler extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = { "discuss.eroscripts.com" }, urls = { "https?://discuss\\.eroscripts\\.com/t/([\\w\\-/]+)" })
+public class EroScriptsComCrawler extends PluginForDecrypt {
 
     private static final Set<String> VIDEO_EXTENSIONS = new HashSet<String>(Arrays.asList("mp4", "mkv", "wmv", "mov", "avi", "m4v", "webm"));
     private static final Set<String> IMAGE_EXTENSIONS = new HashSet<String>(Arrays.asList("jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "avif"));

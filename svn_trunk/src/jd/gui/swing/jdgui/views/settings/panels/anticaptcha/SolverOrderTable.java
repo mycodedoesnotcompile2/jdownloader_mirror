@@ -32,6 +32,7 @@ import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSo
 
 import jd.gui.swing.jdgui.BasicJDTable;
 import jd.gui.swing.jdgui.views.settings.components.ToggleEnabledSelectionAction;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.BuyAction;
 
 public class SolverOrderTable extends BasicJDTable<SolverService> {
     public interface SelectionListener {
@@ -191,8 +192,8 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
         } else if (contextObject instanceof PluginForCaptchaSolverSolverService) {
             final PluginForCaptchaSolverSolverService external = (PluginForCaptchaSolverSolverService) contextObject;
             /*
-             * Account manager icon in front of the text (same icon the Account Manager settings panel uses). Greyed out if the solver has no
-             * account the account manager could show.
+             * Account manager icon in front of the text (same icon the Account Manager settings panel uses). Greyed out if the solver has
+             * no account the account manager could show.
              */
             final JMenuItem openAccountManager = new JMenuItem(_GUI.T.SolverOrderTable_context_openAccountManager(), new AbstractIcon(IconKey.ICON_PREMIUM, 18));
             openAccountManager.setEnabled(external.hasAccount());
@@ -203,13 +204,14 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
                 }
             });
             popup.add(openAccountManager);
-            if (external.getBuyURL() != null) {
+            if (external.isPremiumEnabled()) {
                 /* Paid solver: same "Buy" icon and affiliate/redirect link logic as the account manager. */
                 final JMenuItem buyCredits = new JMenuItem(_GUI.T.SolverOrderTable_context_buyCredits(), new AbstractIcon(IconKey.ICON_BUY, 18));
                 buyCredits.addActionListener(new ActionListener() {
                     @Override
                     public void actionPerformed(final ActionEvent e) {
-                        external.openBuyPage("captchasolver/solvertable/context");
+                        /* Same buy dialog as the Buy button of the account manager, with the hoster of this solver preselected. */
+                        new BuyAction(external.getPlugin().getLazyP(), "captchasolver/solvertable/context").actionPerformed(e);
                     }
                 });
                 popup.add(buyCredits);
@@ -234,7 +236,9 @@ public class SolverOrderTable extends BasicJDTable<SolverService> {
             }
         }
         if (externalSelected) {
-            /* Shown if at least one external solver is selected, it always refers to the solver that was right clicked (only if external). */
+            /*
+             * Shown if at least one external solver is selected, it always refers to the solver that was right clicked (only if external).
+             */
             final JMenuItem addAccount = new JMenuItem(_GUI.T.lit_add_account(), new AbstractIcon(IconKey.ICON_ADD, 18));
             addAccount.setEnabled(contextObject instanceof PluginForCaptchaSolverSolverService);
             addAccount.addActionListener(new ActionListener() {

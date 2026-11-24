@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import jd.PluginWrapper;
-import jd.controlling.ProgressController;
 import jd.parser.html.Form;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -27,7 +26,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 48281 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = {}, urls = {})
 public class AdshortCo extends MightyScriptAdLinkFly {
     public AdshortCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -102,10 +101,5 @@ public class AdshortCo extends MightyScriptAdLinkFly {
         }
         /* Now continue with parent class code (requires captcha + waittime) */
         return ret;
-    }
-
-    @Override
-    public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        return super.decryptIt(param, progress);
     }
 }

@@ -14,13 +14,13 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
 import org.appwork.utils.Regex;
 import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 45872 $", interfaceVersion = 2, names = {}, urls = {})
-public abstract class AbstractChan extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 2, names = {}, urls = {})
+public abstract class AbstractChan extends PluginForDecrypt {
     public AbstractChan(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -30,13 +30,13 @@ public abstract class AbstractChan extends antiDDoSForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final boolean singlePage;
         if (parameter.getCryptedUrl().matches("(?i).+/res/\\d+\\.html$")) {
-            getPage(br, parameter.getCryptedUrl());
+            br.getPage(parameter.getCryptedUrl());
             singlePage = true;
         } else if (parameter.getCryptedUrl().matches("(?i).+/\\d+\\.html$")) {
-            getPage(br, parameter.getCryptedUrl().replaceAll("(?i)/\\d+\\.html$", "/index.html"));
+            br.getPage(parameter.getCryptedUrl().replaceAll("(?i)/\\d+\\.html$", "/index.html"));
             singlePage = false;
         } else {
-            getPage(br, parameter.getCryptedUrl());
+            br.getPage(parameter.getCryptedUrl());
             singlePage = false;
         }
         String title = br.getRegex("<header>\\s*<h\\d+>\\s*(.*?)</h").getMatch(0);
@@ -95,7 +95,7 @@ public abstract class AbstractChan extends antiDDoSForDecrypt {
             if (!singlePage) {
                 final Form next = br.getFormBySubmitvalue("Next");
                 if (next != null && next.getAction() != null && pages.add(next.getAction())) {
-                    submitForm(next);
+                    br.submitForm(next);
                 } else {
                     break;
                 }

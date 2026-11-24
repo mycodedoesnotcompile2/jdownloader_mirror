@@ -17,6 +17,7 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
@@ -34,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.download.DownloadInterface;
 
-@HostPlugin(revision = "$Revision: 54099 $", interfaceVersion = 3, names = { "hearthis.at" }, urls = { "https?://(?:www\\.)?hearthis\\.at/([^/]+)/([A-Za-z0-9-\\.]+)/?" })
+@HostPlugin(revision = "$Revision: 54146 $", interfaceVersion = 3, names = { "hearthis.at" }, urls = { "https?://(?:www\\.)?hearthis\\.at/([^/]+)/([A-Za-z0-9-\\.]+)/?" })
 public class HearthisAt extends PluginForHost {
     public HearthisAt(PluginWrapper wrapper) {
         super(wrapper);
@@ -50,10 +51,11 @@ public class HearthisAt extends PluginForHost {
     // protocol: no https
     // other:
     /* Connection stuff */
-    private boolean   free_resume       = false;
-    private int       free_maxchunks    = 1;
-    private final int free_maxdownloads = -1;
-    private String    dllink            = null;
+    private boolean      free_resume       = false;
+    private int          free_maxchunks    = 1;
+    private final int    free_maxdownloads = -1;
+    private String       dllink            = null;
+    private final String extDefault        = ".mp3";
 
     @Override
     public String getAGBLink() {
@@ -65,9 +67,17 @@ public class HearthisAt extends PluginForHost {
         final String fid = getFID(link);
         if (fid != null) {
             return this.getHost() + "://" + fid;
-        } else {
-            return super.getLinkID(link);
         }
+        return super.getLinkID(link);
+    }
+
+    @Override
+    protected String getDefaultFileName(DownloadLink link) {
+        final String fid = getFID(link);
+        if (fid != null) {
+            return fid + extDefault;
+        }
+        return super.getDefaultFileName(link);
     }
 
     private String getFID(final DownloadLink link) {
@@ -78,11 +88,7 @@ public class HearthisAt extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         final boolean isDownload = PluginEnvironment.DOWNLOAD.isCurrentPluginEnvironment();
-        final String extDefault = ".mp3";
         dllink = null;
-        if (!link.isNameSet()) {
-            link.setName(getFID(link) + extDefault);
-        }
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
@@ -116,10 +122,10 @@ public class HearthisAt extends PluginForHost {
         }
         if (isDownload) {
             /* Doing this during linkcheck would take a lot of time! */
-            String externalDownloadURL = br.getRegex("<a class=\"btn btn-external no-ajaxloader\"\\s*href=\"(https://[^\"]+)\"[^>]+ title=\"(?:FREE )?DOWNLOAD\"").getMatch(0);
+            String externalDownloadURL = br.getRegex("<a class=\"btn btn-external no-ajaxloader\"\\s*href\\s*=\\s*\"(https://[^\"]+)\"[^>]+ title=\"(?:FREE )?DOWNLOAD\"").getMatch(0);
             if (externalDownloadURL == null) {
                 /* 2020-08-04: More wide open attempt e.g. doesn't matter what's the "name of their download button". */
-                externalDownloadURL = br.getRegex("<a class=\"btn btn-external no-ajaxloader\"\\s*href=\"(https://[^\"]+)\"[^>]+ title=\"").getMatch(0);
+                externalDownloadURL = br.getRegex("<a class=\"btn btn-external no-ajaxloader\"\\s*href\\s*=\\s*\"(https://[^\"]+)\"[^>]+ title=\"").getMatch(0);
             }
             if (externalDownloadURL != null) {
                 logger.info("Seems like official download is available");
@@ -166,7 +172,7 @@ public class HearthisAt extends PluginForHost {
         }
         if (!StringUtils.isEmpty(this.dllink) && !isDownload) {
             final Browser br2 = br.cloneBrowser();
-            br2.getHeaders().put("Referer", "https://" + this.getHost() + "/");
+            br2.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, "https://" + this.getHost() + "/");
             final GetRequest request = br2.createGetRequest(dllink);
             request.getHeaders().put(OPEN_RANGE_REQUEST);
             basicLinkCheck(br2, request, link, link.getFinalFileName(), extDefault);

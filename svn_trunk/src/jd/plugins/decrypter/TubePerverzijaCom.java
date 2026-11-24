@@ -34,7 +34,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.XtremestreamCo;
 
-@DecrypterPlugin(revision = "$Revision: 52593 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54143 $", interfaceVersion = 3, names = {}, urls = {})
 public class TubePerverzijaCom extends PluginForDecrypt {
     public TubePerverzijaCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -93,40 +93,43 @@ public class TubePerverzijaCom extends PluginForDecrypt {
         final PluginForHost plg = this.getNewPluginForHostInstance("xtremestream.co");
         String[] links = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
         for (final String singleLink : links) {
-            if (plg.canHandle(singleLink)) {
-                final DownloadLink video = createDownloadlink(singleLink);
-                /* Required in order to access embedded content later. */
-                video.setReferrerUrl(br.getURL());
-                if (title != null) {
-                    video.setProperty(XtremestreamCo.PROPERTY_TITLE, title);
-                } else {
-                    final String urlSlug = new Regex(contenturl, this.getSupportedLinks()).getMatch(0);
-                    final String titleFallback = urlSlug.replace("-", " ").trim();
-                    video.setProperty(XtremestreamCo.PROPERTY_TITLE, titleFallback);
-                }
-                ret.add(video);
+            if (!plg.canHandle(singleLink)) {
+                continue;
             }
+            final DownloadLink video = createDownloadlink(singleLink);
+            /* Required in order to access embedded content later. */
+            video.setReferrerUrl(br.getURL());
+            if (title != null) {
+                video.setProperty(XtremestreamCo.PROPERTY_TITLE, title);
+            } else {
+                final String urlSlug = new Regex(contenturl, this.getSupportedLinks()).getMatch(0);
+                final String titleFallback = urlSlug.replace("-", " ").trim();
+                video.setProperty(XtremestreamCo.PROPERTY_TITLE, titleFallback);
+            }
+            ret.add(video);
         }
         if (!ret.isEmpty()) {
+            /* Preferably return known xtremestream URLs */
             return ret;
         }
         /* Search for iframe embedded items e.g. from playhydrax.com */
         links = br.getRegex("<iframe[^>]*src=\"(https?://[^\"]+)").getColumn(0);
         if (links != null && links.length > 0) {
+            /* e.g. playhydrax.com URLs */
             for (final String url : links) {
                 ret.add(createDownloadlink(url));
             }
         }
-        if (!ret.isEmpty()) {
-            return ret;
+        if (ret.isEmpty()) {
+            /**
+             * Examples for invalid links: <br>
+             * https://tube.perverzija.com/advanced-search/ <br>
+             * https://tube.perverzija.com/contact/ <br>
+             * https://tube.perverzija.com/wp-admin/
+             */
+            logger.info("Failed to find any supported links -> Link unsupported or plugin problem");
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        /**
-         * Examples for invalid links: <br>
-         * https://tube.perverzija.com/advanced-search/ <br>
-         * https://tube.perverzija.com/contact/ <br>
-         * https://tube.perverzija.com/wp-admin/
-         */
-        logger.info("Failed to find any supported links -> Link unsupported or plugin problem");
-        throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        return ret;
     }
 }

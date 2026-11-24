@@ -591,6 +591,12 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Most Hosters offer a \"Premium Mode\". Download in Premium Mode is usually much faster." })
     String buyaction_message();
 
+    @Default(lngs = { "en" }, values = { "Buy captcha credits" })
+    String buyaction_captcha_title();
+
+    @Default(lngs = { "en" }, values = { "Captcha solving services solve captchas for you automatically. You buy credits there, and JDownloader uses them whenever a captcha appears." })
+    String buyaction_captcha_message();
+
     @Default(lngs = { "en" }, values = { "Continue" })
     String buyaction_title_buy_account();
 

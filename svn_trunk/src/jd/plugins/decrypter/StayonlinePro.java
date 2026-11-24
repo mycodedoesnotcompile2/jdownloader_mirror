@@ -18,7 +18,6 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 
 import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -26,21 +25,22 @@ import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 41696 $", interfaceVersion = 3, names = { "stayonline.pro" }, urls = { "https?://(?:www\\.)?stayonline\\.pro/l/([a-z0-9]+)" })
-public class StayonlinePro extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = { "stayonline.pro" }, urls = { "https?://(?:www\\.)?stayonline\\.pro/l/([a-z0-9]+)" })
+public class StayonlinePro extends PluginForDecrypt {
     public StayonlinePro(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        final String parameter = param.toString();
+        final String parameter = param.getCryptedUrl();
         br.getHeaders().put("x-reuested-with", "XMLHttpRequest");
         final String fid = new Regex(parameter, this.getSupportedLinks()).getMatch(0);
         /* 2020-01-20: We can skip everything and get to the final URL with only one request :) */
-        postPage("https://" + this.getHost() + "/ajax/linkView.php", "id=" + fid + "&ref=");
+        br.postPage("https://" + this.getHost() + "/ajax/linkView.php", "id=" + fid + "&ref=");
         final String status = PluginJSonUtils.getJson(br, "status");
         if ("error".equalsIgnoreCase(status)) {
             decryptedLinks.add(this.createOfflinelink(parameter));

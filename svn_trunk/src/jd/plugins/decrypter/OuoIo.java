@@ -22,7 +22,6 @@ import java.util.Random;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.Base64;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -35,6 +34,7 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.SiteType.SiteTemplate;
 
 /**
@@ -43,8 +43,8 @@ import jd.plugins.components.SiteType.SiteTemplate;
  * @author psp
  * @tags: similar to MightyScriptAdLinkFly
  */
-@DecrypterPlugin(revision = "$Revision: 48392 $", interfaceVersion = 3, names = { "ouo.io", "ouo.today", "ouo.press", "cpmlink.net", "uskip.me" }, urls = { "https?://(?:www\\.)?ouo\\.io/(:?s/[A-Za-z0-9]{4,}\\?s=(?:http|ftp).+|[A-Za-z0-9]{4,})", "https?://(?:\\w+\\.)?ouo\\.today/\\?[^/]*(s|cr)=((?:http|ftp).+|[0-9a-zA-Z\\+\\/]+(%3D|=){0,2})", "https?://(?:www\\.)?ouo\\.press/(:?s/[A-Za-z0-9]{4,}\\?s=(?:http|ftp).+|[A-Za-z0-9]{4,})", "https?://cpmlink\\.net/[A-Za-z0-9]+", "https?://uskip\\.me/[A-Za-z0-9]+" })
-public class OuoIo extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = { "ouo.io", "ouo.today", "ouo.press", "cpmlink.net", "uskip.me" }, urls = { "https?://(?:www\\.)?ouo\\.io/(:?s/[A-Za-z0-9]{4,}\\?s=(?:http|ftp).+|[A-Za-z0-9]{4,})", "https?://(?:\\w+\\.)?ouo\\.today/\\?[^/]*(s|cr)=((?:http|ftp).+|[0-9a-zA-Z\\+\\/]+(%3D|=){0,2})", "https?://(?:www\\.)?ouo\\.press/(:?s/[A-Za-z0-9]{4,}\\?s=(?:http|ftp).+|[A-Za-z0-9]{4,})", "https?://cpmlink\\.net/[A-Za-z0-9]+", "https?://uskip\\.me/[A-Za-z0-9]+" })
+public class OuoIo extends PluginForDecrypt {
     public OuoIo(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -86,7 +86,7 @@ public class OuoIo extends antiDDoSForDecrypt {
         if (browserReferrer != null) {
             br.setCurrentURL(browserReferrer);
         }
-        getPage(parameter);
+        br.getPage(parameter);
         do {
             final String redirect = br.getRedirectLocation();
             if (redirect != null) {
@@ -95,7 +95,7 @@ public class OuoIo extends antiDDoSForDecrypt {
                     ret.add(createDownloadlink(br.getRedirectLocation()));
                     return ret;
                 } else {
-                    getPage(redirect);
+                    br.getPage(redirect);
                 }
             }
         } while (br.getRedirectLocation() != null);
@@ -136,7 +136,6 @@ public class OuoIo extends antiDDoSForDecrypt {
                 final String recaptchaV2Response = helper.getToken();
                 /* 2022-09-13 */
                 captchaForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                // captchaForm.put("x-token", Encoding.urlEncode(recaptchaV2Response));
             }
         } else if (!skipCaptcha) {
             // 2020-30-08 - captcha not required/verified :)
@@ -153,7 +152,7 @@ public class OuoIo extends antiDDoSForDecrypt {
                 captchaForm.put("x-token", Encoding.urlEncode(recaptchaV2Response));
             }
         }
-        this.submitForm(captchaForm);
+        br.submitForm(captchaForm);
         br.setFollowRedirects(false);
         String finallink = handleRedirect(br);
         if (finallink != null) {
@@ -163,7 +162,7 @@ public class OuoIo extends antiDDoSForDecrypt {
         final Form f = br.getForm(0);
         if (f != null && f.containsHTML("(?i)>\\s*Get Link\\s*<")) {
             br.setFollowRedirects(false);
-            submitForm(f);
+            br.submitForm(f);
             finallink = br.getRedirectLocation();
         } else {
             finallink = br.getRegex("\"\\s*([^\r\n]+)\\s*\"\\s+id=\"btn-main\"").getMatch(0);

@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -32,20 +31,13 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52924 $", interfaceVersion = 2, names = {}, urls = {})
-public class LinkTl extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 2, names = {}, urls = {})
+public class LinkTl extends PluginForDecrypt {
     public LinkTl(PluginWrapper wrapper) {
         super(wrapper);
     }
-    // private Browser ajax = null;
-    // private void ajaxPostPage(final String url, final LinkedHashMap<String, String> param) throws Exception {
-    // ajax = br.cloneBrowser();
-    // ajax.getHeaders().put("Accept", "*/*");
-    // ajax.getHeaders().put("Connection-Type", "application/x-www-form-urlencoded");
-    // ajax.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-    // postPage(ajax, url, param);
-    // }
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -90,7 +82,7 @@ public class LinkTl extends antiDDoSForDecrypt {
         if (getDeadDomains().contains(addedLinkDomain)) {
             contenturl = contenturl.replaceFirst(Pattern.quote(addedLinkDomain), this.getHost());
         }
-        getPage(contenturl);
+        br.getPage(contenturl);
         /* Check for direct redirect */
         String redirect = br.getRedirectLocation();
         if (redirect == null) {

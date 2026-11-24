@@ -18,10 +18,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import jd.nutils.DiffMatchPatch;
-import jd.nutils.DiffMatchPatch.Diff;
-import jd.nutils.DiffMatchPatch.Patch;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
@@ -116,6 +112,10 @@ import org.jdownloader.myjdownloader.client.bindings.interfaces.EventsInterface;
 import org.jdownloader.myjdownloader.client.bindings.interfaces.Linkable;
 import org.jdownloader.myjdownloader.client.json.AbstractJsonData;
 import org.jdownloader.myjdownloader.client.json.ObjectData;
+
+import jd.nutils.DiffMatchPatch;
+import jd.nutils.DiffMatchPatch.Diff;
+import jd.nutils.DiffMatchPatch.Patch;
 
 public class RemoteAPIController {
     private static RemoteAPIController INSTANCE = new RemoteAPIController();
@@ -481,7 +481,7 @@ public class RemoteAPIController {
         register(advancedConfigAPI = new AdvancedConfigManagerAPIImpl());
         register(new JDownloaderToolBarAPIImpl());
         register(new AccountAPIImpl());
-        register(new AccountAPIImplV2());
+        register(AccountAPIImplV2.INSTANCE);
         register(new SystemAPIImpl());
         register(new LinkCollectorAPIImpl());
         register(linkcollector = new LinkCollectorAPIImplV2());
@@ -758,7 +758,6 @@ public class RemoteAPIController {
             public String[] getParametersbyKey(String key) throws IOException {
                 return null;
             }
-
         };
         final RemoteAPIMethod dummyMethod = this.rapi.getRemoteAPIMethod(dummyHttpRequest);
         final InterfaceHandler<?> iface = dummyMethod.getInterfaceHandler();
@@ -775,7 +774,6 @@ public class RemoteAPIController {
                 parameters[i] = dummyRemoteAPIRequest;
             } else if (RemoteAPIResponse.class.isAssignableFrom(method.getParameterTypes()[i])) {
                 final HttpResponse dummyHttpResponse = new HttpResponse(null) {
-
                     private final NullOutputStream devNull = new NullOutputStream();
 
                     @Override
@@ -790,7 +788,6 @@ public class RemoteAPIController {
                     @Override
                     public void closeConnection() {
                     }
-
                 };
                 final RemoteAPIResponse dummyRemoteAPIResponse = new RemoteAPIResponse(dummyHttpResponse, rapi);
                 parameters[i] = dummyRemoteAPIResponse;

@@ -15,10 +15,10 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.http;
 
-import java.io.IOException;
 import java.net.IDN;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -57,7 +57,7 @@ import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.net.httpconnection.HTTPHeaderMap;
 
 public class Cookies {
-    public static Cookies parseSetCookies(final Request request) throws IOException {
+    public static Cookies parseSetCookies(final Request request) {
         final String protocol = request.getURL().getProtocol();
         final String date = request.getResponseHeader(HTTPConstants.HEADER_REQUEST_DATE);
         final List<String> setCookies = request.getResponseHeaders(HTTPConstants.HEADER_RESPONSE_SET_COOKIE);
@@ -208,10 +208,22 @@ public class Cookies {
     }
 
     @Deprecated
-    public static Cookies parseCookies(final String cookieString, final URL url, final String serverTime, final boolean isSetCookie) throws IOException {
+    public static Cookies parseCookies(final String cookieString, final URL url, final String serverTime, final boolean isSetCookie) {
         if (isSetCookie) {
+            /*
+             * the dummy request only exposes the given Set-Cookie value and server time as response headers. Local name must differ from
+             * Request.headers (field shadowing)
+             */
             final Request dummyRequest = new GetRequest(url) {
-                final HTTPHeaderMap<List<String>> headers = new HTTPHeaderMap<List<String>>();
+                final HTTPHeaderMap<List<String>> dummyResponseHeaders = new HTTPHeaderMap<List<String>>();
+                {
+                    if (cookieString != null) {
+                        dummyResponseHeaders.put(HTTPConstants.HEADER_RESPONSE_SET_COOKIE, Arrays.asList(cookieString));
+                    }
+                    if (serverTime != null) {
+                        dummyResponseHeaders.put(HTTPConstants.HEADER_REQUEST_DATE, Arrays.asList(serverTime));
+                    }
+                }
 
                 @Override
                 public List<String> getResponseHeaders(String key) {
@@ -225,7 +237,7 @@ public class Cookies {
 
                 @Override
                 public Map<String, List<String>> getResponseHeaders() {
-                    return headers;
+                    return dummyResponseHeaders;
                 }
 
                 @Override
@@ -617,7 +629,7 @@ public class Cookies {
     }
 
     @Deprecated
-    public static Cookies parseCookies(final String cookieString, final URL url, final String serverTime) throws IOException {
+    public static Cookies parseCookies(final String cookieString, final URL url, final String serverTime) {
         return Cookies.parseCookies(cookieString, url, serverTime, false);
     }
 

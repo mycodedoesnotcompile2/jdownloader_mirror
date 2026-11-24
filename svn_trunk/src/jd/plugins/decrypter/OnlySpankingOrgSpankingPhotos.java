@@ -5,7 +5,6 @@ import java.util.List;
 
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -17,11 +16,12 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 48401 $", interfaceVersion = 3, names = {}, urls = {})
-public class OnlySpankingOrgSpankingPhotos extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = {}, urls = {})
+public class OnlySpankingOrgSpankingPhotos extends PluginForDecrypt {
     public OnlySpankingOrgSpankingPhotos(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -60,7 +60,7 @@ public class OnlySpankingOrgSpankingPhotos extends antiDDoSForDecrypt {
         final String contenturl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
         if (contenturl.matches("(?i)https?://[^/]+/vfile/[a-z0-9]{12}")) {
             br.setFollowRedirects(false);
-            getPage(contenturl);
+            br.getPage(contenturl);
             final String redirect = br.getRedirectLocation();
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -70,7 +70,7 @@ public class OnlySpankingOrgSpankingPhotos extends antiDDoSForDecrypt {
             ret.add(this.createDownloadlink(redirect));
         } else {
             br.setFollowRedirects(true);
-            getPage(contenturl);
+            br.getPage(contenturl);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -84,7 +84,7 @@ public class OnlySpankingOrgSpankingPhotos extends antiDDoSForDecrypt {
                 /* Important! */
                 br.getHeaders().put("Referer", startURL);
                 if (i > 0) {
-                    getPage(startURL);
+                    br.getPage(startURL);
                 }
                 final Form captchaform = getCaptchaForm(br);
                 if (captchaform == null) {
@@ -101,13 +101,12 @@ public class OnlySpankingOrgSpankingPhotos extends antiDDoSForDecrypt {
                         /* E.g. spanking.photos */
                         captchaform.setAction("/engine/ajax/getlink.php");
                     }
-                    submitForm(br, captchaform);
+                    br.submitForm(captchaform);
                     /* Do not allow retries for reCaptcha and assume it is solved correctly with one attempt. */
                     captchaSuccess = true;
                     break;
                 } else {
                     /* Simple image captcha */
-                    // captchaform.setAction(ajax_action);
                     final String code = getCaptchaCode(br, getHost(), "/engine/modules/antibot/antibot.php?rndval=" + System.currentTimeMillis(), param);
                     captchaform.put("sec_code", code);
                     captchaform.put("skin", Encoding.urlEncode(dle_skin));
@@ -117,7 +116,7 @@ public class OnlySpankingOrgSpankingPhotos extends antiDDoSForDecrypt {
                         /* E.g. spanking.photos */
                         captchaform.setAction("/engine/ajax/getlink.php");
                     }
-                    submitForm(br, captchaform);
+                    br.submitForm(captchaform);
                 }
                 if (br.getRequest().getHtmlCode().length() == 0) {
                     /* Empty page = Wrong captcha */

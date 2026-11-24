@@ -193,7 +193,8 @@ public class CookieStorable implements Storable {
             }
         } catch (IllegalArgumentException e) {
         }
-        if (source == null || (Cookie.SOURCE.LEGACY.equals(source) && getVersion() == -1)) {
+        final boolean guessed = source == null || (Cookie.SOURCE.LEGACY.equals(source) && getVersion() == -1);
+        if (guessed) {
             if (getHostTime() > 0) {
                 source = Cookie.SOURCE.SERVER;
             } else if (getDomain() != null || getSecure() != null) {
@@ -217,6 +218,11 @@ public class CookieStorable implements Storable {
         ret.setHostOnly(getHostOnly());
         ret.setSameSite(getSameSite());
         ret.setProtocol(getProtocol());
+        /*
+         * always forward version(even for -1) so we are able to later modify/optimize the guessing, in case it's wrong or something is
+         * missing
+         */
+        ret.setVersion(getVersion());
         return ret;
     }
 

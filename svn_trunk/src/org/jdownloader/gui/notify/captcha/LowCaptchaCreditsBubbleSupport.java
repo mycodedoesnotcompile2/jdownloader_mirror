@@ -11,10 +11,11 @@ import org.jdownloader.gui.notify.gui.CFG_BUBBLE;
 import org.jdownloader.gui.translate._GUI;
 
 import jd.plugins.Account;
+import jd.plugins.PluginForHost;
 
 /**
- * Bubble which warns the user that the credits of a captcha solver account are running low. It offers two buttons: open the account
- * manager with the affected account selected, and open the solver's "buy premium" page in the browser.
+ * Bubble which warns the user that the credits of a captcha solver account are running low. It offers two buttons: open the account manager
+ * with the affected account selected, and open the buy dialog with the solver preselected.
  */
 public class LowCaptchaCreditsBubbleSupport extends AbstractBubbleSupport {
     private static final LowCaptchaCreditsBubbleSupport INSTANCE = new LowCaptchaCreditsBubbleSupport();
@@ -37,16 +38,16 @@ public class LowCaptchaCreditsBubbleSupport extends AbstractBubbleSupport {
      *            Already formatted remaining credits
      * @param threshold
      *            Already formatted warning threshold
-     * @param buyCreditsUrl
-     *            The solver's full "buy premium" link (built like the account manager's one, see AccountController#buildAfflink), may be null (then the buy button is not shown)
+     * @param plugin
+     *            The captcha solver plugin of the account (the buy button is only shown if it has premium enabled)
      */
-    public void show(final Account account, final String balance, final String threshold, final String buyCreditsUrl) {
+    public void show(final Account account, final PluginForHost plugin, final String balance, final String threshold) {
         show(new AbstractNotifyWindowFactory() {
             @Override
             public AbstractNotifyWindow<?> buildAbstractNotifyWindow() {
                 /* The domain and its favicon (small, 16px) are part of the title only: a bigger favicon would be lowres and waste space. */
                 final DomainInfo domainInfo = account.getDomainInfo();
-                return new LowCaptchaCreditsBubble(LowCaptchaCreditsBubbleSupport.this, _GUI.T.LowCaptchaCreditsBubble_caption(domainInfo.getTld()), domainInfo.getIcon(16), account, _GUI.T.LowCaptchaCreditsBubble_text(balance, threshold), buyCreditsUrl);
+                return new LowCaptchaCreditsBubble(LowCaptchaCreditsBubbleSupport.this, _GUI.T.LowCaptchaCreditsBubble_caption(domainInfo.getTld()), domainInfo.getIcon(16), account, plugin, _GUI.T.LowCaptchaCreditsBubble_text(balance, threshold));
             }
         });
     }

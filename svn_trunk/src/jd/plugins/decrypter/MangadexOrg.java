@@ -9,7 +9,6 @@ import java.util.Map;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
@@ -22,9 +21,10 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52918 $", interfaceVersion = 2, names = {}, urls = {})
-public class MangadexOrg extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 2, names = {}, urls = {})
+public class MangadexOrg extends PluginForDecrypt {
     public MangadexOrg(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -94,7 +94,7 @@ public class MangadexOrg extends antiDDoSForDecrypt {
         br.getHeaders().put("sec-fetch-site", "same-site");
         if (param.getCryptedUrl().matches(TYPE_LEGACY)) {
             /* Handling for older URLs */
-            getPage(param.getCryptedUrl());
+            br.getPage(param.getCryptedUrl());
             final String newurl = br.getURL();
             if (!br.getURL().matches(TYPE_CHAPTER)) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -104,7 +104,7 @@ public class MangadexOrg extends antiDDoSForDecrypt {
             final boolean artTab = StringUtils.containsIgnoreCase(param.getCryptedUrl(), "tab=art");
             final boolean chapterTab = StringUtils.containsIgnoreCase(param.getCryptedUrl(), "tab=chapters");
             final String mangaID = new Regex(param.getCryptedUrl(), TYPE_TITLE).getMatch(0);
-            getPage(apiBase + "manga/" + mangaID + "/?includes[]=artist&includes[]=author&includes[]=cover_art");
+            br.getPage(apiBase + "manga/" + mangaID + "/?includes[]=artist&includes[]=author&includes[]=cover_art");
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -130,7 +130,7 @@ public class MangadexOrg extends antiDDoSForDecrypt {
                 int offset = 0;
                 int limit = 32;
                 while (!isAbort()) {
-                    getPage(apiBase + "cover?order[volume]=asc&manga[]=" + mangaID + "&limit=" + limit + "&offset=" + offset);
+                    br.getPage(apiBase + "cover?order[volume]=asc&manga[]=" + mangaID + "&limit=" + limit + "&offset=" + offset);
                     root = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                     if (!"ok".equals(root.get("result"))) {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -183,7 +183,7 @@ public class MangadexOrg extends antiDDoSForDecrypt {
                 int offset = 0;
                 int limit = 32;
                 while (!isAbort()) {
-                    getPage(apiBase + "manga/" + mangaID + "/feed?limit=" + limit + "&includes[]=scanlation_group&includes[]=user&order[volume]=desc&order[chapter]=desc&offset=" + offset + "&contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica&contentRating[]=pornographic");
+                    br.getPage(apiBase + "manga/" + mangaID + "/feed?limit=" + limit + "&includes[]=scanlation_group&includes[]=user&order[volume]=desc&order[chapter]=desc&offset=" + offset + "&contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica&contentRating[]=pornographic");
                     root = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                     if (!"ok".equals(root.get("result"))) {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -211,7 +211,7 @@ public class MangadexOrg extends antiDDoSForDecrypt {
             return ret;
         } else {
             final String chapterID = new Regex(param.getCryptedUrl(), TYPE_CHAPTER).getMatch(0);
-            getPage(apiBase + "chapter/" + chapterID + "?includes[]=scanlation_group&includes[]=manga&includes[]=user");
+            br.getPage(apiBase + "chapter/" + chapterID + "?includes[]=scanlation_group&includes[]=manga&includes[]=user");
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -289,7 +289,7 @@ public class MangadexOrg extends antiDDoSForDecrypt {
             } else {
                 titleForFilename = mangaTitle;
             }
-            this.getPage("/at-home/server/" + chapterID + "?forcePort443=false");
+            br.getPage("/at-home/server/" + chapterID + "?forcePort443=false");
             final Map<String, Object> root2 = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final Map<String, Object> chapter2 = (Map<String, Object>) root2.get("chapter");
             final String baseUrl = (String) root2.get("baseUrl");

@@ -19,7 +19,6 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Map;
 
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
@@ -37,11 +36,12 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 48305 $", interfaceVersion = 3, names = { "fakku.net" }, urls = { "https?://(?:www\\.)?fakku\\.net/[a-z0-9\\-_]+/[a-z0-9\\-_]+/read" })
-public class FakkuNet extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = { "fakku.net" }, urls = { "https?://(?:www\\.)?fakku\\.net/[a-z0-9\\-_]+/[a-z0-9\\-_]+/read" })
+public class FakkuNet extends PluginForDecrypt {
     public FakkuNet(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -70,7 +70,7 @@ public class FakkuNet extends antiDDoSForDecrypt {
         }
         br.setFollowRedirects(true);
         br.setAllowedResponseCodes(410);
-        getPage(contenturl);
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 410) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("id=\"error\"")) {
@@ -87,7 +87,7 @@ public class FakkuNet extends antiDDoSForDecrypt {
                 throw new AccountRequiredException();
             }
             /* Handling for subscription URLs */
-            getPage("https://books." + this.getHost() + "/" + contentGenre + "/" + url_title + "/read");
+            br.getPage("https://books." + this.getHost() + "/" + contentGenre + "/" + url_title + "/read");
             final Map<String, Object> entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(br.toString());
             if (fpName == null) {
                 fpName = (String) JavaScriptEngineFactory.walkJson(entries, "content/content_name");

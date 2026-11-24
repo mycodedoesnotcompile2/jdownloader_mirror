@@ -21,7 +21,6 @@ import java.util.List;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperCrawlerPluginHCaptcha;
 
 import jd.PluginWrapper;
-import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
@@ -31,7 +30,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 48286 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = {}, urls = {})
 public class ClicksflyCom extends MightyScriptAdLinkFly {
     public ClicksflyCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -58,11 +57,6 @@ public class ClicksflyCom extends MightyScriptAdLinkFly {
             ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(entrar/[A-Za-z0-9\\-]+|(?!full)[a-zA-Z0-9]{2,}/?)");
         }
         return ret.toArray(new String[0]);
-    }
-
-    @Override
-    public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        return super.decryptIt(param, progress);
     }
 
     @Override
@@ -98,7 +92,6 @@ public class ClicksflyCom extends MightyScriptAdLinkFly {
         }
         br.setFollowRedirects(followRedirectsOld);
         return ret;
-        // return super.handlePreCrawlProcess(param);
     }
 
     private Form getAliasForm(final Browser br) {

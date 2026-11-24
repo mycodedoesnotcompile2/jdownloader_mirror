@@ -27,6 +27,7 @@ import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.http.Request;
 import jd.nutils.encoding.Encoding;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -35,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 54089 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54106 $", interfaceVersion = 2, names = {}, urls = {})
 public class WCOForever extends PluginForDecrypt {
     public WCOForever(PluginWrapper wrapper) {
         super(wrapper);
@@ -81,6 +82,8 @@ public class WCOForever extends PluginForDecrypt {
         br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*This Video Is for Premium Users")) {
+            throw new AccountRequiredException();
         }
         String fpName = br.getRegex("<title>(?:Watch\\s+)?([^<]+)Online\\s+-\\s+").getMatch(0);
         if (StringUtils.isEmpty(fpName)) {
@@ -110,6 +113,9 @@ public class WCOForever extends PluginForDecrypt {
         } else {
             /* Fallback */
             fp.setName(br._getURL().getPath());
+        }
+        if (ret.isEmpty()) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         fp.addLinks(ret);
         return ret;

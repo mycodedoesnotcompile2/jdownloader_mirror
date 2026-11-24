@@ -156,7 +156,7 @@ import jd.plugins.download.Downloadable;
 import jd.plugins.download.HashResult;
 import jd.plugins.download.raf.ChunkRange;
 
-@HostPlugin(revision = "$Revision: 53537 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
+@HostPlugin(revision = "$Revision: 54150 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
 public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInterface {
     private static final String    YT_ALTERNATE_VARIANT = "YT_ALTERNATE_VARIANT";
     private static final String    DASH_AUDIO_FINISHED  = "DASH_AUDIO_FINISHED";
@@ -1457,34 +1457,8 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
         if (streamData.getSegments() != null) {
             final String[] streamSegments = streamData.getSegments();
             final List<Segment> allSegments = SegmentDownloader.buildSegments(new URL(streamData.getBaseUrl()), streamSegments);
-            final List<Segment> downloadSegments = new ArrayList<Segment>(allSegments);
-            final String resumeSegmentInfo = downloadLink.getStringProperty(dashChunksProperty + "_segment", null);
-            final String resumeSegmentInfos[] = new Regex(resumeSegmentInfo, "^(\\d+)_(\\d+)_(\\d+)_(.+)$").getRow(0);
-            int resumeSegmentIndex = -1;
-            long resumePosition = -1;
-            if (resumeSegmentInfos != null && resumeSegmentInfos.length == 4) {
-                final int numSegments = Integer.parseInt(resumeSegmentInfos[0]);
-                resumeSegmentIndex = Integer.parseInt(resumeSegmentInfos[1]);
-                resumePosition = Long.parseLong(resumeSegmentInfos[2]);
-                final String segment = streamSegments[resumeSegmentIndex];
-                boolean resume = numSegments == streamSegments.length;
-                resume &= resumeSegmentIndex < streamSegments.length;
-                resume &= StringUtils.contains(segment, "sq/" + (resumeSegmentIndex) + "/");
-                final File resumeFile = new File(dashDownloadable.getFileOutputPart());
-                final long resumeFileLength = resumeFile.length();
-                resume &= resumeFileLength >= resumePosition;
-                if (resume) {
-                    downloadSegments.clear();
-                    downloadSegments.addAll(allSegments.subList(resumeSegmentIndex, allSegments.size()));
-                } else {
-                    resumeSegmentIndex = -1;
-                    resumePosition = -1;
-                }
-            }
-            final int finalResumeSegmentIndex = resumeSegmentIndex;
-            final long finalResumePosition = resumePosition;
             dashDownloadable.setResumeable(true);
-            dl = new SegmentDownloader(this, dashLink, dashDownloadable, br, downloadSegments) {
+            dl = new SegmentDownloader(this, dashLink, dashDownloadable, br, allSegments) {
                 @Override
                 protected Request createSegmentRequest(Segment seg) throws IOException {
                     final Request ret = super.createSegmentRequest(seg);
@@ -1494,25 +1468,34 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                     return ret;
                 }
 
+                /* dashLink is a temporary link: The resume point has to be stored in the real link. */
                 @Override
-                public boolean isResumedDownload() {
-                    return segments.size() < allSegments.size();
+                protected String loadResumeInfo() {
+                    final String info = downloadLink.getStringProperty(dashChunksProperty + "_segment", null);
+                    /*
+                     * Migration: Older versions stored "SEGMENTCOUNT_SEGMENTINDEX_POSITION_SEGMENTURL" (index and position of the segment which
+                     * was started last = start of the segment to continue with). Convert it to the format of the SegmentDownloader.
+                     */
+                    final String[] legacy = new Regex(info, "^(\\d+)_(\\d+)_(\\d+)_.+$").getRow(0);
+                    if (legacy != null) {
+                        return legacy[0] + "_" + legacy[1] + "_" + legacy[2];
+                    }
+                    return info;
                 }
 
                 @Override
-                protected long onSegmentStart(RandomAccessFile outputStream, Segment segment, URLConnectionAdapter con) throws IOException {
-                    final int segmentIndex = allSegments.indexOf(segment);
-                    if (finalResumeSegmentIndex > 0 && finalResumeSegmentIndex == segmentIndex) {
-                        outputStream.seek(finalResumePosition);
-                        bytesWritten = finalResumePosition;
+                protected void storeResumeInfo(final String info) {
+                    if (info == null) {
+                        downloadLink.removeProperty(dashChunksProperty + "_segment");
+                    } else {
+                        downloadLink.setProperty(dashChunksProperty + "_segment", info);
                     }
-                    final long ret = bytesWritten;
-                    outputStream.getChannel().force(true);
-                    if (segmentIndex > 0) {
-                        downloadLink.setProperty(dashChunksProperty + "_segment", streamSegments.length + "_" + segmentIndex + "_" + ret + "_" + streamSegments[segmentIndex]);
-                    }
-                    dashDownloadable.setChunksProgress(new long[] { ret });
-                    return ret;
+                }
+
+                /* the segment of the resume point must be the one with this index (sequence number is part of the URL) */
+                @Override
+                protected boolean isResumePointValid(final int nextSegmentIndex, final long position) {
+                    return nextSegmentIndex < streamSegments.length && StringUtils.contains(streamSegments[nextSegmentIndex], "sq/" + nextSegmentIndex + "/");
                 }
 
                 @Override
@@ -1568,6 +1551,12 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                 }
                 dashDownloadable.setResumeable(true);
                 dl = new SegmentDownloader(this, dashLink, dashDownloadable, br, segments) {
+                    /* This variant resumes via the progress of the chunks (see onSegmentStart) */
+                    @Override
+                    protected boolean isSegmentResumeEnabled() {
+                        return false;
+                    }
+
                     @Override
                     protected Request createSegmentRequest(Segment seg) throws IOException {
                         final Request ret = super.createSegmentRequest(seg);

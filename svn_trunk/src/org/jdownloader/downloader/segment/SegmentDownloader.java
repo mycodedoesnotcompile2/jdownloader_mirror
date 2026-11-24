@@ -61,6 +61,14 @@ public class SegmentDownloader extends DownloadInterface {
     protected final Browser                         obr;
     protected final List<Segment>                   segments          = new ArrayList<Segment>();
     protected Long                                  lastModified      = null;
+    /**
+     * Property of the link which stores the resume point: "SEGMENTCOUNT_NEXTSEGMENTINDEX_FILEPOSITION". The resume point is saved every
+     * time a segment was loaded completely.
+     */
+    private static final String                     PROPERTY_RESUME   = "SegmentDownloader_resume";
+    /* Resume point of this download: Index of the first segment which has to be loaded and the position in the part file where it starts. */
+    private volatile int                            resumeSegmentIndex = 0;
+    private volatile long                           resumePosition     = 0;
 
     @Deprecated
     public static List<Segment> buildSegments(URL baseURL, String[] segments) {
@@ -82,13 +90,8 @@ public class SegmentDownloader extends DownloadInterface {
         logger = plugin.getLogger();
         this.segments.addAll(segments);
         if (dashDownloadable == null) {
-            this.downloadable = new DownloadLinkDownloadable(link) {
-                @Override
-                public boolean isResumable() {
-                    // TODO: maybe resume at last written Segment, save index and position
-                    return false;
-                }
-            };
+            /* Resumable if the plugin says so (the link is resumable): Resume works on segment level, see loadResumePoint */
+            this.downloadable = new DownloadLinkDownloadable(link);
         } else {
             this.downloadable = dashDownloadable;
         }
@@ -99,6 +102,12 @@ public class SegmentDownloader extends DownloadInterface {
         if (terminated.getAndSet(true) == false) {
             if (!externalDownloadStop()) {
                 logger.severe("A critical Downloaderror occured. Terminate...");
+            }
+            /* make sure the download loop stops and blocking reads are aborted */
+            abort.set(true);
+            final URLConnectionAdapter lCurrentConnection = currentConnection;
+            if (lCurrentConnection != null) {
+                lCurrentConnection.disconnect();
             }
         }
     }
@@ -117,12 +126,11 @@ public class SegmentDownloader extends DownloadInterface {
         if (retry != null) {
             return retry.booleanValue();
         }
-        final URLConnectionAdapter con = br.getHttpConnection();
-        if (!externalDownloadStop() && segmentRetryCounter == 0 && (con.getResponseCode() == 404 || con.getResponseCode() == 502)) {
-            return true;
-        } else {
+        if (externalDownloadStop() || segmentRetryCounter != 0) {
             return false;
         }
+        final int responseCode = br.getHttpConnection().getResponseCode();
+        return responseCode == 404 || responseCode == 502;
     }
 
     protected boolean isSegmentConnectionValid(Segment segment, URLConnectionAdapter con) throws IOException, PluginException {
@@ -135,15 +143,21 @@ public class SegmentDownloader extends DownloadInterface {
             final Browser br = obr.cloneBrowser();
             final Request request = createSegmentRequest(segment);
             final URLConnectionAdapter ret = segment.open(br, request);
-            if (!isSegmentConnectionValid(segment, ret)) {
+            boolean valid = false;
+            try {
+                valid = isSegmentConnectionValid(segment, ret);
+                if (valid) {
+                    return ret;
+                }
                 br.followConnection(true);
-                if (retrySegmentConnection(br, segment, segmentRetryCounter)) {
-                    segmentRetryCounter++;
-                } else {
+                if (!retrySegmentConnection(br, segment, segmentRetryCounter)) {
                     throw new IOException("Invalid responseCode:" + ret.getResponseCode() + "|RetryCounter:" + segmentRetryCounter + "|Segment:" + segment.getUrl());
                 }
-            } else {
-                return ret;
+                segmentRetryCounter++;
+            } finally {
+                if (!valid) {
+                    ret.disconnect();
+                }
             }
         }
         throw new PluginException(LinkStatus.ERROR_RETRY, "externalDownloadStop");
@@ -175,8 +189,80 @@ public class SegmentDownloader extends DownloadInterface {
         return bytesWritten;
     }
 
+    /**
+     * Resume on segment level: Already loaded segments are skipped, the file is continued behind the last completely loaded segment.
+     * Enabled if the Downloadable is resumable. Override and return false if the subclass handles resume on its own.
+     */
+    protected boolean isSegmentResumeEnabled() {
+        return downloadable.isResumable();
+    }
+
+    /** Returns the saved resume point ("SEGMENTCOUNT_NEXTSEGMENTINDEX_FILEPOSITION") or null. Default: stored in the link. */
+    protected String loadResumeInfo() {
+        return link.getStringProperty(PROPERTY_RESUME, null);
+    }
+
+    /** Saves the resume point, null removes it. Default: stored in the link (override if the given link is not persistent). */
+    protected void storeResumeInfo(final String info) {
+        if (info == null) {
+            link.removeProperty(PROPERTY_RESUME);
+        } else {
+            link.setProperty(PROPERTY_RESUME, info);
+        }
+    }
+
+    /** Additional check of a loaded resume point, e.g. whether the segment at the given index is still the expected one. */
+    protected boolean isResumePointValid(final int nextSegmentIndex, final long position) {
+        return true;
+    }
+
+    /**
+     * Reads the resume point of the link and checks it: It must belong to the same number of segments and the part file must be at least
+     * as long as the saved position. Otherwise the download starts from the beginning.
+     */
+    private void loadResumePoint() {
+        resumeSegmentIndex = 0;
+        resumePosition = 0;
+        if (!isSegmentResumeEnabled()) {
+            storeResumeInfo(null);
+            return;
+        }
+        final String info = loadResumeInfo();
+        if (info == null) {
+            return;
+        }
+        final String[] parts = info.split("_");
+        if (parts.length != 3) {
+            return;
+        }
+        try {
+            final int count = Integer.parseInt(parts[0]);
+            final int index = Integer.parseInt(parts[1]);
+            final long position = Long.parseLong(parts[2]);
+            if (count != segments.size() || index <= 0 || index > count || position <= 0) {
+                return;
+            }
+            if (!outputPartFile.isFile() || outputPartFile.length() < position || !isResumePointValid(index, position)) {
+                return;
+            }
+            resumeSegmentIndex = index;
+            resumePosition = position;
+            logger.info("Resume at segment " + (index + 1) + "/" + count + " position " + position);
+        } catch (final NumberFormatException e) {
+            logger.log(e);
+        }
+    }
+
+    /** Saves the point behind the segment with the given index: The next segment starts at the current end of the written data. */
+    private void saveResumePoint(final int nextSegmentIndex) {
+        if (isSegmentResumeEnabled()) {
+            storeResumeInfo(segments.size() + "_" + nextSegmentIndex + "_" + bytesWritten);
+        }
+    }
+
     public void run() throws Exception {
         link.setDownloadSize(-1);
+        loadResumePoint();
         final boolean isResumedDownload = isResumedDownload();
         final RandomAccessFile outputStream;
         try {
@@ -187,7 +273,16 @@ public class SegmentDownloader extends DownloadInterface {
         final MeteredThrottledInputStream meteredThrottledInputStream = new MeteredThrottledInputStream(new NullInputStream(), new AverageSpeedMeter(10));
         boolean localIO = false;
         try {
-            if (!isResumedDownload) {
+            if (resumeSegmentIndex > 0) {
+                /* Throw away the data of the segment which was not loaded completely and continue behind the last complete segment. */
+                outputStream.getChannel().truncate(resumePosition);
+                outputStream.seek(resumePosition);
+                bytesWritten = resumePosition;
+                downloadable.setDownloadBytesLoaded(bytesWritten);
+                for (int i = 0; i < resumeSegmentIndex; i++) {
+                    segments.get(i).getChunkRange().setValidLoaded(true);
+                }
+            } else if (!isResumedDownload) {
                 outputStream.getChannel().truncate(0);
             }
             final String cust = link.getCustomExtension();
@@ -197,44 +292,55 @@ public class SegmentDownloader extends DownloadInterface {
             if (connectionHandler != null) {
                 connectionHandler.addThrottledConnection(meteredThrottledInputStream);
             }
-            for (final Segment segment : segments) {
-                if (!externalDownloadStop()) {
-                    try {
-                        currentConnection = openSegmentConnection(segment);
-                        if (lastModified == null) {
-                            final Date last = TimeFormatter.parseDateString(currentConnection.getHeaderField("Last-Modified"));
-                            if (last != null) {
-                                lastModified = last.getTime();
-                            }
+            for (int segmentIndex = resumeSegmentIndex; segmentIndex < segments.size(); segmentIndex++) {
+                final Segment segment = segments.get(segmentIndex);
+                if (externalDownloadStop()) {
+                    break;
+                }
+                try {
+                    currentConnection = openSegmentConnection(segment);
+                    if (lastModified == null) {
+                        final Date last = TimeFormatter.parseDateString(currentConnection.getHeaderField("Last-Modified"));
+                        if (last != null) {
+                            lastModified = last.getTime();
                         }
-                        segment.getChunkRange().setValidLoaded(true);
-                        meteredThrottledInputStream.setInputStream(getInputStream(segment, currentConnection));
-                        bytesWritten = onSegmentStart(outputStream, segment, currentConnection);
-                        while (!externalDownloadStop()) {
-                            final int read = readSegment(segment, currentConnection, meteredThrottledInputStream, readWriteBuffer);
-                            if (read > 0) {
-                                localIO = true;
-                                bytesWritten += writeSegment(segment, currentConnection, outputStream, readWriteBuffer, 0, read);
-                                localIO = false;
-                                downloadable.setDownloadBytesLoaded(bytesWritten);
-                            } else if (read == -1) {
-                                break;
-                            }
+                    }
+                    meteredThrottledInputStream.setInputStream(getInputStream(segment, currentConnection));
+                    bytesWritten = onSegmentStart(outputStream, segment, currentConnection);
+                    while (!externalDownloadStop()) {
+                        final int read = readSegment(segment, currentConnection, meteredThrottledInputStream, readWriteBuffer);
+                        if (read == -1) {
+                            segment.getChunkRange().setValidLoaded(true);
+                            /* the data must be on disk before the resume point is saved */
+                            outputStream.getChannel().force(true);
+                            saveResumePoint(segmentIndex + 1);
+                            break;
+                        } else if (read == 0) {
+                            continue;
                         }
-                    } finally {
-                        final URLConnectionAdapter lCurrentConnection = currentConnection;
-                        currentConnection = null;
-                        if (lCurrentConnection != null) {
-                            try {
-                                onSegmentClose(outputStream, segment, lCurrentConnection);
-                            } finally {
-                                lCurrentConnection.disconnect();
-                            }
+                        localIO = true;
+                        bytesWritten += writeSegment(segment, currentConnection, outputStream, readWriteBuffer, 0, read);
+                        localIO = false;
+                        downloadable.setDownloadBytesLoaded(bytesWritten);
+                    }
+                } finally {
+                    final URLConnectionAdapter lCurrentConnection = currentConnection;
+                    currentConnection = null;
+                    if (lCurrentConnection != null) {
+                        try {
+                            onSegmentClose(outputStream, segment, lCurrentConnection);
+                        } finally {
+                            lCurrentConnection.disconnect();
                         }
                     }
                 }
             }
         } catch (IOException e) {
+            if (externalDownloadStop() && !localIO) {
+                /* connection was closed by stopDownload/terminate */
+                logger.log(e);
+                return;
+            }
             if (localIO) {
                 throw new SkipReasonException(SkipReason.DISK_FULL);
             } else {
@@ -354,15 +460,13 @@ public class SegmentDownloader extends DownloadInterface {
         cleanupDownladInterface();
         if (handleErrors(outputPartFile) == false) {
             return false;
-        } else {
-            final boolean renameOkay = finalizeDownload(outputPartFile, outputCompleteFile, lastModified);
-            if (!renameOkay) {
-                error(new PluginException(LinkStatus.ERROR_DOWNLOAD_FAILED, _JDT.T.system_download_errors_couldnotrename(), LinkStatus.VALUE_LOCAL_IO_ERROR));
-                return false;
-            } else {
-                return true;
-            }
         }
+        final boolean renameOkay = finalizeDownload(outputPartFile, outputCompleteFile, lastModified);
+        if (!renameOkay) {
+            error(new PluginException(LinkStatus.ERROR_DOWNLOAD_FAILED, _JDT.T.system_download_errors_couldnotrename(), LinkStatus.VALUE_LOCAL_IO_ERROR));
+            return false;
+        }
+        return true;
     }
 
     protected boolean finalizeDownload(File outputPartFile, File outputCompleteFile, Long lastModified) throws Exception {
@@ -405,24 +509,26 @@ public class SegmentDownloader extends DownloadInterface {
     }
 
     protected boolean handleErrors(final File file) throws PluginException {
+        final PluginException caught;
+        synchronized (this) {
+            caught = caughtPluginException;
+        }
+        if (caught != null) {
+            throw caught;
+        }
         if (externalDownloadStop()) {
             return false;
-        } else {
-            if (caughtPluginException == null) {
-                if (!file.isFile()) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                } else {
-                    final long fileSize = file.length();
-                    checkComplete(segments, fileSize);
-                    downloadable.setDownloadBytesLoaded(fileSize);
-                    downloadable.setVerifiedFileSize(fileSize);
-                    downloadable.setLinkStatus(LinkStatus.FINISHED);
-                    return true;
-                }
-            } else {
-                throw caughtPluginException;
-            }
         }
+        if (!file.isFile()) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final long fileSize = file.length();
+        checkComplete(segments, fileSize);
+        downloadable.setDownloadBytesLoaded(fileSize);
+        downloadable.setVerifiedFileSize(fileSize);
+        downloadable.setLinkStatus(LinkStatus.FINISHED);
+        storeResumeInfo(null);
+        return true;
     }
 
     private void createOutputChannel() throws SkipReasonException {
@@ -486,6 +592,6 @@ public class SegmentDownloader extends DownloadInterface {
 
     @Override
     public boolean isResumedDownload() {
-        return false;
+        return resumeSegmentIndex > 0;
     }
 }

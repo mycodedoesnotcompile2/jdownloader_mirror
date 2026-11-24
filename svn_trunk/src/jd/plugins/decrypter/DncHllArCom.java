@@ -2,7 +2,6 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -15,12 +14,13 @@ import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
 /**
  * category not designed to do spanning page support!
  */
-@DecrypterPlugin(revision = "$Revision: 52680 $", interfaceVersion = 2, names = { "dancehallarena.com" }, urls = { "https?://(?:\\w*\\.)?dancehallarena\\.com/(?:[a-zA-Z0-9\\-/]+|category/(?:(?:dancehall|reggae)/(?:singles/|dancehall-albums/|instrumental-dancehall/)?|soca/|mixtapes/(?:dancehall-mixtapes/|reggae-mixtapes/|hiphoprb/)?|videos/(?:music-videos/|viral-videos/)?|efx/)(?:page/\\d+)?)" })
-public class DncHllArCom extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 2, names = { "dancehallarena.com" }, urls = { "https?://(?:\\w*\\.)?dancehallarena\\.com/(?:[a-zA-Z0-9\\-/]+|category/(?:(?:dancehall|reggae)/(?:singles/|dancehall-albums/|instrumental-dancehall/)?|soca/|mixtapes/(?:dancehall-mixtapes/|reggae-mixtapes/|hiphoprb/)?|videos/(?:music-videos/|viral-videos/)?|efx/)(?:page/\\d+)?)" })
+public class DncHllArCom extends PluginForDecrypt {
     public DncHllArCom(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -29,7 +29,7 @@ public class DncHllArCom extends antiDDoSForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String parameter = param.getCryptedUrl();
         br.setFollowRedirects(true);
-        getPage(parameter);
+        br.getPage(parameter);
         // invalid url
         if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("<h2>No posts")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -45,7 +45,6 @@ public class DncHllArCom extends antiDDoSForDecrypt {
             return ret;
         } else {
             // all external links pass via there own tracking url
-            // String[] links = br.getRegex("xurl=(http[^\"]+|://[^\"]+|%3A%2F%2F[^\"]+)").getColumn(0);
             String[] links = br.getRegex("xurl=(%3A%2F%2F[^\"]+)\" target=").getColumn(0);
             if (links != null) {
                 for (String link : links) {

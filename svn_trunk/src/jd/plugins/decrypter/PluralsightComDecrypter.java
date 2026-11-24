@@ -8,7 +8,6 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.plugins.components.config.PluralsightComConfig;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
@@ -16,8 +15,6 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
-import jd.http.Browser;
-import jd.http.Request;
 import jd.plugins.Account;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -26,12 +23,13 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.PluralsightCom;
 
-@DecrypterPlugin(revision = "$Revision: 50463 $", interfaceVersion = 1, names = { "pluralsight.com" }, urls = { "https?://(?:app|www)?\\.pluralsight\\.com/.+" })
-public class PluralsightComDecrypter extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54117 $", interfaceVersion = 1, names = { "pluralsight.com" }, urls = { "https?://(?:app|www)?\\.pluralsight\\.com/.+" })
+public class PluralsightComDecrypter extends PluginForDecrypt {
     public PluralsightComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -44,11 +42,6 @@ public class PluralsightComDecrypter extends antiDDoSForDecrypt {
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         return crawl(param);
-    }
-
-    @Override
-    public void sendRequest(Browser ibr, Request request) throws Exception {
-        super.sendRequest(ibr, request);
     }
 
     private ArrayList<DownloadLink> crawl(final CryptedLink param) throws Exception {
@@ -82,7 +75,7 @@ public class PluralsightComDecrypter extends antiDDoSForDecrypt {
                 /* Invalid URL or developer mistake. */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            getPage(baseURL + "/learner/content/courses/" + courseSlug);
+            br.getPage(baseURL + "/learner/content/courses/" + courseSlug);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -91,10 +84,10 @@ public class PluralsightComDecrypter extends antiDDoSForDecrypt {
         }
         if (courseId != null) {
             /* Get table of contents via courseId */
-            getPage(baseURL + "/course-player/api/v1/table-of-contents/course/" + courseId);
+            br.getPage(baseURL + "/course-player/api/v1/table-of-contents/course/" + courseId);
         } else if (clipIdByAddedURL != null) {
             /* Get table of contents via clipId */
-            getPage(baseURL + "/course-player/api/v1/table-of-contents/clip/" + clipIdByAddedURL);
+            br.getPage(baseURL + "/course-player/api/v1/table-of-contents/clip/" + clipIdByAddedURL);
         } else {
             /* This should never happen */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -104,7 +97,6 @@ public class PluralsightComDecrypter extends antiDDoSForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final Map<String, Object> course = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        // final String courseSlug = course.get("deprecatedCourseId").toString();
         final String courseTitle = (String) course.get("title");
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(courseTitle);

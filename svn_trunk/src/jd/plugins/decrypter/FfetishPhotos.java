@@ -29,12 +29,12 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 46930 $", interfaceVersion = 3, names = { "ffetish.photos", "ffetish.video" }, urls = { "https?://(?:[a-z0-9\\-]+\\.)?ffetish\\.photos/\\d+[a-z0-9\\-]+\\.html", "https?://(?:[a-z0-9\\-]+\\.)?ffetish\\.video/\\d+[a-z0-9\\-]+\\.html" })
-public class FfetishPhotos extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = { "ffetish.photos", "ffetish.video" }, urls = { "https?://(?:[a-z0-9\\-]+\\.)?ffetish\\.photos/\\d+[a-z0-9\\-]+\\.html", "https?://(?:[a-z0-9\\-]+\\.)?ffetish\\.video/\\d+[a-z0-9\\-]+\\.html" })
+public class FfetishPhotos extends PluginForDecrypt {
     public FfetishPhotos(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -47,7 +47,7 @@ public class FfetishPhotos extends antiDDoSForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String parameter = param.toString();
+        final String parameter = param.getCryptedUrl();
         final String dl_id = new Regex(parameter, "(?:photos|video)/(\\d+)").getMatch(0);
         final String skin;
         if ("ffetish.photos".equals(getHost())) {
@@ -56,7 +56,7 @@ public class FfetishPhotos extends antiDDoSForDecrypt {
             skin = "ffvideo";
         }
         br.setFollowRedirects(true);
-        getPage(parameter);
+        br.getPage(parameter);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -91,12 +91,12 @@ public class FfetishPhotos extends antiDDoSForDecrypt {
                  * following attempts will fail due to wrong Referer header.
                  */
                 br.setCurrentURL(initialURL);
-                postPage("/engine/ajax/getlink.php", "sec_code=" + Encoding.urlEncode(code) + "&id=" + dl_id + "&skin=" + skin);
+                br.postPage("/engine/ajax/getlink.php", "sec_code=" + Encoding.urlEncode(code) + "&id=" + dl_id + "&skin=" + skin);
                 final Form form = br.getForm(0);
                 if (form != null && form.containsHTML("g-recaptcha")) {
                     final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
                     form.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                    submitForm(form);
+                    br.submitForm(form);
                 }
                 if (br.getForm(0) == null && br.toString().length() > 100) {
                     success = true;
@@ -115,7 +115,7 @@ public class FfetishPhotos extends antiDDoSForDecrypt {
             return null;
         }
         br.setFollowRedirects(false);
-        getPage(finallink);
+        br.getPage(finallink);
         finallink = br.getRedirectLocation();
         if (finallink == null) {
             logger.warning("Decrypter broken for link: " + parameter);

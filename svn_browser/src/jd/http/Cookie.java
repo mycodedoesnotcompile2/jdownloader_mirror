@@ -263,8 +263,18 @@ public abstract class Cookie {
         return ret;
     }
 
+    /**
+     * version number that is currently only used by CookieStorable to provide further meta information for deserialization
+     * 
+     * @return
+     */
     public long getVersion() {
-        return 2026_11_20l;
+        return version;
+    }
+
+    public boolean setVersion(long version) {
+        final long oldVersion = this.version;
+        return oldVersion != (this.version = version);
     }
 
     public boolean isSecureProtocol() {
@@ -296,6 +306,7 @@ public abstract class Cookie {
         ret.setPath(cookie.getPath());
         ret.setKey(cookie.getKey());
         ret.setHost(cookie.getOriginHost());
+        ret.setVersion(cookie.getVersion());
         return ret;
     }
 
@@ -307,6 +318,7 @@ public abstract class Cookie {
     private Boolean secure     = null;
     private Boolean hostOnly   = null;
     private String  sameSite   = null;
+    private long    version    = 2026_11_20l;
 
     public String getSetSameSite() {
         return sameSite;

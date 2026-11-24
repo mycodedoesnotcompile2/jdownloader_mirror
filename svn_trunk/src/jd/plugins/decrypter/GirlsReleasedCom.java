@@ -23,7 +23,6 @@ import java.util.regex.Pattern;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
@@ -37,9 +36,10 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52485 $", interfaceVersion = 3, names = {}, urls = {})
-public class GirlsReleasedCom extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = {}, urls = {})
+public class GirlsReleasedCom extends PluginForDecrypt {
     public GirlsReleasedCom(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -112,7 +112,7 @@ public class GirlsReleasedCom extends antiDDoSForDecrypt {
             getLogger().warning("Unable to determine page type!");
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        getPage(contenturl);
+        br.getPage(contenturl);
         // Build API payload
         String[][] idList = null;
         String payload = null;
@@ -148,7 +148,7 @@ public class GirlsReleasedCom extends antiDDoSForDecrypt {
         final String api_base = "https://www.girlsreleased.com/api/0.3";
         if (pageType == PageType.GR_SET) {
             final Request request = br.createGetRequest(api_base + "/set/" + setID);
-            sendRequest(br, request);
+            br.getPage(request);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -192,7 +192,7 @@ public class GirlsReleasedCom extends antiDDoSForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             final Request request = br.createGetRequest(api_base + "/sets/site/" + site + "/model/" + modelID + "/sort/date" + modelID);
-            sendRequest(br, request);
+            br.getPage(request);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -209,7 +209,7 @@ public class GirlsReleasedCom extends antiDDoSForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             final Request request = br.createGetRequest(api_base + "/sets/site/" + site + "/sort/date");
-            sendRequest(br, request);
+            br.getPage(request);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -246,7 +246,7 @@ public class GirlsReleasedCom extends antiDDoSForDecrypt {
             post.setContentType("application/json");
             post.setPostDataString(payload);
             br.setRequest(post);
-            postPage(br, postURL, payload);
+            br.postPage(postURL, payload);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }

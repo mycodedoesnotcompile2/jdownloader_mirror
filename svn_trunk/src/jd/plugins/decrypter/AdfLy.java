@@ -24,7 +24,6 @@ import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -35,12 +34,14 @@ import jd.parser.html.HTMLParser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.SiteType.SiteTemplate;
+import jd.plugins.components.UserAgents;
 import jd.plugins.components.UserAgents.BrowserName;
 import jd.utils.RazStringBuilder;
 
-@DecrypterPlugin(revision = "$Revision: 48013 $", interfaceVersion = 2, names = {}, urls = {})
-public class AdfLy extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54119 $", interfaceVersion = 2, names = {}, urls = {})
+public class AdfLy extends PluginForDecrypt {
     private static final String[] domains = { "adf.ly", "j.gs", "q.gs", "ay.gy", "zo.ee", "babblecase.com", "riffhold.com", "microify.com", "pintient.com", "tinyium.com", "atominik.com", "bluenik.com", "bitigee.com", "atomcurve.com", "picocurl.com", "tinyical.com", "casualient.com", "battleate.com", "mmoity.com", "simizer.com", "dataurbia.com", "viahold.com", "coginator.com", "cogismith.com", "kaitect.com", "yoalizer.com", "kibuilder.com", "kimechanic.com", "quainator.com", "tinyium.com", "pintient.com", "quamiller.com", "yobuilder.com", "skamason.com", "twineer.com", "vializer.com", "viwright.com", "yabuilder.com", "yamechanic.com", "kializer.com", "yoineer.com", "skamaker.com", "yoitect.com", "activeation.com", "brisktopia.com", "queuecosm.bid", "nimbleinity.com", "rapidtory.com", "swiftation.com", "velocicosm.com", "zipteria.com", "zipvale.com", "agileurbia.com", "briskrange.com",
             "threadsphere.bid", "dashsphere.com", "fasttory.com", "rapidteria.com", "sprysphere.com", "swifttopia.com", "restorecosm.bid", "bullads.net", "velociterium.com", "zipansion.com", "activeterium.com", "clearload.bid", "brightvar.bid", "activetect.net", "swiftviz.net", "kudoflow.com", "infopade.com", "linkjaunt.com", "combostruct.com", "turboagram.com", "wirecellar.com", "streamvoyage.com", "metastead.com", "briskgram.net", "swarife.com", "baymaleti.net", "dapalan.com", "cinebo.net", "stratoplot.com", "thouth.net", "atabencot.net", "ecleneue.com", "twiriock.com", "uclaut.net", "linkup.pro", "lopoteam.com", "keistaru.com", "gloyah.net", "cesinthi.com", "sluppend.com", "fainbory.com", "infopade.com", "onisedeo.com", "ethobleo.com", "evassmat.com", "aclabink.com", "optitopt.com", "tonancos.com", "clesolea.com", "thacorag.com", "xterca.net", "larati.net", "cowner.net",
             "scuseami.net", "gatustox.net", "hinafinea.com", "fiaharam.net", "libittarc.com", "raboninco.com", "gdanstum.net", "aporasal.net", "motriael.com", "smeartha.com", "apticirl.com", "onizatop.net", "anthargo.com", "fumacrom.com", "regecish.net", "hurirk.net", "usfinf.net", "fumacrom.com", "xervoo.net", "usheethe.com", "eloism.net", "magybu.net", "uhishado.com", "hadsucma.com", "lyksoomu.com", "neexulro.net", "shycmedi.com", "oaxyteek.net", "myurl.in",
@@ -104,18 +105,15 @@ public class AdfLy extends antiDDoSForDecrypt {
     private String                         protocol        = null;
 
     @Override
-    protected boolean useRUA() {
-        return true;
-    }
-
-    @Override
-    protected BrowserName setBrowserName() {
-        return BrowserName.Chrome;
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put("User-Agent", UserAgents.stringUserAgent(BrowserName.Chrome));
+        return br;
     }
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        final String parameter = param.toString().replace("www.", "");
+        final String parameter = param.getCryptedUrl().replace("www.", "");
         final String hosts = HOSTS.get();
         if (parameter.matches(hosts + INVALIDLINKS)) {
             logger.info("Invalid: " + parameter);
@@ -166,7 +164,7 @@ public class AdfLy extends antiDDoSForDecrypt {
         String finallink = null;
         for (int i = 0; i <= 2; i++) {
             synchronized (LOCK) {
-                getPage(parameter.replaceFirst("https?://", protocol));
+                br.getPage(parameter.replaceFirst("https?://", protocol));
             }
             if (true) {
                 String redir = br.getRedirectLocation();
@@ -261,7 +259,7 @@ public class AdfLy extends antiDDoSForDecrypt {
             /* 20130130 */
             if (finallink == null && (countdown != null && zzz != null && easyUrl != null)) {
                 if (countdown.equalsIgnoreCase("7") && easyUrl.equalsIgnoreCase("false")) {
-                    postPage("/shortener/go", "zzz=" + Encoding.urlEncode(zzz));
+                    br.postPage("/shortener/go", "zzz=" + Encoding.urlEncode(zzz));
                     finallink = br.getRegex("(http[^\"']+)").getMatch(0);
                 }
             }
@@ -293,7 +291,7 @@ public class AdfLy extends antiDDoSForDecrypt {
                 } else {
                     sleep(wait * 1000l, param);
                 }
-                getPage(extendedProtectionPage);
+                br.getPage(extendedProtectionPage);
                 String tempLink = br.getRedirectLocation();
                 if (tempLink != null) {
                     tempLink = tempLink.replace("www.", "");
@@ -361,7 +359,7 @@ public class AdfLy extends antiDDoSForDecrypt {
         final String[] skpWaitLinks = { "cdn.adf.ly/css/adfly_1.css", "cdn.adf.ly/js/adfly.js", "cdn.adf.ly/images/logo_fb.png", "cdn.adf.ly/images/skip_ad/en.png", "adf.ly/favicon.ico", "cdn.adf.ly/images/ad_top_bg.png", "adf.ly/omnigy7425325410.swf", "adf.ly/holder.php" };
         for (final String skWaitLink : skpWaitLinks) {
             try {
-                openAntiDDoSRequestConnection(brAds, brAds.createGetRequest(protocol + skWaitLink));
+                brAds.openRequestConnection(brAds.createGetRequest(protocol + skWaitLink));
             } catch (final Exception e) {
             }
         }

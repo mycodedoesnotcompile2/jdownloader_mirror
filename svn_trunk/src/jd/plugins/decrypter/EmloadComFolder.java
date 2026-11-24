@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -35,12 +34,13 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.EmloadCom;
 
-@DecrypterPlugin(revision = "$Revision: 53196 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { EmloadCom.class })
-public class EmloadComFolder extends antiDDoSForDecrypt {
+public class EmloadComFolder extends PluginForDecrypt {
     public EmloadComFolder(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -85,7 +85,7 @@ public class EmloadComFolder extends antiDDoSForDecrypt {
                 ((EmloadCom) plugin).login(br, null, false);
             }
         }
-        getPage(contenturl);
+        br.getPage(contenturl);
         /* Keep this errorhandling although, if an account is available, we should be logged in at this stage! */
         if (br.containsHTML(">\\s*This link only for premium")) {
             throw new AccountRequiredException();

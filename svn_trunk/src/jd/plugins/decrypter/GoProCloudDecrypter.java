@@ -46,6 +46,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.gopro.Download;
 import jd.plugins.components.gopro.FlexiJSonNodeResponse;
@@ -68,12 +69,11 @@ import org.appwork.utils.CompareUtils;
 import org.appwork.utils.ConcatIterator;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
-@DecrypterPlugin(revision = "$Revision: 50198 $", interfaceVersion = 3, names = { "gopro.com" }, urls = { "(https?://(?:plus\\.)?gopro\\.com/media-library/[a-zA-Z0-9]+|https?://(?:plus\\.)?gopro\\.com/media-library/?$|https?://(?:www\\.)?gopro\\.com/v/[A-Za-z0-9]+/?(?:[A-Za-z0-9]+)?$)" })
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = { "gopro.com" }, urls = { "(https?://(?:plus\\.)?gopro\\.com/media-library/[a-zA-Z0-9]+|https?://(?:plus\\.)?gopro\\.com/media-library/?$|https?://(?:www\\.)?gopro\\.com/v/[A-Za-z0-9]+/?(?:[A-Za-z0-9]+)?$)" })
 @PluginDependencies(dependencies = { GoProCloud.class })
-public class GoProCloudDecrypter extends antiDDoSForDecrypt {
+public class GoProCloudDecrypter extends PluginForDecrypt {
     private GoProConfig hostConfig;
 
     public GoProCloudDecrypter(PluginWrapper wrapper) {
@@ -186,7 +186,6 @@ public class GoProCloudDecrypter extends antiDDoSForDecrypt {
                 }
                 final Media[] media = resp.getEmbedded().getMedia();
                 for (Media m : media) {
-                    // System.out.println(m.getCaptured_at() + " - " + scanReadable);
                     if (scanUntil > 0 && m.getCaptured_at().getTime() < scanUntil) {
                         return;
                     } else if (isAbort()) {
@@ -215,10 +214,7 @@ public class GoProCloudDecrypter extends antiDDoSForDecrypt {
     @Override
     public CrawledLink convert(DownloadLink link) {
         CrawledLink ret = super.convert(link);
-        // if (hostConfig.isKeepLinksInLinkgrabber()) {
-        // TODO
-        // ret.setSticky(StickyOption.STICKY);
-        // }
+        /* TODO: Keep links in the linkgrabber (StickyOption.STICKY) if hostConfig.isKeepLinksInLinkgrabber() is enabled. */
         return ret;
     }
 

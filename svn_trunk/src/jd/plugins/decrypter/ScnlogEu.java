@@ -30,24 +30,27 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.components.UserAgents;
 
 import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 /**
  * So I had this written some time back, just never committed. Here is my original with proper error handling etc. -raz
  *
  * @author raztoki
  */
-@DecrypterPlugin(revision = "$Revision: 53683 $", interfaceVersion = 3, names = {}, urls = {})
-public class ScnlogEu extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54119 $", interfaceVersion = 3, names = {}, urls = {})
+public class ScnlogEu extends PluginForDecrypt {
     public ScnlogEu(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     @Override
-    protected boolean useRUA() {
-        return true;
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put("User-Agent", UserAgents.stringUserAgent());
+        return br;
     }
 
     public static List<String[]> getPluginDomains() {
@@ -90,7 +93,7 @@ public class ScnlogEu extends antiDDoSForDecrypt {
                 break;
             }
         }
-        getPage(contenturl);
+        br.getPage(contenturl);
         if (br.containsHTML("<title>404 Page Not Found</title>|>Sorry, but you are looking for something that isn't here\\.<") || this.br.toString().length() < 200 || br.getHttpConnection().getResponseCode() == 403 || br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (this.br.getURL().contains("/feed/") || this.br.getURL().contains("/feedback/")) {

@@ -2457,6 +2457,13 @@ public abstract class PluginForHost extends Plugin {
 
     /**
      * no Browser instance available!
+     * <p>
+     * Only called if the plugin returns {@link org.jdownloader.plugins.controller.LazyPlugin.FEATURE#FAVICON} in its getFeatures(), see
+     * {@link jd.controlling.faviconcontroller.FavIcons}. Without this feature, overriding this method has no effect.
+     * <p>
+     * Supported return values: an {@link javax.swing.Icon} or {@link java.awt.Image} (used directly), a String with a domain or a
+     * Collection of Strings with domains (the favicon of that domain is used, e.g. "javcl.com"), or null (default behavior: favicon of the
+     * plugin's own website).
      *
      * @param host
      * @return

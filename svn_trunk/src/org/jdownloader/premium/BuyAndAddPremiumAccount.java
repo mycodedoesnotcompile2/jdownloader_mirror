@@ -10,11 +10,7 @@ import javax.swing.ImageIcon;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-
-import jd.gui.swing.dialog.AddAccountDialog;
-import jd.gui.swing.dialog.InputOKButtonAdapter;
-import jd.plugins.Account;
-import jd.plugins.PluginForHost;
+import javax.swing.SwingConstants;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.swing.MigPanel;
@@ -24,6 +20,7 @@ import org.appwork.utils.swing.dialog.AbstractDialog;
 import org.appwork.utils.swing.dialog.DialogNoAnswerException;
 import org.jdownloader.DomainInfo;
 import org.jdownloader.gui.InputChangedCallbackInterface;
+import org.jdownloader.gui.sponsor.AdDisclosureHelper;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.plugins.accounts.AccountBuilderInterface;
@@ -31,6 +28,12 @@ import org.jdownloader.plugins.controller.PluginClassLoader;
 import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChild;
 import org.jdownloader.plugins.controller.UpdateRequiredClassNotFoundException;
 import org.jdownloader.plugins.controller.host.HostPluginController;
+import org.jdownloader.plugins.controller.host.LazyHostPlugin;
+
+import jd.gui.swing.dialog.AddAccountDialog;
+import jd.gui.swing.dialog.InputOKButtonAdapter;
+import jd.plugins.Account;
+import jd.plugins.PluginForHost;
 
 public class BuyAndAddPremiumAccount extends AbstractDialog<Boolean> implements BuyAndAddPremiumDialogInterface, InputChangedCallbackInterface {
     private AccountBuilderInterface      accountBuilderUI;
@@ -40,6 +43,7 @@ public class BuyAndAddPremiumAccount extends AbstractDialog<Boolean> implements 
     public BuyAndAddPremiumAccount(DomainInfo info, String id) {
         super(0, _GUI.T.BuyAndAddPremiumAccount_BuyAndAddPremiumAccount_title_(), null, null, null);
         cl = PluginClassLoader.getInstance().getChild();
+        // marker: see adDisclosure label
         openURLAction = new OpenURLAction(info, id == null ? "BuyAndAddDialog" : id);
     }
 
@@ -53,24 +57,39 @@ public class BuyAndAddPremiumAccount extends AbstractDialog<Boolean> implements 
     }
 
     public void actionPerformed(final ActionEvent e) {
-        if (e.getSource() == this.okButton) {
-            org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().fine("Answer: Button<OK:" + this.okButton.getText() + ">");
-            Account ac = accountBuilderUI.getAccount();
-            ac.setHoster(getOpenURLAction().getInfo().getTld());
-            try {
-                if (!AddAccountDialog.addAccount(ac)) {
-                    return;
-                } else {
-                    this.dispose();
-                }
-            } catch (DialogNoAnswerException e2) {
-                this.dispose();
-            }
-            this.setReturnmask(true);
-        } else if (e.getSource() == this.cancelButton) {
+        if (e.getSource() == this.cancelButton) {
             org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().fine("Answer: Button<CANCEL:" + this.cancelButton.getText() + ">");
             this.setReturnmask(false);
+            this.dispose();
+            return;
         }
+        if (e.getSource() != this.okButton) {
+            /* Unknown source: just close */
+            this.dispose();
+            return;
+        }
+        org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().fine("Answer: Button<OK:" + this.okButton.getText() + ">");
+        final Account ac = accountBuilderUI.getAccount();
+        if (ac == null) {
+            /* No valid input yet: keep the dialog open */
+            return;
+        }
+        ac.setHoster(getOpenURLAction().getInfo().getTld());
+        final boolean added;
+        try {
+            added = AddAccountDialog.addAccount(ac);
+        } catch (final DialogNoAnswerException e2) {
+            /* The user cancelled the account check: no account was added, so the dialog is closed as cancelled */
+            this.setReturnmask(false);
+            this.dispose();
+            return;
+        }
+        if (!added) {
+            /* The account was rejected (an error message was already shown): keep the dialog open so the user can correct the input */
+            return;
+        }
+        /* The return mask has to be set before dispose() */
+        this.setReturnmask(true);
         this.dispose();
     }
 
@@ -86,13 +105,14 @@ public class BuyAndAddPremiumAccount extends AbstractDialog<Boolean> implements 
 
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
-                if (back != null) {
-                    final Graphics2D g2 = (Graphics2D) g;
-                    double faktor = Math.max((double) back.getWidth(null) / getWidth(), (double) back.getHeight(null) / getHeight());
-                    int width = Math.max((int) (back.getWidth(null) / faktor), 1);
-                    int height = Math.max((int) (back.getHeight(null) / faktor), 1);
-                    g2.drawImage(back, 0, getHeight() - height, width, getHeight(), 0, 0, back.getWidth(null), back.getHeight(null), getBackground(), null);
+                if (back == null) {
+                    return;
                 }
+                final Graphics2D g2 = (Graphics2D) g;
+                double faktor = Math.max((double) back.getWidth(null) / getWidth(), (double) back.getHeight(null) / getHeight());
+                int width = Math.max((int) (back.getWidth(null) / faktor), 1);
+                int height = Math.max((int) (back.getHeight(null) / faktor), 1);
+                g2.drawImage(back, 0, getHeight() - height, width, getHeight(), 0, 0, back.getWidth(null), back.getHeight(null), getBackground(), null);
             }
         });
     }
@@ -107,12 +127,19 @@ public class BuyAndAddPremiumAccount extends AbstractDialog<Boolean> implements 
             ret.add(ico);
         }
         ret.add(header(_GUI.T.BuyAndAddPremiumAccount_layoutDialogContent_get()), "gapleft 15,pushx,growx");
-        ExtButton bt = new ExtButton(openURLAction);
+        final ExtButton bt = new ExtButton(openURLAction);
         ret.add(bt, "gapleft 27");
+        /* The ad disclosure is intentionally always shown here. */
+        ret.add(AdDisclosureHelper.createAdDisclosureLabel(SwingConstants.CENTER, null), "gapleft 27");
         ret.add(header(_GUI.T.BuyAndAddPremiumAccount_layoutDialogContent_enter()), "gapleft 15,pushx,growx");
+        final LazyHostPlugin lazyPlugin = HostPluginController.getInstance().get(info.getTld());
+        if (lazyPlugin == null) {
+            /* Without the plugin there is no account input to show */
+            throw new WTFException("No host plugin found for " + info.getTld());
+        }
         final PluginForHost plg;
         try {
-            plg = HostPluginController.getInstance().get(info.getTld()).newInstance(cl);
+            plg = lazyPlugin.newInstance(cl);
         } catch (UpdateRequiredClassNotFoundException e) {
             throw new WTFException(e);
         }

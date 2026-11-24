@@ -5,6 +5,7 @@ import javax.swing.Icon;
 import org.jdownloader.gui.notify.gui.AbstractNotifyWindow;
 
 import jd.plugins.Account;
+import jd.plugins.PluginForHost;
 
 /**
  * Bubble window for {@link LowCaptchaCreditsBubbleSupport}. Unlike {@link org.jdownloader.gui.notify.BasicNotify} a click on the bubble
@@ -15,8 +16,8 @@ public class LowCaptchaCreditsBubble extends AbstractNotifyWindow<LowCaptchaCred
      * @param headerIcon
      *            Small icon shown in front of the title (the favicon of the solver)
      */
-    public LowCaptchaCreditsBubble(final LowCaptchaCreditsBubbleSupport support, final String caption, final Icon headerIcon, final Account account, final String text, final String buyCreditsUrl) {
-        super(support, caption, new LowCaptchaCreditsBubbleContent(account, text, buyCreditsUrl));
+    public LowCaptchaCreditsBubble(final LowCaptchaCreditsBubbleSupport support, final String caption, final Icon headerIcon, final Account account, final PluginForHost plugin, final String text) {
+        super(support, caption, new LowCaptchaCreditsBubbleContent(account, plugin, text));
         setHeaderIcon(headerIcon);
     }
 }

@@ -29,16 +29,16 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 53511 $", interfaceVersion = 3, names = { "tr.link", "ay.link" }, urls = { "https?://(?:www\\.)?tr\\.link/(?!dmca|skype|webroot)([A-Za-z0-9]+)", "https?://(?:www\\.)?(?:ay\\.link|aylink\\.co)/(?!dmca|skype|webroot)([A-Za-z0-9]+)" })
-public class TrLink extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = { "tr.link", "ay.link" }, urls = { "https?://(?:www\\.)?tr\\.link/(?!dmca|skype|webroot)([A-Za-z0-9]+)", "https?://(?:www\\.)?(?:ay\\.link|aylink\\.co)/(?!dmca|skype|webroot)([A-Za-z0-9]+)" })
+public class TrLink extends PluginForDecrypt {
     public TrLink(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -83,8 +83,7 @@ public class TrLink extends antiDDoSForDecrypt {
         br.getHeaders().put("accept", "application/json, text/javascript, */*; q=0.01");
         br.getHeaders().put("x-requested-with", "XMLHttpRequest");
         /* 2020-06-30: Waittime is skippable */
-        // this.sleep(5 * 1001l, param);
-        getPage("/links/go2?" + query.toString());
+        br.getPage("/links/go2?" + query.toString());
         String finallink = PluginJSonUtils.getJson(br, "url");
         if (StringUtils.isEmpty(finallink)) {
             if (destContent != null) {
@@ -103,7 +102,7 @@ public class TrLink extends antiDDoSForDecrypt {
         if (Browser.getHost(finallink).equals(br.getHost())) {
             logger.info("Looking for internal redirect");
             br.setFollowRedirects(false);
-            getPage(finallink);
+            br.getPage(finallink);
             finallink = br.getRedirectLocation();
             if (finallink == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

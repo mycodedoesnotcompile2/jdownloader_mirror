@@ -10,8 +10,6 @@ import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 
-import jd.plugins.PluginForHost;
-
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtTextArea;
 import org.appwork.utils.images.IconIO;
@@ -24,6 +22,9 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.plugins.controller.UpdateRequiredClassNotFoundException;
 import org.jdownloader.plugins.controller.host.HostPluginController;
+import org.jdownloader.plugins.controller.host.LazyHostPlugin;
+
+import jd.plugins.PluginForHost;
 
 public class PremiumInfoDialog extends AbstractDialog<Object> {
     private final DomainInfo info;
@@ -45,8 +46,8 @@ public class PremiumInfoDialog extends AbstractDialog<Object> {
         super.setReturnmask(b);
         if (b) {
             dispose();
+            /* The afflink is not opened here: The BuyAndAddPremiumAccount dialog has its own button for it (next to the ad disclosure) */
             final BuyAndAddPremiumAccount buyAndAddPremiumAccount = new BuyAndAddPremiumAccount(info, id);
-            buyAndAddPremiumAccount.getOpenURLAction().actionPerformed(null);
             buyAndAddPremiumAccount.show();
         }
     }
@@ -68,12 +69,13 @@ public class PremiumInfoDialog extends AbstractDialog<Object> {
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
                 final Graphics2D g2 = (Graphics2D) g;
-                if (back != null) {
-                    double faktor = Math.max((double) back.getWidth(null) / getWidth(), (double) back.getHeight(null) / getHeight());
-                    int width = Math.max((int) (back.getWidth(null) / faktor), 1);
-                    int height = Math.max((int) (back.getHeight(null) / faktor), 1);
-                    g2.drawImage(back, 0, getHeight() - height, width, getHeight(), 0, 0, back.getWidth(null), back.getHeight(null), getBackground(), null);
+                if (back == null) {
+                    return;
                 }
+                double faktor = Math.max((double) back.getWidth(null) / getWidth(), (double) back.getHeight(null) / getHeight());
+                int width = Math.max((int) (back.getWidth(null) / faktor), 1);
+                int height = Math.max((int) (back.getHeight(null) / faktor), 1);
+                g2.drawImage(back, 0, getHeight() - height, width, getHeight(), 0, 0, back.getWidth(null), back.getHeight(null), getBackground(), null);
             }
         });
     }
@@ -81,10 +83,13 @@ public class PremiumInfoDialog extends AbstractDialog<Object> {
     @Override
     public JComponent layoutDialogContent() {
         PluginForHost plg = null;
-        try {
-            plg = HostPluginController.getInstance().get(info.getTld()).getPrototype(null);
-        } catch (UpdateRequiredClassNotFoundException e) {
-            org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);
+        final LazyHostPlugin lazyPlugin = HostPluginController.getInstance().get(info.getTld());
+        if (lazyPlugin != null) {
+            try {
+                plg = lazyPlugin.getPrototype(null);
+            } catch (UpdateRequiredClassNotFoundException e) {
+                org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);
+            }
         }
         if (plg != null) {
             // let's ask the plugin
@@ -101,47 +106,23 @@ public class PremiumInfoDialog extends AbstractDialog<Object> {
         explain.setText(getDescription(info));
         int h = explain.getPreferredSize().height;
         Icon icon = info.getIcon(h);
-        // if (NewTheme.I().hasIcon("fav/large.wupload.com")) {
-        // JLabel lbl = new JLabel(new AbstractIcon("fav/large.wupload.com",
-        // -1));
-        // lbl.setHorizontalAlignment(SwingConstants.LEFT);
-        // lbl.setBorder(BorderFactory.createMatteBorder(0, 0, 2, 0, new
-        // Color(LAFOptions.getInstance().getPanelHeaderLineColor())));
-        // ret.add(lbl);
-        //
-        // }
         if (icon != null) {
             ret.add(new JLabel(icon), "aligny top,gapright 10");
         }
         ret.add(explain, "spanx");
-        // ret.add(new JSeparator(), "spanx,pushx,growx,gaptop 5");
-        // lbl.setBorder(BorderFactory.createMatteBorder(2, 0, 0, 0, new
-        // Color(LAFOptions.getInstance().getPanelHeaderLineColor())));
         JLabel lbl = new JLabel(_GUI.T.PremiumInfoDialog_layoutDialogContent_advantages_header());
         ret.add(SwingUtils.toBold(lbl), "spanx,pushx,growx");
         ret.add(createAdvantages(), "spanx,gapleft " + (h - 24) + ", gaptop 10");
-        // ret.add(new JSeparator(), "spanx,pushx,growx,gaptop 5");
-        // ret.add(bt, "spanx,alignx center,gapbottom 15,gaptop 10");
-        // ret.add(createHeader(new AbstractIcon("prio_3",
-        // 20),"Premium Mode?"));
         return ret;
     }
 
     protected String getDescription(DomainInfo info2) {
-        return _GUI.T.PremiumInfoDialog_layoutDialogContent_explain(info.getTld());
+        return _GUI.T.PremiumInfoDialog_layoutDialogContent_explain(info2.getTld());
     }
 
     private Component createAdvantages() {
         MigPanel advantages = new MigPanel("ins 0,wrap 2", "[]13[grow,fill]", "[]0[]0[]0[]0[]0[]0[]0[]0");
         advantages.setOpaque(false);
-        // for (PremiumFeature pf :
-        // info.getAffiliateSettings().getPremiumfeatures()) {
-        // if (pf == null) continue;
-        // JLabel ico = new JLabel(new AbstractIcon(pf.getIconKey(), 24));
-        // JLabel lbl = new JLabel(pf.getTranslation());
-        // advantages.add(ico);
-        // advantages.add((lbl));
-        // }
         advantages.add(new JLabel(new AbstractIcon(IconKey.ICON_SPEED, 24)));
         advantages.add(new JLabel(_GUI.T.PremiumFeature_speed_()));
         advantages.add(new JLabel(new AbstractIcon(IconKey.ICON_BATCH, 24)));

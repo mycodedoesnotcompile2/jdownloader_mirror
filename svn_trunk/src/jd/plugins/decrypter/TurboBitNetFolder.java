@@ -23,7 +23,6 @@ import java.util.regex.Pattern;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
@@ -38,12 +37,13 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.hoster.TurboBitNet;
 
-@DecrypterPlugin(revision = "$Revision: 48338 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { TurboBitNet.class })
-public class TurboBitNetFolder extends antiDDoSForDecrypt {
+public class TurboBitNetFolder extends PluginForDecrypt {
     @Override
     public String[] siteSupportedNames() {
         return getAllSupportedNames();
@@ -101,7 +101,6 @@ public class TurboBitNetFolder extends antiDDoSForDecrypt {
             /* Developer mistake! */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        // br.getPage("http://turbobit.net/downloadfolder/gridFile?id_folder=" + id + "&_search=false&nd=&rows=100000&page=1");
         final String host = Browser.getHost(param.getCryptedUrl(), true);
         br.setFollowRedirects(true);
         final int maxItemsPerPage = 100;
@@ -117,7 +116,7 @@ public class TurboBitNetFolder extends antiDDoSForDecrypt {
             query.add("sidx", "name");
             /* Yes they misspelled "sort"! */
             query.add("sord", "asc");
-            getPage("https://" + host + "/downloadfolder/gridFile?" + query.toString());
+            br.getPage("https://" + host + "/downloadfolder/gridFile?" + query.toString());
             if (br.getHttpConnection().getResponseCode() == 400 || br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }

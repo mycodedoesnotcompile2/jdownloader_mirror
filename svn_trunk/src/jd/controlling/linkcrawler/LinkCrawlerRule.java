@@ -10,7 +10,6 @@ import java.util.regex.Pattern;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.remoteapi.annotations.AllowNonStorableObjects;
-import org.appwork.serializer.Deser;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
@@ -73,7 +72,7 @@ public class LinkCrawlerRule {
                 }
                 try {
                     final Map<String, Object> map = JSonStorage.restoreFromString(string, TypeRef.MAP);
-                    if (map == null || !map.containsKey("key") || !map.containsKey("value") || map.containsKey("creationTime")) {
+                    if (map == null || !map.containsKey("key") || !map.containsKey("creationTime")) {
                         return null;
                     }
                     final Cookie cookie = JSonStorage.restoreFromString(string, CookieStorable.TYPE_REF)._restore();
@@ -289,7 +288,7 @@ public class LinkCrawlerRule {
             case 1:
                 try {
                     if (cookieEntry[0] != null && cookieEntry[0].matches("(?s)^\\s*\\{.*\\}\\s*$")) {
-                        cookies.add(Deser.fromString(cookieEntry[0], CookieStorable.TYPE_REF)._restore());
+                        cookies.add(JSonStorage.restoreFromString(cookieEntry[0], CookieStorable.TYPE_REF)._restore());
                         continue;
                     }
                 } catch (Exception e) {

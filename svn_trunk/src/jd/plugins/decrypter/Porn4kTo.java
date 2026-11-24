@@ -25,12 +25,13 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.components.UserAgents;
 
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 52202 $", interfaceVersion = 2, names = { "porn4k.to" }, urls = { "https?://(?:www\\.)?(?:xxx-blog|porn4k)\\.to/(?!wp-content)[a-z0-9\\-]+" })
-public class Porn4kTo extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54119 $", interfaceVersion = 2, names = { "porn4k.to" }, urls = { "https?://(?:www\\.)?(?:xxx-blog|porn4k)\\.to/(?!wp-content)[a-z0-9\\-]+" })
+public class Porn4kTo extends PluginForDecrypt {
     public Porn4kTo(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -41,24 +42,17 @@ public class Porn4kTo extends antiDDoSForDecrypt {
     }
 
     @Override
-    protected boolean useRUA() {
-        return true;
-    }
-
-    @Override
-    protected Browser prepBrowser(final Browser prepBr, final String host) {
-        if (!(browserPrepped.containsKey(prepBr) && browserPrepped.get(prepBr) == Boolean.TRUE)) {
-            super.prepBrowser(prepBr, host);
-            /* define custom browser headers and language settings */
-        }
-        return prepBr;
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put("User-Agent", UserAgents.stringUserAgent());
+        return br;
     }
 
     @Override
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         br = createNewBrowserInstance();
         final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        final String parameter = param.toString().replace("xxx-blog.to", "porn4k.to");
+        final String parameter = param.getCryptedUrl().replace("xxx-blog.to", "porn4k.to");
         final ArrayList<String> pwList = new ArrayList<String>();
         pwList.add("xxx-blog.dl.am");
         pwList.add("xxx-blog.org");
@@ -66,7 +60,7 @@ public class Porn4kTo extends antiDDoSForDecrypt {
         br.setFollowRedirects(true);
         // crapola
         br.setCookie(Browser.getHost(parameter), "hasVsitedSite", "yes");
-        getPage(parameter);
+        br.getPage(parameter);
         final String url_name = new Regex(parameter, "/([^/]+)$").getMatch(0);
         if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML(">403 Forbidden<") || br.containsHTML("No htmlCode read")) {
             decryptedLinks.add(createOfflinelink(parameter, url_name, null));

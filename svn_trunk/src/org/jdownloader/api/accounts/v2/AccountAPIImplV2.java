@@ -6,13 +6,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 
-import jd.controlling.AccountController;
-import jd.controlling.accountchecker.AccountChecker;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountError;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountTrafficView;
-
 import org.appwork.remoteapi.exceptions.BadParameterException;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.api.RemoteAPIController;
@@ -23,10 +16,20 @@ import org.jdownloader.myjdownloader.client.bindings.BasicAuthenticationStorable
 import org.jdownloader.myjdownloader.client.bindings.interfaces.AccountInterface;
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
+import org.jdownloader.plugins.controller.host.LazyHostPluginFilter;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 
+import jd.controlling.AccountController;
+import jd.controlling.accountchecker.AccountChecker;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountError;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountTrafficView;
+
 public class AccountAPIImplV2 implements AccountAPIV2 {
-    public AccountAPIImplV2() {
+    public final static AccountAPIImplV2 INSTANCE = new AccountAPIImplV2();
+
+    private AccountAPIImplV2() {
         RemoteAPIController.validateInterfaces(AccountAPIV2.class, AccountInterface.class);
     }
 
@@ -105,26 +108,22 @@ public class AccountAPIImplV2 implements AccountAPIV2 {
     }
 
     public List<String> listPremiumHoster() {
-        final Collection<LazyHostPlugin> allPLugins = HostPluginController.getInstance().list();
+        final Collection<LazyHostPlugin> allPLugins = HostPluginController.getInstance().list(new LazyHostPluginFilter().setPremium(Boolean.TRUE));
         // Filter - only premium plugins should be here
         final List<String> ret = new ArrayList<String>();
         for (final LazyHostPlugin lhp : allPLugins) {
-            if (lhp.isPremium()) {
-                ret.add(lhp.getDisplayName());
-            }
+            ret.add(lhp.getDisplayName());
         }
         return ret;
     }
 
     @Override
     public HashMap<String, String> listPremiumHosterUrls() {
-        final Collection<LazyHostPlugin> allPLugins = HostPluginController.getInstance().list();
+        final Collection<LazyHostPlugin> allPLugins = HostPluginController.getInstance().list(new LazyHostPluginFilter().setPremium(Boolean.TRUE));
         // Filter - only premium plugins should be here
         final HashMap<String, String> ret = new HashMap<String, String>();
         for (final LazyHostPlugin lazyHostPlugin : allPLugins) {
-            if (lazyHostPlugin.isPremium()) {
-                ret.put(lazyHostPlugin.getHost(), AccountController.buildAfflink(lazyHostPlugin, null, "accountmanager/webinterface"));
-            }
+            ret.put(lazyHostPlugin.getHost(), AccountController.buildAfflink(lazyHostPlugin, null, "accountmanager/webinterface"));
         }
         return ret;
     }
@@ -133,10 +132,9 @@ public class AccountAPIImplV2 implements AccountAPIV2 {
     public String getPremiumHosterUrl(String hoster) {
         if (hoster == null) {
             return null;
-        } else {
-            final LazyHostPlugin lazyHostPlugin = HostPluginController.getInstance().get(hoster);
-            return AccountController.buildAfflink(lazyHostPlugin, null, "captcha/webinterface");
         }
+        final LazyHostPlugin lazyHostPlugin = HostPluginController.getInstance().get(hoster);
+        return AccountController.buildAfflink(lazyHostPlugin, null, "captcha/webinterface");
     }
 
     public void removeAccounts(long[] ids) {

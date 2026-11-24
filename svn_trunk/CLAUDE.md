@@ -82,7 +82,7 @@ if (description != null) {
 
 ## Shared Plugin State (Cross-Instance Variables)
 
-**Scope:** this rule applies **only to plugin classes** — a class that *is* a plugin or *extends* a plugin class (`PluginForHost` / `PluginForDecrypt`, or a base that extends one, e.g. `antiDDoSForHost`, `antiDDoSForDecrypt`, `UseNet`). It does **not** apply to:
+**Scope:** this rule applies **only to plugin classes** — a class that *is* a plugin or *extends* a plugin class (`PluginForHost` / `PluginForDecrypt`, or a base that extends one, e.g. `antiDDoSForHost`, `UseNet`). It does **not** apply to:
 
 - core/framework classes in `jd.plugins.*` that are not plugins (e.g. `DownloadLink`, `LinkInfo`, `DownloadInterface`) — they are loaded by the normal class loader, so their `static` fields are already shared and stay `static final`;
 - helper or UI classes that merely *reference* or *use* a plugin but neither are a plugin nor extend a plugin class (e.g. a `jd.plugins.components.*` `AbstractToolBarAction`) — the same applies, keep `static final`.
@@ -312,3 +312,11 @@ Applies to the Captcha Wizard (`CaptchaWizardDialog` and its tables) and everyth
 - Wherever solvers are preferred or suggested to the user ("solves most types" ranking, combinations), JAntiCaptcha comes after all other solvers, never before an equal alternative.
 - **Exception, the automatic sort order of the solver order table** (`CaptchaWizardDialog#applySortOrder`): among the usable solvers JAntiCaptcha is always at the very top, and the manual solvers always come in the order dialog in JDownloader (`JD_LOCAL_DIALOG`), dialog in the browser (`JD_LOCAL_BROWSER`), MyJDownloader (`JD_REMOTE_MYJD`), whatever preference the user chose. The preference only decides where the manual solvers as a block are placed relative to the external solvers.
 - **Exception, the order in which the solvers are started while solving a captcha** (default order, order for login captchas, see `ChallengeResponseController#getDefaultOrderRank` and `#getLoginCaptchaOrderRank`): JAntiCaptcha stays **first**. It usually needs far less than a second and may solve some very old simple captchas completely automatically, so it is worth trying first. This does not make it more important than the other solvers, it is only cheap to try.
+
+## Base64 Decoding
+
+Use the AppWorkUtils class `org.appwork.utils.encoding.Base64` for all Base64 handling, not `java.util.Base64`.
+
+- Binary data (blobs, keys, hashes, serialized structures): `Base64.decode(String)` returns the raw `byte[]`. Never use `Encoding.Base64Decode(...)` for this, it returns a `String` and would mangle bytes that are not valid text.
+- Text: `Base64.decodeToString(String)` (UTF-8) or `Encoding.Base64Decode(String)`.
+- To search a binary blob with regex / `indexOf`, convert it with `new String(bytes, StandardCharsets.ISO_8859_1)`: every byte maps to exactly one char, so offsets stay valid.

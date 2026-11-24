@@ -18,7 +18,6 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -30,9 +29,10 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52955 $", interfaceVersion = 3, names = {}, urls = {})
-public class RmzCr extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = {}, urls = {})
+public class RmzCr extends PluginForDecrypt {
     public RmzCr(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -70,7 +70,7 @@ public class RmzCr extends antiDDoSForDecrypt {
         /* This crawler is designed for website version v1 -> Allow v2 urls but convert them to v1 urls */
         final String contenturl = param.getCryptedUrl().replaceFirst("^https?://v2\\.", "https://");
         br.setFollowRedirects(true);
-        getPage(contenturl);
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }

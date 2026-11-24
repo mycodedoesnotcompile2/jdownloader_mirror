@@ -1,6 +1,7 @@
 package jd.gui.swing.jdgui.views.settings.panels.anticaptcha;
 
 import java.awt.Component;
+import java.awt.event.ActionEvent;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -21,7 +22,6 @@ import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.swing.exttable.columns.ExtIconColumn;
 import org.appwork.swing.exttable.columns.ExtLongColumn;
 import org.appwork.swing.exttable.columns.ExtTextColumn;
-import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.EDTRunner;
 import org.jdownloader.captcha.v2.SolverService;
 import org.jdownloader.gui.IconKey;
@@ -29,24 +29,25 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.plugins.components.captchasolver.PluginForCaptchaSolverSolverService;
 
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.BuyAction;
 import jd.plugins.CaptchaType;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
 /**
- * Table model of the "Solver comparison table": one row per captcha solver and one column per captcha type. Each cell
- * shows whether the solver supports the captcha type (check mark) or not (red X). The columns are always created for every captcha type
- * JDownloader can process (see {@link CaptchaType#getProcessableCaptchaTypes()}); which of them are actually shown is controlled via
+ * Table model of the "Solver comparison table": one row per captcha solver and one column per captcha type. Each cell shows whether the
+ * solver supports the captcha type (check mark) or not (red X). The columns are always created for every captcha type JDownloader can
+ * process (see {@link CaptchaType#getProcessableCaptchaTypes()}); which of them are actually shown is controlled via
  * {@link #setVisibleTypes(Set)}.
  */
 public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
     /** Icon size used for the type columns' check/X icon, see {@link IconKey#ICON_TRUE}/{@link IconKey#ICON_FALSE}. */
-    private static final int           TYPE_ICON_SIZE       = 16;
+    private static final int             TYPE_ICON_SIZE      = 16;
     /** Icon size used for the solver column's solver icon, see {@link SolverService#getIcon(int)}. */
-    private static final int           SOLVER_ICON_SIZE     = 18;
+    private static final int             SOLVER_ICON_SIZE    = 18;
     /** Fallback default width of the solver column, used only before any solver was loaded (see {@link #setSolvers(List)}). */
-    public static final int            SOLVER_COLUMN_WIDTH  = 170;
+    public static final int              SOLVER_COLUMN_WIDTH = 170;
     /* null = all columns visible. Only read after the constructor has finished (columns are created inside the super constructor). */
-    private volatile Set<CAPTCHA_TYPE> visibleTypes         = null;
+    private volatile Set<CAPTCHA_TYPE>   visibleTypes        = null;
     /* All solvers of the selected solver types, before filtering. */
     private volatile List<SolverService> allSolvers          = new ArrayList<SolverService>();
     /* null = all solvers are shown. Otherwise only these solvers are shown (the solver selection above the table). */
@@ -59,29 +60,12 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
     /* True: only show solvers that support every selected (visible) captcha type. */
     private volatile boolean             onlyFullSupport     = false;
     /* Assigned in initColumns, which is called inside the super constructor: no initializer here, it would reset the field. */
-    private ExtColumn<SolverService> supportedCountColumn;
+    private ExtColumn<SolverService>     supportedCountColumn;
     /* True: sort by the number of supported types among the selected ones instead of the total number of supported types. */
     private volatile boolean             sortBySelectedTypes = false;
 
     public SolverComparisonTableModel() {
         super("SolverComparisonTableModel");
-    }
-
-    /**
-     * Opens the page where an account for the given solver can be bought, with the same affiliate/redirect link logic as the account
-     * manager. Returns true if a page was opened.
-     */
-    public static boolean openBuyPage(final SolverService solver) {
-        final String buyURL = solver.getBuyURL();
-        if (buyURL == null || !CrossSystem.isOpenBrowserSupported()) {
-            return false;
-        }
-        if (solver instanceof PluginForCaptchaSolverSolverService) {
-            ((PluginForCaptchaSolverSolverService) solver).openBuyPage("captchasolver/comparisontable");
-        } else {
-            CrossSystem.openURL(buyURL);
-        }
-        return true;
     }
 
     /** True if the table is empty because not a single captcha type is selected. */
@@ -128,7 +112,10 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
         };
     }
 
-    /** Number of the selected solvers which support all selected captcha types, i.e. the rows shown while the "only full support" filter is active. */
+    /**
+     * Number of the selected solvers which support all selected captcha types, i.e. the rows shown while the "only full support" filter is
+     * active.
+     */
     public int getFullSupportCount() {
         if (isEmptyDueToNoTypes()) {
             return 0;
@@ -333,8 +320,13 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
 
             /** Double click opens the page where an account for this solver can be bought. */
             @Override
-            public boolean onDoubleClick(final MouseEvent e, final SolverService value) {
-                return openBuyPage(value);
+            public boolean onDoubleClick(final MouseEvent e, final SolverService solver) {
+                if (!(solver instanceof PluginForCaptchaSolverSolverService)) {
+                    return false;
+                }
+                final ActionEvent actionEvent = new ActionEvent(e.getSource(), ActionEvent.ACTION_PERFORMED, "Buy", e.getWhen(), e.getModifiersEx());
+                new BuyAction(((PluginForCaptchaSolverSolverService) solver).getPlugin().getLazyP(), "captchasolver/comparisontable").actionPerformed(actionEvent);
+                return true;
             }
 
             @Override
@@ -358,7 +350,6 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
             public int getDefaultWidth() {
                 return 120;
             }
-
         };
         addColumn(supportedCountColumn);
         for (final CAPTCHA_TYPE type : CaptchaType.getProcessableCaptchaTypes()) {
@@ -368,7 +359,7 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
 
     /** Column showing whether the solver supports one specific captcha type. */
     private class TypeColumn extends ExtIconColumn<SolverService> {
-        private static final long serialVersionUID = 1L;
+        private static final long  serialVersionUID = 1L;
         private final CAPTCHA_TYPE type;
         /* Default width capped to the header word's width, never narrower than the check/X icon shown in the cells. */
         private final int          defaultWidth;
@@ -410,8 +401,8 @@ public class SolverComparisonTableModel extends ExtTableModel<SolverService> {
 
         /*
          * All type columns are instances of the same class, so the default id (derived from the class) would be identical for all of them.
-         * The id is needed to store/restore width, order and sort state per column. It is generated inside the super constructor, i.e. before
-         * the type field is set, so the (unique) column name is used.
+         * The id is needed to store/restore width, order and sort state per column. It is generated inside the super constructor, i.e.
+         * before the type field is set, so the (unique) column name is used.
          */
         @Override
         protected String generateID() {

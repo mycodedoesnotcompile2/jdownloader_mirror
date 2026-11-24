@@ -41,12 +41,12 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.URLEncode;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.plugins.components.config.HitomiLaConfig;
 import org.jdownloader.plugins.components.config.HitomiLaConfig.PreferredImageFormat;
 import org.jdownloader.plugins.config.PluginJsonConfig;
@@ -60,8 +60,8 @@ import org.mozilla.javascript.FunctionObject;
  * @author raztoki
  *
  */
-@DecrypterPlugin(revision = "$Revision: 50900 $", interfaceVersion = 3, names = { "hitomi.la" }, urls = { "https?://(?:www\\.)?hitomi\\.la/(?:galleries/\\d+\\.html|reader/\\d+\\.html|[^/]+/.*?-\\d+\\.html)" })
-public class HitomiLa extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = { "hitomi.la" }, urls = { "https?://(?:www\\.)?hitomi\\.la/(?:galleries/\\d+\\.html|reader/\\d+\\.html|[^/]+/.*?-\\d+\\.html)" })
+public class HitomiLa extends PluginForDecrypt {
     public HitomiLa(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -91,7 +91,7 @@ public class HitomiLa extends antiDDoSForDecrypt {
         int numberOfPages;
         final boolean use_Thumbnails = false;
         if (use_Thumbnails) {
-            this.getPage(parameter);
+            br.getPage(parameter);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -109,17 +109,14 @@ public class HitomiLa extends antiDDoSForDecrypt {
                 ret.add(dl);
             }
         } else {
-            getPage("https://hitomi.la/galleries/" + gallery_id + ".html");
-            // this.getPage(parameter);
+            br.getPage("https://hitomi.la/galleries/" + gallery_id + ".html");
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             final String extra_redirect = br.getRegex("<meta http-equiv=\"refresh\" content=\"\\d+;url=(http[^\"]+)\">").getMatch(0);
             if (extra_redirect != null) {
-                this.getPage(Encoding.htmlOnlyDecode(extra_redirect));
+                br.getPage(Encoding.htmlOnlyDecode(extra_redirect));
             }
-            // get the image host.
-            // retval = subdomain_from_galleryid(g) + retval;
             String js = br.getRegex("src\\s*=\\s*\"([^\"]+" + gallery_id + "\\.js)\"").getMatch(0);
             if (js == null) {
                 js = br.getURL("//ltn.gold-usergeneratedcontent.net/galleries/" + gallery_id + ".js").toExternalForm();
@@ -129,7 +126,7 @@ public class HitomiLa extends antiDDoSForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             final Browser brc = br.cloneBrowser();
-            getPage(brc, js);
+            brc.getPage(js);
             Map<String, Object> entries = null;
             final Object map = JavaScriptEngineFactory.jsonToJavaObject(brc.getRequest().getHtmlCode().replaceFirst("(var\\s*galleryinfo\\s*=\\s*)", ""));
             title = (String) JavaScriptEngineFactory.walkJson(map, "title");
@@ -237,11 +234,6 @@ public class HitomiLa extends antiDDoSForDecrypt {
     public static final Pattern URL_FROM_URL_PATTERN        = Pattern.compile("//..?\\.(hitomi\\.la|gold-usergeneratedcontent\\.net)/");
     public static final Pattern FULL_PATH_FROM_HASH_PATTERN = Pattern.compile("^.*(..)(.)$");
 
-    private String subdomain_from_galleryid(int g, int number_of_frontends) {
-        int o = g % number_of_frontends;
-        return String.valueOf((char) (97 + o));
-    }
-
     private ScriptEngine engine = null;
 
     public static String jsStringPad(String string) {
@@ -285,8 +277,6 @@ public class HitomiLa extends antiDDoSForDecrypt {
             if (js == null) {
                 js = brc.getRegex("(function subdom.*?)function\\s*show_loading").getMatch(0);
             }
-            // String.padStart not available in old Rhino version
-            // js = js.replace("g.toString(16).padStart(3, '0')", "jsStringPad(g.toString(16))");
             if (StringUtils.isEmpty(js)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }

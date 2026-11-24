@@ -1,8 +1,7 @@
 package org.jdownloader.captcha.v2;
 
-import java.util.Set;
 import java.util.Currency;
-import java.util.List;
+import java.util.Set;
 
 import javax.swing.Icon;
 
@@ -17,8 +16,8 @@ public interface SolverService {
     public abstract String getDescription();
 
     /**
-     * Captcha types supported by this solver. Must never return null or an empty list: a solver that does not declare any supported
-     * captcha type cannot solve anything, so null/empty is treated as a bug in the solver implementation (it does NOT mean "supports all").
+     * Captcha types supported by this solver. Must never return null or an empty list: a solver that does not declare any supported captcha
+     * type cannot solve anything, so null/empty is treated as a bug in the solver implementation (it does NOT mean "supports all").
      */
     public abstract Set<CAPTCHA_TYPE> getSupportedCaptchaTypes();
 
@@ -30,9 +29,6 @@ public interface SolverService {
 
     /** URL of a help/knowledgebase article for this solver, or null when there is none (then no help icon is shown). */
     public abstract String getHelpArticleURL();
-
-    /** URL of the page where the user can buy/create an account for this solver, or null for solvers that have no such page (e.g. local solvers). */
-    public abstract String getBuyURL();
 
     /**
      * Status text shown in the solver overview (e.g. "Ready", "Ready | Balance: ..."). Returns null when instead an action button (see
@@ -47,9 +43,9 @@ public interface SolverService {
     public abstract void onStatusAction();
 
     /**
-     * Returns true when {@link #getStatusActionName()} represents a warning that needs the user's attention (e.g. "Enable solver
-     * accounts" because external captcha solver accounts are globally disabled), as opposed to a routine action like "Add Account". Used
-     * by the solver overview to pick a warning icon instead of the regular "add" icon for the status action button. Ignored when
+     * Returns true when {@link #getStatusActionName()} represents a warning that needs the user's attention (e.g. "Enable solver accounts"
+     * because external captcha solver accounts are globally disabled), as opposed to a routine action like "Add Account". Used by the
+     * solver overview to pick a warning icon instead of the regular "add" icon for the status action button. Ignored when
      * {@link #getStatusActionName()} is null.
      */
     public abstract boolean isStatusActionWarning();
@@ -93,5 +89,4 @@ public interface SolverService {
     public abstract SolverType getType();
 
     public abstract String getID();
-
 }

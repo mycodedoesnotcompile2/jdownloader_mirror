@@ -17,7 +17,6 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -26,19 +25,19 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 46220 $", interfaceVersion = 2, names = { "topdocumentaryfilms.com" }, urls = { "https?://(?:www\\.)?topdocumentaryfilms\\.com/([^/]+)/" })
-public class TopDocumentaryFilmsCom extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 2, names = { "topdocumentaryfilms.com" }, urls = { "https?://(?:www\\.)?topdocumentaryfilms\\.com/([^/]+)/" })
+public class TopDocumentaryFilmsCom extends PluginForDecrypt {
     public TopDocumentaryFilmsCom(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        String parameter = param.toString();
+        String parameter = param.getCryptedUrl();
         br.setFollowRedirects(true);
-        getPage(parameter);
-        // String page = br.toString();
+        br.getPage(parameter);
         String fpName = br.getRegex("<title>\\s*([^<]+)\\s*- Top Documentary Films").getMatch(0);
         String link = br.getRegex("itemprop=\"embedUrl\"\\s*content=\"([^\"]+)\"").getMatch(0);
         if (link != null && link.length() > 0) {

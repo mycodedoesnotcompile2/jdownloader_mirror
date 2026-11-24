@@ -18,7 +18,6 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -27,13 +26,15 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
+import org.appwork.utils.StringUtils;
 
 /**
  * @author raztoki
  */
-@DecrypterPlugin(revision = "$Revision: 36558 $", interfaceVersion = 2, names = { "icerbox.com" }, urls = { "https?://(?:www\\.)?icerbox\\.com/folder/([A-Za-z0-9]{8})" })
-public class IcerBoxCom extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 2, names = { "icerbox.com" }, urls = { "https?://(?:www\\.)?icerbox\\.com/folder/([A-Za-z0-9]{8})" })
+public class IcerBoxCom extends PluginForDecrypt {
 
     public IcerBoxCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -41,19 +42,19 @@ public class IcerBoxCom extends antiDDoSForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        final String parameter = param.toString();
+        final String parameter = param.getCryptedUrl();
         final String folderid = new Regex(parameter, this.getSupportedLinks().pattern()).getMatch(0);
-        getPage("https://icerbox.com/api/v1/folder?id=" + folderid);
+        br.getPage("https://icerbox.com/api/v1/folder?id=" + folderid);
         final String fpName = PluginJSonUtils.getJsonValue(br, "name");
         final String filesArray = PluginJSonUtils.getJsonArray(br, "files");
-        if (!inValidate(filesArray)) {
+        if (!StringUtils.isEmpty(filesArray)) {
             final String[] files = PluginJSonUtils.getJsonResultsFromArray(filesArray);
             if (files != null && files.length > 0) {
                 for (String file : files) {
                     final String uid = PluginJSonUtils.getJsonValue(file, "id");
                     final String name = PluginJSonUtils.getJsonValue(file, "name");
                     final String size = PluginJSonUtils.getJsonValue(file, "size");
-                    if (!inValidate(uid)) {
+                    if (!StringUtils.isEmpty(uid)) {
                         final DownloadLink d = createDownloadlink("https://icerbox.com/" + uid);
                         d.setVerifiedFileSize(Long.parseLong(size));
                         d.setName(name);
@@ -64,13 +65,13 @@ public class IcerBoxCom extends antiDDoSForDecrypt {
             }
         }
         final String directoryArray = PluginJSonUtils.getJsonArray(br, "folders");
-        if (!inValidate(directoryArray)) {
+        if (!StringUtils.isEmpty(directoryArray)) {
             final String[] files = PluginJSonUtils.getJsonResultsFromArray(directoryArray);
             if (files != null && files.length > 0) {
                 for (String file : files) {
                     // for now just return uid, nitroflare mass linkcheck shows avialable status and other values we need!
                     final String uid = PluginJSonUtils.getJsonValue(file, "id");
-                    if (!inValidate(uid)) {
+                    if (!StringUtils.isEmpty(uid)) {
                         decryptedLinks.add(createDownloadlink("https://icerbox.com/folder/" + uid));
                     }
                 }

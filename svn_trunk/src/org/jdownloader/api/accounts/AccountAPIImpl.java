@@ -5,13 +5,9 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-
-import jd.controlling.AccountController;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountTrafficView;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.remoteapi.APIQuery;
@@ -23,11 +19,17 @@ import org.appwork.utils.ImageProvider.ImageProvider;
 import org.appwork.utils.images.IconIO;
 import org.appwork.utils.net.HTTPHeader;
 import org.jdownloader.DomainInfo;
+import org.jdownloader.api.accounts.v2.AccountAPIImplV2;
 import org.jdownloader.api.myjdownloader.MyJDownloaderController;
 import org.jdownloader.myjdownloader.client.json.JsonMap;
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
+
+import jd.controlling.AccountController;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountTrafficView;
 
 @Deprecated
 public class AccountAPIImpl implements AccountAPI {
@@ -102,26 +104,16 @@ public class AccountAPIImpl implements AccountAPI {
     @Deprecated
     @Override
     public JsonMap listPremiumHosterUrls() {
-        final Collection<LazyHostPlugin> allPLugins = HostPluginController.getInstance().list();
-        // Filter - only premium plugins should be here
+        final HashMap<String, String> map = AccountAPIImplV2.INSTANCE.listPremiumHosterUrls();
         final JsonMap ret = new JsonMap();
-        for (final LazyHostPlugin lazyHostPlugin : allPLugins) {
-            if (lazyHostPlugin.isPremium()) {
-                ret.put(lazyHostPlugin.getHost(), AccountController.buildAfflink(lazyHostPlugin, null, "accountmanager/webinterface"));
-            }
-        }
+        ret.putAll(map);
         return ret;
     }
 
     @Deprecated
     @Override
     public String getPremiumHosterUrl(String hoster) {
-        if (hoster == null) {
-            return null;
-        } else {
-            final LazyHostPlugin lazyHostPlugin = HostPluginController.getInstance().get(hoster);
-            return AccountController.buildAfflink(lazyHostPlugin, null, "captcha/webinterface");
-        }
+        return AccountAPIImplV2.INSTANCE.getPremiumHosterUrl(hoster);
     }
 
     @Deprecated

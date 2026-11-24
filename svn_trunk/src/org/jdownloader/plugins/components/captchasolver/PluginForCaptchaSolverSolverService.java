@@ -1,11 +1,29 @@
 package org.jdownloader.plugins.components.captchasolver;
 
 import java.util.ArrayList;
-import java.util.Set;
 import java.util.Currency;
 import java.util.List;
+import java.util.Set;
 
 import javax.swing.Icon;
+
+import org.appwork.storage.config.JsonConfig;
+import org.appwork.storage.config.ValidationException;
+import org.jdownloader.DomainInfo;
+import org.jdownloader.captcha.v2.CaptchaSolverConfigV3;
+import org.jdownloader.captcha.v2.CaptchaSolverLimitRule;
+import org.jdownloader.captcha.v2.ChallengeResponseController;
+import org.jdownloader.captcha.v2.ChallengeSolver.ChallengeVetoReason;
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverFeature;
+import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
+import org.jdownloader.captcha.v2.PluginChallengeSolver;
+import org.jdownloader.captcha.v2.solver.service.AbstractSolverService;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
+import org.jdownloader.plugins.controller.host.LazyHostPluginFilter;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings;
+import org.jdownloader.settings.staticreferences.CFG_GENERAL;
+import org.jdownloader.utils.HelpLinks;
 
 import jd.controlling.AccountController;
 import jd.gui.swing.dialog.AddAccountDialog;
@@ -18,25 +36,6 @@ import jd.plugins.Account;
 import jd.plugins.AccountInfo;
 import jd.plugins.CaptchaType.CAPTCHA_TYPE;
 
-import org.appwork.storage.config.JsonConfig;
-import org.appwork.storage.config.ValidationException;
-import org.jdownloader.DomainInfo;
-import org.jdownloader.captcha.v2.CaptchaSolverConfigV3;
-import org.jdownloader.captcha.v2.CaptchaSolverLimitRule;
-import org.jdownloader.captcha.v2.ChallengeResponseController;
-import org.jdownloader.captcha.v2.ChallengeSolver.ChallengeVetoReason;
-import org.jdownloader.captcha.v2.ChallengeSolver.SolverFeature;
-import org.jdownloader.captcha.v2.PluginChallengeSolver;
-import org.jdownloader.captcha.v2.ChallengeSolver.SolverType;
-import org.jdownloader.captcha.v2.solver.service.AbstractSolverService;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.components.config.CaptchaSolverPluginConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.host.LazyHostPluginFilter;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings;
-import org.jdownloader.settings.staticreferences.CFG_GENERAL;
-import org.jdownloader.utils.HelpLinks;
-
 public class PluginForCaptchaSolverSolverService extends AbstractSolverService implements ServicePanelExtender {
     protected final abstractPluginForCaptchaSolver plugin;
 
@@ -45,6 +44,10 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
             throw new IllegalArgumentException();
         }
         this.plugin = plugin;
+    }
+
+    public boolean isPremiumEnabled() {
+        return plugin.isPremiumEnabled();
     }
 
     /**
@@ -76,6 +79,10 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
         return this.plugin.getSupportedCaptchaTypes();
     }
 
+    public abstractPluginForCaptchaSolver getPlugin() {
+        return plugin;
+    }
+
     @Override
     public SolverType getType() {
         return SolverType.EXTERNAL;
@@ -87,8 +94,8 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
     }
 
     /**
-     * Why an account of an external solver cannot be used, or {@link ChallengeVetoReason#NONE} if it can. This is the one place which defines
-     * whether an account is usable: The status of the solver (see {@link #getUsableAccounts()}) and the solver of the account (see
+     * Why an account of an external solver cannot be used, or {@link ChallengeVetoReason#NONE} if it can. This is the one place which
+     * defines whether an account is usable: The status of the solver (see {@link #getUsableAccounts()}) and the solver of the account (see
      * {@link PluginChallengeSolver#getChallengeVetoReason(org.jdownloader.captcha.v2.Challenge)}) both use it, so they cannot disagree.
      */
     public static ChallengeVetoReason getAccountVetoReason(final Account account) {
@@ -175,8 +182,8 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
      * The states the Status column can be in for this solver, in priority order: having no account at all (routine "Add Account" case),
      * followed by having accounts that all exist but are unusable (needs the user's attention, unlike the routine "no account yet" case),
      * and finally the normal ready state. The unusable accounts are told apart: all of them disabled, all of them in an error state
-     * (invalid) or a mix of both. A globally disabled usage-of-solver-accounts setting is not part of this state: it is shown by a
-     * separate warning button (see {@link #getStatusWarningButtonTooltip()}).
+     * (invalid) or a mix of both. A globally disabled usage-of-solver-accounts setting is not part of this state: it is shown by a separate
+     * warning button (see {@link #getStatusWarningButtonTooltip()}).
      */
     private enum Status {
         NO_ACCOUNT,
@@ -281,8 +288,8 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
 
     /**
      * True if the solver has exactly one usable account and its credits are below the user's warning threshold (see
-     * {@link Account#isLowBalance()}). With several accounts the status text only shows the total balance, which says
-     * nothing about the single accounts, so no warning is shown then.
+     * {@link Account#isLowBalance()}). With several accounts the status text only shows the total balance, which says nothing about the
+     * single accounts, so no warning is shown then.
      */
     private boolean isLowBalance() {
         final List<Account> validAccounts = getUsableAccounts();
@@ -405,7 +412,7 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
 
     @Override
     public Icon getIcon(int size) {
-        return DomainInfo.getInstance(plugin.getHost());
+        return DomainInfo.getInstance(plugin.getHost()).getIcon(size);
     }
 
     /** Returns the underlying plugin's own captcha solver config (per-plugin storage). */
@@ -416,7 +423,7 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
 
     /** Same as {@link #getConfigV3()}, but typed as the plugin config, which also carries the settings only external solvers have. */
     public CaptchaSolverPluginConfig getPluginConfig() {
-        return PluginJsonConfig.get(plugin.getLazyP(), plugin.getConfigInterface());
+        return plugin.get(plugin.getConfigInterface());
     }
 
     /**
@@ -446,27 +453,11 @@ public class PluginForCaptchaSolverSolverService extends AbstractSolverService i
     }
 
     /**
-     * Returns the captcha feedback types this service supports (see {@link abstractPluginForCaptchaSolver#getSolverFeatures()}),
-     * for display purposes. May be null or empty if the service offers no feedback.
+     * Returns the captcha feedback types this service supports (see {@link abstractPluginForCaptchaSolver#getSolverFeatures()}), for
+     * display purposes. May be null or empty if the service offers no feedback.
      */
     public Set<SolverFeature> getSolverFeatures() {
         return plugin.getSolverFeatures();
-    }
-
-    @Override
-    public String getBuyURL() {
-        return plugin.getBuyPremiumUrl();
-    }
-
-    /**
-     * Opens the "buy premium" page of this solver in the browser. Uses the same affiliate/redirect link logic as the account manager's
-     * buy/renew actions ({@link AccountController#openAfflink}).
-     *
-     * @param source
-     *            Identifies where the link was opened from (part of the redirect link)
-     */
-    public void openBuyPage(final String source) {
-        AccountController.openAfflink(plugin.getLazyP(), plugin, source);
     }
 
     @Override

@@ -8,25 +8,6 @@ import java.util.List;
 
 import javax.swing.KeyStroke;
 
-import jd.controlling.TaskQueue;
-import jd.controlling.downloadcontroller.DownloadController;
-import jd.controlling.linkcollector.LinkCollectingJob;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcollector.LinkCollectorCrawler;
-import jd.controlling.linkcollector.LinkCollectorEvent;
-import jd.controlling.linkcollector.LinkCollectorListener;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.linkcrawler.CrawledPackage.TYPE;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.gui.swing.jdgui.MainTabbedPane;
-import jd.gui.swing.jdgui.interfaces.View;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.DownloadLinkProperty;
-import jd.plugins.FilePackage;
-import jd.plugins.FilePackageProperty;
-
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.swing.exttable.ExtTableEvent;
 import org.appwork.swing.exttable.ExtTableListener;
@@ -36,6 +17,7 @@ import org.appwork.utils.event.queue.QueueAction;
 import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.EDTRunner;
 import org.appwork.utils.swing.dialog.Dialog;
+import org.jdownloader.actions.AppAction;
 import org.jdownloader.controlling.contextmenu.ActionContext;
 import org.jdownloader.controlling.contextmenu.Customizer;
 import org.jdownloader.controlling.download.DownloadControllerListener;
@@ -57,6 +39,25 @@ import org.jdownloader.plugins.FinalLinkState;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.DeleteFileOptions;
 import org.jdownloader.translate._JDT;
 
+import jd.controlling.TaskQueue;
+import jd.controlling.downloadcontroller.DownloadController;
+import jd.controlling.linkcollector.LinkCollectingJob;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcollector.LinkCollectorCrawler;
+import jd.controlling.linkcollector.LinkCollectorEvent;
+import jd.controlling.linkcollector.LinkCollectorListener;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.linkcrawler.CrawledPackage.TYPE;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.gui.swing.jdgui.MainTabbedPane;
+import jd.gui.swing.jdgui.interfaces.View;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.DownloadLinkProperty;
+import jd.plugins.FilePackage;
+import jd.plugins.FilePackageProperty;
+
 public class GenericDeleteFromTableToolbarAction extends AbstractToolBarAction implements ExtTableListener, GUIListener, ExtTableModelListener, ActionContext, DownloadControllerListener, LinkCollectorListener {
     public static final String                 ONLY_SELECTED_ITEMS = "OnlySelectedItems";
     public static final String                 DELETE_ALL          = "deleteAll";
@@ -68,7 +69,7 @@ public class GenericDeleteFromTableToolbarAction extends AbstractToolBarAction i
      *
      */
     private static final long                  serialVersionUID    = 1L;
-    private DelayedRunnable                    delayer;
+    private final DelayedRunnable              delayer;
     private boolean                            deleteAll           = false;
     private boolean                            deleteDisabled      = false;
     private boolean                            deleteFailed        = false;
@@ -85,6 +86,10 @@ public class GenericDeleteFromTableToolbarAction extends AbstractToolBarAction i
         super();
         addContextSetup(byPass = new ByPassDialogSetup());
         setIconKey(IconKey.ICON_DELETE);
+        if (AppAction.isValidationMode()) {
+            delayer = null;
+            return;
+        }
         delayer = new DelayedRunnable(500, 1500) {
             @Override
             public void delayedrun() {

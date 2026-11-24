@@ -22,7 +22,6 @@ import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
@@ -39,13 +38,14 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.LiveMixTapesCom;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 53220 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { LiveMixTapesCom.class })
-public class LiveMixtapesComDecrypter extends antiDDoSForDecrypt {
+public class LiveMixtapesComDecrypter extends PluginForDecrypt {
     public LiveMixtapesComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -103,13 +103,13 @@ public class LiveMixtapesComDecrypter extends antiDDoSForDecrypt {
         /** If link is a short link, correct it */
         if (contenturl.matches(REDIRECTLINK)) {
             br.setFollowRedirects(false);
-            getPage(contenturl);
+            br.getPage(contenturl);
             String redirect = br.getRedirectLocation();
             if (redirect == null) {
                 logger.warning("Decrypter broken for link: " + contenturl);
                 return null;
             }
-            getPage(redirect);
+            br.getPage(redirect);
             redirect = br.getRedirectLocation();
             if (redirect == null) {
                 logger.warning("Decrypter broken for link: " + contenturl);
@@ -130,7 +130,7 @@ public class LiveMixtapesComDecrypter extends antiDDoSForDecrypt {
         final int bitrate = accountAvailable ? BITRATE_ACCOUNT_KBITS : BITRATE_FREE_KBITS;
         final String extension = accountAvailable ? ".mp3" : ".mp4";
         br.setFollowRedirects(true);
-        getPage(contenturl);
+        br.getPage(contenturl);
         if (br.getURL().contains("error/login.html")) {
             throw new AccountRequiredException();
         }
@@ -138,7 +138,7 @@ public class LiveMixtapesComDecrypter extends antiDDoSForDecrypt {
         if (buildID == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        getPage("https://" + this.getHost() + "/_next/data/" + buildID + "/mixtape/" + slug + ".json?slug=" + Encoding.urlEncode(slug));
+        br.getPage("https://" + this.getHost() + "/_next/data/" + buildID + "/mixtape/" + slug + ".json?slug=" + Encoding.urlEncode(slug));
         final String json = br.getRequest().getHtmlCode();
         /* Robustly grab the mixtape-ID so the .zip download can be added even if the detailed json handling fails below. */
         final String mixtapeID = new Regex(json, "\"id\"\\s*:\\s*(\\d+)").getMatch(0);

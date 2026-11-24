@@ -15,15 +15,12 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
-import java.util.ArrayList;
 
 import jd.PluginWrapper;
-import jd.controlling.ProgressController;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
-import jd.plugins.DownloadLink;
 
-@DecrypterPlugin(revision = "$Revision: 48281 $", interfaceVersion = 3, names = { "linkjust.com" }, urls = { "https?://(?:www\\.)?linkjust\\.com/([A-Za-z0-9]+)" })
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = { "linkjust.com" }, urls = { "https?://(?:www\\.)?linkjust\\.com/([A-Za-z0-9]+)" })
 public class LinkjustCom extends MightyScriptAdLinkFly {
     public LinkjustCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -33,10 +30,6 @@ public class LinkjustCom extends MightyScriptAdLinkFly {
     protected String getContentURL(final CryptedLink param) {
         String contenturl = super.getContentURL(param);
         return contenturl.replaceFirst("(?i)http://", "https://");
-    }
-
-    public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        return super.decryptIt(param, progress);
     }
 
     @Override

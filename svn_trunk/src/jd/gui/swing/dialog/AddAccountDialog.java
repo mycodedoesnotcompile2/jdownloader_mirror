@@ -42,6 +42,7 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.KeyStroke;
+import javax.swing.SwingConstants;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
@@ -61,6 +62,7 @@ import org.appwork.utils.swing.dialog.dimensor.RememberLastDialogDimension;
 import org.appwork.utils.swing.dialog.locator.RememberRelativeDialogLocator;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.InputChangedCallbackInterface;
+import org.jdownloader.gui.sponsor.AdDisclosureHelper;
 import org.jdownloader.gui.sponsor.SponsorUtils;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
@@ -123,12 +125,15 @@ public class AddAccountDialog extends AbstractDialog<Integer> implements InputCh
     }
 
     public static boolean addAccount(final Account ac) throws DialogNoAnswerException {
+        boolean checkFailed = false;
         try {
             checkAccount(ac);
         } catch (final DialogNoAnswerException e) {
             throw e;
         } catch (final Throwable e) {
             Dialog.getInstance().showExceptionDialog(_GUI.T.accountdialog_check_failed(), _GUI.T.accountdialog_check_failed_msg(), e);
+            /* The check did not finish: Do not treat the unchecked account as valid and do not add it */
+            checkFailed = true;
         }
         AccountError error = ac.getError();
         String errorMessage = ac.getErrorString();
@@ -147,15 +152,15 @@ public class AddAccountDialog extends AbstractDialog<Integer> implements InputCh
                 Dialog.getInstance().showMessageDialog(_GUI.T.accountdialog_check_invalid(errorMessage));
                 return false;
             case EXPIRED:
-                Dialog.getInstance().showConfirmDialog(0, _GUI.T.accountdialog_check_expired_title(), _GUI.T.accountdialog_check_expired(ac.getUser()), null, _GUI.T.accountdialog_check_expired_renew(), null);
                 AccountController.getInstance().addAccount(ac, false);
+                Dialog.getInstance().showMessageDialog(_GUI.T.accountdialog_check_expired(ac.getUser()));
                 return true;
             case TEMP_DISABLED:
+                AccountController.getInstance().addAccount(ac, false);
                 if (StringUtils.isEmpty(errorMessage)) {
                     errorMessage = _GUI.T.accountdialog_check_failed();
                 }
                 Dialog.getInstance().showMessageDialog(_GUI.T.accountdialog_check_result(errorMessage));
-                AccountController.getInstance().addAccount(ac, false);
                 return true;
             default:
             case INVALID:
@@ -165,6 +170,10 @@ public class AddAccountDialog extends AbstractDialog<Integer> implements InputCh
                 Dialog.getInstance().showMessageDialog(_GUI.T.accountdialog_check_invalid(errorMessage));
                 return false;
             }
+        }
+        if (checkFailed) {
+            /* The check crashed without setting an account error: Do not treat the unchecked account as valid and do not add it */
+            return false;
         }
         /* Success */
         String message = null;
@@ -226,8 +235,7 @@ public class AddAccountDialog extends AbstractDialog<Integer> implements InputCh
     private ExtTextField                 filter;
     private JLabel                       header2;
     private JButton                      link;
-
-    private final LazyHostPluginFilter pluginFilter;
+    private final LazyHostPluginFilter   pluginFilter;
 
     private AddAccountDialog(final PluginForHost preSelectedPlugin, final Account preFillAccount, final LazyHostPluginFilter pluginFilter) {
         super(UserIO.NO_ICON, _GUI.T.jd_gui_swing_components_AccountDialog_title(), null, _GUI.T.lit_save(), null);
@@ -397,6 +405,7 @@ public class AddAccountDialog extends AbstractDialog<Integer> implements InputCh
         link.addActionListener(new ActionListener() {
             public void actionPerformed(final ActionEvent e) {
                 final LazyHostPlugin selected = hosterTable.getSelectedPlugin();
+                // marker: see adDisclosure label
                 AccountController.openAfflink(selected, null, "accountmanager/table");
             }
         });
@@ -410,6 +419,8 @@ public class AddAccountDialog extends AbstractDialog<Integer> implements InputCh
         sp.getVerticalScrollBar().setFocusable(false);
         sp.getViewport().setFocusable(false);
         content.add(link, "height 20!,gapleft 32");
+        /* The ad disclosure is intentionally always shown here, independent of the selected hoster. */
+        content.add(AdDisclosureHelper.createAdDisclosureLabel(SwingConstants.CENTER, null), "gapleft 32,growx");
         content.add(header2 = header(_GUI.T.AddAccountDialog_layoutDialogContent_enterlogininfo()), "gapleft 15,spanx,pushx,growx,gaptop 15");
         final LazyHostPlugin lazyp = getPreselectedHost();
         if (lazyp != null) {

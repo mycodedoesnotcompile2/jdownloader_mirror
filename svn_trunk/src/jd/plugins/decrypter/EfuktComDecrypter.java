@@ -17,7 +17,6 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -28,9 +27,10 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 47101 $", interfaceVersion = 2, names = { "efukt.com" }, urls = { "https?://(?:www\\.)?efukt\\.com/(\\d+[A-Za-z0-9_\\-]+\\.html|out\\.php\\?id=\\d+|view\\.gif\\.php\\?id=\\d+)" })
-public class EfuktComDecrypter extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 2, names = { "efukt.com" }, urls = { "https?://(?:www\\.)?efukt\\.com/(\\d+[A-Za-z0-9_\\-]+\\.html|out\\.php\\?id=\\d+|view\\.gif\\.php\\?id=\\d+)" })
+public class EfuktComDecrypter extends PluginForDecrypt {
     public EfuktComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -42,7 +42,7 @@ public class EfuktComDecrypter extends antiDDoSForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String parameter = param.toString();
+        final String parameter = param.getCryptedUrl();
         if (parameter.matches(".+view\\.gif\\.php.+")) {
             /* Pass this to host plugin */
             ret.add(this.createDownloadlink(parameter));
@@ -50,7 +50,7 @@ public class EfuktComDecrypter extends antiDDoSForDecrypt {
         }
         setBrowserExclusive();
         br.setFollowRedirects(false);
-        getPage(parameter);
+        br.getPage(parameter);
         String redirect = br.getRedirectLocation();
         if (redirect == null) {
             redirect = this.br.getRegex("window\\.location[\t\n\r ]*?=[\t\n\r ]*?\\'(https?[^<>\"]*?)\\';").getMatch(0);
@@ -59,7 +59,7 @@ public class EfuktComDecrypter extends antiDDoSForDecrypt {
             ret.add(createDownloadlink(redirect));
             return ret;
         } else if (redirect != null) {
-            getPage(redirect);
+            br.getPage(redirect);
             redirect = br.getRedirectLocation();
             if (redirect == null) {
                 redirect = this.br.getRegex("window\\.location[\t\n\r ]*?=[\t\n\r ]*?\\'(https?[^<>\"]*?)\\';").getMatch(0);

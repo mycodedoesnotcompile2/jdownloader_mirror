@@ -2,13 +2,13 @@ package org.jdownloader.premium;
 
 import java.awt.event.ActionEvent;
 
-import jd.controlling.AccountController;
-import jd.plugins.PluginForHost;
-
 import org.jdownloader.DomainInfo;
 import org.jdownloader.actions.AppAction;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.logging.LogController;
+
+import jd.controlling.AccountController;
+import jd.plugins.PluginForHost;
 
 public class OpenURLAction extends AppAction {
     /**
@@ -38,7 +38,10 @@ public class OpenURLAction extends AppAction {
     public void actionPerformed(ActionEvent e) {
         try {
             final PluginForHost plugin = info.findPlugin();
-            AccountController.openAfflink(plugin != null ? plugin.getLazyP() : null, plugin, id);
+            if (plugin == null) {
+                return;
+            }
+            AccountController.openAfflink(plugin.getLazyP(), plugin, id);
         } catch (final Throwable e2) {
             LogController.CL().log(e2);
         }

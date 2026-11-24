@@ -18,7 +18,6 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 
 import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -30,18 +29,19 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 45953 $", interfaceVersion = 3, names = { "mountfile.net" }, urls = { "https?://(?:www\\.)?mountfile\\.net/d/[A-Za-z0-9]+" })
-public class MountFileNetFolder extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = { "mountfile.net" }, urls = { "https?://(?:www\\.)?mountfile\\.net/d/[A-Za-z0-9]+" })
+public class MountFileNetFolder extends PluginForDecrypt {
     public MountFileNetFolder(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        final String parameter = param.toString();
+        final String parameter = param.getCryptedUrl();
         br.setFollowRedirects(true);
-        getPage(parameter);
+        br.getPage(parameter);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (!this.canHandle(br.getURL())) {

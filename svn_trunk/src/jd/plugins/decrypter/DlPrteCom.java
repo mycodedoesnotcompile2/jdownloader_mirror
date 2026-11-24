@@ -25,7 +25,6 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudflareTurnstileCaptcha;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -39,14 +38,15 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
 /**
  *
  * @version raz_Template
  * @author raztoki, psp
  */
-@DecrypterPlugin(revision = "$Revision: 52960 $", interfaceVersion = 3, names = {}, urls = {})
-public class DlPrteCom extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 3, names = {}, urls = {})
+public class DlPrteCom extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
@@ -188,7 +188,7 @@ public class DlPrteCom extends antiDDoSForDecrypt {
             return ret;
         }
         br.setFollowRedirects(true);
-        getPage(contenturl);
+        br.getPage(contenturl);
         /* Error handling */
         if (br.getHttpConnection() == null || br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("Page Not Found")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -199,10 +199,10 @@ public class DlPrteCom extends antiDDoSForDecrypt {
             // additional form
             Form continu = findContinueForm(br);
             if (continu != null) {
-                submitForm(continu);
+                br.submitForm(continu);
                 continu = findContinueForm(br);
                 if (continu != null) {
-                    submitForm(continu);
+                    br.submitForm(continu);
                 }
                 // test link had no magic/captcha
                 final String link = br.getRegex("<div class=\"lienet\"><a[^<>]*href=\"(.*?)\">").getMatch(0);
@@ -220,7 +220,7 @@ public class DlPrteCom extends antiDDoSForDecrypt {
                 }
                 continu = br.getFormbyAction("/telecharger/" + strEncodedPart + "}");
                 if (continu != null) {
-                    submitForm(continu);
+                    br.submitForm(continu);
                     go = br.getRegex("class\\s*=\\s*\"showURL\"\\s*>\\s*(.*?)\\s*</p>\\s*</a>").getMatch(0);
                     if (go != null) {
                         final DownloadLink dl = createDownloadlink(go);
@@ -256,7 +256,7 @@ public class DlPrteCom extends antiDDoSForDecrypt {
             passCode = getUserInput("Password?", param);
             continueForm.put("password", Encoding.urlEncode(passCode));
         }
-        this.submitForm(continueForm);
+        br.submitForm(continueForm);
         String link = br.getRegex("class=\"btn-proceed\"[^>]*href=\"(https?://[^\"]+)").getMatch(0); // 2026-07-07
         if (link == null) {
             /* 2020-10-29 */

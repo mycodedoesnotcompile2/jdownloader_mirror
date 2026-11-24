@@ -21,19 +21,16 @@ import jd.gui.swing.jdgui.components.premiumbar.ServicePanel;
 import jd.gui.swing.jdgui.views.settings.components.ToggleEnabledSelectionAction;
 
 public class PremiumAccountTable extends BasicJDTable<AccountEntry> {
-
     private static final long serialVersionUID = -2166408567306279016L;
 
     public PremiumAccountTable(AccountListPanel accountListPanel) {
         this(new PremiumAccountTableModel(accountListPanel));
-
     }
 
     public PremiumAccountTable(PremiumAccountTableModel premiumAccountTableModel) {
         super(premiumAccountTableModel);
         this.setSearchEnabled(true);
         addRowHighlighterSelected();
-
         this.getModel().addExtComponentRowHighlighter(new ExtComponentRowHighlighter<AccountEntry>(LAFOptions.getInstance().getColorForTableAccountTempErrorRowForeground(), LAFOptions.getInstance().getColorForTableAccountTempErrorRowBackground(), null) {
             public int getPriority() {
                 return Integer.MAX_VALUE;
@@ -48,7 +45,6 @@ public class PremiumAccountTable extends BasicJDTable<AccountEntry> {
             public boolean accept(ExtColumn<AccountEntry> column, AccountEntry value, boolean selected, boolean focus, int row) {
                 return value.getAccount().isTempDisabled();
             }
-
         });
         this.getModel().addExtComponentRowHighlighter(new ExtComponentRowHighlighter<AccountEntry>(LAFOptions.getInstance().getColorForTableAccountErrorRowForeground(), LAFOptions.getInstance().getColorForTableAccountErrorRowBackground(), null) {
             public int getPriority() {
@@ -64,7 +60,6 @@ public class PremiumAccountTable extends BasicJDTable<AccountEntry> {
             public boolean accept(ExtColumn<AccountEntry> column, AccountEntry value, boolean selected, boolean focus, int row) {
                 return !value.getAccount().isValid();
             }
-
         });
     }
 
@@ -78,7 +73,6 @@ public class PremiumAccountTable extends BasicJDTable<AccountEntry> {
             public boolean accept(ExtColumn<AccountEntry> column, AccountEntry value, boolean selected, boolean focus, int row) {
                 return selected;
             }
-
         });
     }
 
@@ -132,15 +126,16 @@ public class PremiumAccountTable extends BasicJDTable<AccountEntry> {
             if (selection == null) {
                 popup.add(new NewAction());
                 addRemovePopupItem(popup);
-                popup.add(new BuyAction());
                 popup.add(new RefreshAction(null));
             } else {
-                popup.add(new NewAction());
+                popup.add(new NewAction(selection));
                 popup.add(new EditAction(selection));
                 /* Same as the button in the settings column, but only for an account whose plugin has settings. */
                 if (selection.size() == 1 && selection.get(0).hasConfiguration()) {
                     popup.add(new SettingsAction(selection));
                 }
+                /* Same as the Buy button below the table (the hoster of the selected account is preselected). */
+                popup.add(new BuyAction(this, true));
                 popup.add(new ToggleEnabledSelectionAction<AccountEntry>(contextObject, selection) {
                     private static final long serialVersionUID = 1L;
 
@@ -169,5 +164,4 @@ public class PremiumAccountTable extends BasicJDTable<AccountEntry> {
     protected void addRemovePopupItem(JPopupMenu popup) {
         popup.add(new RemoveAction(null, false));
     }
-
 }

@@ -15,30 +15,23 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
-import java.util.ArrayList;
 
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 
 import jd.PluginWrapper;
-import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.parser.html.Form;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
-import jd.plugins.DownloadLink;
 
-@DecrypterPlugin(revision = "$Revision: 53409 $", interfaceVersion = 3, names = { "short.es" }, urls = { "https?://(?:www\\.)?short\\.es/[A-Za-z0-9]+" })
+@DecrypterPlugin(revision = "$Revision: 54118 $", interfaceVersion = 3, names = { "short.es" }, urls = { "https?://(?:www\\.)?short\\.es/[A-Za-z0-9]+" })
 public class ShortEs extends MightyScriptAdLinkFly {
     public ShortEs(PluginWrapper wrapper) {
         super(wrapper);
     }
 
-    public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        return super.decryptIt(param, progress);
-    }
-
     @Override
-    protected void hookAfterCaptcha(final Browser br, final Form form) throws Exception {
+    protected void hookAfterCaptcha(final CryptedLink param, final Browser br, final Form form) throws Exception {
         /* 2021-12-10: Major workaround */
         final Form captchaForm = this.getCaptchaForm(br, param);
         if (captchaForm != null) {

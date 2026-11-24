@@ -25,22 +25,22 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
+import jd.plugins.PluginForDecrypt;
 
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 51818 $", interfaceVersion = 2, names = { "readcomicsonline.ru" }, urls = { "https?://(?:www\\.)?readcomicsonline\\.ru/comic/.+" })
-public class ReadComicsOnlineRu extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 2, names = { "readcomicsonline.ru" }, urls = { "https?://(?:www\\.)?readcomicsonline\\.ru/comic/.+" })
+public class ReadComicsOnlineRu extends PluginForDecrypt {
     public ReadComicsOnlineRu(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        String parameter = param.toString();
+        String parameter = param.getCryptedUrl();
         br.setFollowRedirects(true);
-        getPage(parameter);
+        br.getPage(parameter);
         final FilePackage fp = FilePackage.getInstance();
         ArrayList<String> links = new ArrayList<String>();
         String itemID = new Regex(parameter, "/comic/([^/]+)").getMatch(0);

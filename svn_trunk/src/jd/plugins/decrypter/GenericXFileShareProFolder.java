@@ -43,6 +43,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.hoster.FileupOrg;
@@ -54,11 +55,10 @@ import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 @SuppressWarnings("deprecation")
-@DecrypterPlugin(revision = "$Revision: 53513 $", interfaceVersion = 2, names = {}, urls = {})
-public class GenericXFileShareProFolder extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 2, names = {}, urls = {})
+public class GenericXFileShareProFolder extends PluginForDecrypt {
     private static final String[] domains        = new String[] { "up-4.net", "up-4ever.com", "up-4ever.net", "subyshare.com", "brupload.net", "powvideo.net", "salefiles.com", "free-uploading.com", "rapidfileshare.net", "fireget.com", "mixshared.com", "novafile.com", "novafile.org", "qtyfiles.com", "free-uploading.com", "free-uploading.com", "downloadani.me", "clicknupload.org", "isra.cloud", "world-files.com", "katfile.vip", "katfile.online", "katfile.cloud", "katfile.com", "filefox.cc", "cosmobox.org", "tstorage.info", "fastfile.cc", "datanodes.to", "filestore.me", "ezvn.net", "filoz.net", "filextras.com", "dropload.io", "datanodes.to", "file-me.top", "rapidx.cloud" };
     /* This list contains all hosts which need special Patterns (see below) - all other XFS hosts have the same folder patterns! */
     private static final String[] specialDomains = { "hotlink.cc", "ex-load.com", "imgbaron.com", "filespace.com", "spaceforfiles.com", "prefiles.com", "file.al", "takefile.link", "florenfile.com" };
@@ -177,7 +177,7 @@ public class GenericXFileShareProFolder extends antiDDoSForDecrypt {
         /* First check for offline and check if we need to be logged in to view this folder. */
         do {
             try {
-                getPage(param.getCryptedUrl());
+                br.getPage(param.getCryptedUrl());
                 if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("No such user exist|No such folder")) {
                     logger.info("Incorrect URL, Invalid user or empty folder");
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -359,18 +359,7 @@ public class GenericXFileShareProFolder extends antiDDoSForDecrypt {
                         break;
                     }
                 }
-                if (StringUtils.isNotEmpty(html_snippet)) {
-                    // split tr_snippet in case it contains multiple links, eg 3 in a row, eg brupload.net
-                    // TODO: 2024-07-22: Remove the commented-out code down below.
-                    // final String link_tr_snippet = new Regex(html_snippet, "(?i)<TD>.*" + linkid + ".*?</TD>").getMatch(-1);
-                    // if (link_tr_snippet != null) {
-                    // final String rest_tr_snippet = html_snippet.replace(link_tr_snippet, "");
-                    // if (StringUtils.isNotEmpty(rest_tr_snippet)) {
-                    // table_snippets.add(0, rest_tr_snippet);
-                    // }
-                    // html_snippet = link_tr_snippet;
-                    // }
-                } else {
+                if (StringUtils.isEmpty(html_snippet)) {
                     /* Lazier attempt: Works for e.g. world-files.com, brupload.net */
                     /* TODO: Improve this RegEx e.g. for katfile.com, brupload.net */
                     html_snippet = new Regex(html, "<tr>\\s*<td>\\s*<a[^<]*" + linkid + ".*</td>\\s*</tr>").getMatch(-1);
@@ -496,12 +485,7 @@ public class GenericXFileShareProFolder extends antiDDoSForDecrypt {
         if (nextPageUrl != null) {
             nextPageUrl = HTMLEntities.unhtmlentities(nextPageUrl);
             nextPageUrl = Request.getLocation(nextPageUrl, br.getRequest());
-            // final String pageStr = UrlQuery.parse(nextPage).get("page");
-            // if (pageStr != null && !pageStr.equalsIgnoreCase(i + "")) {
-            // logger.info("NextPage doesn't match expected page: Next = " + pageStr + " Expected = " + i);
-            // return false;
-            // }
-            getPage(br, nextPageUrl);
+            br.getPage(nextPageUrl);
             return true;
         } else {
             if (folderQuery == null) {
@@ -546,11 +530,9 @@ public class GenericXFileShareProFolder extends antiDDoSForDecrypt {
                 }
             }
             folderQuery.addAndReplace("page", Integer.toString(nextPage));
-            // postData = "op=" + Encoding.urlEncode(op) + "&load=files&page=%s&fld_id=" + Encoding.urlEncode(fld_id) + "&usr_login=" +
-            // Encoding.urlEncode(usr_login);
             br.getHeaders().put("Accept", "*/*");
             br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-            postPage(br.getURL(), folderQuery.toString());
+            br.postPage(br.getURL(), folderQuery.toString());
             return true;
         }
     }

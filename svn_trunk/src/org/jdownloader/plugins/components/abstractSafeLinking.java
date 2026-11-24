@@ -9,6 +9,7 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
@@ -16,6 +17,7 @@ import org.jdownloader.scripting.JavaScriptEngineFactory;
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
+import jd.http.requests.PostRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -27,7 +29,9 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
+import jd.plugins.components.UserAgents;
 
 /**
  * abstract class to handle sites similar to safelinking type sites. <br />
@@ -38,8 +42,8 @@ import jd.plugins.components.PluginJSonUtils;
  * @author bismarck - parts of the original
  * @author psp - parts of the original
  */
-@DecrypterPlugin(revision = "$Revision: 53695 $", interfaceVersion = 2, names = {}, urls = {})
-public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54119 $", interfaceVersion = 2, names = {}, urls = {})
+public abstract class abstractSafeLinking extends PluginForDecrypt {
     public abstractSafeLinking(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -49,22 +53,22 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
     protected String uid       = null;
 
     @Override
-    protected Browser prepBrowser(final Browser prepBr, final String host) {
-        if (!(browserPrepped.containsKey(prepBr) && browserPrepped.get(prepBr) == Boolean.TRUE)) {
-            super.prepBrowser(prepBr, host);
-            /* define custom browser headers and language settings */
-            prepBr.setAllowedResponseCodes(new int[] { 422, 500 });
-            prepBr.setReadTimeout(2 * 60 * 1000);
-            prepBr.setConnectTimeout(2 * 60 * 1000);
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        if (useRUA()) {
+            br.getHeaders().put("User-Agent", UserAgents.stringUserAgent());
         }
-        return prepBr;
+        br.setAllowedResponseCodes(new int[] { 422, 500 });
+        br.setReadTimeout(2 * 60 * 1000);
+        br.setConnectTimeout(2 * 60 * 1000);
+        return br;
     }
 
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, final ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         // set parameter. required to be set here!
-        parameter = param.toString();
+        parameter = param.getCryptedUrl();
         // link correction
         parameter = correctLink(parameter);
         // setuid
@@ -72,7 +76,7 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
         // shortlink i assume
         if (parameter.matches(regexLinkShort())) {
             // currently https does not work with short links!
-            getPage(parameter.replace("https://", "http://"));
+            br.getPage(parameter.replace("https://", "http://"));
             String newparameter = br.getRedirectLocation();
             if (newparameter == null) {
                 logger.warning("Decrypter broken for link: " + parameter);
@@ -85,7 +89,7 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
             }
             parameter = newparameter;
         }
-        getPage(parameter);
+        br.getPage(parameter);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -111,7 +115,7 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
             final String useCaptcha = PluginJSonUtils.getJsonValue(security, "useCaptcha");
             final String captchaType = PluginJSonUtils.getJsonValue(security, "captchaType");
             final String usePassword = PluginJSonUtils.getJsonValue(security, "usePassword");
-            if (!inValidate(security) && (PluginJSonUtils.parseBoolean(useCaptcha) || PluginJSonUtils.parseBoolean(usePassword))) {
+            if (!StringUtils.isEmpty(security) && (PluginJSonUtils.parseBoolean(useCaptcha) || PluginJSonUtils.parseBoolean(usePassword))) {
                 int tries = 4;
                 for (int i = 0; i < tries; i++) {
                     String nextPost = null;
@@ -198,14 +202,14 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
                             break;
                         }
                         case 4: {
-                            getPage(captchaBr, "/includes/captcha_factory/fancycaptcha.php?hash=" + uid);
+                            captchaBr.getPage("/includes/captcha_factory/fancycaptcha.php?hash=" + uid);
                             nextPost = PluginJSonUtils.ammendJson(nextPost, "fancy-captcha", captchaBr.toString().trim());
                             nextPost = PluginJSonUtils.ammendJson(nextPost, "type", 4);
                             break;
                         }
                         case 5: {
                             captchaBr.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-                            postPage(captchaBr, "/includes/captcha_factory/Qaptcha.jquery.php?hash=" + uid, "action=qaptcha");
+                            captchaBr.postPage("/includes/captcha_factory/Qaptcha.jquery.php?hash=" + uid, "action=qaptcha");
                             if (!captchaBr.containsHTML("\"error\":false")) {
                                 logger.warning("Decrypter broken for link: " + parameter + "\n");
                             }
@@ -222,7 +226,7 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
                             // short wait to prevent hammering
                             sleep(2500, param);
                             // maybe also good to clear cookies?
-                            getPage(br.getURL());
+                            br.getPage(br.getURL());
                             continue;
                         }
                         case 12: {
@@ -283,14 +287,9 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
 
     protected final void ajaxPostPageRaw(final String url, final String post) throws Exception {
         setAjaxForPost();
-        postPageRaw(ajax, url, post, true);
-    }
-
-    private void setAjaxForGet() {
-        ajax = br.cloneBrowser();
-        // ajax.getHeaders().put("Accept", "*/*");
-        // ajax.getHeaders().put("X-Request-With" , "XMLHttpRequest");
-        ajax.getHeaders().put("Accept", "application/json, text/plain, */*");
+        final PostRequest request = ajax.createPostRequest(url, new UrlQuery(), "application/json");
+        request.setPostDataString(post);
+        ajax.getPage(request);
     }
 
     private void setAjaxForPost() {
@@ -304,21 +303,13 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
     public ArrayList<DownloadLink> decryptIt_oldStyle(final CryptedLink param, final ProgressController progress) throws Exception {
         ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         // link correction
-        parameter = correctLink(param.toString());
+        parameter = correctLink(param.getCryptedUrl());
         // setuid
         uid = getUID(parameter);
-        getPage(parameter);
+        br.getPage(parameter);
         if (isOffline()) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        // final Form captchaForm = br.getFormByInputFieldPropertyKeyValue("name", "frmprotect");
-        // if (captchaForm != null) {
-        // final InputField captchaTypeField = captchaForm.getInputFieldByName("captchatype");
-        // if (captchaTypeField != null && "re".equalsIgnoreCase(captchaTypeField.getValue())) {
-        // /* reCaptchaV2 */
-        // final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
-        // }
-        // }
         handleCaptcha_oldStyle(param);
         // shortlink i assume
         if (parameter.matches(regexLinkShort())) {
@@ -333,7 +324,7 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
                 return ret;
             }
             parameter = correctLink(newparameter);
-            getPage(parameter);
+            br.getPage(parameter);
         }
         if (br.getRedirectLocation() != null && br.getRedirectLocation().matches("^.+" + regexSupportedDomains() + "/404$")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -344,7 +335,6 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
         if (parameter.matches(regexLinkD())) {
             ret.add(decryptSingleLink(br));
         } else {
-            // handleCaptcha_oldStyle(param);
             ret.addAll(crawlMultipleLinks(param));
         }
         if (ret.isEmpty()) {
@@ -512,7 +502,7 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
         Form preForm = this.findClickToContinueForm();
         if (preForm != null) {
             logger.info("Found preForm");
-            this.submitForm(preForm);
+            br.submitForm(preForm);
         } else {
             logger.info("No preForm available");
         }
@@ -591,13 +581,13 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
                 }
                 case 5: {
                     captchaBr.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-                    getPage(captchaBr, "/fancycaptcha/captcha/captcha.php");
+                    captchaBr.getPage("/fancycaptcha/captcha/captcha.php");
                     protectedForm.put(getCaptchaFancyInputfieldName(), captchaBr.toString().trim());
                     break;
                 }
                 case 6: {
                     captchaBr.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-                    postPage(captchaBr, "/includes/captcha_factory/Qaptcha.jquery.php?hash=" + uid, "action=qaptcha");
+                    captchaBr.postPage("/includes/captcha_factory/Qaptcha.jquery.php?hash=" + uid, "action=qaptcha");
                     if (!captchaBr.containsHTML("\"error\":false")) {
                         logger.warning("Decrypter broken for link: " + parameter + "\n");
                         logger.warning("Qaptcha handling broken");
@@ -639,15 +629,15 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
             }
             if (!captchaRegex.containsKey(cType) && !password) {
                 logger.info("Sending form without any captcha input -> Looks like neither captcha nor password is required");
-                submitForm(protectedForm);
+                br.submitForm(protectedForm);
                 break;
             }
             timesNoUserInput = 0;
-            submitForm(protectedForm);
+            br.submitForm(protectedForm);
             preForm = this.findClickToContinueForm();
             if (preForm != null) {
                 logger.info("Found preForm again -> Strong indicator that user has entered wrong captcha");
-                submitForm(preForm);
+                br.submitForm(preForm);
             }
             protectedForm = findCaptchaForm();
             if (protectedForm == null) {
@@ -829,7 +819,7 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
         // TODO: don't think this is needed! confirm -raztoki, not required by keeplinks or safemylink
         /* Webprotection decryption */
         if (br.getRedirectLocation() != null && br.getRedirectLocation().equals(parameter)) {
-            getPage(parameter);
+            br.getPage(parameter);
         }
         String plaintext = br.getRegex("<textarea class=\"link_textarea trurl form-control2\"(.*?)</textarea>").getMatch(0);
         if (plaintext == null) {

@@ -26,7 +26,6 @@ import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCra
 import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperCrawlerPluginHCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -40,9 +39,10 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 53205 $", interfaceVersion = 2, names = {}, urls = {})
-public class MultiupOrgCrawler extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54119 $", interfaceVersion = 2, names = {}, urls = {})
+public class MultiupOrgCrawler extends PluginForDecrypt {
     // DEV NOTES:
     // DO NOT REMOVE COMPONENTS YOU DONT UNDERSTAND! When in doubt ask raztoki to fix.
     //
@@ -149,7 +149,7 @@ public class MultiupOrgCrawler extends antiDDoSForDecrypt {
             final String csrftoken = br.getRegex("_csrf_token\"\\s*value\\s*=\\s*\"(.*?)\"").getMatch(0);
             final String mirror = contenturl.replace("/en/download/", "/en/mirror/").replace("/download/", "/en/mirror/");
             if (csrftoken != null) {
-                postPage(mirror, "_csrf_token=" + Encoding.urlEncode(csrftoken));
+                br.postPage(mirror, "_csrf_token=" + Encoding.urlEncode(csrftoken));
             } else {
                 getPage(mirror);
             }
@@ -173,7 +173,7 @@ public class MultiupOrgCrawler extends antiDDoSForDecrypt {
                 }
                 final String cfTurnstileResponse = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, br).getToken();
                 captchaform.put("cf-turnstile-response", Encoding.urlEncode(cfTurnstileResponse));
-                submitForm(captchaform);
+                br.submitForm(captchaform);
                 if (AbstractCloudflareTurnstileCaptcha.containsCloudflareTurnstileClass(br)) {
                     /* This should never happen */
                     throw new PluginException(LinkStatus.ERROR_CAPTCHA);
@@ -186,7 +186,7 @@ public class MultiupOrgCrawler extends antiDDoSForDecrypt {
                 final String response = new CaptchaHelperCrawlerPluginHCaptcha(this, br).getToken();
                 captchaform.put("h-captcha-response", Encoding.urlEncode(response));
                 captchaform.put("g-recaptcha-response", Encoding.urlEncode(response));
-                submitForm(captchaform);
+                br.submitForm(captchaform);
                 if (AbstractHCaptcha.containsHCaptcha(br)) {
                     /* This should never happen */
                     throw new PluginException(LinkStatus.ERROR_CAPTCHA);
@@ -194,7 +194,7 @@ public class MultiupOrgCrawler extends antiDDoSForDecrypt {
             } else if (br.containsHTML("g-recaptcha")) {
                 final String response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
                 captchaform.put("g-recaptcha-response", Encoding.urlEncode(response));
-                submitForm(captchaform);
+                br.submitForm(captchaform);
                 if (br.containsHTML("g-recaptcha")) {
                     /* This should never happen */
                     throw new PluginException(LinkStatus.ERROR_CAPTCHA);
@@ -276,14 +276,13 @@ public class MultiupOrgCrawler extends antiDDoSForDecrypt {
 
     private String multiNewsWorkaround = null;
 
-    @Override
-    protected void getPage(String page) throws Exception {
+    private void getPage(String page) throws Exception {
         final boolean workaround = multiNewsWorkaround == null;
         try {
             if (workaround) {
                 multiNewsWorkaround = page;
             }
-            super.getPage(page);
+            br.getPage(page);
             if (br.containsHTML("<title>\\s*Redirect\\s*</title>")) {
                 final String location = br.getRegex("window\\.opener\\.location\\s*=\\s*'([^']+)'\\s*;").getMatch(0);
                 if (location != null) {

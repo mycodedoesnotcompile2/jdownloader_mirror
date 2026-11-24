@@ -12,7 +12,6 @@ import org.appwork.utils.Regex;
 import org.appwork.utils.encoding.Base64;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter.ExtensionsFilterInterface;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -21,9 +20,10 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 52655 $", interfaceVersion = 2, names = { "stream-mdh.co" }, urls = { "https?://(?:www\\.)?stream-mdh.co/(view|video)/.*?/.+" })
-public class StreamMdh extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 54120 $", interfaceVersion = 2, names = { "stream-mdh.co" }, urls = { "https?://(?:www\\.)?stream-mdh.co/(view|video)/.*?/.+" })
+public class StreamMdh extends PluginForDecrypt {
     public StreamMdh(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -35,9 +35,9 @@ public class StreamMdh extends antiDDoSForDecrypt {
         final String streamID = new Regex(contenturl, "/view/.*?/(.+)").getMatch(0);
         br.setFollowRedirects(true);
         if (streamID != null) {
-            getPage("https://stream-mdh.co/embed/" + streamID);
+            br.getPage("https://stream-mdh.co/embed/" + streamID);
         } else {
-            getPage(contenturl);
+            br.getPage(contenturl);
         }
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
