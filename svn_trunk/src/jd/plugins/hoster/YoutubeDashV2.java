@@ -156,7 +156,7 @@ import jd.plugins.download.Downloadable;
 import jd.plugins.download.HashResult;
 import jd.plugins.download.raf.ChunkRange;
 
-@HostPlugin(revision = "$Revision: 54150 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
+@HostPlugin(revision = "$Revision: 54167 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
 public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInterface {
     private static final String    YT_ALTERNATE_VARIANT = "YT_ALTERNATE_VARIANT";
     private static final String    DASH_AUDIO_FINISHED  = "DASH_AUDIO_FINISHED";
@@ -1473,8 +1473,8 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                 protected String loadResumeInfo() {
                     final String info = downloadLink.getStringProperty(dashChunksProperty + "_segment", null);
                     /*
-                     * Migration: Older versions stored "SEGMENTCOUNT_SEGMENTINDEX_POSITION_SEGMENTURL" (index and position of the segment which
-                     * was started last = start of the segment to continue with). Convert it to the format of the SegmentDownloader.
+                     * Migration: Older versions stored "SEGMENTCOUNT_SEGMENTINDEX_POSITION_SEGMENTURL" (index and position of the segment
+                     * which was started last = start of the segment to continue with). Convert it to the format of the SegmentDownloader.
                      */
                     final String[] legacy = new Regex(info, "^(\\d+)_(\\d+)_(\\d+)_.+$").getRow(0);
                     if (legacy != null) {
@@ -1553,7 +1553,7 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                 dl = new SegmentDownloader(this, dashLink, dashDownloadable, br, segments) {
                     /* This variant resumes via the progress of the chunks (see onSegmentStart) */
                     @Override
-                    protected boolean isSegmentResumeEnabled() {
+                    protected boolean isResumeEnabled() {
                         return false;
                     }
 
@@ -1603,8 +1603,8 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                     }
 
                     @Override
-                    protected boolean isSegmentConnectionValid(Segment segment, URLConnectionAdapter con) throws IOException, PluginException {
-                        final boolean ret = super.isSegmentConnectionValid(segment, con);
+                    protected boolean isSegmentConnectionValid(URLConnectionAdapter con, Segment segment) throws IOException, PluginException {
+                        final boolean ret = super.isSegmentConnectionValid(con, segment);
                         if (ret) {
                             final String query = con.getURL().getQuery();
                             if (query.contains("range=")) {

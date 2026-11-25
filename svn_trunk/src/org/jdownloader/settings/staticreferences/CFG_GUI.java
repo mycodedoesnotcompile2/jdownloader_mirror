@@ -291,7 +291,11 @@ public class CFG_GUI {
      * Set to false to invert the sort Order for the Download & Linkgrabber Tables.
      **/
     public static final BooleanKeyHandler                              PRIMARY_TABLE_SORTER_DESC                                            = SH.getKeyHandler("PrimaryTableSorterDesc", BooleanKeyHandler.class);
-    public static final BooleanKeyHandler                              OVERVIEW_PANEL_LINKGRABBER_PACKAGE_COUNT_VISIBLE                     = SH.getKeyHandler("OverviewPanelLinkgrabberPackageCountVisible", BooleanKeyHandler.class);
+    /**
+     * Remember last sort view: If enabled, the column sorting of the Download & Linkgrabber Tables is restored after a JDownloader restart.
+     **/
+    public static final BooleanKeyHandler                              REMEMBER_LAST_SORT_VIEW_ENABLED                                      = SH.getKeyHandler("RememberLastSortViewEnabled", BooleanKeyHandler.class);
+    public static final BooleanKeyHandler                              OVERVIEW_PANEL_LINKGRABBER_PACKAGE_COUNT_VISIBLE                  = SH.getKeyHandler("OverviewPanelLinkgrabberPackageCountVisible", BooleanKeyHandler.class);
     public static final BooleanKeyHandler                              DOWNLOADS_PROPERTIES_PANEL_CHECKSUM_VISIBLE                          = SH.getKeyHandler("DownloadsPropertiesPanelChecksumVisible", BooleanKeyHandler.class);
     public static final BooleanKeyHandler                              OVERVIEW_PANEL_LINKGRABBER_STATUS_OFFLINE_VISIBLE                    = SH.getKeyHandler("OverviewPanelLinkgrabberStatusOfflineVisible", BooleanKeyHandler.class);
     public static final BooleanKeyHandler                              HATE_CAPTCHAS_TEXT_IN_CAPTCHA_DIALOG_VISIBLE                         = SH.getKeyHandler("HateCaptchasTextInCaptchaDialogVisible", BooleanKeyHandler.class);

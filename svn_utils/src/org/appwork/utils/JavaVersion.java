@@ -54,6 +54,7 @@ public enum JavaVersion implements JavaVersionInterface {
             return this.next;
         }
     };
+
     public final long    longID;
     public final int     classID;
     public final String  string;
@@ -106,54 +107,67 @@ public enum JavaVersion implements JavaVersionInterface {
             // remove trailing LTS
             version = version.replaceFirst("\\s*-\\s*LTS$", "");
         }
-        final String majorFeature = new Regex(version, "^(\\d+)").getMatch(0);
-        final String minorInterim = new Regex(version, "^\\d+\\.(\\d+)").getMatch(0);
-        final String securityUpdate = new Regex(version, "^\\d+\\.\\d+\\.(\\d+)").getMatch(0);
-        // final String patch = new Regex(version, "^\\d+\\.\\d+\\.\\d+\\.(\\d+)").getMatch(0);
-        long ret = 0;
-        final String u;
-        final String b;
-        if ("1".equals(majorFeature) && minorInterim != null) {
+        final String feature = new Regex(version, "^(\\d+)").getMatch(0);// Hauptversion
+        final String interim = new Regex(version, "^\\d+\\.(\\d+)").getMatch(0);// Zwischenversion
+        final String update = new Regex(version, "^\\d+\\.\\d+\\.(\\d+)").getMatch(0);// Quartals-Update
+        final String patch = new Regex(version, "^\\d+\\.\\d+\\.\\d+\\.(\\d+)").getMatch(0);// Notfall- / Sonder-Patch
+        final String build = new Regex(version, "\\+(\\d+)").getMatch(0);// Build-Nummer
+        if ("1".equals(feature) && interim != null) {
             // java 1.5 - java 1.8
-            ret = Long.parseLong(minorInterim) * 1000 * 1000 + 10000000;
-            u = new Regex(version, "^.*?_(\\d+)").getMatch(0);
-            b = new Regex(version, "^.*?(_|-)b(\\d+)$").getMatch(1);
+            final long major = Long.parseLong(interim);
+            long ret = (major * 1000 * 1000) + 10000000;
+            final String oldUpdate = new Regex(version, "^.*?_(\\d+)").getMatch(0);
+            final String oldBuild = new Regex(version, "^.*?(_|-)b(\\d+)$").getMatch(1);
             // ignore securityUpdate
-        } else if (majorFeature != null) {
+            if (oldUpdate != null) {
+                ret += Math.min(999, Long.parseLong(oldUpdate)) * 1000;
+            }
+            if (oldBuild != null) {
+                ret += Math.min(999, Long.parseLong(oldBuild));
+            }
+            return ret;
+        } else if (feature != null) {
             // java 1.9, java 10, java 11...
-            final long major = Long.parseLong(majorFeature);
-            u = new Regex(version, "u(\\d+)").getMatch(0);
-            b = new Regex(version, "\\+(\\d+)$").getMatch(0);
-            // if (major < 5) {
-            // // fallback to Java 1.5
-            // return JAVA_1_5;
-            // } else
-            //
+            final long major = Long.parseLong(feature);
+            final String oldUpdate = new Regex(version, "u(\\d+)").getMatch(0);
+            final String oldBuild = new Regex(version, "^.*?(_|-)b(\\d+)$").getMatch(1);
+            long ret = 0;
             if (major < 9) {
                 // < java 9
                 ret = major * 1000 * 1000 + 10000000;
+                if (oldUpdate != null) {
+                    /* append update number */
+                    ret += Math.min(999, Long.parseLong(oldUpdate)) * 1000;
+                }
+                if (build != null) {
+                    /* append build number */
+                    ret += Math.min(999, Long.parseLong(build));
+                } else if (oldBuild != null) {
+                    /* append build number */
+                    ret += Math.min(999, Long.parseLong(oldBuild));
+                }
             } else {
                 // >= java 9
                 ret = major * 1000 * 1000 * 1000 * 1000l;
-                if (minorInterim != null) {
-                    ret += Math.min(999, Long.parseLong(minorInterim)) * 1000 * 1000 * 1000l;
+                if (interim != null) {
+                    ret += Math.min(999, Long.parseLong(interim)) * 1000 * 1000 * 1000l;
                 }
-                if (securityUpdate != null) {
-                    ret += Math.min(999, Long.parseLong(securityUpdate)) * 1000 * 1000;
+                if (update != null) {
+                    ret += Math.min(999, Long.parseLong(update)) * 1000 * 1000;
+                } else if (oldUpdate != null) {
+                    ret += Math.min(999, Long.parseLong(oldUpdate)) * 1000 * 1000;
+                }
+                if (patch != null) {
+                    ret += Math.min(999, Long.parseLong(patch)) * 1000;
+                }
+                if (build != null) {
+                    ret += Math.min(999, Long.parseLong(build));
                 }
             }
+            return ret;
         } else {
             return -1;
         }
-        if (u != null) {
-            /* append update number */
-            ret += Math.min(999, Long.parseLong(u)) * 1000;
-        }
-        if (b != null) {
-            /* append build number */
-            ret += Math.min(999, Long.parseLong(b));
-        }
-        return ret;
     }
 
     public boolean isHigherThan(final JavaVersionInterface v) {

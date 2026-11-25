@@ -170,7 +170,12 @@ public class OldRAFDownload extends DownloadInterface {
         request.setConnectTimeout(getRequestTimeout());
         request.setReadTimeout(getReadTimeout());
         br.setRequest(request);
-        URLConnectionAdapter ret = connect();
+        final URLConnectionAdapter ret = connect();
+        /*
+         * connect() uses internal browser field ( from Downloadable.getContextBrowser() -> Browser.cloneBrowser), so we must update request
+         * field in calling browser instance
+         */
+        br.setRequest(ret.getRequest());
         return ret;
     }
 

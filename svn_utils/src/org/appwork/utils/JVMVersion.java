@@ -49,8 +49,7 @@ public class JVMVersion {
     // https://endoflife.date/java
     @Deprecated
     public final static long JAVA_1_5 = JavaVersion.JVM_1_5.longID;
-    @Deprecated
-    public final static long JAVA15   = JavaVersion.JVM_1_5.longID;
+
     @Deprecated
     public final static long JAVA_1_6 = JavaVersion.JVM_1_6.longID;
     @Deprecated
@@ -60,7 +59,7 @@ public class JVMVersion {
     @Deprecated
     public final static long JAVA17   = JavaVersion.JVM_1_7.longID;
     @Deprecated
-    public final static long JAVA_1_8 = JavaVersion.JVM_1_8.longID; // LTS Dec 2030
+    public final static long JAVA_1_8 = JavaVersion.JVM_1_8.longID;  // LTS Dec 2030
     @Deprecated
     public final static long JAVA18   = JavaVersion.JVM_1_8.longID;
     @Deprecated
@@ -68,17 +67,9 @@ public class JVMVersion {
     @Deprecated
     public final static long JAVA19   = JavaVersion.JVM_9_0.longID;
     @Deprecated
-    public final static long JAVA_10  = JavaVersion.JVM_10_0.longID;
-    @Deprecated
     public final static long JAVA_11  = JavaVersion.JVM_11_0.longID; // LTS Sep 2026
     @Deprecated
     public final static long JAVA_12  = JavaVersion.JVM_12_0.longID; // March 2019
-    @Deprecated
-    public final static long JAVA_13  = JavaVersion.JVM_13_0.longID; // September 2019
-    @Deprecated
-    public final static long JAVA_14  = JavaVersion.JVM_14_0.longID; // March 2020
-    @Deprecated
-    public final static long JAVA_15  = JavaVersion.JVM_15_0.longID; // September 2020
     @Deprecated
     public final static long JAVA_16  = JavaVersion.JVM_16_0.longID; // March 2021
     @Deprecated
@@ -87,12 +78,6 @@ public class JVMVersion {
     public final static long JAVA_18  = JavaVersion.JVM_18_0.longID; // March 2022, EA
     @Deprecated
     public final static long JAVA_19  = JavaVersion.JVM_19_0.longID; // September 2022, EA
-    @Deprecated
-    public final static long JAVA_20  = JavaVersion.JVM_20_0.longID; // March 2023
-    @Deprecated
-    public final static long JAVA_21  = JavaVersion.JVM_21_0.longID; // September 2023, LTS Sep 2031
-    @Deprecated
-    public final static long JAVA_22  = JavaVersion.JVM_22_0.longID; // March 2024
 
     @Deprecated
     /**

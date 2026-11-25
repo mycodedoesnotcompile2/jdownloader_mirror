@@ -6,6 +6,7 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.io.File;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -15,13 +16,12 @@ import java.util.Map.Entry;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
+import javax.management.openmbean.CompositeData;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 import javax.swing.JFrame;
-
-import jd.controlling.proxy.ProxyController;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.components.IconedProcessIndicator;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -31,6 +31,8 @@ import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
 import org.appwork.utils.IO;
+import org.appwork.utils.JavaVersion;
+import org.appwork.utils.JavaVersionInterface;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.URLEncode;
@@ -39,6 +41,7 @@ import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.logging2.extmanager.LoggerFactory;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.os.CrossSystem.ARCHFamily;
 import org.appwork.utils.os.hardware.HardwareType;
 import org.appwork.utils.os.hardware.HardwareTypeInterface;
 import org.appwork.utils.processes.ProcessBuilderFactory;
@@ -52,6 +55,10 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.controller.crawler.CrawlerPluginController;
 import org.jdownloader.plugins.controller.host.HostPluginController;
+
+import jd.controlling.proxy.ProxyController;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.components.IconedProcessIndicator;
 
 public class UpdateController implements UpdateCallbackInterface {
     private volatile Boolean extractionLibrary = null;
@@ -671,6 +678,114 @@ public class UpdateController implements UpdateCallbackInterface {
         }
     }
 
+    public static enum JAVA4SHELL {
+        /** Java version or VM (non-HotSpot, flags unknown) not affected/too old. */
+        UNAFFECTED_JAVA,
+        /**
+         * Java version with bugfix. Not set by the check yet (deliberately coarse version check); kept for later, when Connect reports its
+         * state to the server itself (user decision).
+         */
+        SAFE_JAVA,
+        /**
+         * Affected Java, but UseAVX <= 2: no AVX-512 CPU (or AVX-512 disabled), the vulnerable intrinsic is not used. Also a JVM that is
+         * not x86-64: the intrinsic exists only there.
+         */
+        SAFE_CPU,
+        /** Affected Java on an AVX-512 CPU, UseBASE64Intrinsics is off. */
+        MITIGATED,
+        /** Affected Java on an AVX-512 CPU and the mitigation is not effective. */
+        VULNERABLE,
+        /**
+         * The check itself failed (e.g. jlinked runtime without jdk.management, unexpected MXBean error). Treated as not vulnerable: a
+         * failed check must never block Connect, same as a JVM that does not know the flags.
+         */
+        UNKNOWN,
+        ERROR;
+
+        public static JAVA4SHELL get() {
+            if (!ARCHFamily.X86.equals(CrossSystem.getARCHFamily())) {
+                return JAVA4SHELL.SAFE_CPU;
+            }
+            final JAVA4SHELL javaVersion = isAffectedVersion();
+            if (javaVersion != null) {
+                return javaVersion;
+            }
+            if (!Application.is64BitJvm()) {
+                return JAVA4SHELL.UNAFFECTED_JAVA;
+            }
+            try {
+                final String avxRaw = getVMOptionValue("UseAVX");
+                if (avxRaw == null) {
+                    return JAVA4SHELL.UNAFFECTED_JAVA;
+                }
+                final Integer useAvx = Integer.parseInt(avxRaw);
+                if (useAvx.intValue() <= 2) {
+                    return JAVA4SHELL.SAFE_CPU;
+                }
+            } catch (NumberFormatException ignored) {
+                return JAVA4SHELL.ERROR;
+            }
+            final String base64Raw = getVMOptionValue("UseBASE64Intrinsics");
+            if (base64Raw == null) {
+                return JAVA4SHELL.UNAFFECTED_JAVA;
+            }
+            final Boolean useBase64Intrinsics = Boolean.valueOf(base64Raw);
+            if (Boolean.FALSE.equals(useBase64Intrinsics)) {
+                return JAVA4SHELL.MITIGATED;
+            }
+            return JAVA4SHELL.VULNERABLE;
+        }
+
+        private static final String HOTSPOT_BEAN = "com.sun.management:type=HotSpotDiagnostic";
+
+        private static JAVA4SHELL isAffectedVersion() {
+            final JavaVersionInterface version = JavaVersion.getVersion();
+            if (!version.isMinimum(JavaVersion.JVM_17_0)) {
+                return JAVA4SHELL.UNAFFECTED_JAVA;
+            }
+            if (version.is(JavaVersion.JVM_17_0)) {
+                if (version.isMinimum(JavaVersion.toJavaVersion("17.0.21.1"))) {
+                    return JAVA4SHELL.SAFE_JAVA;
+                }
+            }
+            if (version.is(JavaVersion.JVM_21_0)) {
+                if (version.isMinimum(JavaVersion.toJavaVersion("21.0.13.1"))) {
+                    return JAVA4SHELL.SAFE_JAVA;
+                }
+            }
+            if (version.is(JavaVersion.JVM_25_0)) {
+                if (version.isMinimum(JavaVersion.toJavaVersion("25.0.5.1"))) {
+                    return JAVA4SHELL.SAFE_JAVA;
+                }
+            }
+            if (version.is(JavaVersion.JVM_27_0)) {
+                if (version.isMinimum(JavaVersion.toJavaVersion("27.0.1.1"))) {
+                    return JAVA4SHELL.SAFE_JAVA;
+                }
+            }
+            return null;
+        }
+
+        private static String getVMOptionValue(String optionName) {
+            try {
+                final MBeanServer server = ManagementFactory.getPlatformMBeanServer();
+                final ObjectName objectName = new ObjectName(HOTSPOT_BEAN);
+                if (!server.isRegistered(objectName)) {
+                    return null;
+                }
+                final Object result = server.invoke(objectName, "getVMOption", new Object[] { optionName }, new String[] { "java.lang.String" });
+                if (result instanceof CompositeData) {
+                    final Object value = ((CompositeData) result).get("value");
+                    return value != null ? value.toString() : null;
+                }
+            } catch (Throwable t) {
+            }
+            return null;
+        }
+    }
+
+    private final static JAVA4SHELL J4S_STATE = JAVA4SHELL.get();
+
     @Override
     public void append(StringBuilder sb) {
         if (sb != null && !new Regex(sb, ".*app=JDU.*").matches()) {
@@ -681,6 +796,7 @@ public class UpdateController implements UpdateCallbackInterface {
             } catch (Throwable e) {
                 logger.log(e);
             }
+            sb.append("&j4s=" + J4S_STATE.name());
             boolean hwDebug = false;
             if (Boolean.FALSE.equals(getExtractionLibrary())) {
                 try {

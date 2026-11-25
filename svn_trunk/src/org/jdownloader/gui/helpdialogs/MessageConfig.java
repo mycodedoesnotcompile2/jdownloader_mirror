@@ -4,6 +4,8 @@ import java.awt.Point;
 
 import javax.swing.Icon;
 
+import org.appwork.storage.config.handler.BooleanKeyHandler;
+
 public class MessageConfig {
     private Point point = null;
 
@@ -24,6 +26,8 @@ public class MessageConfig {
     private Icon    icon;
     private Boolean expandToBottom   = null;
     private Boolean expandToRight    = null;
+    private BooleanKeyHandler optionKeyHandler = null;
+    private String            optionLabel      = null;
 
     public MessageConfig() {
     }
@@ -94,6 +98,23 @@ public class MessageConfig {
     public MessageConfig setExpandToBottom(Boolean expandToBottom) {
         this.expandToBottom = expandToBottom;
         return this;
+    }
+
+    /**
+     * Optional extra checkbox that is shown below the message and directly controls the given boolean setting
+     */
+    public MessageConfig setOption(BooleanKeyHandler optionKeyHandler, String optionLabel) {
+        this.optionKeyHandler = optionKeyHandler;
+        this.optionLabel = optionLabel;
+        return this;
+    }
+
+    public BooleanKeyHandler getOptionKeyHandler() {
+        return optionKeyHandler;
+    }
+
+    public String getOptionLabel() {
+        return optionLabel;
     }
 
     public Boolean getExpandToRight() {

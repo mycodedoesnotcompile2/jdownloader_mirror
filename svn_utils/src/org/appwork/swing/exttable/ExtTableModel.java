@@ -1377,6 +1377,14 @@ public abstract class ExtTableModel<E> extends AbstractTableModel {
     }
 
     public void setSortColumn(final ExtColumn<E> e) {
+        final ExtColumn<E> previous = this.sortColumn;
+        if (previous != null && previous != e) {
+            /*
+             * Reset the sort state of the previously sorted column. Otherwise it keeps its old state (e.g. SORT_ASC) and a later click on
+             * it would continue the old sort cycle although another column was active in between.
+             */
+            previous.setSortOrderIdentifier(null);
+        }
         this.sortColumn = e;
     }
 

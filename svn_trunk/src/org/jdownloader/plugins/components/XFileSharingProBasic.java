@@ -95,7 +95,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 54090 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54164 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1897,24 +1897,26 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                         return super.put(key, value);
                     }
                 };
+                /*
+                 * TODO: "filename" is reassigned for every textarea below, also with null. If textareas exist but none of the regexes match,
+                 * "fileNames" stays empty and "filename" ends up null, which discards the filename found before (fname/dfilename). Use a
+                 * local variable inside the loop and only assign "filename" if "fileNames" is not empty.
+                 */
                 for (final String textarea : textareas) {
                     /* Filename from URL */
                     if (quotedFUID != null) {
-                        final Regex targetUrlWithFilename = new Regex(textarea, "(?i)(?:^|=\\s*\")https?://[^/]+/" + quotedFUID + "/([^/?]+)(\\.html)?($|\"\\s+)");
+                        final Regex targetUrlWithFilename = new Regex(textarea, "(?i)(?:^|=\\s*\")https?://[^/]+/" + quotedFUID + "/([^/?]+?)(\\.html)?(\\s*$|\"\\s+)");
                         if (targetUrlWithFilename.patternFind()) {
                             filename = targetUrlWithFilename.getMatch(0);
                             fileNames.put(filename, null);
                         }
                     }
                     /* e.g. xxembed.com */
+                    /* Video image thumbnail item: Forum code: Link + Thumbnail as URL with title as text. */
                     filename = new Regex(textarea, "(?i)\\[URL=[^\\]]+\\]\\[IMG\\][^\\[]+\\[/IMG\\](.*?)\\[/URL\\]").getMatch(0);
+                    fileNames.put(filename, null);
                     if (filename == null && !supports_availablecheck_filesize_bytes_from_sharebox()) {
                         filename = new Regex(textarea, "\\](.*?)\\[/URL\\]").getMatch(0);
-                        fileNames.put(filename, null);
-                    }
-                    {
-                        /* Video image thumbnail item: Forum code: Link + Thumbnail as URL with title as text. */
-                        filename = new Regex(textarea, "(?i)\\[URL=[^\\]]+\\]\\[IMG\\][^\\[]+\\[/IMG\\](.*?)\\[/URL\\]").getMatch(0);
                         fileNames.put(filename, null);
                     }
                     if (pattern_shareboxWithFilenameAndFilesizeBytes != null) {
@@ -1945,6 +1947,11 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                     Integer most = null;
                     logger.info("found multiple results in textareas:" + fileNames);
                     for (Entry<String, Integer> entry : fileNames.entrySet()) {
+                        /*
+                         * TODO: "filename" is the value of the last textarea loop iteration and may be null here. This only works because
+                         * the first entry wins via "most == null" (short-circuit) and sets "filename" before the second condition is
+                         * evaluated. Fragile, better compare against a separate "best" variable.
+                         */
                         if (most == null || entry.getValue() > most || (entry.getKey().replaceAll("[^ ]", "").length() > filename.replaceAll("[^ ]", "").length())) {
                             most = entry.getValue();
                             filename = entry.getKey();
@@ -1955,7 +1962,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             }
             if ((filename == null || filesizeBytesStr == null) && pattern_shareboxWithFilenameAndFilesizeBytes != null) {
                 /* E.g. send.cm */
-                final Regex shareboxWithFilesizeBytesRegex = br.getRegex(pattern_shareboxWithFilenameAndFilesizeBytes);
+                final Regex shareboxWithFilesizeBytesRegex = new Regex(html, pattern_shareboxWithFilenameAndFilesizeBytes);
                 if (filename == null) {
                     filename = shareboxWithFilesizeBytesRegex.getMatch(0);
                 }
@@ -2037,7 +2044,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             }
             if (internal_isVideohosterEmbed(this.br) && (StringUtils.isEmpty(filename) || StringUtils.equalsIgnoreCase("No title", filename))) {
                 /* 2019-10-15: E.g. vidoza.net */
-                final String curFileName = br.getRegex("var\\s*curFileName\\s*=\\s*\"(.*?)\"").getMatch(0);
+                final String curFileName = new Regex(html, "var\\s*curFileName\\s*=\\s*\"(.*?)\"").getMatch(0);
                 if (StringUtils.isNotEmpty(curFileName)) {
                     filename = curFileName;
                 }

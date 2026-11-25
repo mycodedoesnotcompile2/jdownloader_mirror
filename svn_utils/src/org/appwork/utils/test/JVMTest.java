@@ -50,6 +50,12 @@ public class JVMTest extends AWTest {
 
     @Override
     public void runTest() throws Exception {
+        check(("8u514-b01"), 18514001l);
+        check(("11.0.33.1+1"), 11000033001001l);
+        check(("17.0.21.1+2"), 17000021001002l);
+        check(("21.0.13.1+2"), 21000013001002l);
+        check(("25.0.5.1+2"), 25000005001002l);
+        check(("27.0.1.1+4"), 27000001001004l);
         check(("1.8.0_112-b16"), 18112016l);
         check(("1.7.0_72-b14"), 17072014);
         check(("1.5.1_144"), 15144000);
@@ -65,13 +71,13 @@ public class JVMTest extends AWTest {
         check(("12+33"), 12000000000033l);
         check(("13-ea+25"), 13000000000025l);
         check(("11.0.3+7"), 11000003000007l);
-        check(("11.0.9.1"), 11000009000000l);
+        check(("11.0.9.1"), 11000009001000l);
         check("7u331", JVMVersion.JAVA_1_7 + 331000);
         check("6u331", JVMVersion.JAVA_1_6 + 331000);
         check("8u331", JVMVersion.JAVA_1_8 + 331000);
-        check("9u331", JVMVersion.JAVA_9 + 331000);
-        check("11u331", JVMVersion.JAVA_11 + 331000);
-        check("17u331", JVMVersion.JAVA_17 + 331000);
+        check("9u331", JVMVersion.JAVA_9 + 331000000);
+        check("11u331", JVMVersion.JAVA_11 + 331000000);
+        check("17u331", JVMVersion.JAVA_17 + 331000000);
         check("17.0.2", 17000002000000l);
         checkgt("17.0.2", JVMVersion.JAVA_17);
         checkgt("7u331", JVMVersion.JAVA_1_7);

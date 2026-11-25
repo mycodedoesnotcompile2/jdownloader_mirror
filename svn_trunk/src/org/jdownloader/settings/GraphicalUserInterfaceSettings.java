@@ -1682,6 +1682,13 @@ public interface GraphicalUserInterfaceSettings extends ConfigInterface {
     void setPrimaryTableSorterDesc(boolean b);
 
     @AboutConfig
+    @DefaultBooleanValue(false)
+    @DescriptionForConfigEntry("Remember last sort view: If enabled, the column sorting of the Download & Linkgrabber Tables is restored after a JDownloader restart.")
+    boolean isRememberLastSortViewEnabled();
+
+    void setRememberLastSortViewEnabled(boolean b);
+
+    @AboutConfig
     @DefaultBooleanValue(true)
     boolean isPremiumDisabledWarningFlashEnabled();
 

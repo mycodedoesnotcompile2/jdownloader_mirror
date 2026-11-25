@@ -69,6 +69,10 @@ public abstract class PackageControllerTableModel<PackageType extends AbstractPa
                 int lastOldRowIndex = -1;
                 while (selectedRowIndex >= 0) {
                     final int oldRowIndex;
+                    /*
+                     * NOTE: BitSet.previousSetBit exists since Java 7, so this Java 17 check is probably unnecessary. The else branch is an
+                     * equivalent manual backwards search.
+                     */
                     if (Application.getJavaVersion() >= Application.JAVA17) {
                         oldRowIndex = selectedRowsBitSet.previousSetBit(selectedRowIndex);
                     } else {
@@ -261,7 +265,10 @@ public abstract class PackageControllerTableModel<PackageType extends AbstractPa
     public PackageControllerTableModel(final PackageController<PackageType, ChildrenType> pc, String id) {
         super(id);
         storage = getStorage();
-        resetSorting();
+        if (!isSortStateSaverEnabled()) {
+            /* Start unsorted unless the last sort view should be remembered. Otherwise this would wipe the state restored by initModel. */
+            resetSorting();
+        }
         CFG_GUI.HIDE_SINGLE_CHILD_PACKAGES.getEventSender().addListener(new GenericConfigEventListener<Boolean>() {
             @Override
             public void onConfigValueModified(KeyHandler<Boolean> keyHandler, Boolean newValue) {
@@ -322,6 +329,11 @@ public abstract class PackageControllerTableModel<PackageType extends AbstractPa
     }
 
     private void fireRepaint() {
+        /*
+         * NOTE: Both values are millisecond timestamps. If a refresh and a structure change are requested within the same millisecond, the
+         * repaint is skipped here. This is harmless as the structure change rebuild repaints the table anyway. A counter (like
+         * structureChangeRequestCount) would avoid this.
+         */
         if (repaintRequested.get() > structureChangeRequested.get()) {
             ArrayList<ChildrenView<PackageType, ChildrenType>> viewUpdates = new ArrayList<ChildrenView<PackageType, ChildrenType>>();
             for (AbstractNode node : getTableData()) {
@@ -604,6 +616,10 @@ public abstract class PackageControllerTableModel<PackageType extends AbstractPa
 
     public void addFilter(PackageControllerTableModelFilter<PackageType, ChildrenType> filter) {
         if (filter != null && !tableFilters.contains(filter)) {
+            /*
+             * TODO: This locks on tableFilters, which is replaced by a new list below, and removeFilter locks on tableFiltersLock. So
+             * addFilter and removeFilter are not mutually exclusive and concurrent calls can lose an update. Should use tableFiltersLock.
+             */
             synchronized (tableFilters) {
                 if (!tableFilters.contains(filter)) {
                     final ArrayList<PackageControllerTableModelFilter<PackageType, ChildrenType>> availableTableFilters = new ArrayList<PackageControllerTableModelFilter<PackageType, ChildrenType>>(this.tableFilters);
@@ -1138,7 +1154,8 @@ public abstract class PackageControllerTableModel<PackageType extends AbstractPa
             try {
                 if (data.getTableModelCustomizer() != null) {
                     for (PackageControllerTableModelCustomizer customizer : data.getTableModelCustomizer()) {
-                        ret = customizer.customizedTableData();
+                        /* Every customizer can veto the selection restore, so do not let a later one overwrite an earlier "false" */
+                        ret = customizer.customizedTableData() && ret;
                     }
                 }
             } finally {
@@ -1188,17 +1205,20 @@ public abstract class PackageControllerTableModel<PackageType extends AbstractPa
     }
 
     protected boolean isSortStateSaverEnabled() {
-        return false;
+        return CFG_GUI.CFG.isRememberLastSortViewEnabled();
     }
 
     @Override
     public String getNextSortIdentifier(String sortOrderIdentifier) {
         if (sortOrderIdentifier == null) {
-            if (CFG_GUI.CFG.isPrimaryTableSorterDesc()) {
-                sortOrderIdentifier = ExtColumn.SORT_DESC;
-            } else {
-                sortOrderIdentifier = ExtColumn.SORT_ASC;
+            /*
+             * A column that was never sorted has no identifier yet. The first click must lead to the primary direction, so it is handled
+             * like the unsorted state (SORT_ORIGINAL) instead of like an already active primary direction.
+             */
+            if (!isTristateSorterEnabled()) {
+                return CFG_GUI.CFG.isPrimaryTableSorterDesc() ? ExtColumn.SORT_DESC : ExtColumn.SORT_ASC;
             }
+            sortOrderIdentifier = SORT_ORIGINAL;
         }
         if (!isTristateSorterEnabled()) {
             if (sortOrderIdentifier.equals(ExtColumn.SORT_ASC)) {

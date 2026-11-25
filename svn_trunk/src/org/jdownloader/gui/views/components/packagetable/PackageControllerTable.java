@@ -9,6 +9,7 @@ import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
@@ -22,6 +23,7 @@ import javax.swing.JTable;
 import javax.swing.KeyStroke;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.table.TableModel;
@@ -46,7 +48,10 @@ import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.EDTRunner;
 import org.jdownloader.actions.AppAction;
+import org.appwork.utils.swing.dialog.Dialog;
 import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.helpdialogs.HelpDialog;
+import org.jdownloader.gui.helpdialogs.MessageConfig;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.SelectionInfo.PackageView;
@@ -476,6 +481,29 @@ public abstract class PackageControllerTable<ParentType extends AbstractPackageN
     @SuppressWarnings("unchecked")
     public PackageControllerTableModel<ParentType, ChildrenType> getModel() {
         return (PackageControllerTableModel<ParentType, ChildrenType>) super.getModel();
+    }
+
+    /* Shared by download list and linkgrabber, so the hint is only shown once for both */
+    private static final String TEMPORARY_SORT_HINT_KEY = "downloadtabe_sortwarner_v2";
+
+    /**
+     * Shows the "temporary sort order" hint after a header click has applied a sort (not if the click only reverted the sorting).
+     */
+    protected void showTemporarySortHint(final MouseEvent headerClick, final ExtColumn<AbstractNode> oldSortColumn) {
+        final Point location = headerClick.getLocationOnScreen();
+        /* Wait until the sort of the click has been applied to the model */
+        final Timer timer = new Timer(100, new ActionListener() {
+            @Override
+            public void actionPerformed(final ActionEvent e) {
+                ((Timer) e.getSource()).stop();
+                final ExtColumn<AbstractNode> sortColumn = getModel().getSortColumn();
+                if (oldSortColumn == sortColumn || sortColumn == null) {
+                    return;
+                }
+                HelpDialog.showIfAllowed(new MessageConfig(location, TEMPORARY_SORT_HINT_KEY, Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, _GUI.T.PackageTable_sortwarner_title(sortColumn.getName()), _GUI.T.PackageTable_sortwarner_text(), new AbstractIcon(IconKey.ICON_SORT, 32)).setOption(CFG_GUI.REMEMBER_LAST_SORT_VIEW_ENABLED, _GUI.T.PackageTable_sortwarner_remember()));
+            }
+        });
+        timer.start();
     }
 
     protected void doSortOnColumn(ExtColumn<AbstractNode> column, MouseEvent e) {

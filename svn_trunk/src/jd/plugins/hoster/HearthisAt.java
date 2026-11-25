@@ -16,9 +16,13 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -35,10 +39,56 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.download.DownloadInterface;
 
-@HostPlugin(revision = "$Revision: 54146 $", interfaceVersion = 3, names = { "hearthis.at" }, urls = { "https?://(?:www\\.)?hearthis\\.at/([^/]+)/([A-Za-z0-9-\\.]+)/?" })
+@HostPlugin(revision = "$Revision: 54166 $", interfaceVersion = 3, names = {}, urls = {})
 public class HearthisAt extends PluginForHost {
     public HearthisAt(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        /* Each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0] -> main domain */
+        ret.add(new String[] { "hearthis.at" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    /* Group 1: username, group 2: track title/slug */
+    private static final Pattern PATTERN_FILE = Pattern.compile("/([^/]+)/([A-Za-z0-9-\\.]+)/?", Pattern.CASE_INSENSITIVE);
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_FILE.pattern());
+        }
+        return ret.toArray(new String[0]);
+    }
+
+    /**
+     * PATTERN_FILE only describes the path, so it must be applied behind the protocol and host. Otherwise it could match parts of the
+     * protocol/host.
+     */
+    private Regex getURLInfo(final DownloadLink link) {
+        return new Regex(link.getPluginPatternMatcher(), Pattern.compile("^https?://[^/]+" + PATTERN_FILE.pattern(), Pattern.CASE_INSENSITIVE));
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT_LANGUAGE, "en-gb, en;q=0.9");
+        return br;
     }
 
     @Override
@@ -51,15 +101,14 @@ public class HearthisAt extends PluginForHost {
     // protocol: no https
     // other:
     /* Connection stuff */
-    private boolean      free_resume       = false;
-    private int          free_maxchunks    = 1;
-    private final int    free_maxdownloads = -1;
-    private String       dllink            = null;
-    private final String extDefault        = ".mp3";
+    private boolean             free_resume    = false;
+    private int                 free_maxchunks = 1;
+    private String              dllink         = null;
+    private static final String extDefault     = ".mp3";
 
     @Override
     public String getAGBLink() {
-        return "https://hearthis.at/nutzungsbedingungen/";
+        return "https://" + getHost() + "/nutzungsbedingungen/";
     }
 
     @Override
@@ -81,7 +130,7 @@ public class HearthisAt extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
+        final Regex urlinfo = getURLInfo(link);
         return urlinfo.getMatch(0) + " - " + urlinfo.getMatch(1);
     }
 
@@ -91,10 +140,12 @@ public class HearthisAt extends PluginForHost {
         dllink = null;
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
-        final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
+        final Regex urlinfo = getURLInfo(link);
         final String url_title = urlinfo.getMatch(1);
         br.getPage(link.getPluginPatternMatcher());
-        if (br.getHttpConnection().getResponseCode() == 404 || br.getHttpConnection().getResponseCode() == 410) {
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.getHttpConnection().getResponseCode() == 410) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (StringUtils.containsIgnoreCase(br.getURL(), "/search/")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -109,7 +160,7 @@ public class HearthisAt extends PluginForHost {
         String downloadlink_stream = HTMLSearch.searchMetaTag(br, "og:audio");
         if (downloadlink_stream == null) {
             final String[] mp3Links = br.getRegex("data-(?:mp3|src)\\s*=\\s*\"(http[^<>\"]*?)\"").getColumn(0);
-            for (String mp3Link : mp3Links) {
+            for (final String mp3Link : mp3Links) {
                 if (!mp3Link.contains("/untitled/")) {
                     downloadlink_stream = mp3Link;
                     break;
@@ -117,47 +168,54 @@ public class HearthisAt extends PluginForHost {
             }
         }
         br.setFollowRedirects(true);
-        if (dllink != null && (!dllink.contains(extDefault) && !dllink.contains("index.php"))) {
-            dllink = null;
+        /**
+         * The filesize of the official download is shown next to the download button, e.g. 'Download (18 MB)' or, if the user needs to be
+         * logged in and has to follow the uploader, 'Follow to Download (162 MB)'. Set it in both cases and even if we end up using the
+         * stream. This also makes the (slow) direct-URL check below obsolete in many cases. <br>
+         * 2026-11-25: File sizes of stream and official download look to be identical.
+         */
+        /*
+         * Get the complete HTML element (<a> or <button>) of the download button. Attribute values are skipped as a whole because they may
+         * contain '>' (e.g. in CSS classes). All information is taken from this element only, independent of the website language (the
+         * aria-label is translated, e.g. 'Folgen zum Download (162 MB)').
+         */
+        /**
+         * Example account required for official download: <br>
+         * /mixkatalog/art-of-mix-art-of-compilation-volume-6/ <br>
+         * Example official download possible without account: <br>
+         * /markoannderofficial/cosmic-fate-aoz/
+         */
+        final String officialDownloadButtonHTML = br.getRegex("(<(?:a|button)\\s(?:[^>\"]|\"[^\"]*\")*?data-player-action=\"download\"(?:[^>\"]|\"[^\"]*\")*>)").getMatch(0);
+        /*
+         * 'data-lock' (e.g. data-lock="login") means that the download is locked and can only be used when logged in and following the
+         * user.
+         */
+        final boolean officialDownloadRequiresAccount = officialDownloadButtonHTML != null && officialDownloadButtonHTML.contains("data-lock=");
+        final String officialDownloadFilesize = officialDownloadButtonHTML != null ? new Regex(officialDownloadButtonHTML, "aria-label=\"[^\"]*\\(\\s*([^\\)\"]+?)\\s*\\)\"").getMatch(0) : null;
+        if (officialDownloadFilesize != null) {
+            link.setDownloadSize(SizeFormatter.getSize(officialDownloadFilesize));
         }
-        if (isDownload) {
-            /* Doing this during linkcheck would take a lot of time! */
-            String externalDownloadURL = br.getRegex("<a class=\"btn btn-external no-ajaxloader\"\\s*href\\s*=\\s*\"(https://[^\"]+)\"[^>]+ title=\"(?:FREE )?DOWNLOAD\"").getMatch(0);
-            if (externalDownloadURL == null) {
-                /* 2020-08-04: More wide open attempt e.g. doesn't matter what's the "name of their download button". */
-                externalDownloadURL = br.getRegex("<a class=\"btn btn-external no-ajaxloader\"\\s*href\\s*=\\s*\"(https://[^\"]+)\"[^>]+ title=\"").getMatch(0);
+        if (officialDownloadRequiresAccount) {
+            logger.info("Official downloadurl found but it can only be used when logged in and following the uploader");
+        }
+        find_official_downloadurl: {
+            String officialDownloadURL = null;
+            /*
+             * 2026-11-25: Only use the URL of the 'Download' link ('href'). If the download button is locked (user has to be logged in and
+             * follow the uploader), its URL ('data-href') cannot be used for downloading.
+             */
+            if (officialDownloadButtonHTML != null && !officialDownloadRequiresAccount) {
+                officialDownloadURL = new Regex(officialDownloadButtonHTML, "\\shref=\"(https?://[^\"]+)\"").getMatch(0);
             }
-            if (externalDownloadURL != null) {
-                logger.info("Seems like official download is available");
-                br.getPage(externalDownloadURL);
-                String officialDownloadURL = br.getRegex("\"((/|http)[^\"]+/" + url_title + "/download/[^\"]+)\"").getMatch(0);
-                if (officialDownloadURL == null) {
-                    /* Wider attempt */
-                    officialDownloadURL = br.getRegex("\"((/|http)[^\"]+/download/[^\"]+)\"").getMatch(0);
-                }
-                if (officialDownloadURL != null) {
-                    logger.info("Successfully found official downloadurl");
-                    if (!officialDownloadURL.startsWith("http")) {
-                        officialDownloadURL = "https://" + this.getHost() + officialDownloadURL;
-                    }
-                    this.dllink = officialDownloadURL;
-                } else {
-                    logger.warning("Failed to find official downloadurl");
-                }
-            } else {
-                logger.info("No official downloadurl available");
+            if (officialDownloadURL != null) {
+                logger.info("Successfully found official downloadurl");
+                this.dllink = officialDownloadURL;
+            } else if (!officialDownloadRequiresAccount) {
+                /* Locked download buttons are already logged above */
+                logger.warning("Failed to find official downloadurl");
             }
         }
-        if (dllink == null) {
-            dllink = this.br.getRegex("\"(https?://download\\.hearthis\\.at/\\?track=[^<>\"]*?)\"").getMatch(0);
-            if (dllink == null) {
-                dllink = this.br.getRegex("\"(https?://[^<>\"]*?/download/[^<>\"]*?)\"").getMatch(0);
-                if (dllink == null) {
-                    dllink = this.br.getRegex("\"(https?://[^<>\"]*?)\">click here to download</a>").getMatch(0);
-                }
-            }
-        }
-        if (dllink == null) {
+        if (dllink == null && downloadlink_stream != null) {
             /* We failed to get a 'real' downloadlink --> Fallback to stream (lower quality) */
             /* Stream urls can be downloaded with multiple connections and resume is possible! */
             free_resume = true;
@@ -170,7 +228,7 @@ public class HearthisAt extends PluginForHost {
         if (link.getFinalFileName() == null) {
             link.setFinalFileName(title + extDefault);
         }
-        if (!StringUtils.isEmpty(this.dllink) && !isDownload) {
+        if (officialDownloadFilesize == null && !StringUtils.isEmpty(this.dllink) && !isDownload && !link.isSizeSet()) {
             final Browser br2 = br.cloneBrowser();
             br2.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, "https://" + this.getHost() + "/");
             final GetRequest request = br2.createGetRequest(dllink);
@@ -189,6 +247,7 @@ public class HearthisAt extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         // required to enforce use of range requests
+        /* 2026-11-25: Resume only works with new (unpublished) download core */
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, free_resume && DownloadInterface.isNewHTTPCore(), free_maxchunks);
         handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
@@ -196,6 +255,6 @@ public class HearthisAt extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
+        return Integer.MAX_VALUE;
     }
 }

@@ -216,12 +216,14 @@ public class ExtPasswordField extends MigPanel implements FocusListener, Documen
     protected void applyTextHighlighter(DocumentEvent e) {
         final Highlighter highlighter = editor.getHighlighter();
         highlighter.removeAllHighlights();
+
         final CharSequence pw = new CharSequence() {
             final char[] pw = editor.getPassword();
 
             @Override
             public CharSequence subSequence(int start, int end) {
-                return null;
+                /* methods may rely on CharSequence.subSequence to process the CharSequence content */
+                return toString().subSequence(end, end);
             }
 
             @Override
@@ -232,6 +234,12 @@ public class ExtPasswordField extends MigPanel implements FocusListener, Documen
             @Override
             public char charAt(int index) {
                 return pw[index];
+            }
+
+            @Override
+            public String toString() {
+                /* methods may rely on CharSequence.toString to process the CharSequence content */
+                return new String(pw);
             }
         };
         for (final ExtTextHighlighter textHighlighter : getTextHighlighter()) {

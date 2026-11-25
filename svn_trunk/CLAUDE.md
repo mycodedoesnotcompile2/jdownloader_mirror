@@ -320,3 +320,7 @@ Use the AppWorkUtils class `org.appwork.utils.encoding.Base64` for all Base64 ha
 - Binary data (blobs, keys, hashes, serialized structures): `Base64.decode(String)` returns the raw `byte[]`. Never use `Encoding.Base64Decode(...)` for this, it returns a `String` and would mangle bytes that are not valid text.
 - Text: `Base64.decodeToString(String)` (UTF-8) or `Encoding.Base64Decode(String)`.
 - To search a binary blob with regex / `indexOf`, convert it with `new String(bytes, StandardCharsets.ISO_8859_1)`: every byte maps to exactly one char, so offsets stay valid.
+
+## HTTP Header Names
+
+When setting or reading HTTP headers, use the header name constants of `org.appwork.net.protocol.http.HTTPConstants` (e.g. `HTTPConstants.HEADER_REQUEST_ACCEPT_LANGUAGE`, `HTTPConstants.HEADER_REQUEST_REFERER`) instead of string literals like `"Accept-Language"`.

@@ -1958,7 +1958,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
      * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site </br> auto completes Sec-Fetch-Site, some websites(eg
      * facebook) check it
      */
-    protected void autoCompleteHeaders(final Request request) {
+    protected void autoCompleteHeaders(final Request request) throws IOException{
         if (request == null) {
             return;
         }
@@ -2720,7 +2720,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
      *
      * @return
      */
-    private String getRefererURL(Request nextRequest) {
+    public String getRefererURL(Request nextRequest) {
         HTTPHeader referer = this.getHeaders().remove(HTTPConstants.HEADER_REQUEST_REFERER);
         final String refererURLHeader = referer != null ? referer.getValue() : null;
         if (refererURLHeader != null) {

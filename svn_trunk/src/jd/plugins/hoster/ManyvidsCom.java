@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -31,6 +32,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
+import jd.http.Request;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -47,7 +49,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 54038 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54170 $", interfaceVersion = 3, names = {}, urls = {})
 public class ManyvidsCom extends PluginForHost {
     public ManyvidsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -255,7 +257,8 @@ public class ManyvidsCom extends PluginForHost {
     }
 
     private boolean checkLogin(final Browser br) throws IOException {
-        br.getPage("https://www." + getHost() + "/bff/user/viewer");
+        final Request request = br.createGetRequest("https://www." + getHost() + "/bff/user/viewer");
+        br.getPage(request);
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         if (getLoginCookie(br) == null) {
             return false;
@@ -278,14 +281,18 @@ public class ManyvidsCom extends PluginForHost {
         login(account, true);
         final Browser brc = br.cloneBrowser();
         /* The profile API needs the numeric legacy user-ID, not the GUID from the KGID cookie. */
-        brc.getPage("https://www." + getHost() + "/bff/user/viewer");
+        if (!StringUtils.endsWithCaseInsensitive(br.getURL(), "/bff/user/viewer")) {
+            final Request request = brc.createGetRequest("https://www." + getHost() + "/bff/user/viewer");
+            brc.getPage(request);
+        }
         final Map<String, Object> viewer = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
         final String internalUserID = (String) ((Map<String, Object>) viewer.get("user")).get("userId");
         /* Old endpoint api.journey-bff.kiwi.manyvids.com/api/v1/user/<id> is dead (HTTP 503) -> use api.manyvids.com instead. */
-        brc.getHeaders().put("Accept", "application/json");
-        brc.getHeaders().put("Origin", "https://www." + getHost());
-        brc.getHeaders().put("Referer", "https://www." + getHost() + "/");
-        brc.getPage("https://api." + getHost() + "/profile/profile/" + internalUserID);
+        final Request request = brc.createGetRequest("https://api." + getHost() + "/profile/profile/" + internalUserID);
+        brc.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT, "application/json");
+        brc.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www." + getHost());
+        brc.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, "https://www." + getHost() + "/");
+        brc.getPage(request);
         final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
         /* Integer flag: 0 = no premium membership, otherwise premium. */
         if (((Number) entries.get("hasPremiumMembership")).intValue() != 0) {

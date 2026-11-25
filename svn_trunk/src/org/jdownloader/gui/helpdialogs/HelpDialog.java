@@ -2,9 +2,16 @@ package org.jdownloader.gui.helpdialogs;
 
 import java.awt.Point;
 import java.awt.event.ComponentEvent;
+import java.awt.event.ItemEvent;
+import java.awt.event.ItemListener;
 import java.awt.event.WindowEvent;
 
 import javax.swing.Icon;
+import javax.swing.JCheckBox;
+import javax.swing.JComponent;
+
+import org.appwork.storage.config.handler.BooleanKeyHandler;
+import org.appwork.swing.MigPanel;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.config.JsonConfig;
@@ -29,7 +36,7 @@ public class HelpDialog {
             /* Do not show dialog */
             return;
         }
-        show(config.getPoint(), config.getDontShowAgainKey(), config.getFlags(), config.getTitle(), config.getMsg(), config.getIcon());
+        show(config.getExpandToBottom(), config.getExpandToRight(), config.getPoint(), config.getDontShowAgainKey(), config.getFlags(), config.getTitle(), config.getMsg(), config.getIcon(), config.getOptionKeyHandler(), config.getOptionLabel());
     }
 
     public static void show(final Point point, final String dontShowAgainKey, int flags, String title, String msg, Icon icon) {
@@ -43,6 +50,16 @@ public class HelpDialog {
     }
 
     public static void show(final Boolean expandToBottom, final Boolean expandToRight, final Point point, final String dontShowAgainKey, int flags, String title, String msg, Icon icon) {
+        show(expandToBottom, expandToRight, point, dontShowAgainKey, flags, title, msg, icon, null, null);
+    }
+
+    /**
+     * @param optionKeyHandler
+     *            optional: boolean setting that is controlled by an extra checkbox below the message
+     * @param optionLabel
+     *            label of the extra checkbox
+     */
+    public static void show(final Boolean expandToBottom, final Boolean expandToRight, final Point point, final String dontShowAgainKey, int flags, String title, String msg, Icon icon, final BooleanKeyHandler optionKeyHandler, final String optionLabel) {
         final boolean test = RestartController.getInstance().getParameterParser(null).hasCommandSwitch("translatortest");
         if (!JsonConfig.create(GraphicalUserInterfaceSettings.class).isBalloonNotificationEnabled()) {
             return;
@@ -74,6 +91,23 @@ public class HelpDialog {
                             }
                         });
                     }
+                }
+
+                @Override
+                public JComponent layoutDialogContent() {
+                    final JComponent content = super.layoutDialogContent();
+                    if (optionKeyHandler != null && content instanceof MigPanel) {
+                        final JCheckBox option = new JCheckBox(optionLabel, optionKeyHandler.isEnabled());
+                        /* Apply immediately, the dialog has no further result handling */
+                        option.addItemListener(new ItemListener() {
+                            @Override
+                            public void itemStateChanged(final ItemEvent e) {
+                                optionKeyHandler.setValue(option.isSelected());
+                            }
+                        });
+                        ((MigPanel) content).add(option, "newline, gaptop 10");
+                    }
+                    return content;
                 }
 
                 @Override

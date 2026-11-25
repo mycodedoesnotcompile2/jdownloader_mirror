@@ -62,7 +62,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 53890 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54163 $", interfaceVersion = 3, names = {}, urls = {})
 public class NitroFlareCom extends PluginForHost {
     /* Documentation | docs: https://nitroflare.com/member?s=api */
     /* Don't touch the following! */
@@ -175,30 +175,31 @@ public class NitroFlareCom extends PluginForHost {
     public static String getBaseDomain(final Plugin plugin, final Browser br) throws PluginException {
         synchronized (BASE_DOMAIN) {
             String baseDomain = BASE_DOMAIN.get();
-            if (baseDomain == null) {
-                final Browser brc;
-                if (br != null) {
-                    brc = br.cloneBrowser();
-                } else {
-                    brc = plugin.createNewBrowserInstance();
-                }
-                brc.setFollowRedirects(true);
-                for (final String siteSupportedName : getSupportedNamesStatic(plugin.getHost())) {
-                    try {
-                        brc.getPage("https://" + siteSupportedName);
-                        baseDomain = brc.getHost();
-                        if (baseDomain != null && brc.containsHTML(siteSupportedName)) {
-                            BASE_DOMAIN.set(baseDomain);
-                            return baseDomain;
-                        }
-                    } catch (final IOException e) {
-                        plugin.getLogger().log(e);
-                    }
-                }
-                /* Possibly blocked by ISP? */
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "No working Nitroflare base domain found! Blocked?!");
+            if (baseDomain != null) {
+                /* Return cached value */
+                return baseDomain;
             }
-            return baseDomain;
+            final Browser brc;
+            if (br != null) {
+                brc = br.cloneBrowser();
+            } else {
+                brc = plugin.createNewBrowserInstance();
+            }
+            brc.setFollowRedirects(true);
+            for (final String siteSupportedName : getSupportedNamesStatic(plugin.getHost())) {
+                try {
+                    brc.getPage("https://" + siteSupportedName);
+                    baseDomain = brc.getHost();
+                    if (baseDomain != null && brc.containsHTML(siteSupportedName)) {
+                        BASE_DOMAIN.set(baseDomain);
+                        return baseDomain;
+                    }
+                } catch (final IOException e) {
+                    plugin.getLogger().log(e);
+                }
+            }
+            /* Possibly blocked by ISP? */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "No working Nitroflare base domain found! Blocked?!");
         }
     }
 

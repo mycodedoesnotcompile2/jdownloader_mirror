@@ -15,8 +15,7 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import java.io.IOException;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +25,7 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.Base64;
@@ -34,9 +34,6 @@ import org.jdownloader.downloader.segment.SegmentDownloader;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -60,7 +57,7 @@ import jd.plugins.PluginForHost;
  *    into one file.
  * </pre>
  */
-@HostPlugin(revision = "$Revision: 54150 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54173 $", interfaceVersion = 3, names = {}, urls = {})
 public class PlayhydraxCom extends PluginForHost {
     public PlayhydraxCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -74,8 +71,6 @@ public class PlayhydraxCom extends PluginForHost {
     private static final String PLAYER_ORIGIN  = "https://playhydrax.com";
     /* Size of the chunks the CDN delivers (the player requests the file in pieces of 2 MiB). */
     private static final long   CHUNK_SIZE     = 2097152;
-    /* The "media" field contains raw bytes which are transported as ISO-8859-1 characters (1 character = 1 byte). */
-    private static final String CHARSET_LATIN1 = "ISO-8859-1";
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -122,9 +117,8 @@ public class PlayhydraxCom extends PluginForHost {
         final String fid = getFID(link);
         if (fid != null) {
             return "playhydrax://" + fid;
-        } else {
-            return super.getLinkID(link);
         }
+        return super.getLinkID(link);
     }
 
     /** Returns the video ID ("slug") of the given link. */
@@ -156,7 +150,7 @@ public class PlayhydraxCom extends PluginForHost {
     }
 
     /** Information about the video file which will be downloaded. */
-    private static class MediaInfo {
+    private class MediaInfo {
         /* Title of the embed page, can be null. */
         private String title;
         /* CDN domain, e.g. yurawzq6o26.sssrr.org */
@@ -197,7 +191,7 @@ public class PlayhydraxCom extends PluginForHost {
         /* The embed page can be opened with the referrer of the site which embeds it. */
         final String referer = link.getReferrerUrl();
         if (referer != null) {
-            br.getHeaders().put("Referer", referer);
+            br.setCurrentURL(referer);
         }
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
@@ -227,15 +221,15 @@ public class PlayhydraxCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find media information");
         }
         /* The JSON contains raw bytes (as ISO-8859-1 characters) in the field "media". */
-        final Map<String, Object> datas = restoreFromString(new String(Base64.decode(datasBase64), CHARSET_LATIN1), TypeRef.MAP);
+        final Map<String, Object> datas = restoreFromString(new String(Base64.decode(datasBase64), StandardCharsets.ISO_8859_1), TypeRef.MAP);
         final String md5Id = String.valueOf(((Number) datas.get("md5_id")).longValue());
         /*
          * Step 2: Decrypt "media". The key is the md5 of "user_id:slug:md5_id", see aesCtr. Result is a JSON object with the qualities and
          * the CDN domains.
          */
         final String seed = ((Number) datas.get("user_id")).longValue() + ":" + datas.get("slug") + ":" + md5Id;
-        final byte[] mediaEncrypted = ((String) datas.get("media")).getBytes(CHARSET_LATIN1);
-        final Map<String, Object> media = restoreFromString(new String(aesCtr(mediaEncrypted, md5Hex(seed.getBytes("UTF-8"))), "UTF-8"), TypeRef.MAP);
+        final byte[] mediaEncrypted = ((String) datas.get("media")).getBytes(StandardCharsets.ISO_8859_1);
+        final Map<String, Object> media = restoreFromString(new String(aesCtr(mediaEncrypted, md5Hex(seed.getBytes(StandardCharsets.UTF_8))), StandardCharsets.UTF_8), TypeRef.MAP);
         final Map<String, Object> mp4 = (Map<String, Object>) media.get("mp4");
         final List<Map<String, Object>> sources = (List<Map<String, Object>>) mp4.get("sources");
         final List<String> domains = (List<String>) mp4.get("domains");
@@ -286,54 +280,18 @@ public class PlayhydraxCom extends PluginForHost {
         final MediaInfo info = loadMediaInfo(link);
         link.setVerifiedFileSize(info.size);
         /* The CDN only delivers the chunks if the request looks like it was sent by the player. The downloader clones this browser. */
-        br.getHeaders().put("Referer", PLAYER_REFERER);
-        br.getHeaders().put("Origin", PLAYER_ORIGIN);
-        br.getHeaders().put("Accept", "*/*");
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, PLAYER_REFERER);
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, PLAYER_ORIGIN);
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT, "*/*");
         final long chunkCount = (info.size + CHUNK_SIZE - 1) / CHUNK_SIZE;
         final List<Segment> segments = new ArrayList<Segment>();
         for (long chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
             /* All chunks have the same size except the last one. */
             final long expectedLength = Math.min(CHUNK_SIZE, info.size - chunkIndex * CHUNK_SIZE);
-            segments.add(new ChunkSegment(buildChunkUrl(info, chunkIndex), chunkIndex, chunkCount, expectedLength));
+            segments.add(new Segment(buildChunkUrl(info, chunkIndex), expectedLength));
         }
         dl = new SegmentDownloader(this, link, null, br, segments);
         dl.startDownload();
-    }
-
-    /** One chunk of the video file. */
-    private class ChunkSegment extends Segment {
-        private final long chunkIndex;
-        private final long chunkCount;
-        private final long expectedLength;
-
-        private ChunkSegment(final String url, final long chunkIndex, final long chunkCount, final long expectedLength) {
-            super(url);
-            this.chunkIndex = chunkIndex;
-            this.chunkCount = chunkCount;
-            this.expectedLength = expectedLength;
-        }
-
-        /** Chunk numbers in the log start with 1. Only every 10th chunk (and every failed one, see isConnectionValid) is logged. */
-        @Override
-        protected URLConnectionAdapter open(final Browser br, final Request request) throws IOException {
-            if ((chunkIndex + 1) % 10 == 0) {
-                logger.info("Downloading chunk " + (chunkIndex + 1) + "/" + chunkCount);
-            }
-            return super.open(br, request);
-        }
-
-        /** Besides the response code the length has to be the one of the chunk, otherwise the file would be corrupt. */
-        @Override
-        protected boolean isConnectionValid(final URLConnectionAdapter con) throws IOException {
-            boolean valid = super.isConnectionValid(con);
-            if (valid && con.getCompleteContentLength() != -1 && con.getCompleteContentLength() != expectedLength) {
-                valid = false;
-            }
-            if (!valid) {
-                logger.info("Failed to load chunk " + (chunkIndex + 1) + "/" + chunkCount + ": responseCode=" + con.getResponseCode() + " length=" + con.getCompleteContentLength() + " expected=" + expectedLength);
-            }
-            return valid;
-        }
     }
 
     /**
@@ -359,11 +317,10 @@ public class PlayhydraxCom extends PluginForHost {
         for (int i = 0; i < digits.length; i++) {
             digits[i] = (byte) (sizeString.charAt(i) - '0');
         }
-        final byte[] encrypted = aesCtr(path.getBytes("UTF-8"), md5Hex(digits));
-        final Charset ascii = Charset.forName("US-ASCII");
+        final byte[] encrypted = aesCtr(path.getBytes(StandardCharsets.UTF_8), md5Hex(digits));
         /* Base64 is applied twice and the padding ("=") is removed each time. */
         final String inner = Base64.encodeToString(encrypted).replace("=", "");
-        final String token = Base64.encodeToString(inner.getBytes(ascii)).replace("=", "");
+        final String token = Base64.encodeToString(inner.getBytes(StandardCharsets.US_ASCII)).replace("=", "");
         return "https://" + info.domain + "/sora/" + info.size + "/" + token;
     }
 
@@ -382,7 +339,7 @@ public class PlayhydraxCom extends PluginForHost {
      * CTR is symmetric: This method encrypts and decrypts.
      */
     private static byte[] aesCtr(final byte[] input, final String keyHex) throws Exception {
-        final byte[] key = keyHex.getBytes("US-ASCII");
+        final byte[] key = keyHex.getBytes(StandardCharsets.US_ASCII);
         final byte[] iv = new byte[16];
         System.arraycopy(key, 0, iv, 0, 16);
         final Cipher cipher = Cipher.getInstance("AES/CTR/NoPadding");

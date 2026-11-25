@@ -3,6 +3,7 @@ package jd.plugins;
 import java.io.IOException;
 import java.net.Inet6Address;
 import java.net.InetAddress;
+import java.net.URL;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -10,6 +11,7 @@ import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Files;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.net.httpconnection.DNSResolver;
 import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
@@ -89,29 +91,102 @@ public class PluginBrowser<T extends Plugin> extends Browser {
         setCookies(getPlugin().getHost(), iCookies);
     }
 
+    protected final class SecChUaGenerator {
+        private final char[]   GREASE_CHARS    = { ' ', '(', ')', '-', '.', '/', ':', ';', '=', '?', '_' };
+        private final String[] GREASE_VERSIONS = { "8", "99", "24" };
+        // Alle 6 Permutationen für 3 Elemente (Indizes 0, 1, 2)
+        private final int[][]  PERMUTATIONS    = { { 0, 1, 2 }, { 0, 2, 1 }, { 1, 0, 2 }, { 1, 2, 0 }, { 2, 0, 1 }, { 2, 1, 0 } };
+
+        protected SecChUaGenerator() {
+        }
+
+        /**
+         * Erzeugt den Sec-CH-UA Header für Google Chrome anhand der Major-Version.
+         *
+         * @param majorVersion
+         *            z. B. 130 oder 156
+         * @return fertiger Header-Wert, z. B. "\"Chromium\";v=\"130\", \"Google Chrome\";v=\"130\", \"Not?A_Brand\";v=\"99\""
+         */
+        public String buildChromeSecChUa(int majorVersion) {
+            return buildSecChUa("Google Chrome", majorVersion, null);
+        }
+
+        /**
+         * Erzeugt den Sec-CH-UA-Full-Version-List Header für Google Chrome.
+         *
+         * @param majorVersion
+         *            z. B. 130
+         * @param fullVersion
+         *            z. B. "130.0.6723.91"
+         */
+        public String buildChromeFullVersionList(int majorVersion, String fullVersion) {
+            return buildSecChUa("Google Chrome", majorVersion, fullVersion);
+        }
+
+        /**
+         * Generische Variante für beliebige Chromium-Browser ("Google Chrome", "Microsoft Edge", "Brave", "Opera").
+         *
+         * @param productBrand
+         *            z. B. "Google Chrome"
+         * @param majorVersion
+         *            Major-Version als int
+         * @param fullVersion
+         *            null für Sec-CH-UA (Low-Entropy), oder vollständige Version (z. B. "130.0.6723.91") für Full-Version-List
+         */
+        public String buildSecChUa(String productBrand, int majorVersion, String fullVersion) {
+            // 1. GREASE Brand-String & Version berechnen (Chromium-Logik seit ~Chrome 103+)
+            char c1 = GREASE_CHARS[majorVersion % GREASE_CHARS.length];
+            char c2 = GREASE_CHARS[(majorVersion + 1) % GREASE_CHARS.length];
+            String greaseBrand = "Not" + c1 + "A" + c2 + "Brand";
+            String greaseBaseVersion = GREASE_VERSIONS[majorVersion % GREASE_VERSIONS.length];
+            String greaseVersion = (fullVersion != null) ? (greaseBaseVersion + ".0.0.0") : greaseBaseVersion;
+            // 2. Engine- und Produkt-Version bestimmen
+            String brandVersion = (fullVersion != null) ? fullVersion : Integer.toString(majorVersion);
+            // 3. Die 3 Einträge vor Permutation: [0 = GREASE, 1 = Chromium, 2 = Produkt]
+            String[] brands = { greaseBrand, "Chromium", productBrand };
+            String[] versions = { greaseVersion, brandVersion, brandVersion };
+            // 4. Deterministische Permutation anhand majorVersion % 6
+            int[] order = PERMUTATIONS[majorVersion % PERMUTATIONS.length];
+            StringBuilder sb = new StringBuilder(96);
+            for (int i = 0; i < 3; i++) {
+                if (i > 0) {
+                    sb.append(", ");
+                }
+                int idx = order[i];
+                sb.append('"').append(brands[idx]).append("\";v=\"").append(versions[idx]).append('"');
+            }
+            return sb.toString();
+        }
+    }
+
+    protected boolean isRequestHeaderForAutoCompleteSet(final Request request, final String headerKey) {
+        return getHeaders().getHeader(headerKey) != null || request.getHeaders().getHeader(headerKey) != null;
+    }
+
     @Override
-    protected void autoCompleteHeaders(Request request) {
-        if (request == null) {
+    protected void autoCompleteHeaders(Request request) throws IOException {
+        if (request == null || !"https".equalsIgnoreCase(request.getURL().getProtocol())) {
             return;
         }
         final RequestHeader requestHeaders = request.getHeaders();
+        final String userAgent = requestHeaders.getValue(HTTPConstants.HEADER_REQUEST_USER_AGENT);
         boolean addSecHeaders = false;
-        final String firefoxVersionString = new Regex(requestHeaders.getValue("User-Agent"), "FireFox/(\\d+)").getMatch(0);
+        final String firefoxVersionString = new Regex(userAgent, "FireFox/(\\d+)").getMatch(0);
         final int firefoxVersion = firefoxVersionString != null ? Integer.parseInt(firefoxVersionString) : -1;
         if (firefoxVersion >= 90) {
             addSecHeaders = true;
         }
-        final String chromeVersionString = new Regex(requestHeaders.getValue("User-Agent"), "Chrome/(\\d+)").getMatch(0);
+        final String chromeVersionString = new Regex(userAgent, "Chrome/(\\d+)").getMatch(0);
         final int chromeVersion = chromeVersionString != null ? Integer.parseInt(chromeVersionString) : -1;
         if (chromeVersion >= 76) {
             addSecHeaders = true;
         }
-        final String operaVersionString = new Regex(requestHeaders.getValue("User-Agent"), "OPR/(\\d+)").getMatch(0);
+        final String operaVersionString = new Regex(userAgent, "OPR/(\\d+)").getMatch(0);
         final int operaVersion = operaVersionString != null ? Integer.parseInt(operaVersionString) : -1;
         if (operaVersion >= 63) {
             addSecHeaders = true;
         }
-        final String edgeVersionString = new Regex(requestHeaders.getValue("User-Agent"), "Edg/(\\d+)").getMatch(0);
+        final String edgeVersionString = new Regex(userAgent, "Edg/(\\d+)").getMatch(0);
         final int edgeVersion = edgeVersionString != null ? Integer.parseInt(edgeVersionString) : -1;
         if (edgeVersion >= 79) {
             addSecHeaders = true;
@@ -119,21 +194,68 @@ public class PluginBrowser<T extends Plugin> extends Browser {
         if (!addSecHeaders) {
             return;
         }
-        if (getHeaders().getHeader(HTTPConstants.HEADER_REQUEST_SEC_FETCH_SITE) == null) {
-            requestHeaders.put(new HTTPHeader(HTTPConstants.HEADER_REQUEST_SEC_FETCH_SITE, "same-origin"));
-        }
-        if (getHeaders().getHeader(HTTPConstants.HEADER_REQUEST_SEC_FETCH_DEST) == null) {
-            final String path = request.getURL().getFile();
-            final CompiledFiletypeExtension extension = CompiledFiletypeFilter.getExtensionsFilterInterface(Files.getExtension(path, true));
-            if (CompiledFiletypeFilter.AudioExtensions.MP3.isSameExtensionGroup(extension)) {
-                requestHeaders.put(new HTTPHeader(HTTPConstants.HEADER_REQUEST_SEC_FETCH_DEST, "audio"));
-            } else if (CompiledFiletypeFilter.VideoExtensions.MP4.isSameExtensionGroup(extension)) {
-                requestHeaders.put(new HTTPHeader(HTTPConstants.HEADER_REQUEST_SEC_FETCH_DEST, "video"));
-            } else if (CompiledFiletypeFilter.ImageExtensions.BMP.isSameExtensionGroup(extension)) {
-                requestHeaders.put(new HTTPHeader(HTTPConstants.HEADER_REQUEST_SEC_FETCH_DEST, "image"));
-            } else {
-                requestHeaders.put(new HTTPHeader(HTTPConstants.HEADER_REQUEST_SEC_FETCH_DEST, "document"));
+        if (chromeVersion >= 103) {
+            if (!isRequestHeaderForAutoCompleteSet(request, "sec-ch-ua")) {
+                requestHeaders.put("sec-ch-ua", new SecChUaGenerator().buildChromeSecChUa(chromeVersion));
             }
+            if (!isRequestHeaderForAutoCompleteSet(request, "sec-ch-ua-mobile")) {
+                requestHeaders.put("sec-ch-ua-mobile", "?0");
+            }
+            if (!isRequestHeaderForAutoCompleteSet(request, "sec-ch-ua-platform")) {
+                final String platform;
+                if (StringUtils.containsIgnoreCase(userAgent, "Windows")) {
+                    platform = "Windows";
+                } else if (StringUtils.containsIgnoreCase(userAgent, "Macintosh") || StringUtils.containsIgnoreCase(userAgent, "Mac OS")) {
+                    platform = "macOS";
+                } else if (StringUtils.containsIgnoreCase(userAgent, "Linux")) {
+                    platform = "Linux";
+                } else {
+                    platform = "Unknown";
+                }
+                requestHeaders.put("sec-ch-ua-platform", "\"" + platform + "\"");
+            }
+        }
+        if (!isRequestHeaderForAutoCompleteSet(request, HTTPConstants.HEADER_REQUEST_SEC_FETCH_DEST)) {
+            final String fetchDest;
+            if (request.isXHR()) {
+                fetchDest = "empty";
+            } else {
+                final String path = request.getURL().getFile();
+                final CompiledFiletypeExtension extension = CompiledFiletypeFilter.getExtensionsFilterInterface(Files.getExtension(path, true));
+                if (CompiledFiletypeFilter.AudioExtensions.MP3.isSameExtensionGroup(extension)) {
+                    fetchDest = "audio";
+                } else if (CompiledFiletypeFilter.VideoExtensions.MP4.isSameExtensionGroup(extension)) {
+                    fetchDest = "video";
+                } else if (CompiledFiletypeFilter.ImageExtensions.BMP.isSameExtensionGroup(extension)) {
+                    fetchDest = "image";
+                } else {
+                    fetchDest = "document";
+                }
+            }
+            requestHeaders.put(new HTTPHeader(HTTPConstants.HEADER_REQUEST_SEC_FETCH_DEST, fetchDest));
+        }
+        if (!isRequestHeaderForAutoCompleteSet(request, HTTPConstants.HEADER_REQUEST_SEC_FETCH_MODE)) {
+            if (request.isXHR()) {
+                requestHeaders.put(HTTPConstants.HEADER_REQUEST_SEC_FETCH_MODE, "cors");
+            } else {
+                requestHeaders.put(HTTPConstants.HEADER_REQUEST_SEC_FETCH_MODE, "cors");
+            }
+        }
+        if (!isRequestHeaderForAutoCompleteSet(request, HTTPConstants.HEADER_REQUEST_SEC_FETCH_SITE)) {
+            final String refererURL = getRefererURL(request);
+            final String fetchSite;
+            if (StringUtils.isEmpty(refererURL)) {
+                fetchSite = "none";
+            } else if (!StringUtils.equalsIgnoreCase(new URL(refererURL).getProtocol(), request.getURL().getProtocol())) {
+                fetchSite = "cross-site";
+            } else if (StringUtils.equalsIgnoreCase(new URL(refererURL).getHost(), request.getURL().getHost())) {
+                fetchSite = "same-origin";
+            } else if (StringUtils.equalsIgnoreCase(getHost(refererURL), getHost(request.getURL()))) {
+                fetchSite = "same-site";
+            } else {
+                fetchSite = "cross-site";
+            }
+            requestHeaders.put(new HTTPHeader(HTTPConstants.HEADER_REQUEST_SEC_FETCH_SITE, fetchSite));
         }
     }
 

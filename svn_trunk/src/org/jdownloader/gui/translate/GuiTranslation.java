@@ -748,10 +748,13 @@ public interface GuiTranslation extends TranslateInterface {
     String ConnectionColumn_getStringValue_from(String host);
 
     @Default(lngs = { "en" }, values = { "Sorted by '%s1'-Column" })
-    String DownloadsTable_actionPerformed_sortwarner_title(String column);
+    String PackageTable_sortwarner_title(String column);
 
-    @Default(lngs = { "en" }, values = { "You've just applied a visual sort.\r\nNOTE: This does not change download order!\r\nTo revert this, click on the highlighted column header until the highlighting disappears.\r\nTo perform a permanent sort which will change the download order, press and hold CTRL and click inside any column header." })
-    String DownloadsTable_actionPerformed_sortwarner_text();
+    @Default(lngs = { "en" }, values = { "Did you know that your list is now in a temporary sort order?\r\nNOTE: This only changes the view, not the real order of your links!\r\nTo revert this, click on the highlighted column header until the highlighting disappears.\r\nTo perform a permanent sort which will change the real order, press and hold CTRL and click inside any column header." })
+    String PackageTable_sortwarner_text();
+
+    @Default(lngs = { "en" }, values = { "Keep sorted views after restart" })
+    String PackageTable_sortwarner_remember();
 
     @Default(lngs = { "en" }, values = { "Comment" })
     String CommentColumn_CommentColumn_();

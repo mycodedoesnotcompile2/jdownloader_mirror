@@ -260,6 +260,7 @@ public class LinkGrabberTable extends PackageControllerTable<CrawledPackage, Cra
 
     protected boolean onHeaderSortClick(final MouseEvent event, final ExtColumn<AbstractNode> oldColumn, final String oldIdentifier, ExtColumn<AbstractNode> newColumn) {
         if (((LinkGrabberTableModel) getModel()).isTristateSorterEnabled()) {
+            showTemporarySortHint(event, oldColumn);
             return false;
         }
         //
