@@ -49,7 +49,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 54170 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54178 $", interfaceVersion = 3, names = {}, urls = {})
 public class ManyvidsCom extends PluginForHost {
     public ManyvidsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -280,21 +280,29 @@ public class ManyvidsCom extends PluginForHost {
         final AccountInfo ai = new AccountInfo();
         login(account, true);
         final Browser brc = br.cloneBrowser();
-        /* The profile API needs the numeric legacy user-ID, not the GUID from the KGID cookie. */
+        /**
+         * The profile API needs the numeric legacy user-ID (e.g. "1007961634"), not the GUID from the KGID cookie. <br>
+         * It is available as "user.userId" in the response of /bff/user/viewer, which was already requested by the login check. Only request
+         * it again if the last request of our browser was a different one.
+         */
         if (!StringUtils.endsWithCaseInsensitive(br.getURL(), "/bff/user/viewer")) {
             final Request request = brc.createGetRequest("https://www." + getHost() + "/bff/user/viewer");
             brc.getPage(request);
         }
         final Map<String, Object> viewer = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
         final String internalUserID = (String) ((Map<String, Object>) viewer.get("user")).get("userId");
-        /* Old endpoint api.journey-bff.kiwi.manyvids.com/api/v1/user/<id> is dead (HTTP 503) -> use api.manyvids.com instead. */
+        /**
+         * 2026-11-25: The old endpoint api.journey-bff.kiwi.manyvids.com/api/v1/user/<id> is dead (HTTP 503). <br>
+         * The website now loads the profile from api.manyvids.com/profile/profile/<legacyUserId>. This API checks the same browser-like
+         * headers as the website (Accept, Origin, Referer), otherwise it answers with HTTP 403.
+         */
         final Request request = brc.createGetRequest("https://api." + getHost() + "/profile/profile/" + internalUserID);
         brc.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT, "application/json");
         brc.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www." + getHost());
         brc.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, "https://www." + getHost() + "/");
         brc.getPage(request);
         final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-        /* Integer flag: 0 = no premium membership, otherwise premium. */
+        /* "hasPremiumMembership" is an integer flag: 0 = no premium membership, otherwise premium member. */
         if (((Number) entries.get("hasPremiumMembership")).intValue() != 0) {
             account.setType(AccountType.PREMIUM);
         } else {

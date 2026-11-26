@@ -48,7 +48,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ManyvidsCom;
 
-@DecrypterPlugin(revision = "$Revision: 51999 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54186 $", interfaceVersion = 3, names = {}, urls = {})
 public class ManyvidsComCrawler extends PluginForDecrypt {
     public ManyvidsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -154,9 +154,9 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
                 brc.getPage("/bff/store/videos/" + contentID + "/?page=" + page);
                 final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
                 final Map<String, Object> pagination = (Map<String, Object>) entries.get("pagination");
-                final int totalNumberofItems = ((Number) pagination.get("total")).intValue();
-                final Number nextPage = (Number) pagination.get("nextPage");
-                if (totalNumberofItems == 0) {
+                final Number pagination_nextPage = (Number) pagination.get("nextPage");
+                final int pagination_totalNumberofItems = ((Number) pagination.get("total")).intValue();
+                if (pagination_totalNumberofItems == 0) {
                     throw new DecrypterRetryException(RetryReason.EMPTY_PROFILE);
                 }
                 final List<Map<String, Object>> items = (List<Map<String, Object>>) entries.get("data");
@@ -219,14 +219,14 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
                     ret.add(video);
                     distribute(video);
                 }
-                logger.info("Crawled page: " + page + "/" + pagination.get("totalPages") + " | Offset: " + offset + " |  Number of new items on this page: " + numberofNewItems + " | Total found so far: " + ret.size() + "/" + totalNumberofItems);
+                logger.info("Crawled page: " + page + "/" + pagination.get("totalPages") + " | Offset: " + offset + " |  Number of new items on this page: " + numberofNewItems + " | Total found so far: " + ret.size() + "/" + pagination_totalNumberofItems);
                 if (this.isAbort()) {
                     logger.info("Stopping because: Aborted by user");
                     throw new InterruptedException();
                 } else if (numberofNewItems == 0) {
                     logger.info("Stopping because: Failed to find any new items on current page");
                     break;
-                } else if (nextPage == null || nextPage.intValue() <= page) {
+                } else if (pagination_nextPage == null || pagination_nextPage.intValue() <= page) {
                     logger.info("Stopping because: Reached end");
                     break;
                 }
@@ -340,11 +340,33 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
             }
             if (crawlVideoStreams) {
                 logger.info("Crawling stream downloadurls");
-                final String videourl1 = (String) data2.get("filepath");
+                /* 2026-11-25 */
+                /* Public video data (first request): "price.free" is true for videos that can be watched for free. */
+                final boolean isFree = (Boolean) ((Map<String, Object>) data.get("price")).get("free");
+                /* Private video data (second request): Original file. Only accessible for users who have access to this video. */
+                final String filepath = (String) data2.get("filepath");
+                /* Private video data: Transcoded (compressed) file. Has signed URL parameters (Expires, Key-Pair-Id, Signature). */
+                final String transcodedFilepath = (String) data2.get("transcodedFilepath");
                 boolean originalVideoAvailable = false;
-                if (!StringUtils.isEmpty(videourl1)) {
+                /**
+                 * This follows the logic of the website player (function "getVideoSources" in the website's JavaScript, see
+                 * https://www.manyvids.com/_next/static/immutable/chunks/2-vrw8knddbcx.js ): <br>
+                 * 1. The transcoded version is always the first choice of the website. <br>
+                 * 2. The original version is only added by the website if the video is not free or if no transcoded version exists. <br>
+                 * 3. The teaser is only used as a last resort. <br>
+                 * Reason: For free videos, "filepath" is returned but without signed URL parameters, so it cannot be accessed (HTTP error
+                 * 403). <br>
+                 * Difference to the website: For videos which are not free, we prefer the original over the transcoded version because it
+                 * has the better quality and we know its file size. <br>
+                 * Example URL where "filepath" is not accessible: /Video/5990407/yoga-challenge
+                 */
+                if (isFree && !StringUtils.isEmpty(transcodedFilepath)) {
+                    /* Skip the original video and let the code below add the transcoded version. */
+                    logger.info("Free video with transcoded version available -> Original video is not accessible");
+                    originalVideoAvailable = false;
+                } else if (!StringUtils.isEmpty(filepath)) {
                     /* Original video -> We may know the filesize of this item. */
-                    final DownloadLink video1 = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(videourl1));
+                    final DownloadLink video1 = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(filepath));
                     if (!StringUtils.isEmpty(filesizeStr)) {
                         video1.setDownloadSize(SizeFormatter.getSize(filesizeStr));
                     }
@@ -353,15 +375,15 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
                     originalVideoAvailable = true;
                 }
                 if (!originalVideoAvailable) {
-                    final String videourl2 = (String) data2.get("transcodedFilepath");
-                    if (!StringUtils.isEmpty(videourl2)) {
-                        /* Transcoded video -> We do not know the filesize of this item. */
-                        final DownloadLink video2 = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(videourl2));
+                    if (!StringUtils.isEmpty(transcodedFilepath)) {
+                        /* Transcoded video -> We do not know the file size of this item. */
+                        final DownloadLink video2 = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(transcodedFilepath));
                         video2.setFinalFileName(filename_base + ".mp4");
                         ret.add(video2);
                     }
+                    /* Last resort: Preview video (only if neither the original nor the transcoded version is available). */
                     final Map<String, Object> teasermap = (Map<String, Object>) data2.get("teaser");
-                    if (teasermap != null && StringUtils.isEmpty(videourl2)) {
+                    if (teasermap != null && StringUtils.isEmpty(transcodedFilepath)) {
                         final String videourlTeaser = (String) teasermap.get("filepath");
                         if (!StringUtils.isEmpty(videourlTeaser)) {
                             final DownloadLink video3 = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(videourlTeaser));

@@ -22,9 +22,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.URLHelper;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -45,7 +47,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 52786 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54197 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadhavenCom extends PluginForHost {
     public UploadhavenCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -142,19 +144,9 @@ public class UploadhavenCom extends PluginForHost {
         /**
          * 2021-01-19: Some URLs are restricted to one particular referer-website (mainpage does the job)
          */
-        final String referer;
-        if (!StringUtils.isEmpty(link.getDownloadPassword())) {
-            /* Prefer "Download password" --> User defined Referer value */
-            referer = link.getDownloadPassword();
-        } else if (link.getReferrerUrl() != null) {
-            referer = link.getReferrerUrl();
-        } else if (link.getContainerUrl() != null && !this.canHandle(link.getContainerUrl())) {
-            referer = link.getContainerUrl();
-        } else {
-            referer = null;
-        }
+        final String referer = getReferer(link);
         if (!StringUtils.isEmpty(referer)) {
-            br.getHeaders().put("Referer", referer);
+            br.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, referer);
         }
         br.getPage(link.getPluginPatternMatcher());
         if (this.isRefererProtected(br)) {
@@ -214,19 +206,15 @@ public class UploadhavenCom extends PluginForHost {
                 String userReferer = null;
                 for (int i = 0; i <= 2; i++) {
                     try {
-                        userReferer = getUserInput("Enter referer?", link);
+                        userReferer = correctUserEnteredReferer(getUserInput("Enter referer?", link));
                     } catch (final PluginException abortException) {
                         throw new PluginException(LinkStatus.ERROR_FATAL, "Enter referer as password to be able to download this item");
                     }
-                    if (!StringUtils.startsWithCaseInsensitive(userReferer, "http")) {
-                        userReferer = "https://" + userReferer;
-                    }
-                    try {
-                        new URL(userReferer);
-                    } catch (final MalformedURLException e) {
-                        logger.info("Entered string is not a valid URL!");
+                    if (!verifyURLFormat(userReferer)) {
+                        logger.info("Entered string is not a valid URL: " + userReferer);
                         continue;
                     }
+                    /* this host has no download passwords, the download password field is used to store the referer, see getReferer */
                     link.setDownloadPassword(userReferer);
                     requestFileInformation(link, account);
                     if (!this.isRefererProtected(br)) {
@@ -287,6 +275,77 @@ public class UploadhavenCom extends PluginForHost {
         }
         link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         dl.startDownload();
+    }
+
+    /**
+     * Returns the referer to be used for this link, null if none. <br>
+     * Order: download password (user defined referer, this host has no download passwords), referrer URL, container URL. Each value is only
+     * used if it is a valid URL (see verifyURLFormat), the container URL only if it is no link of this host. <br>
+     * Referer behavior of the Browser: the value is set in the browser headers right before the first request of the exclusive browser.
+     * There is no current page yet, so the default referrer policy compares the value itself with the target: a value of another website is
+     * cross-origin and only its origin is sent (not sent at all for an https value to an http target).
+     */
+    private String getReferer(final DownloadLink link) {
+        final String downloadPassword = link.getDownloadPassword();
+        if (verifyURLFormat(downloadPassword)) {
+            /* Prefer "Download password" --> User defined Referer value */
+            logger.info("Using download password as referer: " + downloadPassword);
+            return downloadPassword;
+        }
+        final String referrerURL = link.getReferrerUrl();
+        if (verifyURLFormat(referrerURL)) {
+            logger.info("Using referrerURL as referer: " + referrerURL);
+            return referrerURL;
+        }
+        final String containerURL = link.getContainerUrl();
+        if (!StringUtils.isEmpty(containerURL) && !this.canHandle(containerURL) && verifyURLFormat(containerURL)) {
+            logger.info("Using containerURL as referer: " + containerURL);
+            return containerURL;
+        }
+        /* No Referer at all. */
+        return null;
+    }
+
+    /**
+     * Corrects a referer URL entered by the user so it can be used as Referer header value (same as
+     * XFileSharingProBasic.correctUserEnteredReferer):
+     *
+     * - removes leading/trailing whitespace
+     *
+     * - adds "https://" if the user only entered a domain or a URL without protocol (e.g. "example.com" or "example.com/page")
+     *
+     * - changes "http://" to "https://" (nearly all websites use https nowadays)
+     *
+     * Returns null for null or empty input. The result is not verified here, see verifyURLFormat.
+     */
+    private String correctUserEnteredReferer(String referer) {
+        if (referer == null) {
+            return null;
+        }
+        referer = referer.trim();
+        if (referer.isEmpty()) {
+            return null;
+        }
+        if (referer.matches("(?i)^http://.*")) {
+            /* http -> https */
+            referer = "https://" + referer.substring("http://".length());
+        } else if (!referer.matches("(?i)^https://.*")) {
+            /* no protocol given (e.g. only domain) -> add https, also removes leading slashes like in "//example.com" */
+            referer = "https://" + referer.replaceFirst("^/+", "");
+        }
+        return referer;
+    }
+
+    /** Returns true if the given string is a valid http(s) URL (same as XFileSharingProBasic.verifyURLFormat). */
+    private boolean verifyURLFormat(final String url) {
+        try {
+            if (StringUtils.startsWithCaseInsensitive(url, "http")) {
+                URLHelper.verifyURL(new URL(url));
+                return true;
+            }
+        } catch (MalformedURLException ignore) {
+        }
+        return false;
     }
 
     /**

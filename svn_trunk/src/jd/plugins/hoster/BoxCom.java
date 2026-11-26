@@ -16,8 +16,17 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.List;
 import java.util.Map;
+
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -33,14 +42,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 51887 $", interfaceVersion = 2, names = { "box.com" }, urls = { "https?://(?:\\w+\\.|app\\.)*box\\.(?:com|net)/s(?:hared)?/(?:[a-z0-9]{32}|[a-z0-9]{20})/file/\\d+" })
+@HostPlugin(revision = "$Revision: 54182 $", interfaceVersion = 2, names = { "box.com" }, urls = { "https?://(?:\\w+\\.|app\\.)*box\\.(?:com|net)/s(?:hared)?/(?:[a-z0-9]{32}|[a-z0-9]{20})/file/\\d+" })
 public class BoxCom extends antiDDoSForHost {
     private static final String fileLink           = "https?://(?:\\w+\\.|app\\.)*box\\.com/s(?:hared)?/(?:[a-z0-9]{32}|[a-z0-9]{20})/file/\\d+";
     private String              dllink             = null;
@@ -104,7 +106,7 @@ public class BoxCom extends antiDDoSForHost {
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         // our default is german, this returns german!!
-        br.getHeaders().put("Accept-Language", "en-gb, en;q=0.8");
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT_LANGUAGE, "en-gb, en;q=0.8");
         if (!link.getPluginPatternMatcher().matches(fileLink)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -162,12 +164,14 @@ public class BoxCom extends antiDDoSForHost {
                 logger.info("Failed to find filesize");
             }
         }
-        final PostRequest tokens = br.createJSonPostRequest("https://app.box.com/app-api/enduserapp/elements/tokens", "{\"fileIDs\":[\"file_" + fileid + "\"]}");
+        /* app-api must be called on the correct domain! */
+        final PostRequest tokens = br.createJSonPostRequest("/app-api/enduserapp/elements/tokens", "{\"fileIDs\":[\"file_" + fileid + "\"]}");
         tokens.getHeaders().put("Request-Token", requestToken);
         tokens.getHeaders().put("X-Request-Token", requestToken);
         tokens.getHeaders().put("X-Box-EndUser-API", "sharedName=" + sharedname);
-        tokens.getHeaders().put("X-Box-Client-Name", "enduserapp");
-        tokens.getHeaders().put("X-Box-Client-Version", "0.86.0");
+        tokens.getHeaders().put("X-Box-Client-Name", "box_preview_client");
+        tokens.getHeaders().put("X-Box-Client-Version", "development");
+        tokens.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://" + new URL(contenturl).getHost());
         Browser brc = br.cloneBrowser();
         brc.getPage(tokens);
         Map<String, Object> map = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
@@ -176,10 +180,10 @@ public class BoxCom extends antiDDoSForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final GetRequest pre_download_req = br.createGetRequest("https://api.box.com/2.0/files/" + fileid + "?fields=permissions,shared_link,sha1,file_version,name,size,extension,representations,watermark_info,authenticated_download_url,is_download_available");
-        pre_download_req.getHeaders().put("Authorization", "Bearer " + token_read);
+        pre_download_req.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + token_read);
         pre_download_req.getHeaders().put("BoxApi", "shared_link=https://app.box.com/s/" + sharedname);
         pre_download_req.getHeaders().put("X-Box-Client-Name", "ContentPreview");
-        pre_download_req.getHeaders().put("Origin", "https://app.box.com");
+        pre_download_req.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://app.box.com");
         brc = br.cloneBrowser();
         brc.getPage(pre_download_req);
         map = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
@@ -205,11 +209,11 @@ public class BoxCom extends antiDDoSForHost {
         final boolean can_download = ((Boolean) permissions.get("can_download")).booleanValue();
         if (can_download) {
             final GetRequest download_req = br.createGetRequest("https://api.box.com/2.0/files/" + fileid + "?fields=download_url");
-            download_req.getHeaders().put("Authorization", "Bearer " + token_read);
+            download_req.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + token_read);
             download_req.getHeaders().put("BoxApi", "shared_link=https://app.box.com/s/" + sharedname);
             download_req.getHeaders().put("X-Box-Client-Name", "box-content-preview");
             download_req.getHeaders().put("X-Box-Client-Version", "1.54.0");
-            download_req.getHeaders().put("Origin", "https://app.box.com");
+            download_req.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://app.box.com");
             brc = br.cloneBrowser();
             brc.getPage(download_req);
             /*

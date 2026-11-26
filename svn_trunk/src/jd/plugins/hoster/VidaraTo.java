@@ -16,6 +16,8 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -23,6 +25,7 @@ import java.util.Map;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
 import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.controller.LazyPlugin;
@@ -39,7 +42,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53105 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54181 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidaraTo extends PluginForHost {
     public VidaraTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -170,7 +173,21 @@ public class VidaraTo extends PluginForHost {
         }
         checkFFmpeg(link, "Download a HLS Stream");
         final String url_hls = hlsbest.getDownloadurl();
-        dl = new HLSDownloader(link, br, url_hls);
+        dl = new HLSDownloader(link, br, url_hls) {
+            @Override
+            protected String buildDownloadUrl(String url) {
+                try {
+                    /*
+                     * server cache doesn't check for requested range and responds with last cached range response, which can be a small
+                     * range or total different range, enforce cache miss with random timestamp
+                     */
+                    url = URLHelper.parseLocation(new URL(url), "&_=" + System.currentTimeMillis());
+                } catch (MalformedURLException e) {
+                    VidaraTo.this.getLogger().log(e);
+                }
+                return super.buildDownloadUrl(url);
+            }
+        };
         dl.startDownload();
     }
 

@@ -29,7 +29,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52060 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54193 $", interfaceVersion = 3, names = {}, urls = {})
 public class XvideosharingCom extends XFileSharingProBasic {
     public XvideosharingCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -72,15 +72,21 @@ public class XvideosharingCom extends XFileSharingProBasic {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "xvideosharing.com" });
-        /* 2025-11-25: Main domain has changed from vidspeeds.com to vidspeed.org and domain vidspeed.net is down */
-        ret.add(new String[] { "vidspeed.org", "vidspeeds.com", "vidspeed.net" });
+        ret.add(new String[] { "vidspeed.space", "vidspeed.org", "vidspeeds.com", "vidspeed.space", "vidspeed.net", "vidspeeds.org" });
         return ret;
+    }
+
+    @Override
+    public String rewriteHost(final String host) {
+        /* 2026-11-26: Main domain changed from vidspeed.org to vidspeed.space and vidspeed.org looks to be another project now. */
+        return this.rewriteHost(getPluginDomains(), host);
     }
 
     @Override
     protected List<String> getDeadDomains() {
         final ArrayList<String> deadDomains = new ArrayList<String>();
         deadDomains.add("vidspeed.net");
+        deadDomains.add("vidspeed.org"); // 2026-11-26
         return deadDomains;
     }
 

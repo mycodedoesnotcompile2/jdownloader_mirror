@@ -21,7 +21,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonStorage;
+import org.appwork.storage.SimpleMapper;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
@@ -60,7 +62,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.InstaGramComDecrypter;
 
-@HostPlugin(revision = "$Revision: 53833 $", interfaceVersion = 4, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54192 $", interfaceVersion = 4, names = {}, urls = {})
 @PluginDependencies(dependencies = { InstaGramComDecrypter.class })
 public class InstaGramCom extends PluginForHost {
     @SuppressWarnings("deprecation")
@@ -141,48 +143,48 @@ public class InstaGramCom extends PluginForHost {
         return MAINPAGE + "/about/legal/terms/";
     }
 
-    private String               dllink                                      = null;
+    private String              dllink                                      = null;
     /**
      * https://instagram.api-docs.io/1.0 </br>
      */
-    public static final String   ALT_API_BASE                                = "https://i.instagram.com/api/v1";
+    public static final String  ALT_API_BASE                                = "https://i.instagram.com/api/v1";
     /* Chunkload makes no sense for pictures/small files */
-    private final int            MAXCHUNKS_pictures                          = 1;
+    private final int           MAXCHUNKS_pictures                          = 1;
     /* 2020-01-21: Multi chunks are possible but it's better not to do this to avoid getting blocked! */
-    private final int            MAXCHUNKS_videos                            = 1;
-    private static final String  MAINPAGE                                    = "https://www.instagram.com";
+    private final int           MAXCHUNKS_videos                            = 1;
+    private static final String MAINPAGE                                    = "https://www.instagram.com";
     /* DownloadLink/Packagizer properties */
-    public static final String   PROPERTY_has_tried_to_crawl_original_url    = "has_tried_to_crawl_original_url";
-    public static final String   PROPERTY_is_part_of_story                   = "is_part_of_story";
-    public static final String   PROPERTY_DIRECTURL                          = "directurl";
-    public static final String   PROPERTY_private_url                        = "private_url";
-    public static final String   PROPERTY_internal_media_id                  = "internal_media_id";
-    public static final String   PROPERTY_orderid                            = "orderid";
-    public static final String   PROPERTY_orderid_raw                        = "orderid_raw";
-    public static final String   PROPERTY_orderid_max_raw                    = "orderid_max_raw";                   // number of items
+    public static final String  PROPERTY_has_tried_to_crawl_original_url    = "has_tried_to_crawl_original_url";
+    public static final String  PROPERTY_is_part_of_story                   = "is_part_of_story";
+    public static final String  PROPERTY_DIRECTURL                          = "directurl";
+    public static final String  PROPERTY_private_url                        = "private_url";
+    public static final String  PROPERTY_internal_media_id                  = "internal_media_id";
+    public static final String  PROPERTY_orderid                            = "orderid";
+    public static final String  PROPERTY_orderid_raw                        = "orderid_raw";
+    public static final String  PROPERTY_orderid_max_raw                    = "orderid_max_raw";                   // number of items
     // inside
     // post/story
-    public static final String   PROPERTY_shortcode                          = "shortcode";
-    public static final String   PROPERTY_story_title                        = "story_title";
-    public static final String   PROPERTY_description                        = "description";
-    public static final String   PROPERTY_uploader                           = "uploader";
-    public static final String   PROPERTY_uploader_id                        = "uploader_id";
-    public static final String   PROPERTY_type                               = "type";
-    public static final String   PROPERTY_date                               = "date";
-    public static final String   PROPERTY_hashtag                            = "hashtag";
+    public static final String  PROPERTY_shortcode                          = "shortcode";
+    public static final String  PROPERTY_story_title                        = "story_title";
+    public static final String  PROPERTY_description                        = "description";
+    public static final String  PROPERTY_uploader                           = "uploader";
+    public static final String  PROPERTY_uploader_id                        = "uploader_id";
+    public static final String  PROPERTY_type                               = "type";
+    public static final String  PROPERTY_date                               = "date";
+    public static final String  PROPERTY_hashtag                            = "hashtag";
     /* If one post has multiple authors */
-    public static final String   PROPERTY_coauthor_producers_comma_separated = "coauthor_producers_comma_separated";
-    public static final String   PROPERTY_json_usertags                      = "json_usertags";
+    public static final String  PROPERTY_coauthor_producers_comma_separated = "coauthor_producers_comma_separated";
+    public static final String  PROPERTY_json_usertags                      = "json_usertags";
     @Deprecated
-    public static final String   PROPERTY_filename_from_crawler              = "decypter_filename";                 // used until crawler
+    public static final String  PROPERTY_filename_from_crawler              = "decypter_filename";                 // used until crawler
     // rev
     // 45795
-    public static final String   PROPERTY_main_content_id                    = "main_content_id";                   // e.g.
+    public static final String  PROPERTY_main_content_id                    = "main_content_id";                   // e.g.
     // instagram.com/p/<main_content_id>/
-    public static final String   PROPERTY_forced_packagename                 = "forced_packagename";
-    public static final String   PROPERTY_is_private                         = "is_private";
-    private final String         ACCOUNT_USERNAME                            = "username";
-    private boolean              hasJustRefreshedDirecturl                   = false;
+    public static final String  PROPERTY_forced_packagename                 = "forced_packagename";
+    public static final String  PROPERTY_is_private                         = "is_private";
+    private final String        ACCOUNT_USERNAME                            = "username";
+    private boolean             hasJustRefreshedDirecturl                   = false;
 
     public static void setRequestLimit() {
         Browser.setRequestIntervalLimitGlobal("instagram.com", true, 8000);
@@ -426,7 +428,7 @@ public class InstaGramCom extends PluginForHost {
         final Map<String, Object> tokenData = new java.util.LinkedHashMap<String, Object>();
         tokenData.put("ds_user_id", ds_user_id);
         tokenData.put("sessionid", sessionid);
-        br.getHeaders().put("Authorization", "Bearer IGT:2:" + Encoding.Base64Encode(JSonStorage.serializeToJson(tokenData)));
+        br.getHeaders().put("Authorization", "Bearer IGT:2:" + Encoding.Base64Encode(new SimpleMapper().setPrettyPrintEnabled(false).objectToString(tokenData)));
         br.getHeaders().put("ig-intended-user-id", ds_user_id);
         br.getHeaders().put("ig-u-ds-user-id", ds_user_id);
     }
@@ -499,9 +501,6 @@ public class InstaGramCom extends PluginForHost {
             } else if (StringUtils.equalsIgnoreCase(message, "Not authorized to view user")) {
                 /* E.g. private Instagram account/content and current user is not allowed to view it. */
                 throw new AccountRequiredException();
-            } else if (map.size() == 1 && "ok".equals(map.get("status"))) {
-                /* 2025-12-05: answer for request "/users/web_profile_info" */
-                throw new AccountRequiredException("Mature content or private profile: Account required to access this profile");
             }
         }
         handle_responseCode: {
@@ -532,7 +531,11 @@ public class InstaGramCom extends PluginForHost {
                 for (final Object qualityO : ressourcelist) {
                     final Map<String, Object> imageQualityInfo = (Map<String, Object>) qualityO;
                     final long widthTmp = JavaScriptEngineFactory.toLong(imageQualityInfo.get("width"), 0);
-                    if (widthTmp > qualityMax && imageQualityInfo.containsKey("url")) {
+                    /*
+                     * dllink == null: Logged out website json (e.g. xig_logged_out_reels_feed) only contains "type" and "url" without
+                     * "width" -> Use the first item which is the best quality (same as instaloader assumes).
+                     */
+                    if ((dllink == null || widthTmp > qualityMax) && imageQualityInfo.containsKey("url")) {
                         qualityMax = widthTmp;
                         dllink = (String) imageQualityInfo.get("url");
                     }
@@ -546,7 +549,7 @@ public class InstaGramCom extends PluginForHost {
                 for (final Object qualityO : ressourcelist) {
                     final Map<String, Object> imageQualityInfo = (Map<String, Object>) qualityO;
                     final long widthTmp = JavaScriptEngineFactory.toLong(imageQualityInfo.get("width"), 0);
-                    if (widthTmp > qualityMax && imageQualityInfo.containsKey("url")) {
+                    if ((dllink == null || widthTmp > qualityMax) && imageQualityInfo.containsKey("url")) {
                         qualityMax = widthTmp;
                         dllink = (String) imageQualityInfo.get("url");
                     }
@@ -598,7 +601,9 @@ public class InstaGramCom extends PluginForHost {
                     break;
                 }
             }
-            directurl = foundLink.getStringProperty(PROPERTY_DIRECTURL);
+            if (foundLink != null) {
+                directurl = foundLink.getStringProperty(PROPERTY_DIRECTURL);
+            }
         }
         if (directurl == null) {
             /* On failure, check for offline. */
@@ -763,6 +768,8 @@ public class InstaGramCom extends PluginForHost {
                         return;
                     } else {
                         errorSessionExpired(account);
+                        /* Unreachable code */
+                        throw new WTFException();
                     }
                 } else {
                     showCookieLoginInfo();

@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 52670 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54193 $", interfaceVersion = 3, names = {}, urls = {})
 public class UqloadCom extends XFileSharingProBasic {
     public UqloadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -43,13 +43,14 @@ public class UqloadCom extends XFileSharingProBasic {
     @Override
     public String rewriteHost(final String host) {
         /* 2023-08-09: They're frequently changing their main domain. */
+        /* 2026-11-26: Main domain changed from uqload.is to uqload.vc */
         return this.rewriteHost(getPluginDomains(), host);
     }
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "uqload.is", "uqload.bz", "uqload.cx", "uqload.net", "uqload.ws", "uqload.to", "uqload.io", "uqload.co", "uqload.com", "uqload.cc" });
+        ret.add(new String[] { "uqload.vc", "uqload.is", "uqload.bz", "uqload.cx", "uqload.net", "uqload.ws", "uqload.to", "uqload.io", "uqload.co", "uqload.com", "uqload.cc" });
         return ret;
     }
 

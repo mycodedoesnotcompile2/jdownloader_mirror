@@ -146,13 +146,6 @@ public class Browser implements HTTPConnectionFactoryInterface {
         STRICT_ORIGIN,
         STRICT_ORIGIN_WHEN_CROSS_ORIGIN,
         UNSAFE_URL;
-        public static boolean isSameProtocol(final Request current, final Request next) {
-            return StringUtils.equalsIgnoreCase(current.getURL().getProtocol(), next.getURL().getProtocol());
-        }
-
-        public static boolean isSecureProtocol(final Request current, final Request next) {
-            return StringUtils.equalsIgnoreCase("https", current.getURL().getProtocol()) && REFERRER_POLICY.isSameProtocol(current, next);
-        }
 
         public static boolean isDowngrade(final Request current, final Request next) {
             return StringUtils.equalsIgnoreCase("https", current.getURL().getProtocol()) && !StringUtils.equalsIgnoreCase("https", next.getURL().getProtocol());
@@ -1078,7 +1071,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
     /**
      * Creates a new postrequest based an an requestVariable ArrayList
      *
-     * @deprecated use {@link #createPostRequest(String, UrlQuery, String)
+     * @deprecated use {@link #createPostRequest(String, UrlQuery, String)
      *
      *
      *
@@ -1348,16 +1341,82 @@ public class Browser implements HTTPConnectionFactoryInterface {
     }
 
     @Deprecated
-    public String getCookie(final String url, final String key) {
-        return this.getCookie(url, key, null);
+    public String getCookie(final String urlString, final String key) {
+        return this.getCookie(urlString, key, null);
     }
 
-    public String getCookie(final String url, final String key, String pattern) {
+    @Deprecated
+    public String getCookie(final String urlString, final String key, String valuePattern) {
         try {
-            return getCookie(expandToURL(url), key, pattern);
+            final URL url = expandToURL(urlString, false);
+            if (url != null) {
+                /* full URL given: first try the scope aware lookup (domain, path, secure) */
+                final String ret = getCookie(url, key, valuePattern);
+                if (ret != null) {
+                    return ret;
+                }
+            }
+            /*
+             * Intended lenient fallback: search all cookies of the host (registrable domain), regardless of their scope (path, hostOnly
+             * subdomain, secure). This is done for plain host strings (e.g. br.getCookie(br.getHost(), key)) and on purpose also for full
+             * URLs when the scope aware lookup found nothing, so legacy callers still find cookies with a specific path or subdomain.
+             */
+            final List<Cookie> cookies = getAllCookiesFromHost(expandToURL(urlString, true), key, valuePattern);
+            if (cookies.size() == 0) {
+                return null;
+            } else if (cookies.size() == 1) {
+                return cookies.get(0).getValue();
+            } else {
+                DebugMode.debugger();
+                return cookies.get(0).getValue();
+            }
         } catch (MalformedURLException e) {
             throw new WTFException(e);
         }
+    }
+
+    /**
+     * Returns all not expired cookies with the given key (exact match first, case insensitive as fallback) from the cookie store of the
+     * host of the given url, regardless of their scope (path, domain, secure). If valuePattern is set, only cookies whose value fully
+     * matches it are returned. Never returns null.
+     *
+     * Note: the key lookup is the same as Cookies.list(null, key) (which returns null instead of an empty list), only the valuePattern
+     * filter for all hits is added here.
+     */
+    public List<Cookie> getAllCookiesFromHost(URL url, String key, final String valuePattern) {
+        final List<Cookie> ret = new ArrayList<Cookie>();
+        final Cookies cookies = getCookies(url);
+        for (Cookie cookie : cookies.getCookies()) {
+            if (cookie.isExpired()) {
+                continue;
+            }
+            if (cookie.getKey().equals(key)) {
+                ret.add(cookie);
+            }
+        }
+        if (ret.size() == 0) {
+            for (Cookie cookie : cookies.getCookies()) {
+                if (cookie.isExpired()) {
+                    continue;
+                }
+                if (cookie.getKey().equalsIgnoreCase(key)) {
+                    ret.add(cookie);
+                }
+            }
+        }
+        if (ret.size() == 0 || valuePattern == null) {
+            return ret;
+        }
+        final Pattern pattern = Pattern.compile(valuePattern);
+        final Iterator<Cookie> it = ret.iterator();
+        while (it.hasNext()) {
+            final Cookie next = it.next();
+            final String cookieValue = next.getValue();
+            if (cookieValue == null || !pattern.matcher(cookieValue).matches()) {
+                it.remove();
+            }
+        }
+        return ret;
     }
 
     public String getCookie(final URL url, final String key, String pattern) {
@@ -1400,20 +1459,22 @@ public class Browser implements HTTPConnectionFactoryInterface {
     @Deprecated
     public Cookies getCookies(final String url) {
         try {
-            return getCookies(expandToURL(url));
+            return getCookies(expandToURL(url, true));
         } catch (MalformedURLException e) {
             throw new WTFException(e);
         }
     }
 
-    protected URL expandToURL(final String url) throws MalformedURLException {
+    protected URL expandToURL(final String url, boolean doExpand) throws MalformedURLException {
         if (url == null) {
             DebugMode.debugger();
             return null;
         } else if (url.matches("(?i)^(https?|ftps?|wss?)://.+")) {
             return new URL(url);
-        } else {
+        } else if (doExpand) {
             return new URL("https://" + url);
+        } else {
+            return null;
         }
     }
 
@@ -1955,10 +2016,10 @@ public class Browser implements HTTPConnectionFactoryInterface {
     }
 
     /**
-     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site </br> auto completes Sec-Fetch-Site, some websites(eg
-     * facebook) check it
+     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site </br>
+     * auto completes Sec-Fetch-Site, some websites(eg facebook) check it
      */
-    protected void autoCompleteHeaders(final Request request) throws IOException{
+    protected void autoCompleteHeaders(final Request request) throws IOException {
         if (request == null) {
             return;
         }
@@ -2074,6 +2135,12 @@ public class Browser implements HTTPConnectionFactoryInterface {
      *
      * https://w3c.github.io/webappsec-referrer-policy/
      *
+     * Applies the referrer policy to the referrer candidate (see getRefererURL) and sets or removes the Referer header of nextRequest.
+     * Policies that depend on same origin / downgrade compare the current page (base request) with nextRequest, not the referrer value
+     * itself. On the first request of a fresh browser there is no current page, then the referrer value is compared with nextRequest (see
+     * getReferrerPolicyCurrentRequest): a referrer of another website is cross-origin and shortened to its origin by the default policy,
+     * use UNSAFE_URL to send it in full.
+     *
      * @param referrerPolicy
      * @param nextRequest
      */
@@ -2092,10 +2159,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
         case NO_REFERRER_WHEN_DOWNGRADE: {
             // Send the origin, path, and query string in Referer when the protocol security level stays the same or improves (HTTP→HTTP,
             // HTTP→HTTPS, HTTPS→HTTPS). Don't send the Referer header for requests to less secure destinations (HTTPS→HTTP, HTTPS→file).
-            Request currentRequest = this.getBaseRequest();
-            if (currentRequest == null) {
-                currentRequest = new GetRequest(requestReferrer);
-            }
+            final Request currentRequest = this.getReferrerPolicyCurrentRequest(requestReferrer);
             if (REFERRER_POLICY.isDowngrade(currentRequest, nextRequest)) {
                 // Don't send the Referer header for requests to less secure destinations (HTTPS→HTTP, HTTPS→file).
                 return this.setReferrer(REFERRER_POLICY.NO_REFERRER, requestReferrer, nextRequest);
@@ -2115,10 +2179,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
         case ORIGIN_WHEN_CROSS_ORIGIN: {
             // When performing a same-origin request, send the origin, path, and query string. Send only the origin for cross origin
             // requests and requests to less secure destinations (HTTPS→HTTP).
-            Request currentRequest = this.getBaseRequest();
-            if (currentRequest == null) {
-                currentRequest = new GetRequest(requestReferrer);
-            }
+            final Request currentRequest = this.getReferrerPolicyCurrentRequest(requestReferrer);
             if (!REFERRER_POLICY.isSameOrigin(currentRequest, nextRequest) || REFERRER_POLICY.isDowngrade(currentRequest, nextRequest)) {
                 // Send only the origin for cross origin requests and requests to less secure destinations (HTTPS→HTTP).
                 return this.setReferrer(REFERRER_POLICY.ORIGIN, requestReferrer, nextRequest);
@@ -2128,10 +2189,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
         }
         case SAME_ORIGIN: {
             // Send the origin, path, and query string for same-origin requests. Don't send the Referer header for cross-origin requests.
-            Request currentRequest = this.getBaseRequest();
-            if (currentRequest == null) {
-                currentRequest = new GetRequest(requestReferrer);
-            }
+            final Request currentRequest = this.getReferrerPolicyCurrentRequest(requestReferrer);
             if (REFERRER_POLICY.isSameOrigin(currentRequest, nextRequest)) {
                 // Send the origin, path, and query string for same-origin requests.
                 return this.setReferrer(REFERRER_POLICY.UNSAFE_URL, requestReferrer, nextRequest);
@@ -2140,33 +2198,28 @@ public class Browser implements HTTPConnectionFactoryInterface {
             return this.setReferrer(REFERRER_POLICY.NO_REFERRER, requestReferrer, nextRequest);
         }
         case STRICT_ORIGIN: {
-            // Send only the origin when the protocol security level stays the same (HTTPS→HTTPS). Don't send the Referer header to less
-            // secure destinations (HTTPS→HTTP).
-            Request currentRequest = this.getBaseRequest();
-            if (currentRequest == null) {
-                currentRequest = new GetRequest(requestReferrer);
-            }
+            // Send only the origin when the protocol security level stays the same or improves (HTTP→HTTP, HTTP→HTTPS, HTTPS→HTTPS). Don't
+            // send the Referer header to less secure destinations (HTTPS→HTTP).
+            final Request currentRequest = this.getReferrerPolicyCurrentRequest(requestReferrer);
             if (REFERRER_POLICY.isDowngrade(currentRequest, nextRequest)) {
                 // Don't send the Referer header to less secure destinations (HTTPS→HTTP).
                 return this.setReferrer(REFERRER_POLICY.NO_REFERRER, requestReferrer, nextRequest);
             }
-            // Send only the origin when the protocol security level stays the same (HTTPS→HTTPS)
+            // Send only the origin when the protocol security level stays the same or improves (HTTP→HTTP, HTTP→HTTPS, HTTPS→HTTPS)
             return this.setReferrer(REFERRER_POLICY.ORIGIN, requestReferrer, nextRequest);
         }
         case STRICT_ORIGIN_WHEN_CROSS_ORIGIN: {
             // Send the origin, path, and query string when performing a same-origin request. For cross-origin requests send the origin
-            // (only) when the protocol security level stays same (HTTPS→HTTPS). Don't send the Referer header to less secure destinations
-            // (HTTPS→HTTP).
-            Request currentRequest = this.getBaseRequest();
-            if (currentRequest == null) {
-                currentRequest = new GetRequest(requestReferrer);
-            }
+            // (only) when the protocol security level stays the same or improves (HTTP→HTTP, HTTP→HTTPS, HTTPS→HTTPS). Don't send the
+            // Referer header to less secure destinations (HTTPS→HTTP).
+            final Request currentRequest = this.getReferrerPolicyCurrentRequest(requestReferrer);
             if (REFERRER_POLICY.isSameOrigin(currentRequest, nextRequest)) {
                 // Send the origin, path, and query string when performing a same-origin request.
                 return this.setReferrer(REFERRER_POLICY.UNSAFE_URL, requestReferrer, nextRequest);
             }
-            if (REFERRER_POLICY.isSecureProtocol(currentRequest, nextRequest)) {
-                // For cross-origin requests send the origin (only) when the protocol security level stays same (HTTPS→HTTPS).
+            if (!REFERRER_POLICY.isDowngrade(currentRequest, nextRequest)) {
+                // For cross-origin requests send the origin (only) when the protocol security level stays the same or improves (HTTP→HTTP,
+                // HTTP→HTTPS, HTTPS→HTTPS).
                 return this.setReferrer(REFERRER_POLICY.STRICT_ORIGIN, requestReferrer, nextRequest);
             }
             // Don't send the Referer header to less secure destinations(HTTPS→HTTP).
@@ -2180,6 +2233,23 @@ public class Browser implements HTTPConnectionFactoryInterface {
         default:
             throw new WTFException("FIXME:" + referrerPolicy);
         }
+    }
+
+    /**
+     * Returns the request that the referrer policy compares with the next request (same origin, downgrade): the current page (base
+     * request).
+     *
+     * Without a current page (first request of a fresh browser), the referrer value itself is treated as the current page, like a real
+     * browser compares the referring document with the target. So a referrer of another website (e.g. explicitly set by a plugin or via
+     * setCurrentURL) is cross-origin on the first request and shortened to its origin by the default policy (an https referrer to an http
+     * target is removed). To send it in full, use br.setBrowserReferrerPolicy(REFERRER_POLICY.UNSAFE_URL).
+     */
+    protected Request getReferrerPolicyCurrentRequest(final String requestReferrer) throws IOException {
+        final Request baseRequest = this.getBaseRequest();
+        if (baseRequest != null) {
+            return baseRequest;
+        }
+        return new GetRequest(requestReferrer);
     }
 
     protected REFERRER_POLICY getNextRequestReferrerPolicy() {
@@ -2572,7 +2642,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
             if (url == null) {
                 DebugMode.debugger();
             }
-            setCookie(expandToURL(url), key, value);
+            setCookie(expandToURL(url, true), key, value);
         } catch (MalformedURLException e) {
             throw new WTFException(e);
         }
@@ -2633,7 +2703,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
                         DebugMode.debugger();
                         continue;
                     }
-                    final Cookies existingCookies = getCookies(expandToURL(cookieHost));
+                    final Cookies existingCookies = getCookies(expandToURL(cookieHost, true));
                     if (replace && clearedCookies.add(cookieHost)) {
                         existingCookies.clear();
                     }
@@ -2641,7 +2711,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 }
             } else {
                 /* Get cookies for pre-defined host and set them */
-                final URL url = expandToURL(urlString);
+                final URL url = expandToURL(urlString, true);
                 final Cookies existingCookies = this.getCookies(url);
                 if (replace) {
                     existingCookies.clear();
@@ -2687,16 +2757,26 @@ public class Browser implements HTTPConnectionFactoryInterface {
     }
 
     /**
+     * Sets the current URL, which pretends that the browser currently is on this page. It is only used as referrer candidate (see
+     * getRefererURL, step 3) and is cleared as soon as the next request has been set (see setRequest), so it acts like the initial/first
+     * referrer until then. It does not load anything and does not change getURL() / getBaseRequest().
      *
-     * sets CurrentURL (used for referer)
+     * null -> no current URL, the referrer is taken from the current page (base request) as usual
      *
-     * null -> null
+     * empty -> do not send a Referer header with the next request
      *
-     * empty -> do not set referer for next request
+     * other -> use given value as referrer for the next request
      *
-     * other -> use given referer for next request
+     * This can be used to set a referer, but the better way is to set the Referer header directly, it has priority over currentURL:
      *
-     * @param string
+     * - for the next request: br.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, value)
+     *
+     * - for one specific request object: request.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, value)
+     *
+     * Use setCurrentURL only if the browser should behave as if it came from that page (e.g. before the first request of a fresh browser)
+     * or to suppress the referer with an empty value.
+     *
+     * @param url
      * @since JD2
      */
     public void setCurrentURL(final String url) throws MalformedURLException {
@@ -2707,24 +2787,65 @@ public class Browser implements HTTPConnectionFactoryInterface {
         } else {
             this.currentURL = url;
         }
+        if (url != null && this.getRequest() == null) {
+            final LogInterface logger = this.getLogger();
+            if (logger != null && this.isDebug()) {
+                logger.info("This value will be used as referer for first request: " + url);
+            }
+        }
     }
 
     /**
-     * returns referer for next request
+     * Returns the referrer candidate for the next request. The returned value is not sent as is, setRequestProperties passes it to
+     * {@link #setReferrer(REFERRER_POLICY, String, Request)}, which applies the referrer policy (see
+     * {@link #getNextRequestReferrerPolicy()}) and then sets or removes the Referer header of the request.
      *
-     * 1.) getAndClear referer from browser.getHeaders
+     * Order (first non-null value wins):
      *
-     * 2.) if 1==null, get currentURL (String)
+     * 1.) Referer header of the browser headers (br.getHeaders()). It is removed (get and clear), so it is only used for the next request.
      *
-     * 3.) if 2==null, get url from getURL(returns url from last request)
+     * 2.) Referer header of the given request itself (e.g. set via request.getHeaders() before br.getPage(request)), only if it is the
+     * first request (no redirect origin). An explicitly set request referrer has priority over the current page. For the following requests
+     * of a redirect chain it is not used, there the current page / last request is more relevant.
      *
-     * @return
+     * 3.) currentURL (see {@link #setCurrentURL(String)})
+     *
+     * 4.) url of the base request (current page / last request)
+     *
+     * 5.) referrer of the redirect origin, if the given request is a redirect
+     *
+     * How a plugin sets a specific referrer:
+     *
+     * - for the next request: br.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, value)
+     *
+     * - for one specific request object: request.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, value), only used for this first
+     * request, not for the requests that follow a redirect
+     *
+     * - in both cases the referrer policy may still shorten (origin only) or remove the value, e.g. the default
+     * STRICT_ORIGIN_WHEN_CROSS_ORIGIN sends only the origin for cross-origin requests (compared with the current page, on the first request
+     * of a fresh browser with the referrer value itself, see getReferrerPolicyCurrentRequest). To send the value unchanged in any case,
+     * additionally use br.setBrowserReferrerPolicy(REFERRER_POLICY.UNSAFE_URL).
+     *
+     * Note: this method has a side effect (removes the Referer from the browser headers). Use the Referer header of the request (set by
+     * setReferrer) instead of calling it again for the same request.
+     *
+     * @return referrer candidate or null
      */
     public String getRefererURL(Request nextRequest) {
-        HTTPHeader referer = this.getHeaders().remove(HTTPConstants.HEADER_REQUEST_REFERER);
+        final HTTPHeader referer = this.getHeaders().remove(HTTPConstants.HEADER_REQUEST_REFERER);
         final String refererURLHeader = referer != null ? referer.getValue() : null;
         if (refererURLHeader != null) {
             return refererURLHeader;
+        }
+        if (nextRequest != null && nextRequest.getRedirectOrigin() == null) {
+            /*
+             * explicitly set referrer of the first request must not be overwritten by currentURL/base request. Not used for requests that
+             * follow a redirect
+             */
+            final String nextRequestReferer = nextRequest.getHeaders().getValue(HTTPConstants.HEADER_REQUEST_REFERER);
+            if (nextRequestReferer != null) {
+                return nextRequestReferer;
+            }
         }
         final Object lCurrentURL = this.currentURL;
         if (lCurrentURL instanceof String) {
@@ -2737,10 +2858,6 @@ public class Browser implements HTTPConnectionFactoryInterface {
             return baseRequest.getUrl(false);
         }
         if (nextRequest != null) {
-            final String nextRequestReferer = nextRequest.getHeaders().getValue(HTTPConstants.HEADER_REQUEST_REFERER);
-            if (nextRequestReferer != null) {
-                return nextRequestReferer;
-            }
             final Request redirectOrigin = nextRequest.getRedirectOrigin();
             if (redirectOrigin != null) {
                 return this.getRefererURL(redirectOrigin);
@@ -2779,7 +2896,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
     }
 
     /**
-     * Sets Browser upper page load limit Byte value. </br> Use Integer.MAX_VALUE for "unlimited" (do not use "-1"!).
+     * Sets Browser upper page load limit Byte value. </br>
+     * Use Integer.MAX_VALUE for "unlimited" (do not use "-1"!).
      *
      * @since JD2
      * @param i
@@ -2868,7 +2986,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
         if (request == null || !request.hasCookies()) {
             return;
         }
-        final Cookies cookies = this.getCookies(Browser.getHost(request.getURL()));
+        final Cookies cookies = this.getCookies(request.getURL());
         cookies.add(request.getCookies());
     }
 
@@ -2930,7 +3048,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
     }
 
     /**
-     * Checks for block by firewalls and similar. </br> To be called after a sent request.
+     * Checks for block by firewalls and similar. </br>
+     * To be called after a sent request.
      */
     public void checkForBlockedByAfterLoadConnection(Request request) throws IOException {
         if (!this.getThrowExceptionOnBlockedBy(request)) {
@@ -2962,7 +3081,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
         /* 520: Web server is returning an unknown error | 526: Invalid SSL certificate */
         /**
          * TODO: 2023-12-21: Maybe remove reliance on http status-code as it looks like literally any status code can be returned when a
-         * Cloudflare block happens. </br> I've just added code 502 to the list of "Cloudflare response-codes".
+         * Cloudflare block happens. </br>
+         * I've just added code 502 to the list of "Cloudflare response-codes".
          */
         /*
          * It is really important to also check for Cloudflare html else stuff will fail/break e.g. icerbox.com wrong login -> Cloudflare
@@ -3259,7 +3379,7 @@ public class Browser implements HTTPConnectionFactoryInterface {
                     return null;
                 }
                 if (con.getResponseCode() == 200 && request.getResponseHeader("X-Iinfo") != null && browser.containsHTML("src=\"/_Incapsula_Resource")) {
-                    for (final Cookie cookie : browser.getCookies(browser.getHost()).getCookies()) {
+                    for (final Cookie cookie : browser.getCookies(request.getURL()).getCookies()) {
                         if (StringUtils.startsWithCaseInsensitive(cookie.getKey(), "visid_incap_")) {
                             return this;
                         }
@@ -3412,7 +3532,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
                         return this;
                     }
                     /**
-                     * <title>Sito Illegale - AGCOM</title> <h1>ATTENZIONE SITO ILLEGALE</h1>
+                     * <title>Sito Illegale - AGCOM</title>
+                     * <h1>ATTENZIONE SITO ILLEGALE</h1>
                      *
                      * <p class="warning-text">
                      * L'accesso al presente sito è stato disabilitato in esecuzione di un provvedimento Agcom per violazione del diritto
@@ -3431,9 +3552,9 @@ public class Browser implements HTTPConnectionFactoryInterface {
                      * </p>
                      *
                      * <p>
-                     * Per maggiori informazioni visita la <a
-                     * href="https://www.agcom.it/competenze/piattaforme-online/antipirateria-e-piracy-shield">pagina dedicata</a> sul sito
-                     * Agcom.it
+                     * Per maggiori informazioni visita la
+                     * <a href="https://www.agcom.it/competenze/piattaforme-online/antipirateria-e-piracy-shield">pagina dedicata</a> sul
+                     * sito Agcom.it
                      * </p>
                      */
                     if (request.containsHTML("<h1>\\s*ATTENZIONE SITO ILLEGALE\\s*</h1>") && request.containsHTML("per violazione del diritto") && request.containsHTML("www\\.agcom\\.it")) {
@@ -3899,8 +4020,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
                     return null;
                 }
                 if (true) { /*
-                 * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
-                 */
+                             * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
+                             */
                     /* See new ESET NOD32 html code 2023: https://board.jdownloader.org/showthread.php?t=91433 */
                     return null;
                 }
@@ -4124,8 +4245,8 @@ public class Browser implements HTTPConnectionFactoryInterface {
     }
 
     /**
-     * Returns true if any antiddos provider/other sort of blocking is blocking at this moment. </br> See also:
-     * https://svn.jdownloader.org/issues/89834
+     * Returns true if any antiddos provider/other sort of blocking is blocking at this moment. </br>
+     * See also: https://svn.jdownloader.org/issues/89834
      */
     public boolean isBlocked() {
         final Request request = this.getRequest();

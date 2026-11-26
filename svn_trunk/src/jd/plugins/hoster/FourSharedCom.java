@@ -22,6 +22,11 @@ import java.util.Random;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -46,18 +51,12 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.utils.locale.JDL;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-
-@HostPlugin(revision = "$Revision: 53925 $", interfaceVersion = 2, names = { "4shared.com" }, urls = { "https?://(www\\.)?(?:4shared(?:-china)?\\.com|4s\\.io)/(account/)?(download|get|file|document|embed|photo|video|audio|mp3|office|rar|zip|archive|music|mobile)/[A-Za-z0-9\\-_]+(?:/.*)?|https?://api\\.4shared(-china)?\\.com/download/[A-Za-z0-9\\-_]+" })
+@HostPlugin(revision = "$Revision: 54181 $", interfaceVersion = 2, names = { "4shared.com" }, urls = { "https?://(www\\.)?(?:4shared(?:-china)?\\.com|4s\\.io)/(account/)?(download|get|file|document|embed|photo|video|audio|mp3|office|rar|zip|archive|music|mobile)/[A-Za-z0-9\\-_]+(?:/.*)?|https?://api\\.4shared(-china)?\\.com/download/[A-Za-z0-9\\-_]+" })
 public class FourSharedCom extends PluginForHost {
     // DEV NOTES:
     // old versions of JDownloader can have troubles with Java7+ with HTTPS posts.
     public final String                    PLUGINS_HOSTER_FOURSHAREDCOM_ONLY4PREMIUM = "plugins.hoster.foursharedcom.only4premium";
     private final String                   PASSWORDTEXT                              = "enter a password to access";
-
     private static final boolean           TRY_FAST_FREE                             = true;
     private static final String            type_api_direct                           = "https?://api\\.(?:4shared(?:\\-china)?\\.com|4s\\.io)/download/[A-Za-z0-9\\-_]+";
     private static AtomicReference<String> agent                                     = new AtomicReference<String>();
@@ -635,10 +634,15 @@ public class FourSharedCom extends PluginForHost {
             ai.setTrafficLeft(SizeFormatter.getSize(traffic[2], true, false) - SizeFormatter.getSize(traffic[0], true, false));
             ai.setTrafficMax(SizeFormatter.getSize(traffic[2], true, false));
         }
-        if (!expire.equalsIgnoreCase("Until Cancellation")) {
+        if ("Until Cancellation".equalsIgnoreCase(expire)) {
+            ai.setValidUntil(-1);
+        } else {
             ai.setValidUntil(System.currentTimeMillis() + (Long.parseLong(expire) * 24 * 60 * 60 * 1000l));
         }
-        if (!"Premium".equalsIgnoreCase(accType)) {
+        if ("500GB".equals(accType) || "100GB".equals(accType) || "1TB".endsWith(accType) || "1000GB".equals(accType)) {
+            ai.setStatus(accType);
+            account.setType(AccountType.PREMIUM);
+        } else if (!"Premium".equalsIgnoreCase(accType)) {
             ai.setStatus("Registered (free) User");
             account.setType(AccountType.FREE);
         } else {

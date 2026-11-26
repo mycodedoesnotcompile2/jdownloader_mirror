@@ -20,7 +20,6 @@ import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -31,7 +30,9 @@ import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
+import org.appwork.storage.SimpleMapper;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Files;
@@ -72,10 +73,9 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
-import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.InstaGramCom;
 
-@DecrypterPlugin(revision = "$Revision: 53921 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54192 $", interfaceVersion = 4, names = {}, urls = {})
 public class InstaGramComDecrypter extends PluginForDecrypt {
     public InstaGramComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -190,11 +190,11 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
      * For links matching pattern {@link #TYPE_LEGACY_HASHTAG} --> This will be set on created DownloadLink objects as a (packagizer-)
      * property.
      */
-    private static Map<String, String> ID_TO_USERNAME             = new LinkedHashMap<String, String>() {
-                                                                      protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
-                                                                          return size() > 100;
-                                                                      };
-                                                                  };
+    private static Map<String, String> ID_TO_USERNAME = new LinkedHashMap<String, String>() {
+        protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+            return size() > 100;
+        };
+    };
 
     @SuppressWarnings({ "deprecation" })
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
@@ -382,12 +382,12 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         final String userProfileURL = this.generateURLProfile(username);
         findUserIdViaWebsite: if (userID == null) {
             /**
-             * 2026-10-30: The public profile page embeds the result of its GraphQL queries (<code>xig_user_by_username</code>) even when the
-             * API refuses anonymous requests (same approach as instaloader). This is the most reliable way to find the userID.
+             * 2026-10-30: The public profile page embeds the result of its GraphQL queries (<code>xig_user_by_username</code>) even when
+             * the API refuses anonymous requests (same approach as instaloader). This is the most reliable way to find the userID.
              */
             logger.info("Trying to find user-id via website");
-            getPageAutoLogin(account, loggedIN, userProfileURL, param, br, userProfileURL);
-            final Map<String, Object> profile = getEmbeddedProfileData(br);
+            final Browser brp = getProfilePageAnonymous(param, username);
+            final Map<String, Object> profile = getEmbeddedProfileData(brp);
             final Object pk = profile.get("pk");
             if (pk != null) {
                 userID = pk.toString();
@@ -397,9 +397,9 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 }
             } else {
                 /* Legacy fallbacks */
-                userID = br.getRegex("\"owner\":\\s*\\{\"id\":\\s*\"(\\d+)\"\\}").getMatch(0);
+                userID = brp.getRegex("\"owner\":\\s*\\{\"id\":\\s*\"(\\d+)\"\\}").getMatch(0);
                 if (StringUtils.isEmpty(userID)) {
-                    userID = br.getRegex("\"page_id\"\\s*:\\s*\"profilePage_(\\d+)").getMatch(0);
+                    userID = brp.getRegex("\"page_id\"\\s*:\\s*\"profilePage_(\\d+)").getMatch(0);
                 }
             }
             if (StringUtils.isEmpty(userID)) {
@@ -547,8 +547,8 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
 
     /**
      * Returns all information about a profile that is embedded in the (logged out) profile page (<code>xig_user_by_username</code>) as one
-     * merged map. Contains e.g. pk, username, profile_pic_url, is_private and polaris_ordered_timeline_connection (first posts). Returns
-     * an empty map if nothing was found.
+     * merged map. Contains e.g. pk, username, profile_pic_url, is_private and polaris_ordered_timeline_connection (first posts). Returns an
+     * empty map if nothing was found.
      */
     private Map<String, Object> getEmbeddedProfileData(final Browser br) {
         final Map<String, Object> ret = new LinkedHashMap<String, Object>();
@@ -559,6 +559,24 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             }
         }
         return ret;
+    }
+
+    /**
+     * Loads the profile page of given username as a logged out visitor (same as instaloader). <br>
+     * Instagram only embeds the profile data (<code>xig_user_by_username</code>) for logged out visitors and only if the request looks like
+     * a browser page navigation. For this reason, a fresh browser instance without cookies is used even if we are logged in. <br>
+     * Returns that browser instance so it can be used for follow-up requests in the same (anonymous) session.
+     */
+    private Browser getProfilePageAnonymous(final CryptedLink param, final String username) throws Exception {
+        final Browser brp = this.createNewBrowserInstance();
+        InstaGramCom.prepBRWebsite(brp);
+        final Request req = brp.createGetRequest(this.generateURLProfile(username.toLowerCase(Locale.ENGLISH)));
+        req.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT, "text/html");
+        req.getHeaders().put(HTTPConstants.HEADER_REQUEST_SEC_FETCH_DEST, "document");
+        req.getHeaders().put(HTTPConstants.HEADER_REQUEST_SEC_FETCH_MODE, "navigate");
+        req.getHeaders().put(HTTPConstants.HEADER_REQUEST_SEC_FETCH_SITE, "none");
+        getPage(param, brp, req);
+        return brp;
     }
 
     /**
@@ -595,7 +613,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         if (csrftoken != null) {
             brc.getHeaders().put("X-CSRFToken", csrftoken);
         }
-        final String body = "variables=" + URLEncode.encodeURIComponent(JSonStorage.serializeToJson(variables)) + "&doc_id=" + docId + "&server_timestamps=true&lsd=" + URLEncode.encodeURIComponent(lsd);
+        final String body = "variables=" + URLEncode.encodeURIComponent(new SimpleMapper().setPrettyPrintEnabled(false).objectToString(variables)) + "&doc_id=" + docId + "&server_timestamps=true&lsd=" + URLEncode.encodeURIComponent(lsd);
         brc.postPage("https://www." + getHost() + "/api/graphql", body);
         final int responsecode = brc.getHttpConnection().getResponseCode();
         if (responsecode == 429 || responsecode == 403) {
@@ -603,7 +621,19 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         } else if (responsecode == 401) {
             throw new AccountRequiredException();
         }
-        return restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+        /*
+         * Errors are returned with response 200, e.g. {"errors":[{"message":"Rate limit exceeded","severity":"CRITICAL","code":1675004}]}
+         */
+        final List<Map<String, Object>> errors = (List<Map<String, Object>>) entries.get("errors");
+        if (errors != null && errors.size() > 0) {
+            final String message = StringUtils.valueOfOrNull(errors.get(0).get("message"));
+            if (StringUtils.containsIgnoreCase(message, "rate limit")) {
+                throw new DecrypterRetryException(RetryReason.HOST_RATE_LIMIT, "RATE_LIMIT_REACHED_GRAPHQL_" + docId, message);
+            }
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "GraphQL error: " + message);
+        }
+        return entries;
     }
 
     private void getPageAutoLogin(final Account account, final AtomicBoolean loginState, final String urlCheck, final CryptedLink param, final Browser br, final String requestURL) throws Exception {
@@ -706,13 +736,13 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         getPageAutoLogin(account, loggedIN, galleryID, param, br, param.getCryptedUrl());
         final List<Map<String, Object>> postsFromWebsite = new ArrayList<Map<String, Object>>(0);
         findGalleryJsonSource: try {
-            /* Logged out post pages do not embed any post data anymore -> See GraphQL fallback below. */
-            if (loggedIN.get()) {
-                final String[] bboxJsons = br.getRegex("data-sjs>(\\{\"require\".*?\\})</script>").getColumn(0);
-                if (bboxJsons != null && bboxJsons.length > 0) {
-                    for (final String bboxJson : bboxJsons) {
+            /* Logged in: xdt_api__v1__media__shortcode__web_info, logged out: if_not_gated_logged_out (not given for every post). */
+            final String[] bboxJsons = br.getRegex("data-sjs>(\\{\"require\".*?\\})</script>").getColumn(0);
+            if (bboxJsons != null && bboxJsons.length > 0) {
+                for (final String bboxJson : bboxJsons) {
+                    {
                         final Map<String, Object> bboxJsonParsed = restoreFromString(bboxJson, TypeRef.MAP);
-                        final Map<String, Object> result = (Map<String, Object>) findPostsListRecursive(bboxJsonParsed);
+                        final Map<String, Object> result = (Map<String, Object>) findPostsListRecursive(bboxJsonParsed, "xdt_api__v1__media__shortcode__web_info");
                         if (result != null) {
                             final List<Map<String, Object>> postitems = (List<Map<String, Object>>) result.get("items");
                             for (final Map<String, Object> postitem : postitems) {
@@ -721,12 +751,44 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                             break findGalleryJsonSource;
                         }
                     }
+                    PolarisLoggedOutDesktop: if (bboxJson.contains("PolarisLoggedOutDesktop")) {
+                        /* available without being logged in */
+                        final Map<String, Object> bboxJsonParsed = restoreFromString(bboxJson, TypeRef.MAP);
+                        final Map<String, Object> map = (Map<String, Object>) findPostsListRecursive(bboxJsonParsed, "if_not_gated_logged_out");
+                        if (map == null) {
+                            break PolarisLoggedOutDesktop;
+                        } else if (!galleryID.equals(map.get("code"))) {
+                            /* Other post e.g. from a list of related posts -> See findMediaByShortcodeRecursive down below. */
+                            break PolarisLoggedOutDesktop;
+                        }
+                        /**
+                         * Add the carousel as one post: crawlPost handles its carousel_media items. <br>
+                         * Do not add the carousel items as separate posts: Each item has its own "code" which would result in "/p/<code>/"
+                         * URLs that go back into this crawler.
+                         */
+                        postsFromWebsite.add(map);
+                        break findGalleryJsonSource;
+                    }
                 }
             }
         } catch (final Throwable e) {
             logger.log(e);
             logger.warning("Website mode failed with exception");
             /* Allow fallback to API down below. */
+        }
+        if (postsFromWebsite.size() == 0 && !loggedIN.get()) {
+            /**
+             * 2026-11-26: Logged out reel pages embed the requested reel (plus some other reels) including its video URLs e.g. in
+             * <code>xig_logged_out_reels_feed</code>. This saves the GraphQL request below.
+             */
+            for (final Map<String, Object> data : getEmbeddedQueryData(br)) {
+                final Map<String, Object> media = findMediaByShortcodeRecursive(data, galleryID);
+                if (media != null) {
+                    logger.info("Found post in embedded website json");
+                    postsFromWebsite.add(media);
+                    break;
+                }
+            }
         }
         if (postsFromWebsite.size() == 0 && !loggedIN.get()) {
             /* 2026-10-30: Logged out post pages do not embed the post data anymore -> Use GraphQL (same as instaloader). */
@@ -800,11 +862,35 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         }
     }
 
+    /** Finds the media object with given shortcode (field "code") which also contains media information, inside given json object. */
+    private Map<String, Object> findMediaByShortcodeRecursive(final Object o, final String shortcode) {
+        if (o instanceof Map) {
+            final Map<String, Object> map = (Map<String, Object>) o;
+            if (shortcode.equals(map.get("code")) && (map.containsKey("video_versions") || map.containsKey("image_versions2") || map.containsKey("carousel_media"))) {
+                return map;
+            }
+            for (final Object value : map.values()) {
+                final Map<String, Object> ret = findMediaByShortcodeRecursive(value, shortcode);
+                if (ret != null) {
+                    return ret;
+                }
+            }
+        } else if (o instanceof List) {
+            for (final Object value : (List<Object>) o) {
+                final Map<String, Object> ret = findMediaByShortcodeRecursive(value, shortcode);
+                if (ret != null) {
+                    return ret;
+                }
+            }
+        }
+        return null;
+    }
+
     /* Finds object containing single Instagram posts inside given parsed website-json object. */
-    private Object findPostsListRecursive(final Object o) {
+    private Object findPostsListRecursive(final Object o, final String key) {
         if (o instanceof Map) {
             final Map<String, Object> entrymap = (Map<String, Object>) o;
-            final Object targetO = entrymap.get("xdt_api__v1__media__shortcode__web_info");
+            final Object targetO = entrymap.get(key);
             if (targetO != null) {
                 return targetO;
             } else {
@@ -812,7 +898,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                     // final String key = entry.getKey();
                     final Object value = entry.getValue();
                     if (value instanceof List || value instanceof Map) {
-                        final Object ret = findPostsListRecursive(value);
+                        final Object ret = findPostsListRecursive(value, key);
                         if (ret != null) {
                             return ret;
                         }
@@ -824,7 +910,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             final List<Object> array = (List) o;
             for (final Object arrayo : array) {
                 if (arrayo instanceof List || arrayo instanceof Map) {
-                    final Object res = findPostsListRecursive(arrayo);
+                    final Object res = findPostsListRecursive(arrayo, key);
                     if (res != null) {
                         return res;
                     }
@@ -1026,9 +1112,9 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
 
     /**
      * Crawls profile picture and posts of a user without being logged in. <br>
-     * 2026-10-30: Reworked: The profile page embeds the first page of posts (only shortcodes and thumbnails) and further pages are
-     * obtained via the "api/graphql" endpoint (doc_id based) just like the logged-out web app and instaloader do. The actual media of each
-     * post is crawled by sending the post-URL back into this crawler (see {@link #crawlGallery}).
+     * 2026-10-30: Reworked: The profile page embeds the first page of posts (only shortcodes and thumbnails) and further pages are obtained
+     * via the "api/graphql" endpoint (doc_id based) just like the logged-out web app and instaloader do. The actual media of each post is
+     * crawled by sending the post-URL back into this crawler (see {@link #crawlGallery}).
      */
     private ArrayList<DownloadLink> crawlUserWebsite(final CryptedLink param, final String username, final Account account, final AtomicBoolean loggedIN, final boolean crawlProfilePicture, final boolean crawlPosts) throws UnsupportedEncodingException, Exception {
         if (username == null) {
@@ -1040,13 +1126,13 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String userProfileURL = this.generateURLProfile(username);
-        getPageAutoLogin(account, loggedIN, null, param, br, userProfileURL);
-        if (br.getURL().contains("/accounts/login")) {
+        final Browser brp = getProfilePageAnonymous(param, username);
+        if (brp.getURL().contains("/accounts/login")) {
             throw new AccountRequiredException();
         }
-        final Map<String, Object> profile = getEmbeddedProfileData(br);
+        final Map<String, Object> profile = getEmbeddedProfileData(brp);
         if (profile.isEmpty()) {
-            if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("Sorry, this page isn't available")) {
+            if (brp.getHttpConnection().getResponseCode() == 404 || brp.containsHTML("Sorry, this page isn't available")) {
                 ret.add(getDummyDownloadlinkProfileOffline(username));
                 return ret;
             }
@@ -1054,6 +1140,8 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             throw new AccountRequiredException();
         }
         final String userID = profile.get("pk").toString();
+        /* The "id" of the page is not the userID (pk). It is needed for the pagination query (see instaloader). */
+        final String pageProfileID = profile.get("id").toString();
         this.addCachedUserID(userID, username);
         final Boolean isPrivate = (Boolean) profile.get("is_private");
         final Map<String, Object> postsConnection = (Map<String, Object>) profile.get("polaris_ordered_timeline_connection");
@@ -1120,11 +1208,13 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 /* Continue to next page */
                 page++;
                 final Map<String, Object> vars = new LinkedHashMap<String, Object>();
-                vars.put("id", userID);
+                vars.put("id", pageProfileID);
                 vars.put("after", nextid);
+                vars.put("before", null);
                 vars.put("first", 12);
+                vars.put("last", null);
                 vars.put("__relay_internal__pv__PolarisSEOIsCrawlerrelayprovider", false);
-                final Map<String, Object> response = this.graphqlDocIdRequest(br, "28904005159232689", vars, userProfileURL);
+                final Map<String, Object> response = this.graphqlDocIdRequest(brp, "28904005159232689", vars, userProfileURL);
                 connection = (Map<String, Object>) JavaScriptEngineFactory.walkJson(response, "data/node/polaris_ordered_timeline_connection");
                 if (connection == null) {
                     /* Instagram only allows anonymous users to see a limited number of items. */
@@ -1220,8 +1310,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             if (page == 1) {
                 InstaGramCom.getPageAltAPI(account, this.br, profilePostsFeedBaseURL);
             } else {
-                // br.getPage(hashtagBaseURL + "?after=" + nextid);
-                InstaGramCom.getPageAltAPI(account, this.br, profilePostsFeedBaseURL + "?max_id=" + nextid);
+                InstaGramCom.getPageAltAPI(account, this.br, profilePostsFeedBaseURL + "?max_id=" + Encoding.urlEncode(nextid));
             }
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             if (crawlProfilePicture && !hasCrawledProfilePicture) {
@@ -1346,7 +1435,9 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             metadata = new InstagramMetadata();
         }
         metadata.setMainContentID(mainContentID);
-        metadata.setDate(new Date(date_timestamp * 1000));
+        if (date_timestamp != 0) {
+            metadata.setDate(new Date(date_timestamp * 1000));
+        }
         /* Find username if it is not pre-given. */
         String username = null;
         String userID = null;
@@ -1415,13 +1506,13 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final ArrayList<Map<String, Object>> mediaItems = new ArrayList<Map<String, Object>>();
-        if (typename.equalsIgnoreCase("GraphImage")) {
+        if (typename.equalsIgnoreCase("GraphImage") || typename.equalsIgnoreCase("XIGPolarisImageMedia")) {
             /* Single image */
             mediaItems.add(post);
-        } else if (typename.equalsIgnoreCase("GraphVideo")) {
+        } else if (typename.equalsIgnoreCase("GraphVideo") || typename.equalsIgnoreCase("XIGPolarisVideoMedia")) {
             /* Single video */
             mediaItems.add(post);
-        } else if (typename.equalsIgnoreCase("GraphSidecar")) {
+        } else if (typename.equalsIgnoreCase("GraphSidecar") || typename.equalsIgnoreCase("XIGPolarisCarouselMedia")) {
             /* Process multiple media items posted in a single IG post. */
             List<Map<String, Object>> medias = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(post, "edge_sidecar_to_children/edges");
             if (medias == null) {
@@ -1454,43 +1545,61 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 /* 2022-03-30: E.g. media as part of user profile */
                 media = (Map<String, Object>) nodeO;
             }
-            final String internalMediaID = media.get("id").toString();
+            /* Logged out website json uses ids like "POLARIS_<pk>" */
+            final String internalMediaID = media.get("id").toString().replaceFirst("^POLARIS_", "");
             final String shortcode = (String) media.get("shortcode");
             final Number thisMediaType = (Number) media.get("media_type");// api
-            final boolean isVideo = Boolean.TRUE.equals(media.get("is_video")) || (thisMediaType != null && thisMediaType.intValue() == 2);
+            final boolean isVideo = Boolean.TRUE.equals(media.get("is_video")) || (thisMediaType != null && thisMediaType.intValue() == 2) || "XIGPolarisVideoMedia".equals(media.get("__typename"));
             String dllink = null;
+            boolean isFromAltAPI = false;
             if (isVideo) {
-                dllink = (String) media.get("video_url");
-            } else {
-                /* Find best image-quality */
-                final List<Object> ressourcelist = (List<Object>) media.get("display_resources");
-                if (ressourcelist != null) {
-                    long qualityMax = 0;
-                    for (final Object qualityO : ressourcelist) {
-                        final Map<String, Object> imageQualityInfo = (Map<String, Object>) qualityO;
-                        final long widthTmp = JavaScriptEngineFactory.toLong(imageQualityInfo.get("config_width"), 0);
-                        if (widthTmp > qualityMax && imageQualityInfo.containsKey("src")) {
-                            qualityMax = widthTmp;
-                            dllink = (String) imageQualityInfo.get("src");
-                        }
-                    }
+                /*
+                 * Only use getBestQualityURLAltAPI if video_versions are given: Without them it would return the URL of the preview image.
+                 */
+                if (media.get("video_versions") != null) {
+                    dllink = InstaGramCom.getBestQualityURLAltAPI(media);
+                    isFromAltAPI = !StringUtils.isEmpty(dllink);
                 }
                 if (StringUtils.isEmpty(dllink)) {
-                    dllink = (String) media.get("display_src");
-                    if (StringUtils.isEmpty(dllink)) {
-                        dllink = (String) media.get("display_url");
-                        if (StringUtils.isEmpty(dllink)) {
-                            dllink = (String) media.get("thumbnail_src");
+                    dllink = (String) media.get("video_url");
+                }
+            } else {
+                dllink = InstaGramCom.getBestQualityURLAltAPI(media);
+                isFromAltAPI = !StringUtils.isEmpty(dllink);
+                if (StringUtils.isEmpty(dllink)) {
+                    /* Find best image-quality */
+                    List<Object> ressourcelist = (List<Object>) media.get("display_resources");
+                    if (ressourcelist == null) {
+                        ressourcelist = (List<Object>) JavaScriptEngineFactory.walkJson(media, "image_versions2/candidates");
+                    }
+                    if (ressourcelist != null) {
+                        long qualityMax = 0;
+                        for (final Object qualityO : ressourcelist) {
+                            final Map<String, Object> imageQualityInfo = (Map<String, Object>) qualityO;
+                            if (imageQualityInfo.containsKey("url")) {
+                                /* first one always best? */
+                                dllink = (String) imageQualityInfo.get("url");
+                                break;
+                            }
+                            final long widthTmp = JavaScriptEngineFactory.toLong(imageQualityInfo.get("config_width"), 0);
+                            if (widthTmp > qualityMax && imageQualityInfo.containsKey("src")) {
+                                qualityMax = widthTmp;
+                                dllink = (String) imageQualityInfo.get("src");
+                            }
                         }
                     }
-                }
-            }
-            boolean isFromAltAPI = false;
-            if (StringUtils.isEmpty(dllink)) {
-                try {
-                    dllink = InstaGramCom.getBestQualityURLAltAPI(media);
-                    isFromAltAPI = true;
-                } catch (final Throwable ignore) {
+                    if (StringUtils.isEmpty(dllink)) {
+                        dllink = (String) media.get("display_src");
+                        if (StringUtils.isEmpty(dllink)) {
+                            dllink = (String) media.get("display_url");
+                            if (StringUtils.isEmpty(dllink)) {
+                                dllink = (String) media.get("thumbnail_src");
+                            }
+                            if (StringUtils.isEmpty(dllink)) {
+                                dllink = (String) media.get("display_uri");
+                            }
+                        }
+                    }
                 }
             }
             if (StringUtils.isEmpty(dllink)) {
@@ -1566,7 +1675,8 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 fp.setName(metadata.getUsername() + " - " + metadata.getMainContentID());
             } else if (cfg.getPostCrawlerPackagenameSchemeType() == SinglePostPackagenameSchemeType.CUSTOM && !StringUtils.isEmpty(cfg.getPostCrawlerPackagenameScheme())) {
                 /* Use User defined package names */
-                String customPackageName = cfg.getPostCrawlerPackagenameScheme().replace("*date*", metadata.getDateFormatted());
+                final String dateFormatted = metadata.getDateFormatted();
+                String customPackageName = cfg.getPostCrawlerPackagenameScheme().replace("*date*", dateFormatted != null ? dateFormatted : "-");
                 final String usernameForReplacer;
                 if (metadata.getUsername() != null) {
                     usernameForReplacer = metadata.getUsername();
@@ -1853,7 +1963,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         } else if (ft == FilenameType.CUSTOM && !StringUtils.isEmpty(filenameScheme)) {
             /* Build filename according to user defined filename scheme. */
             // *date*_*uploader* - *main_content_id* *orderid*_of_*orderid_max* - *shortcode*.*ext*
-            String filename = filenameScheme.replace("*date*", dateFormatted);
+            String filename = filenameScheme.replace("*date*", dateFormatted != null ? dateFormatted : "-");
             filename = filename.replace("*uploader*", username != null ? username : "-");
             filename = filename.replace("*uploader_id*", user_id != null ? user_id : "-");
             filename = filename.replace("*title*", storyHighlightTitle != null ? storyHighlightTitle : "-");

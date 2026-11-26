@@ -242,7 +242,11 @@ public class PluginBrowser<T extends Plugin> extends Browser {
             }
         }
         if (!isRequestHeaderForAutoCompleteSet(request, HTTPConstants.HEADER_REQUEST_SEC_FETCH_SITE)) {
-            final String refererURL = getRefererURL(request);
+            /*
+             * use the Referer that is actually sent with this request (already set by setReferrer according to the referrer policy).
+             * getRefererURL must not be called again here, it removes the Referer from the browser headers and was already consumed.
+             */
+            final String refererURL = requestHeaders.getValue(HTTPConstants.HEADER_REQUEST_REFERER);
             final String fetchSite;
             if (StringUtils.isEmpty(refererURL)) {
                 fetchSite = "none";

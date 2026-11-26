@@ -38,21 +38,11 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 52939 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54186 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilefoxCc extends XFileSharingProBasic {
     public FilefoxCc(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(super.getPurchasePremiumURL());
-    }
-
-    @Override
-    public Browser prepBrowser(final Browser prepBr, final String host) {
-        super.prepBrowser(prepBr, host);
-        final String custom_referer = this.getPluginConfig().getStringProperty("CUSTOM_REFERER", null);
-        if (!StringUtils.isEmpty(custom_referer)) {
-            prepBr.getHeaders().put("Referer", custom_referer);
-        }
-        return prepBr;
     }
 
     /**

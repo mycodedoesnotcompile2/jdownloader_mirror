@@ -19,16 +19,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperCrawlerPluginCloudflareTurnstile;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
+import jd.http.requests.FormData;
+import jd.http.requests.PostFormDataRequest;
 import jd.parser.Regex;
-import jd.parser.html.Form;
-import jd.parser.html.Form.MethodType;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 51616 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54183 $", interfaceVersion = 3, names = {}, urls = {})
 public class AbdlSt extends PluginForDecrypt {
     public AbdlSt(PluginWrapper wrapper) {
         super(wrapper);
@@ -88,17 +88,11 @@ public class AbdlSt extends PluginForDecrypt {
         /** 2025-10-06: See https://abdl.st/_next/static/chunks/app/video/%5Bslug%5D/page-903eb0127bcdb396.js */
         final String cfSiteKey = "0x4AAAAAABgccoPrNI6Z55n_";
         final String cfTurnstileResponse = new CaptchaHelperCrawlerPluginCloudflareTurnstile(this, br, cfSiteKey).getToken();
-        br.getHeaders().put("Accept", "text/x-component");
-        br.getHeaders().put("content-type", "text/plain;charset=UTF-8");
-        br.getHeaders().put("Origin", "https://" + br.getHost());
-        br.getHeaders().put("next-action", "4051b516cd96ea16b05c1d2b0290f7d0ccf584856c");
-        final Form form = new Form();
-        form.setAction(br.getURL());
-        form.setMethod(MethodType.POST);
-        form.put("1_turnstile-token", Encoding.urlEncode(cfTurnstileResponse));
-        form.put("1_video-slug", Encoding.urlEncode(content_id));
-        form.put("0", Encoding.urlEncode("[\"$K1\"]"));
-        br.submitForm(form);
+        final PostFormDataRequest request = new PostFormDataRequest("https://abdl.st/api/verify-turnstile");
+        request.addFormData(new FormData("turnstile-token", cfTurnstileResponse));
+        request.addFormData(new FormData("video-slug", content_id));
+        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://abdl.st");
+        br.getPage(request);
         /* Process Next.js output. */
         String[] lines = br.getRequest().getHtmlCode().split("\\r?\\n");
         Map<String, Object> entries = null;

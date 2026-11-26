@@ -95,7 +95,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 54164 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54196 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1116,6 +1116,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
 
     protected boolean probeDirectDownload(final DownloadLink link, final Account account, final Browser br, final Request request, final boolean setFilesize) throws Exception {
         request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING, "identity");
+        /* custom referer, has priority over the current page (referrer policy may shorten it to its origin), see getReferer */
         final String referer = this.getReferer(link);
         if (referer != null) {
             request.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, referer);
@@ -1163,6 +1164,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      */
     public AvailableStatus requestFileInformationWebsiteXFSOld(final DownloadLink link, final Account account) throws Exception {
         final GetRequest req = br.createGetRequest(this.getContentURL(link));
+        /* custom referer, has priority over the current page (referrer policy may shorten it to its origin), see getReferer */
         final String referer = this.getReferer(link);
         if (referer != null) {
             req.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, referer);
@@ -1394,6 +1396,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                     url = this.getMainPage(br) + this.buildURLPath(link, fid, URL_TYPE.EMBED_VIDEO);
                 }
             }
+            /* custom referer, has priority over the current page (referrer policy may shorten it to its origin), see getReferer */
             final String referer = this.getReferer(link);
             if (referer != null) {
                 br.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, referer);
@@ -1430,7 +1433,9 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
     }
 
-    protected static final String PROPERTY_REFERER_REQUIRED = "PROPERTY_REFERER_REQUIRED";
+    protected static final String PROPERTY_REFERER_REQUIRED        = "PROPERTY_REFERER_REQUIRED";
+    /* DownloadLink property: download password holds a referer URL entered by the user, see getReferer */
+    protected static final String PROPERTY_USE_PASSWORD_AS_REFERER = "use_password_as_referer";
 
     protected String isRefererRequired(DownloadLink link) throws PluginException {
         final Object ret = link.getProperty(PROPERTY_REFERER_REQUIRED);
@@ -1489,6 +1494,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             url = this.getMainPage(br) + this.buildURLPath(link, fuid, URL_TYPE.OFFICIAL_VIDEO_DOWNLOAD);
         }
         final GetRequest req = br.createGetRequest(url);
+        /* custom referer, has priority over the current page (referrer policy may shorten it to its origin), see getReferer */
         final String referer = this.getReferer(link);
         if (referer != null) {
             req.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, referer);
@@ -1541,6 +1547,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         } else {
             url = this.getMainPage(br) + this.buildURLPath(link, fid, URL_TYPE.EMBED_VIDEO_2);
         }
+        /* custom referer, has priority over the current page (referrer policy may shorten it to its origin), see getReferer */
         final String refererSaved = this.getReferer(link);
         if (refererSaved != null) {
             br.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, refererSaved);
@@ -1548,16 +1555,19 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         getPage(br, url);
         if (this.isReferrerBlocked(br)) {
             if (isDownload) {
-                final String referer = getUserInput("Enter referer-URL?", link);
+                /* user entered referer, sent in full for the reload below (same origin as current page), see getReferer */
+                final String referer = correctUserEnteredReferer(getUserInput("Enter referer-URL?", link));
                 br.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, referer);
                 /* Reload page */
                 getPage(br.getURL());
                 if (!this.isReferrerBlocked(br)) {
-                    /* Success */
+                    /* Success: store referer as download password and mark it, so getReferer will use it */
                     link.setDownloadPassword(referer);
+                    link.setProperty(PROPERTY_USE_PASSWORD_AS_REFERER, true);
                 } else {
                     /* Failure */
                     link.setDownloadPassword(null);
+                    link.removeProperty(PROPERTY_USE_PASSWORD_AS_REFERER);
                 }
             } else {
                 /* Problem happened during availablecheck -> Do not ask user for password/referer. */
@@ -1759,6 +1769,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             /* Check if the URL we want has already been accessed with given browser instance */
             if (br.getURL() == null || !br.getURL().equals(contentURL)) {
                 final GetRequest req = br.createGetRequest(contentURL);
+                /* custom referer, has priority over the current page (referrer policy may shorten it to its origin), see getReferer */
                 final String referer = this.getReferer(link);
                 if (referer != null) {
                     req.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, referer);
@@ -3527,6 +3538,35 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         return link.removeProperty(directurlproperty);
     }
 
+    /**
+     * Corrects a referer URL entered by the user so it can be used as Referer header value:
+     *
+     * - removes leading/trailing whitespace
+     *
+     * - adds "https://" if the user only entered a domain or a URL without protocol (e.g. "example.com" or "example.com/page")
+     *
+     * - changes "http://" to "https://" (nearly all websites use https nowadays)
+     *
+     * Returns null for null or empty input. The result is not verified here, see verifyURLFormat.
+     */
+    protected String correctUserEnteredReferer(String referer) {
+        if (referer == null) {
+            return null;
+        }
+        referer = referer.trim();
+        if (referer.isEmpty()) {
+            return null;
+        }
+        if (referer.matches("(?i)^http://.*")) {
+            /* http -> https */
+            referer = "https://" + referer.substring("http://".length());
+        } else if (!referer.matches("(?i)^https://.*")) {
+            /* no protocol given (e.g. only domain) -> add https, also removes leading slashes like in "//example.com" */
+            referer = "https://" + referer.replaceFirst("^/+", "");
+        }
+        return referer;
+    }
+
     protected boolean verifyURLFormat(final String url) {
         try {
             if (StringUtils.startsWithCaseInsensitive(url, "http")) {
@@ -3540,11 +3580,21 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
 
     /**
      * Returns referer to be used in availablecheck. <br>
-     * This is e.g. useful for websites which restrict the embedding of videos to a specific source.
+     * This is e.g. useful for websites which restrict the embedding of videos to a specific source. <br>
+     * Order: download password (only if PROPERTY_USE_PASSWORD_AS_REFERER is set and it is a valid URL), container URL, custom referer from
+     * plugin settings. <br>
+     * Referer behavior of the Browser (see Browser.getRefererURL / Browser.setReferrer): the value is set on the request
+     * (request.getHeaders()) or for the next request (br.getHeaders()) and has priority over the current page, but not for requests that
+     * follow a redirect. The default referrer policy (STRICT_ORIGIN_WHEN_CROSS_ORIGIN) compares the current page with the target: once the
+     * browser is on this host, the value (also of another website) is same origin and sent in full. On the first request of a fresh
+     * browser there is no current page, then the value itself is compared with the target: a value of another website is cross-origin and
+     * only its origin is sent (not sent at all for an https value to an http target). Setting UNSAFE_URL is intentionally not done, it would
+     * apply to the whole browser and also send full URLs to other domains (e.g. download servers).
      */
     protected String getReferer(final DownloadLink link) {
         final String downloadPassword = link.getDownloadPassword();
-        if (!StringUtils.isEmpty(downloadPassword) && !this.canHandle(downloadPassword) && verifyURLFormat(downloadPassword)) {
+        /* only use download password as referer if it was stored as referer (see PROPERTY_USE_PASSWORD_AS_REFERER) and is a valid URL */
+        if (link.getBooleanProperty(PROPERTY_USE_PASSWORD_AS_REFERER, false) && verifyURLFormat(downloadPassword)) {
             logger.info("Using download password as referer: " + downloadPassword);
             return downloadPassword;
         }

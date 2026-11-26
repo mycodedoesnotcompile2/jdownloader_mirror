@@ -47,6 +47,7 @@ import org.jdownloader.downloader.hls.M3U8Playlist;
 import org.jdownloader.plugins.components.config.MediathekProperties;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.jdownloader.utils.HelpLinks;
 
 import jd.PluginWrapper;
 import jd.http.BearerAuthentication;
@@ -69,9 +70,8 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashInfo.TYPE;
-import org.jdownloader.utils.HelpLinks;
 
-@HostPlugin(revision = "$Revision: 53997 $", interfaceVersion = 2, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "ardmediathek\\.dedecrypted://.+", "(?:mediathek\\.)?daserste\\.dedecrypted://.+", "sandmann\\.dedecrypted://.+", "wdr.dedecrypted://.+", "sportschau\\.dedecrypted://.+", "wdrmaus\\.dedecrypted://.+", "eurovision\\.dedecrypted://.+", "sputnik\\.dedecrypted://.+", "mdr\\.dedecrypted://.+", "ndr\\.dedecrypted://.+", "tagesschau\\.dedecrypted://.+" })
+@HostPlugin(revision = "$Revision: 54180 $", interfaceVersion = 2, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "ardmediathek\\.dedecrypted://.+", "(?:mediathek\\.)?daserste\\.dedecrypted://.+", "sandmann\\.dedecrypted://.+", "wdr.dedecrypted://.+", "sportschau\\.dedecrypted://.+", "wdrmaus\\.dedecrypted://.+", "eurovision\\.dedecrypted://.+", "sputnik\\.dedecrypted://.+", "mdr\\.dedecrypted://.+", "ndr\\.dedecrypted://.+", "tagesschau\\.dedecrypted://.+" })
 public class ARDMediathek extends PluginForHost {
     private String              dllink                                                             = null;
     public static final String  PROPERTY_CRAWLER_FORCED_FILENAME                                   = "crawler_forced_filename";
@@ -622,7 +622,7 @@ public class ARDMediathek extends PluginForHost {
             throw new AccountInvalidException(msg);
         }
         br.getPage("https://sso.ardmediathek.de/sso/token");
-        Map<String, Object> entries = null;
+        final Map<String, Object> entries;
         try {
             entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         } catch (final JSonMapperException ignore) {
@@ -650,7 +650,7 @@ public class ARDMediathek extends PluginForHost {
         if (fetch_user_data_from_api) {
             setAuthHeader(br, account);
             br.getPage("https://accounts.ard.de/users");
-            List<Map<String, Object>> userlist = null;
+            final List<Map<String, Object>> userlist;
             try {
                 userlist = (List<Map<String, Object>>) restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
             } catch (final JSonMapperException ignore) {
