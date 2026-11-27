@@ -43,15 +43,6 @@ import javax.imageio.ImageIO;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 
-import jd.captcha.utils.GifDecoder;
-import jd.http.Browser;
-import jd.http.Browser.BlockedByException;
-import jd.http.Browser.BrowserException;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.plugins.PluginForHost;
-
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.resources.MultiResolutionImageHelper;
 import org.appwork.shutdown.ShutdownController;
@@ -88,9 +79,32 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
+import jd.captcha.utils.GifDecoder;
+import jd.http.Browser;
+import jd.http.Browser.BlockedByException;
+import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.plugins.Plugin;
+import jd.plugins.PluginForHost;
+
+/*
+ * TODO: Deviations from the project rules that are left from the review: (1) the file still contains line comments ("//") instead of block
+ * comments, (2) durations are written as number literals or with a manual multiplication (e.g. Thread.sleep(500), setConnectTimeout(10000))
+ * instead of TimeUnit.<unit>.toMillis(...). Adjust them when the surrounding code is touched.
+ */
 public class FavIcons {
     private static final int                                 BASE_SIZE        = 16;
-    /* max size in bytes of a downloaded favicon (ico files with several resolutions and apple-touch-icons are well below that) */
+    /*
+     * max size in bytes of a downloaded favicon (ico files with several resolutions and apple-touch-icons are well below that)
+     *
+     * TODO: This only limits the bytes, not the decoded size. A png or gif below this limit can declare a huge resolution (e.g. 30000x30000
+     * in one color compresses to a few KB), ImageIO.read(...) then allocates a BufferedImage of that size (OutOfMemoryError or a memory
+     * peak, several loader threads run in parallel and the url comes from the html of any website). Read width and height first (e.g. via
+     * an ImageReader) and reject images above a limit (e.g. 2048x2048) before decoding, in downloadImage and load_DataURL, also for ico and
+     * gif.
+     */
     private static final int                                 MAX_FAVICON_SIZE = 1024 * 1024;
     private static final ThreadPoolExecutor                  THREAD_POOL;
     private static final Object                              LOCK             = new Object();
@@ -101,6 +115,14 @@ public class FavIcons {
     private static final FavIconsConfig                      CONFIG           = JsonConfig.create(FavIconsConfig.class);
     private static final long                                REFRESH_TIMEOUT  = TimeUnit.DAYS.toMillis(7);
     private static final long                                RETRY_TIMEOUT    = TimeUnit.DAYS.toMillis(7);
+    /* minimum and maximum wait time before a request is repeated that was answered with 429 (Too Many Requests) */
+    private static final long                                RETRY_AFTER_MIN  = TimeUnit.SECONDS.toMillis(2);
+    private static final long                                RETRY_AFTER_MAX  = TimeUnit.SECONDS.toMillis(20);
+    /*
+     * Hosts are used as file name (see getFavIconFileName) and as theme key. Letters, digits (also non ascii ones of IDN hosts), dot, hyphen
+     * and underscore are enough for every real host and exclude path separators, drive/stream separators (":") and the like.
+     */
+    private static final Pattern                             VALID_HOST       = Pattern.compile("^[\\p{L}\\p{N}._-]{1,200}$");
     static {
         int maxThreads = Math.max(CONFIG.getMaxThreads(), 1);
         int keepAlive = Math.max(CONFIG.getThreadKeepAlive(), 100);
@@ -186,6 +208,13 @@ public class FavIcons {
         if (host == null) {
             return null;
         }
+        if (!VALID_HOST.matcher(host).matches()) {
+            /*
+             * The host would be used as file name and theme key. A host with e.g. path separators or ":" must never reach the file system
+             * (path traversal, NTFS alternate data streams on Windows), so there is no favicon for it.
+             */
+            return null;
+        }
         /*
          * check if we already have a favicon? The lookup does file system calls and does not touch shared state, so it runs outside LOCK.
          * writeFavIcon replaces the file via temporary file, so the lookup never finds a partially written file.
@@ -214,8 +243,24 @@ public class FavIcons {
         if (!updatePermission) {
             return null;
         }
-        /* add to queue list */
-        return add(host, requestor);
+        /* add to queue list, the lookup above found no file, add checks again if a loader finished in the meantime */
+        return add(host, requestor, true);
+    }
+
+    /**
+     * Returns the theme key of the favicon of the given host if there is a file for it (see getFavIcon), else null. Does file system calls,
+     * so it must not be called while holding LOCK.
+     */
+    private static String findFavIconKey(final String host) {
+        String key = "fav/" + host;
+        if (NewTheme.I().getIconURL(key) != null) {
+            return key;
+        }
+        key = "fav/big." + host;
+        if (NewTheme.I().getIconURL(key) != null) {
+            return key;
+        }
+        return null;
     }
 
     /**
@@ -262,7 +307,11 @@ public class FavIcons {
                 return;
             }
             file.setLastModified(now);// avoid retry before expired
-            add(host, requestor);
+            /*
+             * TODO: add renders a default icon (getDefaultIcon, cached in DEFAULT_ICONS) although the real icon already exists, and
+             * onLoadFailed renders it a second time if the refresh fails. A parameter "refresh: no default icon needed" would save that.
+             */
+            add(host, requestor, false);
         } catch (final Throwable e) {
             e.printStackTrace();
         }
@@ -314,6 +363,7 @@ public class FavIcons {
         }
     }
 
+    /* TODO: host and requestor are not used, remove the parameters (callers: add, getDefaultIcon) */
     private static LogSource getLogger(final String host, FavIconRequestor requestor) {
         final LogSource ret = LogController.getFastPluginLogger("FavIcons");
         if (CONFIG.isDebugFlag()) {
@@ -322,21 +372,21 @@ public class FavIcons {
         return ret;
     }
 
-    private static LazyHostPlugin getPlugin(final String host) {
-        final LazyHostPlugin existingHostPlugin = new PluginFinder()._assignHost(host);
+    private static LazyPlugin<? extends Plugin> getPlugin(final String host) {
+        LazyPlugin<? extends Plugin> existingHostPlugin = new PluginFinder()._assignHost(host);
         if (existingHostPlugin != null) {
             return existingHostPlugin;
         }
         /* getInstance() is null if the public suffix list could not be loaded */
         final PublicSuffixList publicSuffixList = PublicSuffixList.getInstance();
-        if (publicSuffixList == null) {
-            return null;
+        final String domain = publicSuffixList == null ? null : publicSuffixList.getDomain(host);
+        if (domain != null && !host.equalsIgnoreCase(domain)) {
+            existingHostPlugin = new PluginFinder()._assignHost(domain);
+            if (existingHostPlugin != null) {
+                return existingHostPlugin;
+            }
         }
-        final String domain = publicSuffixList.getDomain(host);
-        if (domain == null || host.equalsIgnoreCase(domain)) {
-            return null;
-        }
-        return new PluginFinder()._assignHost(domain);
+        return CrawlerPluginController.getInstance().get(host);
     }
 
     private static abstract class FavIconsRunnable implements Runnable {
@@ -347,7 +397,16 @@ public class FavIcons {
         }
     }
 
-    private static Icon add(final String host, FavIconRequestor requestor) {
+    /**
+     * Enqueues the host for favicon loading and returns its default icon.
+     *
+     * @param checkExisting
+     *            true if the caller found no favicon file for the host just before (getFavIcon). The lookup runs without LOCK, so a loader
+     *            of another thread may have finished (file written, host removed from QUEUE) in the meantime. In that case no second
+     *            download is started, the existing favicon is returned and the requestors that were queued so far are notified. false for
+     *            a refresh of an existing file, there the file is expected and the download must start.
+     */
+    private static Icon add(final String host, FavIconRequestor requestor, final boolean checkExisting) {
         final LogSource logger = getLogger(host, requestor);
         final AtomicReference<LogSource> loggerReference = new AtomicReference<LogSource>(logger);
         try {
@@ -394,7 +453,28 @@ public class FavIcons {
              * (getDefaultIcon(..., true)), so creating it afterwards could leave a stale DEFAULT_ICONS entry
              */
             boolean loaderStarted = false;
+            boolean queueReleased = false;
             try {
+                if (startLoader && checkExisting) {
+                    /* outside LOCK because of the file system calls, see checkExisting */
+                    final String existingKey = findFavIconKey(host);
+                    if (existingKey != null) {
+                        final List<FavIconRequestor> requestors;
+                        synchronized (LOCK) {
+                            requestors = QUEUE.remove(host);
+                        }
+                        /* the QUEUE entry is gone, the finally block below must not remove an entry of another thread */
+                        queueReleased = true;
+                        if (requestors != null) {
+                            /* the requestor of this call gets the icon as return value */
+                            requestors.remove(requestor);
+                            if (requestors.size() > 0) {
+                                notifyRequestors(logger, host, requestors);
+                            }
+                        }
+                        return new AbstractIcon(existingKey, -1);
+                    }
+                }
                 final Icon icon = getDefaultIcon(logger, host, false);
                 if (!startLoader) {
                     /* already enqueued, requestor gets notified by the running loader */
@@ -427,7 +507,7 @@ public class FavIcons {
                 }
                 return icon;
             } finally {
-                if (startLoader && !loaderStarted) {
+                if (startLoader && !loaderStarted && !queueReleased) {
                     /*
                      * Rendering the default icon or starting the loader failed, so no loader will ever remove the host from QUEUE. Without
                      * this the host would never be loaded again and its requestor list would keep growing.
@@ -451,12 +531,13 @@ public class FavIcons {
         final CopyOnWriteArrayList<String> tryHosts = new CopyOnWriteArrayList<String>();
         BufferedImage favicon = null;
         String[] siteSupportedNames = null;
-        final LazyHostPlugin existingHostPlugin = getPlugin(host);
-        if (existingHostPlugin != null) {
+        final LazyPlugin<? extends Plugin> existingHostPlugin = getPlugin(host);
+        if (existingHostPlugin instanceof LazyHostPlugin) {
             boolean pluginProvidedFavIcon = false;
             if (existingHostPlugin.hasFeature(LazyPlugin.FEATURE.FAVICON)) {
+                PluginForHost pluginInstance = null;
                 try {
-                    final PluginForHost pluginInstance = existingHostPlugin.newInstance(null, false);
+                    pluginInstance = (PluginForHost) existingHostPlugin.newInstance(null, false);
                     pluginInstance.setLogger(logger);
                     siteSupportedNames = pluginInstance.siteSupportedNames();
                     if (siteSupportedNames == null) {
@@ -481,6 +562,11 @@ public class FavIcons {
                     pluginProvidedFavIcon = favicon != null || tryHosts.size() > 0;
                 } catch (Exception e) {
                     logger.log(e);
+                } finally {
+                    /* the instance is only needed to ask for the favicon, release browser and challenges of it */
+                    if (pluginInstance != null) {
+                        pluginInstance.clean();
+                    }
                 }
             }
             if (!pluginProvidedFavIcon && existingHostPlugin.hasFeature(LazyPlugin.FEATURE.INTERNAL)) {
@@ -490,13 +576,23 @@ public class FavIcons {
         }
         if (favicon == null) {
             if (existingHostPlugin != null) {
-                tryHosts.addIfAbsent(existingHostPlugin.getHost());
+                tryHosts.addIfAbsent(existingHostPlugin.getDisplayName());
             }
             tryHosts.addIfAbsent(host);
             addParentDomains(host, tryHosts);
             favicon = downloadFavIcon(logger, tryHosts, siteSupportedNames);
         }
         if (favicon == null) {
+            if (Thread.currentThread().isInterrupted()) {
+                /*
+                 * The loader was interrupted (e.g. on shutdown), so the host was not really tried. Do not remember it as failed, otherwise it
+                 * would not be tried again for RETRY_TIMEOUT. The next getFavIcon call starts a new loader.
+                 */
+                synchronized (LOCK) {
+                    QUEUE.remove(host);
+                }
+                return;
+            }
             onLoadFailed(logger, host);
             return;
         }
@@ -631,6 +727,9 @@ public class FavIcons {
      * <li>On Windows the replacement fails while another thread has the file open for reading, so it is retried for a short time.</li>
      * </ul>
      * If anything fails, an existing file stays intact and the temporary file is removed. The parent directory must exist.
+     *
+     * TODO: The description above names Files.move with REPLACE_EXISTING, but the code uses IO.renameTo(tmpFile, file, true). Check what
+     * IO.renameTo does (atomic replace or delete + rename) and adjust the description or the code.
      *
      * @return true if the file has been written, false if it was already up to date
      */
@@ -768,6 +867,10 @@ public class FavIcons {
      * Returns the two letter abbreviation shown in the default icon of the given host: the first and the middle consonant of the host
      * without tld (digits, non-word characters, vowels and 'J' are removed). Falls back to the first two characters of the host if no
      * consonant is left (e.g. "aio.com" -> "AI").
+     */
+    /*
+     * TODO: IP addresses as host: "1.2.3.4" has no consonants, so the fallback shows "1." as abbreviation, and createDefaultFavIcon draws
+     * ".4" as tld. Handle IP hosts separately (e.g. no tld and the first two digits, or a generic icon).
      */
     private static String getDefaultIconAbbreviation(final String host) {
         String name = host.toUpperCase(Locale.ROOT);
@@ -988,19 +1091,24 @@ public class FavIcons {
      * Returns the siteSupportedNames of the host plugin responsible for host, or null if there is none.
      */
     private static String[] getSiteSupportedNames(final Browser br, final String host) {
-        final LazyHostPlugin existingHostPlugin = getPlugin(host);
+        final LazyPlugin<? extends Plugin> existingHostPlugin = getPlugin(host);
         if (existingHostPlugin == null) {
             return null;
         }
         final LogInterface logger = br.getLogger();
+        Plugin pluginInstance = null;
         try {
-            final PluginForHost pluginInstance = existingHostPlugin.newInstance(null, false);
-            pluginInstance.setBrowser(br.cloneBrowser());
+            pluginInstance = existingHostPlugin.newInstance(null, false);
             pluginInstance.setLogger(br.getLogger());
             return pluginInstance.siteSupportedNames();
         } catch (Exception e) {
             logger.log(e);
             return null;
+        } finally {
+            /* the instance is only needed to ask for the supported names, release browser and challenges of it */
+            if (pluginInstance != null) {
+                pluginInstance.clean();
+            }
         }
     }
 
@@ -1028,8 +1136,8 @@ public class FavIcons {
                  * download_FavIconTag(Browser, String). It travels up to download_FavIconTag(String, String[], LogInterface), which only
                  * catches BrowserException and IOException, and further up to downloadFavIcon(LogSource, String, String[]), which catches
                  * Throwable, logs it and returns null. So one malicious or broken <link> tag makes the whole favicon download of this host
-                 * fail, although other (valid) favicon urls of the same page and /favicon.ico were not tried yet. The next host of tryHosts in
-                 * downloadFavIcon(LogSource, List, String[]) is still tried, because the exception is caught per host.
+                 * fail, although other (valid) favicon urls of the same page and /favicon.ico were not tried yet. The next host of tryHosts
+                 * in downloadFavIcon(LogSource, List, String[]) is still tried, because the exception is caught per host.
                  *
                  * Fix idea: catch RuntimeException around parseLocation and return null (the url is ignored like any other unsupported
                  * url), or check the scheme before calling parseLocation.
@@ -1051,128 +1159,153 @@ public class FavIcons {
     }
 
     public static BufferedImage download_FavIconTag(final String host, String[] siteSupportedNames, LogInterface logger) throws IOException {
-        final Browser favBr = new Browser();
-        if (CONFIG.isDebugFlag()) {
-            favBr.setDebug(true);
-            favBr.setVerbose(true);
-        }
-        favBr.getHeaders().put("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:145.0) Gecko/20100101 Firefox/145.0");
-        favBr.getHeaders().put("Sec-GPC", "1");
-        favBr.getHeaders().put("Connection", "keep-alive");
-        favBr.getHeaders().put("Upgrade-Insecure-Requests", "1");
-        favBr.getHeaders().put("Sec-Fetch-Dest", "document");
-        favBr.getHeaders().put("Sec-Fetch-Mode", "navigate");
-        favBr.getHeaders().put("Sec-Fetch-Site", "none");
-        favBr.getHeaders().put("Sec-Fetch-User", "?1");
-        favBr.getHeaders().put("Priority", "u=0, i");
-        favBr.getHeaders().put("Pragma", "no-cache");
-        favBr.getHeaders().put("Cache-Control", "no-cache");
-        favBr.getHeaders().put("TE", "trailers");
-        favBr.setLogger(logger);
-        favBr.setConnectTimeout(10000);
-        favBr.setReadTimeout(10000);
-        final List<String> websites = new ArrayList<String>();
-        if (getFavIconURL(null, host) == null) {
-            if (host.matches("(?i)^https?://.+")) {
-                websites.add(host);
-            } else {
-                websites.addAll(Arrays.asList(new String[] { "https://" + host, "http://" + host }));
-            }
-        }
-        for (final String website : websites) {
-            if (Thread.currentThread().isInterrupted()) {
-                /* interrupted by a sleep above, stop instead of trying the next website */
-                break;
-            }
-            favBr.setRequest(null);
-            boolean retryFlag = true;
-            int retryCount = 0;
-            while (retryFlag) {
-                retryFlag = false;
+        final LazyPlugin<? extends Plugin> existingHostPlugin = getPlugin(host);
+        Browser favBr = new Browser();
+        Plugin plugin = null;
+        try {
+            if (existingHostPlugin != null) {
                 try {
-                    try {
-                        favBr.getPage(website);
-                    } catch (BrowserException e) {
-                        if (!Exceptions.containsInstanceOf(e, UnknownHostException.class)) {
-                            throw e;
-                        }
-                        final String unknownHost = Browser.getHost(website, true);
-                        if (StringUtils.startsWithCaseInsensitive(unknownHost, "www.")) {
-                            /*
-                             * Already a www subdomain, there is nothing left to retry. Rethrow, otherwise the code below would continue
-                             * without a loaded page.
-                             */
-                            throw e;
-                        }
-                        final String wwwSubdomain = website.replaceFirst("//" + Pattern.quote(unknownHost), "//www." + unknownHost);
-                        favBr.getPage(wwwSubdomain);
-                    }
-                    String redirectOrRefresh = StringUtils.firstNotEmpty(favBr.getRedirectLocation(), favBr.getRequest().getHTMLRefresh());
-                    int redirectLoop = 0;
-                    while (redirectOrRefresh != null) {
-                        if (++redirectLoop > 10) {
-                            throw new IOException("redirect loop?" + redirectOrRefresh);
-                        }
-                        try {
-                            Thread.sleep(500);// helps to prevent cloudflare protection
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            throw new IOException(e);
-                        }
-                        favBr.getPage(redirectOrRefresh);
-                        if (!isSameDomain(favBr, host, siteSupportedNames)) {
-                            throw new IOException("redirect to different domain?" + favBr._getURL().getHost() + "!=" + host);
-                        } else {
-                            redirectOrRefresh = StringUtils.firstNotEmpty(favBr.getRedirectLocation(), favBr.getRequest().getHTMLRefresh());
-                        }
-                    }
-                    final BufferedImage ret = download_FavIconTag(favBr, host);
-                    if (ret != null) {
-                        return ret;
-                    }
-                    break;
-                } catch (final BrowserException e) {
-                    if (Exceptions.containsInstanceOf(e, UnknownHostException.class, ConnectException.class, SocketTimeoutException.class)) {
-                        continue;
-                    }
-                    if (e instanceof BlockedByException) {
-                        try {
-                            final Browser br = favBr.cloneBrowser();
-                            br.setRequest(null);
-                            final BufferedImage ret = download_FavIconTag(br, favBr.getURL("/favicon.ico").toExternalForm(), host);
-                            if (ret != null) {
-                                return ret;
-                            }
-                        } catch (IOException ignore) {
-                        }
-                    }
-                    logger.log(e);
-                    final Request reg = e.getRequest();
-                    if (reg != null && reg.getHttpConnection() != null && reg.getHttpConnection().getResponseCode() == 429 && retryCount == 0) {
-                        try {
-                            int timeout = 2000;// minimum wait timeout
-                            final String retryAfter = reg.getHttpConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_RETRY_AFTER);
-                            if (retryAfter != null && retryAfter.matches("^\\s*\\d+\\s*$")) {
-                                timeout = Math.max(timeout, Math.min(Integer.parseInt(retryAfter) * 1000, 20000));
-                            }
-                            Thread.sleep(timeout);
-                            retryFlag = true;
-                            retryCount = 1;
-                        } catch (InterruptedException ie) {
-                            /* no retry, keep the interrupt so the callers can stop */
-                            Thread.currentThread().interrupt();
-                        }
-                    }
-                } catch (final IOException e) {
+                    plugin = existingHostPlugin.newInstance(null, false);
+                    favBr = plugin.createNewBrowserInstance();
+                } catch (Exception e) {
                     logger.log(e);
                 }
             }
+            if (CONFIG.isDebugFlag()) {
+                favBr.setDebug(true);
+                favBr.setVerbose(true);
+            }
+            if (favBr.getHeaders().contains(HTTPConstants.HEADER_REQUEST_USER_AGENT)) {
+                favBr.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, Request.getSuggestedUserAgent("153.0"));
+            }
+            if (favBr.getHeaders().contains(HTTPConstants.HEADER_REQUEST_SEC_FETCH_MODE)) {
+                favBr.getHeaders().put(HTTPConstants.HEADER_REQUEST_SEC_FETCH_MODE, "navigate");
+            }
+            favBr.setLogger(logger);
+            favBr.setConnectTimeout(10000);
+            favBr.setReadTimeout(10000);
+            final List<String> websites = new ArrayList<String>();
+            if (getFavIconURL(null, host) == null) {
+                if (host.matches("(?i)^https?://.+")) {
+                    websites.add(host);
+                } else {
+                    websites.addAll(Arrays.asList(new String[] { "https://" + host, "http://" + host }));
+                }
+            }
+            for (final String website : websites) {
+                if (Thread.currentThread().isInterrupted()) {
+                    /* interrupted by a sleep above, stop instead of trying the next website */
+                    break;
+                }
+                favBr.setRequest(null);
+                boolean retryFlag = true;
+                int retryCount = 0;
+                while (retryFlag) {
+                    retryFlag = false;
+                    try {
+                        try {
+                            favBr.getPage(website);
+                        } catch (BrowserException e) {
+                            if (!Exceptions.containsInstanceOf(e, UnknownHostException.class)) {
+                                throw e;
+                            }
+                            final String unknownHost = Browser.getHost(website, true);
+                            if (StringUtils.startsWithCaseInsensitive(unknownHost, "www.")) {
+                                /*
+                                 * Already a www subdomain, there is nothing left to retry. Rethrow, otherwise the code below would continue
+                                 * without a loaded page.
+                                 */
+                                throw e;
+                            }
+                            final String wwwSubdomain = website.replaceFirst("//" + Pattern.quote(unknownHost), "//www." + unknownHost);
+                            favBr.getPage(wwwSubdomain);
+                        }
+                        String redirectOrRefresh = StringUtils.firstNotEmpty(favBr.getRedirectLocation(), favBr.getRequest().getHTMLRefresh());
+                        int redirectLoop = 0;
+                        while (redirectOrRefresh != null) {
+                            if (++redirectLoop > 10) {
+                                throw new IOException("redirect loop?" + redirectOrRefresh);
+                            }
+                            try {
+                                Thread.sleep(500);// helps to prevent cloudflare protection
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                throw new IOException(e);
+                            }
+                            favBr.getPage(redirectOrRefresh);
+                            if (!isSameDomain(favBr, host, siteSupportedNames)) {
+                                throw new IOException("redirect to different domain?" + favBr._getURL().getHost() + "!=" + host);
+                            } else {
+                                redirectOrRefresh = StringUtils.firstNotEmpty(favBr.getRedirectLocation(), favBr.getRequest().getHTMLRefresh());
+                            }
+                        }
+                        final BufferedImage ret = download_FavIconTag(favBr, host);
+                        if (ret != null) {
+                            return ret;
+                        }
+                        break;
+                    } catch (final BrowserException e) {
+                        if (Exceptions.containsInstanceOf(e, UnknownHostException.class, ConnectException.class, SocketTimeoutException.class)) {
+                            continue;
+                        }
+                        if (e instanceof BlockedByException) {
+                            try {
+                                final Browser br = favBr.cloneBrowser();
+                                br.setRequest(null);
+                                final BufferedImage ret = download_FavIconTag(br, favBr.getURL("/favicon.ico").toExternalForm(), host);
+                                if (ret != null) {
+                                    return ret;
+                                }
+                            } catch (IOException ignore) {
+                            }
+                        }
+                        logger.log(e);
+                        final Request reg = e.getRequest();
+                        if (reg != null && reg.getHttpConnection() != null && reg.getHttpConnection().getResponseCode() == 429 && retryCount == 0) {
+                            try {
+                                Thread.sleep(getRetryAfterMillis(reg.getHttpConnection()));
+                                retryFlag = true;
+                                retryCount = 1;
+                            } catch (InterruptedException ie) {
+                                /* no retry, keep the interrupt so the callers can stop */
+                                Thread.currentThread().interrupt();
+                            }
+                        }
+                    } catch (final IOException e) {
+                        logger.log(e);
+                    }
+                }
+            }
+            if (websites.size() > 0) {
+                return null;
+            }
+            // host is absolute URL
+            return download_FavIconTag(favBr, host);
+        } finally {
+            if (plugin != null) {
+                plugin.clean();
+            }
         }
-        if (websites.size() > 0) {
-            return null;
+    }
+
+    /**
+     * Returns how long to wait before a request is repeated that was answered with 429 (Too Many Requests): the value of the Retry-After
+     * header in seconds, but at least RETRY_AFTER_MIN and at most RETRY_AFTER_MAX. A missing or unusable header (e.g. a http date or a number
+     * that does not fit into a long) results in RETRY_AFTER_MIN respectively RETRY_AFTER_MAX for a number that is too big.
+     */
+    private static long getRetryAfterMillis(final URLConnectionAdapter con) {
+        final String retryAfter = con == null ? null : con.getHeaderField(HTTPConstants.HEADER_RESPONSE_RETRY_AFTER);
+        if (retryAfter == null || !retryAfter.matches("^\\s*\\d+\\s*$")) {
+            return RETRY_AFTER_MIN;
         }
-        // host is absolute URL
-        return download_FavIconTag(favBr, host);
+        try {
+            /* the seconds are limited before they are converted, so a huge value cannot overflow */
+            final long seconds = Math.min(Long.parseLong(retryAfter.trim()), TimeUnit.MILLISECONDS.toSeconds(RETRY_AFTER_MAX));
+            return Math.max(RETRY_AFTER_MIN, TimeUnit.SECONDS.toMillis(seconds));
+        } catch (final NumberFormatException e) {
+            /* only digits, so the number is just too big for a long */
+            return RETRY_AFTER_MAX;
+        }
     }
 
     /**
@@ -1232,6 +1365,7 @@ public class FavIcons {
                 }
                 // ImageIO may be able to read GIF
             }
+            /* TODO: check the declared width and height before decoding, see MAX_FAVICON_SIZE */
             final BufferedImage ret = ImageIO.read(bis.resetInputStream());
             if (ret != null) {
                 return ret;
@@ -1251,55 +1385,35 @@ public class FavIcons {
                 /* interrupted by a sleep below, stop and use what has been loaded so far */
                 break;
             }
-            boolean retryFlag = true;
-            int retryCount = 0;
-            while (retryFlag) {
-                retryFlag = false;
-                try {
-                    final DataURLInputStream is = DataURLInputStream.open(favIconURL);
-                    if (is != null) {
-                        try {
-                            final BufferedImage ret = load_DataURL(is);
-                            if (ret != null) {
-                                images.add(ret);
-                            }
-                        } finally {
-                            is.close();
-                        }
-                        continue;
-                    }
-                    final Browser brc = favBr.cloneBrowser();
+            try {
+                final DataURLInputStream is = DataURLInputStream.open(favIconURL);
+                if (is != null) {
                     try {
-                        Thread.sleep(250);// helps to prevent cloudflare protection
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        throw new IOException(e);
-                    }
-                    final BufferedImage ret = download_FavIconTag(brc, favIconURL, host);
-                    if (ret != null) {
-                        images.add(ret);
-                    }
-                } catch (final BrowserException e) {
-                    logger.log(e);
-                    final Request reg = e.getRequest();
-                    if (reg != null && reg.getHttpConnection() != null && reg.getHttpConnection().getResponseCode() == 429 && retryCount < 1) {
-                        try {
-                            int timeout = 2000;// minimum wait timeout
-                            final String retryAfter = reg.getHttpConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_RETRY_AFTER);
-                            if (retryAfter != null && retryAfter.matches("^\\s*\\d+\\s*$")) {
-                                timeout = Math.max(timeout, Math.min(Integer.parseInt(retryAfter) * 1000, 20000));
-                            }
-                            Thread.sleep(timeout);
-                            retryFlag = true;
-                            retryCount++;
-                        } catch (InterruptedException ie) {
-                            /* no retry, keep the interrupt so the callers can stop */
-                            Thread.currentThread().interrupt();
+                        final BufferedImage ret = load_DataURL(is);
+                        if (ret != null) {
+                            images.add(ret);
                         }
+                    } finally {
+                        is.close();
                     }
-                } catch (IOException e) {
-                    logger.log(e);
+                    continue;
                 }
+                final Browser brc = favBr.cloneBrowser();
+                try {
+                    /* helps to prevent cloudflare protection */
+                    Thread.sleep(250);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException(e);
+                }
+                /* a 429 (Too Many Requests) is retried inside of download_FavIconTag, see there */
+                final BufferedImage ret = download_FavIconTag(brc, favIconURL, host);
+                if (ret != null) {
+                    images.add(ret);
+                }
+            } catch (final IOException e) {
+                /* includes BrowserException */
+                logger.log(e);
             }
         }
         final BufferedImage best = returnBestImage(images);
@@ -1352,7 +1466,6 @@ public class FavIcons {
     }
 
     private static class CustomByteArrayInputStream extends ByteArrayInputStream {
-
         public CustomByteArrayInputStream(byte[] buf) {
             super(buf);
         }
@@ -1361,7 +1474,6 @@ public class FavIcons {
             super.reset();
             return this;
         }
-
     }
 
     /**
@@ -1372,8 +1484,11 @@ public class FavIcons {
      *
      * The response is limited to MAX_FAVICON_SIZE bytes, bigger responses throw an IOException.
      *
+     * A response with 429 (Too Many Requests) is repeated once after the time given by the Retry-After header (see getRetryAfterMillis).
+     *
      * @return the image or null if the response is not an image or is not a valid favicon (see getValidImage)
      */
+    /* TODO: the parameter host is not used, remove it (callers: download_FavIconTag(Browser, String), BlockedByException handling) */
     public static BufferedImage download_FavIconTag(final Browser favBr, final String url, final String host) throws IOException {
         URLConnectionAdapter con = null;
         byte[] bytes = null;
@@ -1386,6 +1501,23 @@ public class FavIcons {
             favBr.setFollowRedirects(true);
             GetRequest request = favBr.createGetRequest(url);
             con = favBr.openRequestConnection(request);
+            if (con.getResponseCode() == 429) {
+                /*
+                 * Too Many Requests: Wait as requested by the server and try once more. openRequestConnection does not throw an exception
+                 * for an error response code, so this has to be handled here and not by the caller.
+                 */
+                final long waitMillis = getRetryAfterMillis(con);
+                con.disconnect();
+                try {
+                    Thread.sleep(waitMillis);
+                } catch (InterruptedException e) {
+                    /* no retry, keep the interrupt so the callers can stop */
+                    Thread.currentThread().interrupt();
+                    throw new IOException(e);
+                }
+                request = favBr.createGetRequest(url);
+                con = favBr.openRequestConnection(request);
+            }
             /* check status and content type first, the body of an error page or a html page is not read at all */
             if (!con.isOK() || StringUtils.containsIgnoreCase(con.getContentType(), "text")) {
                 favBr.getLogger().info("could not load:" + con.getURL() + "|responseCode=" + con.getResponseCode() + "|contentType=" + con.getContentType());
@@ -1557,6 +1689,7 @@ public class FavIcons {
                 }
             }
             is.reset();
+            /* TODO: check the declared width and height before decoding, see MAX_FAVICON_SIZE */
             final BufferedImage ret = ImageIO.read(is);
             if (ret != null) {
                 return getValidImage(ret);

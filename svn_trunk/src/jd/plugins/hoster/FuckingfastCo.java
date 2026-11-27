@@ -22,13 +22,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.net.httpconnection.HTTPConnection;
+import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
+import org.appwork.utils.net.httpconnection.SSLSocketStreamOptionsModifier;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.CaptchaHelperHostPluginCloudflareTurnstile;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.Request;
+import jd.http.requests.GetRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.HTMLSearch;
@@ -40,7 +46,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 53129 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54204 $", interfaceVersion = 3, names = {}, urls = {})
 public class FuckingfastCo extends PluginForHost {
     public FuckingfastCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -49,7 +55,17 @@ public class FuckingfastCo extends PluginForHost {
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, Request.getSuggestedUserAgent("153.0"));
         br.setFollowRedirects(true);
+        br.setSSLSocketStreamOptions(new SSLSocketStreamOptionsModifier() {
+            @Override
+            public SSLSocketStreamOptions modify(SSLSocketStreamOptions sslSocketStreamOptions, HTTPConnection httpConnection) {
+                sslSocketStreamOptions.getDisabledCipherSuites().clear();
+                sslSocketStreamOptions.getCustomFactorySettings().add("JSSE_TLS1.3_ENABLED");
+                sslSocketStreamOptions.getCustomFactorySettings().add("BC_TLS1.3_ENABLED");
+                return sslSocketStreamOptions;
+            }
+        });
         return br;
     }
 
@@ -93,9 +109,8 @@ public class FuckingfastCo extends PluginForHost {
         final String fid = getFID(link);
         if (fid != null) {
             return this.getHost() + "://" + fid;
-        } else {
-            return super.getLinkID(link);
         }
+        return super.getLinkID(link);
     }
 
     private String getFID(final DownloadLink link) {
@@ -137,7 +152,11 @@ public class FuckingfastCo extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
-        br.getPage(link.getPluginPatternMatcher());
+        final GetRequest request = br.createGetRequest(link.getPluginPatternMatcher());
+        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_SEC_FETCH_MODE, "navigate");// signal user navigation
+        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_SEC_FETCH_USER, "?1");// initiated by user
+        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_UPGRADE_INSECURE_REQUESTS, "1");// initiated by user and first request
+        br.getPage(request);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }

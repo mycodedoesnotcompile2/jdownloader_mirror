@@ -177,6 +177,8 @@ public class CaptchaDialog extends AbstractImageCaptchaDialog<String> implements
             /* Length info below the image as plain text, like the click info of the click captcha. */
             lengthField = new ExtTextField();
             lengthField.setEditable(false);
+            /* Info text only: it must not take the focus (and with it the left/right arrow keys, which rotate the image). */
+            lengthField.setFocusable(false);
             updateOkButtonEnabled();
             final JPanel panel = new JPanel(new MigLayout("ins 0,wrap 1", "[grow,fill]", "[]3[]"));
             panel.setOpaque(false);
@@ -238,6 +240,17 @@ public class CaptchaDialog extends AbstractImageCaptchaDialog<String> implements
             return null;
         }
         return textField.getText();
+    }
+
+    /* A prefilled suggestion is not an input of the user, only a changed text is. */
+    @Override
+    protected boolean hasUserInput() {
+        final ExtTextField textField = this.textField;
+        if (textField == null) {
+            return false;
+        }
+        final String text = textField.getText();
+        return !StringUtils.isEmpty(text) && !text.equals(suggest);
     }
 
     public void suggest(String value) {

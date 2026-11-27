@@ -73,7 +73,7 @@ import jd.plugins.download.DownloadInterface;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 53909 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 54207 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class K2SApi extends PluginForHost {
     private final String        lng                                                    = getLanguage();
     private final String        PROPERTY_ACCOUNT_AUTHTOKEN                             = "auth_token";
@@ -83,6 +83,7 @@ public abstract class K2SApi extends PluginForHost {
     private static final String PROPERTY_FILE_ID                                       = "fileID";
     private final String        PROPERTY_LASTDOWNLOAD                                  = "_lastdownload_timestamp";
     public static final String  PROPERTY_ACCESS                                        = "access";
+    public static final String  PROPERTY_SUBSCRIPTION                                  = "subscription";
     private static final String TEXT_DOWNLOADLIMIT_REACHED                             = "Downloadlimit reached";
     // public static final String PROPERTY_isAvailableForFree = "isAvailableForFree";
     /* Hardcoded time to wait between downloads once limit is reached. */
@@ -103,6 +104,11 @@ public abstract class K2SApi extends PluginForHost {
 
     protected List<String> getDeadDomains() {
         return null;
+    }
+
+    @Override
+    public void resetDownloadlink(DownloadLink link) {
+        link.removeProperty(PROPERTY_SUBSCRIPTION);
     }
 
     @Override
@@ -290,7 +296,7 @@ public abstract class K2SApi extends PluginForHost {
      * @author Jiaz
      */
     protected long getAPIRevision() {
-        return Math.max(0, Formatter.getRevision("$Revision: 53909 $"));
+        return Math.max(0, Formatter.getRevision("$Revision: 54207 $"));
     }
 
     /**
@@ -853,7 +859,8 @@ public abstract class K2SApi extends PluginForHost {
             } else {
                 logger.info("Using Referer value: NONE given");
             }
-            if (isFree) {
+            boolean doCaptcha = isFree || Boolean.TRUE.equals(link.getBooleanProperty(PROPERTY_SUBSCRIPTION));
+            if (doCaptcha) {
                 // final Map<String, Object> requestcaptcha = postPageRaw(this.br, "/requestcaptcha", postdata, account, link);
                 final Map<String, Object> requestcaptcha = postPageRaw(this.br, "/requestcaptcha", new HashMap<String, Object>(), account, link);
                 final String challenge = (String) requestcaptcha.get("challenge");
@@ -872,7 +879,14 @@ public abstract class K2SApi extends PluginForHost {
             try {
                 geturlResponse = postPageRaw(this.br, "/geturl", postdata, account, link);
             } catch (PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_CAPTCHA && !isFree) {
+                if (e.getLinkStatus() == LinkStatus.ERROR_CAPTCHA && !doCaptcha) {
+                    if (!link.hasProperty(PROPERTY_SUBSCRIPTION)) {
+                        logger.log(e);
+                        logger.info("Download captcha required in premium mode -> most likely subscription missing/required, retry with captcha");
+                        link.setProperty(PROPERTY_SUBSCRIPTION, Boolean.TRUE);
+                        handleDownload(link, account);
+                        return;
+                    }
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, null, e);
                 }
                 throw e;

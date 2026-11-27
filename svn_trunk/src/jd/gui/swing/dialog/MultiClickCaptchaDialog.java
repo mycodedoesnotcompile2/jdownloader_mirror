@@ -24,12 +24,16 @@ import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.Point;
 import java.awt.RenderingHints;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionAdapter;
 import java.util.ArrayList;
 
 import javax.swing.JComponent;
+import javax.swing.JRootPane;
+import javax.swing.KeyStroke;
 
 import org.appwork.swing.components.ExtTextField;
 import org.appwork.utils.swing.dialog.Dialog;
@@ -64,7 +68,12 @@ public class MultiClickCaptchaDialog extends AbstractImageCaptchaDialog<MultiCli
     public JComponent layoutDialogContent() {
         final JComponent ret = super.layoutDialogContent();
         iconPanel.setCursor(Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR));
-        iconPanel.setToolTipText(getHelpText());
+        iconPanel.setToolTipText(getImageTooltip(getHelpText()));
+        /* Backspace or Ctrl+Z: remove the last click, Delete: remove all clicks. */
+        final JRootPane rootPane = getDialog().getRootPane();
+        registerImageKey(rootPane, KeyStroke.getKeyStroke(KeyEvent.VK_BACK_SPACE, 0), true, () -> removeLastClick());
+        registerImageKey(rootPane, KeyStroke.getKeyStroke(KeyEvent.VK_Z, InputEvent.CTRL_DOWN_MASK), false, () -> removeLastClick());
+        registerImageKey(rootPane, KeyStroke.getKeyStroke(KeyEvent.VK_DELETE, 0), true, () -> removeAllClicks());
         /* okButton exists now, so apply the initial state (0 clicks). */
         updateOkButton();
         iconPanel.addMouseListener(new MouseListener() {
@@ -85,6 +94,8 @@ public class MultiClickCaptchaDialog extends AbstractImageCaptchaDialog<MultiCli
                 resultPoint.y -= getOffset().y;
                 resultPoint.x *= getScaleFaktor();
                 resultPoint.y *= getScaleFaktor();
+                /* Click points are stored in the coordinates of the original image (the displayed image may be rotated). */
+                final Point originalPoint = toOriginalPoint(resultPoint);
                 if (rp == null) {
                     rp = new ArrayList<Point>();
                 }
@@ -93,7 +104,7 @@ public class MultiClickCaptchaDialog extends AbstractImageCaptchaDialog<MultiCli
                     /* Maximum reached: the user has to remove a click first. */
                     return;
                 }
-                rp.add(resultPoint);
+                rp.add(originalPoint);
                 updateClickCounter();
                 iconPanel.repaint();
                 if (maxClicks == 1) {
@@ -125,10 +136,44 @@ public class MultiClickCaptchaDialog extends AbstractImageCaptchaDialog<MultiCli
                 /* Hand cursor over a click marker = clicking removes it. */
                 final boolean overMarker = getClickAt(e.getPoint()) != null;
                 iconPanel.setCursor(Cursor.getPredefinedCursor(overMarker ? Cursor.HAND_CURSOR : Cursor.CROSSHAIR_CURSOR));
-                iconPanel.setToolTipText(overMarker ? _GUI.T.MultiClickCaptchaDialog_marker_tooltip() : getHelpText());
+                iconPanel.setToolTipText(getImageTooltip(overMarker ? _GUI.T.MultiClickCaptchaDialog_marker_tooltip() : getHelpText()));
             }
         });
         return ret;
+    }
+
+    /* Placed clicks are an input of the user. */
+    @Override
+    protected boolean hasUserInput() {
+        final ArrayList<Point> clicks = rp;
+        return clicks != null && !clicks.isEmpty();
+    }
+
+    /** Hotkey: removes the click that was placed last. */
+    private void removeLastClick() {
+        if (rp == null || rp.isEmpty()) {
+            return;
+        }
+        cancel();
+        rp.remove(rp.size() - 1);
+        updateClickCounter();
+        iconPanel.repaint();
+    }
+
+    /** Hotkey: removes all clicks. */
+    private void removeAllClicks() {
+        if (rp == null || rp.isEmpty()) {
+            return;
+        }
+        cancel();
+        rp.clear();
+        updateClickCounter();
+        iconPanel.repaint();
+    }
+
+    @Override
+    protected String getHotkeyTooltip() {
+        return _GUI.T.MultiClickCaptchaDialog_hotkeys_tooltip();
     }
 
     /** Returns the nearest already placed click whose marker (hit area) contains the given display position, or null. */
@@ -143,8 +188,9 @@ public class MultiClickCaptchaDialog extends AbstractImageCaptchaDialog<MultiCli
         Point best = null;
         double bestDistance = Double.MAX_VALUE;
         for (final Point p : rp) {
-            final double dx = p.x / scale + getOffset().x - displayPoint.x;
-            final double dy = p.y / scale + getOffset().y - displayPoint.y;
+            final Point shown = toDisplayedPoint(p);
+            final double dx = shown.x / scale + getOffset().x - displayPoint.x;
+            final double dy = shown.y / scale + getOffset().y - displayPoint.y;
             final double distance = Math.sqrt(dx * dx + dy * dy);
             if (distance <= MARKER_HIT_RADIUS && distance < bestDistance) {
                 best = p;
@@ -159,6 +205,8 @@ public class MultiClickCaptchaDialog extends AbstractImageCaptchaDialog<MultiCli
         /* Click info below the image as plain text. The challenge description is shown above the image, see addBeforeImage. */
         counterField = new ExtTextField();
         counterField.setEditable(false);
+        /* Info text only: it must not take the focus (and with it the left/right arrow keys, which rotate the image). */
+        counterField.setFocusable(false);
         updateClickCounter();
         return counterField;
     }
@@ -214,8 +262,9 @@ public class MultiClickCaptchaDialog extends AbstractImageCaptchaDialog<MultiCli
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             final int size = MARKER_SIZE;
             for (final Point p : rp) {
-                final int x = (int) Math.round(p.x / scale) + xOffset;
-                final int y = (int) Math.round(p.y / scale) + yOffset;
+                final Point shown = toDisplayedPoint(p);
+                final int x = (int) Math.round(shown.x / scale) + xOffset;
+                final int y = (int) Math.round(shown.y / scale) + yOffset;
                 /* White outline first so the marker is visible on any background. */
                 g2.setColor(Color.WHITE);
                 g2.setStroke(new BasicStroke(7f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));

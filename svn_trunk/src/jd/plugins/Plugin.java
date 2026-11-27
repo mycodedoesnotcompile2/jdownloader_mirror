@@ -1398,7 +1398,15 @@ public abstract class Plugin implements ActionListener {
         }
     }
 
+    /**
+     * Tells the captcha solvers that the answers of all captchas of this plugin were wrong (e.g. because the host rejected them), so that
+     * they can e.g. refund the solving. <br>
+     * Every plugin instance has its own challenge list. Captchas can also be solved by child plugin instances (e.g. a crawler that uses a
+     * hoster plugin instance, see {@link #setParentPlugin(Plugin)}), their challenges are not part of the challenge list of this plugin.
+     * Therefore the call is passed on to all child instances (recursively) first.
+     */
     public void invalidateLastChallengeResponse() {
+        /* Children first: Their challenges are stored in their own list, not in the one of this plugin. */
         for (Plugin plugin : pluginInstances) {
             plugin.invalidateLastChallengeResponse();
         }
@@ -1556,7 +1564,15 @@ public abstract class Plugin implements ActionListener {
         }
     }
 
+    /**
+     * Tells the captcha solver that the answer of the latest captcha of this plugin was correct (e.g. because the process went on
+     * successfully), so that it can e.g. confirm the solving. <br>
+     * Every plugin instance has its own challenge list. Captchas can also be solved by child plugin instances (e.g. a crawler that uses a
+     * hoster plugin instance, see {@link #setParentPlugin(Plugin)}), their challenges are not part of the challenge list of this plugin.
+     * Therefore the call is passed on to all child instances (recursively), each one validates its own latest challenge.
+     */
     public void validateLastChallengeResponse() {
+        /* Children first: Their challenges are stored in their own list, not in the one of this plugin. */
         for (Plugin plugin : pluginInstances) {
             plugin.validateLastChallengeResponse();
         }

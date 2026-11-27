@@ -22,6 +22,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.jdownloader.plugins.components.config.XFSConfigVideoVoeSx;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -40,11 +44,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.VoeSx;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.jdownloader.plugins.components.config.XFSConfigVideoVoeSx;
-
-@DecrypterPlugin(revision = "$Revision: 53685 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 54199 $", interfaceVersion = 3, names = {}, urls = {})
 public class VoeSxCrawler extends PluginForDecrypt {
     public VoeSxCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -63,7 +63,7 @@ public class VoeSxCrawler extends PluginForDecrypt {
                 "449unceremoniousnasoseptal.com", "cyamidpulverulence530.com", "boonlessbestselling244.com", "antecoxalbobbing1010.com", "matriculant401merited.com", "scatch176duplicities.com", "35volitantplimsoles5.com", "tummulerviolableness.com", "tubelessceliolymph.com", "availedsmallest.com", "counterclockwisejacky.com", "monorhinouscassaba.com", "tummulerviolableness.com", "urochsunloath.com", "simpulumlamerop.com", "wolfdyslectic.com", "metagnathtuggers.com", "gamoneinterrupted.com", "chromotypic.com", "crownmakermacaronicism.com", "generatesnitrosate.com", "yodelswartlike.com", "figeterpiazine.com", "cigarlessarefy.com", "valeronevijao.com", "apinchcaseation.com", "nectareousoverelate.com", "phenomenalityuniform.com", "nonesnanking.com", "troyyourlead.com", "stevenimaginelittle.com", "edwardarriveoften.com", "lukecomparetwo.com", "bradleyviewdoctor.com", "jamiesamewalk.com",
                 "seanshowcould.com", "sandrataxeight.com", "jayservicestuff.com", "graceaddresscommunity.com", "loriwithinfamily.com", "roberteachfinal.com", "erikcoldperson.com", "jasminetesttry.com", "heatherdiscussionwhen.com", "robertplacespace.com", "alleneconomicmatter.com", "josephseveralconcern.com", "donaldlineelse.com", "bethshouldercan.com", "thomasalthoughhear.com", "richardstorehalf.com", "brittneystandardwestern.com", "sandratableother.com", "robertordercharacter.com", "maxfinishseveral.com", "alejandrocenturyoil.com", "heatherwholeinvolve.com", "kristiesoundsimply.com", "adrianmissionminute.com", "nathanfromsubject.com", "jennifercertaindevelopment.com", "richardsignfish.com", "diananatureforeign.com", "jonathansociallike.com", "sarahnewspaperbeat.com", "johnalwayssame.com", "kellywhatcould.com", "jilliandescribecompany.com", "lukesitturn.com", "mikaylaarealike.com",
                 "christopheruntilpoint.com", "walterprettytheir.com", "crystaltreatmenteast.com", "lauradaydo.com", "lancewhosedifficult.com", "dianaavoidthey.com", "jefferycontrolmodel.com", "marissasharecareer.com", "charlestoughrace.com", "timmaybealready.com", "richardquestionbuilding.com", "charlessheimprove.com", "maryspecialwatch.com", "kathyinformationwhether.com", "bryantenunder.com", "vickisaveworker.com", "rebeccacostthousand.com", "lindalastattack.com", "jessicayeahcatch.com", "jeanprofessorcentral.com", "juliewomanwish.com", "garylargeavailable.com", "jennifereconomicgive.com", "pamelachangemission.com", "ellenpoliticalfollow.com", "matthewhotelscience.com", "nicolehappyoutside.com", "rebeccapracticeloss.com", "eugenemakedraw.com", "johnfullwonder.com", "katherineschoolphone.com", "jamesbornmain.com", "teresapoliticallearn.com", "megankiddifference.com",
-                "derricknationtop.com" });
+                "derricknationtop.com", "shanelocaldog.com", "caseyseemavoid.com" });
         return ret;
     }
 

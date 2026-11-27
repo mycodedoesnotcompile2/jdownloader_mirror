@@ -3331,8 +3331,17 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Refresh is not possible for this type of captcha." })
     String AbstractCaptchaDialog_refreshDisabledCaptchaType_tooltip();
 
-    @Default(lngs = { "en" }, values = { "Show captcha image in greyscale" })
+    @Default(lngs = { "en" }, values = { "Show captcha image in greyscale (key: G)" })
     String AbstractImageCaptchaDialog_greyscaleToggle_tooltip();
+
+    @Default(lngs = { "en" }, values = { "Rotate captcha image 90° to the right (keys: R or right arrow = right, L or left arrow = left, with Alt while typing)" })
+    String AbstractImageCaptchaDialog_rotateButton_tooltip();
+
+    @Default(lngs = { "en" }, values = { "Hotkeys:\r\nR / right arrow = rotate right\r\nL / left arrow = rotate left\r\nG = greyscale\r\nWhile typing in the text field, hold Alt:\r\nAlt + R / right arrow = rotate right\r\nAlt + L / left arrow = rotate left\r\nAlt + G = greyscale" })
+    String AbstractImageCaptchaDialog_hotkeys_tooltip();
+
+    @Default(lngs = { "en" }, values = { "Hotkeys:\r\nR / right arrow = rotate right\r\nL / left arrow = rotate left\r\nG = greyscale\r\nBackspace or Ctrl + Z = remove the last click\r\nDelete = remove all clicks" })
+    String MultiClickCaptchaDialog_hotkeys_tooltip();
 
     @Default(lngs = { "en" }, values = { "Visit the Website" })
     String lit_open_website();

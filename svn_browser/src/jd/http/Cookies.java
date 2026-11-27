@@ -835,20 +835,13 @@ public class Cookies {
             if (cookieString.length() > 0) {
                 cookieString.append("; ");
             }
+            /*
+             * only send one cookie per key: a single cookie, the preferred custom cookie or (default/firefox handling) the best match, all
+             * sorted to the first position by BEST_MATCH_COMPARATOR
+             */
             final List<Cookie> values = keyValue.getValue();
-            if (values.size() == 1) {
-                /* only one cookie */
-                cookieString.append(keyValue.getKey()).append("=");
-                cookieString.append(StringUtils.valueOrEmpty(values.get(0).getValue()));
-            } else if (values.get(0).isCustomCookie()) {
-                /* first cookie is customized/preferred */
-                cookieString.append(keyValue.getKey()).append("=");
-                cookieString.append(StringUtils.valueOrEmpty(values.get(0).getValue()));
-            } else {
-                /* choose default/firefox handling to send only one cookie */
-                cookieString.append(keyValue.getKey()).append("=");
-                cookieString.append(StringUtils.valueOrEmpty(values.get(0).getValue()));
-            }
+            cookieString.append(keyValue.getKey()).append("=");
+            cookieString.append(StringUtils.valueOrEmpty(values.get(0).getValue()));
         }
         return cookieString.toString();
     }
@@ -901,6 +894,11 @@ public class Cookies {
             return null;
         }
         if (url != null) {
+            /*
+             * Only sort if an url is given, BEST_MATCH_COMPARATOR (custom cookie first, longest path, hostOnly, longest domain) is about the
+             * cookie that would be sent to this url. Without url the result keeps the insertion order, so get(key) may return a server
+             * cookie even if a custom/manual cookie with the same key exists.
+             */
             Collections.sort(ret, BEST_MATCH_COMPARATOR);
         }
         return ret;

@@ -22,6 +22,7 @@ import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter.CompiledFiletypeExtension;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
+import jd.controlling.linkcrawler.CrawledLink;
 import jd.http.BlockLevelType;
 import jd.http.BlockSourceType;
 import jd.http.BlockedTypeInterface;
@@ -194,6 +195,26 @@ public class PluginBrowser<T extends Plugin> extends Browser {
         if (!addSecHeaders) {
             return;
         }
+        if (getBaseRequest() == null && request.getRedirectOrigin() == null && !isRequestHeaderForAutoCompleteSet(request, HTTPConstants.HEADER_REQUEST_SEC_FETCH_MODE)) {
+            final Plugin plugin = getPlugin();
+            String url = null;
+            if (plugin instanceof PluginForHost) {
+                final DownloadLink link = ((PluginForHost) plugin).getDownloadLink();
+                url = link == null ? null : link.getPluginPatternMatcher();
+            } else if (plugin instanceof PluginForDecrypt) {
+                final CrawledLink link = ((PluginForHost) plugin).getCurrentLink();
+                url = link == null ? null : link.getURL();
+            }
+            final String requestURLFile = request.getURL().getFile();
+            if (url != null && StringUtils.equalsIgnoreCase(new URL(url).getFile(), requestURLFile)) {
+                requestHeaders.put(new HTTPHeader(HTTPConstants.HEADER_REQUEST_SEC_FETCH_MODE, "navigate"));
+            }
+        }
+        if (firefoxVersion >= 120) {
+            if (!isRequestHeaderForAutoCompleteSet(request, "Sec-GPC")) {
+                requestHeaders.put("Sec-GPC", "1");
+            }
+        }
         if (chromeVersion >= 103) {
             if (!isRequestHeaderForAutoCompleteSet(request, "sec-ch-ua")) {
                 requestHeaders.put("sec-ch-ua", new SecChUaGenerator().buildChromeSecChUa(chromeVersion));
@@ -260,6 +281,12 @@ public class PluginBrowser<T extends Plugin> extends Browser {
                 fetchSite = "cross-site";
             }
             requestHeaders.put(new HTTPHeader(HTTPConstants.HEADER_REQUEST_SEC_FETCH_SITE, fetchSite));
+        }
+        if ("navigate".equals(requestHeaders.getValue(HTTPConstants.HEADER_REQUEST_SEC_FETCH_MODE)) && !isRequestHeaderForAutoCompleteSet(request, HTTPConstants.HEADER_REQUEST_SEC_FETCH_USER)) {
+            requestHeaders.put(HTTPConstants.HEADER_REQUEST_SEC_FETCH_USER, "?1");
+        }
+        if (getBaseRequest() == null && "navigate".equals(requestHeaders.getValue(HTTPConstants.HEADER_REQUEST_SEC_FETCH_MODE)) && !isRequestHeaderForAutoCompleteSet(request, HTTPConstants.HEADER_REQUEST_UPGRADE_INSECURE_REQUESTS)) {
+            requestHeaders.put(new HTTPHeader(HTTPConstants.HEADER_REQUEST_UPGRADE_INSECURE_REQUESTS, "1"));
         }
     }
 

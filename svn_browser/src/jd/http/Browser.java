@@ -2713,9 +2713,6 @@ public class Browser implements HTTPConnectionFactoryInterface {
                 /* Get cookies for pre-defined host and set them */
                 final URL url = expandToURL(urlString, true);
                 final Cookies existingCookies = this.getCookies(url);
-                if (replace) {
-                    existingCookies.clear();
-                }
                 final String host = getHost(url);
                 final Cookies newSetCookies = new Cookies();
                 for (final Cookie setCookie : setCookies.getCookies()) {
@@ -2729,6 +2726,10 @@ public class Browser implements HTTPConnectionFactoryInterface {
                         }
                         DebugMode.debugger();
                     }
+                }
+                if (replace && (!newSetCookies.isEmpty() || setCookies.isEmpty())) {
+                    /* only dump existing cookies if there is something to replace them with (or nothing was given at all) */
+                    existingCookies.clear();
                 }
                 existingCookies.add(newSetCookies);
             }
